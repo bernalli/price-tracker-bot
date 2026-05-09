@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, cast
 
 import httpx
@@ -16,16 +16,35 @@ from price_tracker.core.alert import (
     crosses_threshold,
     format_alert,
 )
+from price_tracker.core.health import HealthManager
 from price_tracker.core.outlier import is_outlier
+from price_tracker.core.url_utils import extract_etld_plus_one
 
 if TYPE_CHECKING:
     from price_tracker.core.registry import ScraperRegistry
+    from price_tracker.db.models import ProductRecord
     from price_tracker.db.repository import Repository
 
 logger = logging.getLogger(__name__)
 
 # Notifier coroutine: receives a user_id and a formatted alert message.
 NotifierFn = Callable[[int, str], Awaitable[None]]
+
+
+def _no_op_health_mgr() -> HealthManager:
+    """Return a HealthManager subclass that never locks or half-opens anything."""
+
+    class _NoOpHealthManager(HealthManager):
+        def __init__(self) -> None:
+            pass  # skip Repository dependency
+
+        def is_locked(self, domain: str) -> bool:  # noqa: ARG002
+            return False
+
+        def is_half_open(self, domain: str) -> bool:  # noqa: ARG002
+            return False
+
+    return _NoOpHealthManager()
 
 
 @dataclass
@@ -38,6 +57,7 @@ class SchedulerDeps:
     notifier: NotifierFn
     max_consecutive_errors: int = 10
     delay_between_products: float = 5.0
+    health_mgr: HealthManager = field(default_factory=_no_op_health_mgr)
 
 
 class Scheduler:
@@ -45,6 +65,39 @@ class Scheduler:
 
     def __init__(self, deps: SchedulerDeps) -> None:
         self.deps = deps
+
+    async def _scrape_one(self, product: ProductRecord) -> None:
+        """Scrape a single product and persist results (delegates to _check_product)."""
+        try:
+            await self._check_product(product.id)
+        except (httpx.HTTPError, ValueError, KeyError) as e:
+            logger.warning("Check failed for product %d: %s", product.id, e)
+            await self.deps.repo.increment_errors(product.id)
+
+    async def _run_tick(self, products: list[ProductRecord]) -> None:
+        """One scheduler tick: scrape all eligible products.
+
+        Filtering rules per Feature B:
+          - skip products on LOCKED domains entirely
+          - on HALF_OPEN domains send exactly one probe (first product per domain per tick)
+        """
+        half_open_seen: set[str] = set()
+        for product in products:
+            domain = extract_etld_plus_one(product.url)
+            if not domain:
+                # Unknown domain — best-effort scrape (Generic scraper handles it)
+                await self._scrape_one(product)
+                continue
+
+            if self.deps.health_mgr.is_locked(domain):
+                continue  # skip — domain is in quarantine lockout
+
+            if self.deps.health_mgr.is_half_open(domain):
+                if domain in half_open_seen:
+                    continue  # only one probe per half-open domain per tick
+                half_open_seen.add(domain)
+
+            await self._scrape_one(product)
 
     async def run_check_for_user(self, *, user_id: int) -> None:
         """Check every active product owned by `user_id` sequentially."""
