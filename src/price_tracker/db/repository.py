@@ -7,7 +7,14 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
-from price_tracker.db.models import PriceHistoryRecord, ProductRecord, ScraperHealth, UserRecord
+from price_tracker.db.models import (
+    DigestEntry,
+    NotificationPrefs,
+    PriceHistoryRecord,
+    ProductRecord,
+    ScraperHealth,
+    UserRecord,
+)
 
 if TYPE_CHECKING:
     import aiosqlite
@@ -484,3 +491,192 @@ class Repository:
             )
             for r in rows
         ]
+
+    # ── Test helpers (minimal user/product setup) ──────────────
+
+    async def create_user(self, *, user_id: int) -> None:
+        """Create a user if it does not exist. Test/admin helper."""
+        await self.ensure_user(user_id=user_id)
+
+    async def create_product(self, *, product_id: int, user_id: int, url: str) -> None:
+        """Insert a product with explicit id. Test helper for FK setup."""
+        await self._conn.execute(
+            "INSERT INTO products (id, user_id, url) VALUES (?, ?, ?)",
+            (product_id, user_id, url),
+        )
+        await self._conn.commit()
+
+    # ── Notification prefs ─────────────────────────────────────
+
+    async def get_notification_prefs(
+        self, *, user_id: int, product_id: int | None
+    ) -> NotificationPrefs | None:
+        if product_id is None:
+            cursor = await self._conn.execute(
+                "SELECT user_id, product_id, mute, mute_until, digest_mode, "
+                "digest_interval_minutes, quiet_hours_start, quiet_hours_end, "
+                "throttle_per_hour, timezone, throttle_state_json, updated_at "
+                "FROM notification_prefs WHERE user_id = ? AND product_id IS NULL",
+                (user_id,),
+            )
+        else:
+            cursor = await self._conn.execute(
+                "SELECT user_id, product_id, mute, mute_until, digest_mode, "
+                "digest_interval_minutes, quiet_hours_start, quiet_hours_end, "
+                "throttle_per_hour, timezone, throttle_state_json, updated_at "
+                "FROM notification_prefs WHERE user_id = ? AND product_id = ?",
+                (user_id, product_id),
+            )
+        row = await cursor.fetchone()
+        if row is None:
+            return None
+        return NotificationPrefs(
+            user_id=row[0],
+            product_id=row[1],
+            mute=bool(row[2]),
+            mute_until=_parse_ts(row[3]),
+            digest_mode=bool(row[4]),
+            digest_interval_minutes=row[5],
+            quiet_hours_start=row[6],
+            quiet_hours_end=row[7],
+            throttle_per_hour=row[8],
+            timezone=row[9],
+            throttle_state_json=row[10],
+            updated_at=_parse_ts(row[11]),
+        )
+
+    async def upsert_notification_prefs(self, prefs: NotificationPrefs) -> None:
+        if prefs.product_id is None:
+            # NULL-product upsert needs partial-uniqueness emulation:
+            # SQLite treats NULLs as distinct in PK, so ON CONFLICT does not fire.
+            existing = await self._conn.execute(
+                "SELECT 1 FROM notification_prefs WHERE user_id = ? AND product_id IS NULL",
+                (prefs.user_id,),
+            )
+            if await existing.fetchone() is None:
+                await self._conn.execute(
+                    """
+                    INSERT INTO notification_prefs (
+                        user_id, product_id, mute, mute_until, digest_mode,
+                        digest_interval_minutes, quiet_hours_start, quiet_hours_end,
+                        throttle_per_hour, timezone, throttle_state_json
+                    )
+                    VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        prefs.user_id,
+                        int(prefs.mute),
+                        prefs.mute_until.isoformat() if prefs.mute_until else None,
+                        int(prefs.digest_mode),
+                        prefs.digest_interval_minutes,
+                        prefs.quiet_hours_start,
+                        prefs.quiet_hours_end,
+                        prefs.throttle_per_hour,
+                        prefs.timezone,
+                        prefs.throttle_state_json,
+                    ),
+                )
+            else:
+                await self._conn.execute(
+                    """
+                    UPDATE notification_prefs SET
+                        mute = ?, mute_until = ?, digest_mode = ?,
+                        digest_interval_minutes = ?, quiet_hours_start = ?,
+                        quiet_hours_end = ?, throttle_per_hour = ?, timezone = ?,
+                        throttle_state_json = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE user_id = ? AND product_id IS NULL
+                    """,
+                    (
+                        int(prefs.mute),
+                        prefs.mute_until.isoformat() if prefs.mute_until else None,
+                        int(prefs.digest_mode),
+                        prefs.digest_interval_minutes,
+                        prefs.quiet_hours_start,
+                        prefs.quiet_hours_end,
+                        prefs.throttle_per_hour,
+                        prefs.timezone,
+                        prefs.throttle_state_json,
+                        prefs.user_id,
+                    ),
+                )
+        else:
+            await self._conn.execute(
+                """
+                INSERT INTO notification_prefs (
+                    user_id, product_id, mute, mute_until, digest_mode,
+                    digest_interval_minutes, quiet_hours_start, quiet_hours_end,
+                    throttle_per_hour, timezone, throttle_state_json
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(user_id, product_id) DO UPDATE SET
+                    mute = excluded.mute,
+                    mute_until = excluded.mute_until,
+                    digest_mode = excluded.digest_mode,
+                    digest_interval_minutes = excluded.digest_interval_minutes,
+                    quiet_hours_start = excluded.quiet_hours_start,
+                    quiet_hours_end = excluded.quiet_hours_end,
+                    throttle_per_hour = excluded.throttle_per_hour,
+                    timezone = excluded.timezone,
+                    throttle_state_json = excluded.throttle_state_json,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (
+                    prefs.user_id,
+                    prefs.product_id,
+                    int(prefs.mute),
+                    prefs.mute_until.isoformat() if prefs.mute_until else None,
+                    int(prefs.digest_mode),
+                    prefs.digest_interval_minutes,
+                    prefs.quiet_hours_start,
+                    prefs.quiet_hours_end,
+                    prefs.throttle_per_hour,
+                    prefs.timezone,
+                    prefs.throttle_state_json,
+                ),
+            )
+        await self._conn.commit()
+
+    # ── Digest queue ───────────────────────────────────────────
+
+    async def enqueue_digest(self, *, user_id: int, product_id: int, payload: str) -> int:
+        cursor = await self._conn.execute(
+            "INSERT INTO digest_queue (user_id, product_id, alert_payload_json) VALUES (?, ?, ?)",
+            (user_id, product_id, payload),
+        )
+        await self._conn.commit()
+        rid = cursor.lastrowid
+        assert rid is not None  # AUTOINCREMENT PK always returns a row id
+        return int(rid)
+
+    async def list_pending_digest(self, *, user_id: int) -> list[DigestEntry]:
+        cursor = await self._conn.execute(
+            "SELECT id, user_id, product_id, alert_payload_json, "
+            "enqueued_at, flushed_at "
+            "FROM digest_queue "
+            "WHERE user_id = ? AND flushed_at IS NULL "
+            "ORDER BY enqueued_at",
+            (user_id,),
+        )
+        rows = await cursor.fetchall()
+        return [
+            DigestEntry(
+                id=r[0],
+                user_id=r[1],
+                product_id=r[2],
+                alert_payload_json=r[3],
+                enqueued_at=_parse_ts(r[4]),
+                flushed_at=_parse_ts(r[5]),
+            )
+            for r in rows
+        ]
+
+    async def mark_digest_flushed(self, ids: list[int]) -> None:
+        if not ids:
+            return
+        placeholders = ",".join("?" * len(ids))
+        await self._conn.execute(
+            f"UPDATE digest_queue SET flushed_at = CURRENT_TIMESTAMP "  # noqa: S608
+            f"WHERE id IN ({placeholders})",
+            ids,
+        )
+        await self._conn.commit()

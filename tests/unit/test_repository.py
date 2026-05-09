@@ -424,3 +424,90 @@ class TestScraperHealthRepository:
         all_records = await repo.list_all_scraper_health()
         domains = {h.domain for h in all_records}
         assert domains == {"a.com", "b.com"}
+
+
+class TestNotificationPrefsRepository:
+    @pytest.mark.asyncio
+    async def test_get_prefs_none_for_missing(self, repo: Repository):
+        result = await repo.get_notification_prefs(user_id=1, product_id=None)
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_upsert_global_then_get(self, repo: Repository):
+        from price_tracker.db.models import NotificationPrefs
+
+        await repo.create_user(user_id=1)
+        prefs = NotificationPrefs(
+            user_id=1, product_id=None, digest_mode=True, digest_interval_minutes=30
+        )
+        await repo.upsert_notification_prefs(prefs)
+        loaded = await repo.get_notification_prefs(user_id=1, product_id=None)
+        assert loaded is not None
+        assert loaded.digest_mode is True
+        assert loaded.digest_interval_minutes == 30
+
+    @pytest.mark.asyncio
+    async def test_upsert_per_product_does_not_clash_with_global(self, repo: Repository):
+        from price_tracker.db.models import NotificationPrefs
+
+        await repo.create_user(user_id=1)
+        await repo.create_product(product_id=10, user_id=1, url="https://x.com/1")
+        global_prefs = NotificationPrefs(user_id=1, product_id=None, digest_mode=True)
+        per_product = NotificationPrefs(user_id=1, product_id=10, digest_mode=False)
+        await repo.upsert_notification_prefs(global_prefs)
+        await repo.upsert_notification_prefs(per_product)
+        loaded_global = await repo.get_notification_prefs(user_id=1, product_id=None)
+        loaded_per = await repo.get_notification_prefs(user_id=1, product_id=10)
+        assert loaded_global is not None
+        assert loaded_per is not None
+        assert loaded_global.digest_mode is True
+        assert loaded_per.digest_mode is False
+
+    @pytest.mark.asyncio
+    async def test_upsert_global_updates_existing(self, repo: Repository):
+        """Second upsert with product_id=None must hit the UPDATE branch."""
+        from price_tracker.db.models import NotificationPrefs
+
+        await repo.create_user(user_id=1)
+        first = NotificationPrefs(
+            user_id=1, product_id=None, digest_mode=False, digest_interval_minutes=60
+        )
+        await repo.upsert_notification_prefs(first)
+        second = NotificationPrefs(
+            user_id=1, product_id=None, digest_mode=True, digest_interval_minutes=15
+        )
+        await repo.upsert_notification_prefs(second)
+        loaded = await repo.get_notification_prefs(user_id=1, product_id=None)
+        assert loaded is not None
+        assert loaded.digest_mode is True
+        assert loaded.digest_interval_minutes == 15
+
+
+class TestDigestQueueRepository:
+    @pytest.mark.asyncio
+    async def test_enqueue_and_list_pending(self, repo: Repository):
+        await repo.create_user(user_id=1)
+        await repo.create_product(product_id=10, user_id=1, url="https://x.com/1")
+        eid = await repo.enqueue_digest(user_id=1, product_id=10, payload='{"k":"v"}')
+        assert eid is not None
+        pending = await repo.list_pending_digest(user_id=1)
+        assert len(pending) == 1
+        assert pending[0].user_id == 1
+        assert pending[0].product_id == 10
+
+    @pytest.mark.asyncio
+    async def test_mark_flushed_excludes_from_pending(self, repo: Repository):
+        await repo.create_user(user_id=1)
+        await repo.create_product(product_id=10, user_id=1, url="https://x.com/1")
+        eid = await repo.enqueue_digest(user_id=1, product_id=10, payload="{}")
+        await repo.mark_digest_flushed([eid])
+        pending = await repo.list_pending_digest(user_id=1)
+        assert pending == []
+
+    @pytest.mark.asyncio
+    async def test_mark_flushed_empty_list_is_noop(self, repo: Repository):
+        """Empty list short-circuits without any DB query."""
+        await repo.mark_digest_flushed([])
+        # No exception raised, no rows touched.
+        pending = await repo.list_pending_digest(user_id=1)
+        assert pending == []
