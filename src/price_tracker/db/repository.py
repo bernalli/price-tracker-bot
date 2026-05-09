@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
@@ -16,10 +16,17 @@ logger = logging.getLogger(__name__)
 
 
 def _parse_ts(value: str | None) -> datetime | None:
-    """Parse an ISO-format timestamp from DB into a timezone-aware datetime."""
+    """Parse an ISO-format timestamp from DB into a timezone-aware datetime.
+
+    SQLite CURRENT_TIMESTAMP writes naive strings ('2026-05-09 20:30:00').
+    Fields written via .isoformat() from UTC-aware datetimes are already aware.
+    Always attaches UTC when the parsed value is naive so callers receive a
+    consistent type and comparisons never raise TypeError.
+    """
     if value is None:
         return None
-    return datetime.fromisoformat(value)
+    dt = datetime.fromisoformat(value)
+    return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
 
 
 def _dec(value: object) -> Decimal | None:
@@ -436,7 +443,7 @@ class Repository:
                    last_block_at, last_block_reason, last_success_at, updated_at
             FROM scraper_health
             WHERE state LIKE 'LOCKED_%' OR state LIKE 'HALF_OPEN_%'
-            ORDER BY locked_until ASC
+            ORDER BY locked_until IS NULL ASC, locked_until ASC
             """
         )
         rows = await cursor.fetchall()
