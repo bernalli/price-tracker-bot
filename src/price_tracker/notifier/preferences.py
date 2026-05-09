@@ -6,8 +6,9 @@ NULL fields fall through.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime, time
+import json
+from dataclasses import dataclass, field
+from datetime import datetime, time, timedelta
 from typing import TYPE_CHECKING, TypeVar
 from zoneinfo import ZoneInfo
 
@@ -159,3 +160,39 @@ def is_muted_now(prefs: EffectivePrefs, *, now_utc: datetime) -> bool:
     if prefs.mute_until is None:
         return True
     return now_utc < prefs.mute_until
+
+
+@dataclass(slots=True)
+class ThrottleWindow:
+    """Sliding 60-minute window of notification timestamps.
+
+    Persisted as JSON in ``notification_prefs.throttle_state_json``.
+    """
+
+    timestamps: list[float] = field(default_factory=list)
+
+    def to_json(self) -> str:
+        return json.dumps({"ts": self.timestamps})
+
+    @classmethod
+    def from_json(cls, payload: str | None) -> ThrottleWindow:
+        if not payload:
+            return cls()
+        data = json.loads(payload)
+        raw_ts = data.get("ts", [])
+        return cls(timestamps=[float(t) for t in raw_ts])
+
+    def _evict(self, now: datetime) -> None:
+        cutoff = (now - timedelta(hours=1)).timestamp()
+        self.timestamps = [t for t in self.timestamps if t >= cutoff]
+
+    def record(self, when: datetime) -> None:
+        self._evict(when)
+        self.timestamps.append(when.timestamp())
+
+    def count_within_hour(self, now: datetime) -> int:
+        self._evict(now)
+        return len(self.timestamps)
+
+    def exceeded(self, *, limit: int, now: datetime) -> bool:
+        return self.count_within_hour(now) >= limit
