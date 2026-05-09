@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import re
+from pathlib import Path
 from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from pathlib import Path
+import aiosqlite
 
-    import aiosqlite
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
 
 logger = logging.getLogger(__name__)
 
@@ -94,3 +96,37 @@ async def apply_migrations(conn: aiosqlite.Connection, migrations_dir: Path) -> 
         await conn.commit()
 
     return await get_current_version(conn)
+
+
+_DEFAULT_MIGRATIONS_DIR = Path(__file__).parent / "migrations"
+
+
+class Migrator:
+    """Object-oriented wrapper around the functional migrator helpers.
+
+    Usage::
+
+        migrator = Migrator(db_path=Path("my.db"))
+        await migrator.migrate()
+        async with migrator._connect() as conn:
+            ...
+    """
+
+    def __init__(
+        self,
+        db_path: Path,
+        migrations_dir: Path = _DEFAULT_MIGRATIONS_DIR,
+    ) -> None:
+        self._db_path = db_path
+        self._migrations_dir = migrations_dir
+
+    async def migrate(self) -> int:
+        """Apply all pending migrations. Returns the resulting schema version."""
+        async with self._connect() as conn:
+            return await apply_migrations(conn, self._migrations_dir)
+
+    @contextlib.asynccontextmanager
+    async def _connect(self) -> AsyncIterator[aiosqlite.Connection]:
+        """Open a connection to the database file."""
+        async with aiosqlite.connect(self._db_path) as conn:
+            yield conn

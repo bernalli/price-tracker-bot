@@ -9,6 +9,7 @@ import pytest
 
 from price_tracker.db.migrator import (
     SCHEMA_VERSION_TABLE,
+    Migrator,
     apply_migrations,
     get_current_version,
     list_migrations,
@@ -18,10 +19,10 @@ MIGRATIONS_DIR = Path("src/price_tracker/db/migrations")
 
 
 @pytest.mark.asyncio
-async def test_list_migrations_finds_001_to_007():
+async def test_list_migrations_finds_001_to_008():
     files = list_migrations(MIGRATIONS_DIR)
     versions = [v for v, _ in files]
-    assert versions == [1, 2, 3, 4, 5, 6, 7]
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8]
 
 
 @pytest.mark.asyncio
@@ -36,7 +37,7 @@ async def test_apply_migrations_brings_fresh_db_to_latest():
     async with aiosqlite.connect(":memory:") as conn:
         await apply_migrations(conn, MIGRATIONS_DIR)
         version = await get_current_version(conn)
-        assert version == 7
+        assert version == 8
         cursor = await conn.execute("PRAGMA table_info(products)")
         cols = [row[1] async for row in cursor]
         assert "id" in cols
@@ -55,7 +56,7 @@ async def test_apply_migrations_is_idempotent():
         await apply_migrations(conn, MIGRATIONS_DIR)
         await apply_migrations(conn, MIGRATIONS_DIR)
         version = await get_current_version(conn)
-        assert version == 7
+        assert version == 8
 
 
 @pytest.mark.asyncio
@@ -90,4 +91,49 @@ async def test_apply_migrations_partial_then_complete():
 
         await apply_migrations(conn, MIGRATIONS_DIR)
         version = await get_current_version(conn)
-        assert version == 7
+        assert version == 8
+
+
+class TestMigration008:
+    @pytest.mark.asyncio
+    async def test_creates_scraper_health_table(self, tmp_db_path):
+        migrator = Migrator(db_path=tmp_db_path)
+        await migrator.migrate()  # applies 001..008
+
+        async with migrator._connect() as conn:
+            cursor = await conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='scraper_health'"
+            )
+            row = await cursor.fetchone()
+            assert row is not None
+
+    @pytest.mark.asyncio
+    async def test_idempotent_replay_through_008(self, tmp_db_path):
+        migrator = Migrator(db_path=tmp_db_path)
+        await migrator.migrate()
+        await migrator.migrate()  # second call should be no-op
+
+        async with migrator._connect() as conn:
+            cursor = await conn.execute("SELECT version FROM schema_version ORDER BY version")
+            versions = [r[0] async for r in cursor]
+            assert versions == sorted(versions)
+            assert versions[-1] >= 8
+
+
+class TestScraperHealthModel:
+    def test_dataclass_fields(self):
+        from datetime import UTC, datetime
+
+        from price_tracker.db.models import ScraperHealth
+
+        h = ScraperHealth(
+            domain="amazon.com",
+            state="CLOSED",
+            consecutive_blocks=0,
+            locked_until=None,
+            last_block_at=None,
+            last_block_reason=None,
+            last_success_at=datetime.now(UTC),
+        )
+        assert h.domain == "amazon.com"
+        assert h.state == "CLOSED"
