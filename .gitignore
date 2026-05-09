@@ -1,0 +1,52 @@
+# Secrets & local config
+.env
+.env.*
+!.env.example
+docker-compose.override.yml
+
+# Database & data volumes
+*.db
+*.db-shm
+*.db-wal
+data/
+
+# Plugins (drop-in extension dir — keep README only)
+plugins/*
+!plugins/README.md
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+
+# Test & lint caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*~
+
+# Logs & backups
+logs/
+*.log
+backup/
+*.bak
+*.tar.gz
+*.tar.zst
+
+# OS
+.DS_Store
+Thumbs.db
