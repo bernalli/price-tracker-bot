@@ -148,9 +148,7 @@ class ShopifyScraper(AbstractScraper):
             return f"{parsed.scheme}://{parsed.netloc}{product_path}.json"
         return None
 
-    async def _try_json_api(
-        self, json_url: str, client: httpx.AsyncClient
-    ) -> ProductInfo | None:
+    async def _try_json_api(self, json_url: str, client: httpx.AsyncClient) -> ProductInfo | None:
         """Fetch product data from Shopify JSON API."""
         try:
             logger.debug("Shopify JSON API: fetching %s", json_url)
@@ -334,11 +332,7 @@ class ShopifyScraper(AbstractScraper):
         for sel in selectors:
             el = soup.select_one(sel)
             if el:
-                val = (
-                    el.get("data-product-price")
-                    or el.get("content")
-                    or el.get_text(strip=True)
-                )
+                val = el.get("data-product-price") or el.get("content") or el.get_text(strip=True)
                 if val:
                     price = parse_price(str(val))
                     if price:

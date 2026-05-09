@@ -14,7 +14,6 @@ from price_tracker.db.migrator import (
     list_migrations,
 )
 
-
 MIGRATIONS_DIR = Path("src/price_tracker/db/migrations")
 
 
@@ -83,7 +82,10 @@ async def test_apply_migrations_partial_then_complete():
         for version, path in partial:
             sql = path.read_text()
             await conn.executescript(sql)
-            await conn.execute(f"INSERT INTO {SCHEMA_VERSION_TABLE}(version) VALUES (?)", (version,))
+            await conn.execute(
+                f"INSERT INTO {SCHEMA_VERSION_TABLE}(version) VALUES (?)",
+                (version,),
+            )
         await conn.commit()
 
         await apply_migrations(conn, MIGRATIONS_DIR)

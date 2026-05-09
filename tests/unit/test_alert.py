@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-import pytest
-
 from price_tracker.core.alert import (
     PriceAlert,
     crosses_threshold,
@@ -15,57 +13,75 @@ from price_tracker.core.alert import (
 
 
 def test_crosses_threshold_percentage_drop():
-    assert crosses_threshold(
-        old=Decimal("100"),
-        new=Decimal("89"),
-        threshold_type="percentage",
-        threshold_value=Decimal("10"),
-    ) is True
+    assert (
+        crosses_threshold(
+            old=Decimal("100"),
+            new=Decimal("89"),
+            threshold_type="percentage",
+            threshold_value=Decimal("10"),
+        )
+        is True
+    )
 
 
 def test_crosses_threshold_percentage_no_trigger():
-    assert crosses_threshold(
-        old=Decimal("100"),
-        new=Decimal("95"),
-        threshold_type="percentage",
-        threshold_value=Decimal("10"),
-    ) is False
+    assert (
+        crosses_threshold(
+            old=Decimal("100"),
+            new=Decimal("95"),
+            threshold_type="percentage",
+            threshold_value=Decimal("10"),
+        )
+        is False
+    )
 
 
 def test_crosses_threshold_absolute_drop():
-    assert crosses_threshold(
-        old=Decimal("100"),
-        new=Decimal("89"),
-        threshold_type="absolute",
-        threshold_value=Decimal("10"),
-    ) is True
+    assert (
+        crosses_threshold(
+            old=Decimal("100"),
+            new=Decimal("89"),
+            threshold_type="absolute",
+            threshold_value=Decimal("10"),
+        )
+        is True
+    )
 
 
 def test_crosses_threshold_target_price():
-    assert crosses_threshold(
-        old=Decimal("100"),
-        new=Decimal("89"),
-        threshold_type="target",
-        threshold_value=Decimal("90"),
-    ) is True
+    assert (
+        crosses_threshold(
+            old=Decimal("100"),
+            new=Decimal("89"),
+            threshold_type="target",
+            threshold_value=Decimal("90"),
+        )
+        is True
+    )
 
 
 def test_crosses_threshold_target_price_above():
-    assert crosses_threshold(
-        old=Decimal("100"),
-        new=Decimal("91"),
-        threshold_type="target",
-        threshold_value=Decimal("90"),
-    ) is False
+    assert (
+        crosses_threshold(
+            old=Decimal("100"),
+            new=Decimal("91"),
+            threshold_type="target",
+            threshold_value=Decimal("90"),
+        )
+        is False
+    )
 
 
 def test_crosses_threshold_no_drop():
-    assert crosses_threshold(
-        old=Decimal("100"),
-        new=Decimal("110"),
-        threshold_type="percentage",
-        threshold_value=Decimal("10"),
-    ) is False
+    assert (
+        crosses_threshold(
+            old=Decimal("100"),
+            new=Decimal("110"),
+            threshold_type="percentage",
+            threshold_value=Decimal("10"),
+        )
+        is False
+    )
 
 
 def test_format_alert_includes_drop_percentage():

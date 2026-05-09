@@ -51,8 +51,7 @@ async def handle_menu_navigation(
             )
         else:
             await query.edit_message_text(
-                f"📦 Hai <b>{len(products)}</b> prodotti tracciati.\n"
-                "Usa /lista per vederli tutti.",
+                f"📦 Hai <b>{len(products)}</b> prodotti tracciati.\nUsa /lista per vederli tutti.",
                 parse_mode=ParseMode.HTML,
                 reply_markup=back_kb,
             )
@@ -94,7 +93,7 @@ async def handle_menu_navigation(
                 rows.append(
                     [
                         InlineKeyboardButton(
-                            f"... altri {len(products)-10} → /lista",
+                            f"... altri {len(products) - 10} → /lista",
                             callback_data="cmd_lista",
                         )
                     ]
@@ -330,7 +329,7 @@ async def _handle_menu_esporta(query: Any, db: Any, user_id: int) -> bool:
                 p.get("current_price", ""),
                 p.get("lowest_price", ""),
                 p.get("target_price", ""),
-                f"{p.get('threshold_type', 'percentage')}:" f"{p.get('threshold_value', '10')}",
+                f"{p.get('threshold_type', 'percentage')}:{p.get('threshold_value', '10')}",
                 "Si" if p.get("is_active") else "No",
                 p.get("currency", "EUR"),
             ]

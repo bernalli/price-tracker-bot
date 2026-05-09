@@ -94,7 +94,7 @@ async def test_with_retry_does_not_retry_non_retryable():
         calls["n"] += 1
         raise ValueError("permanent")
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="permanent"):
         await f()
     assert calls["n"] == 1
 

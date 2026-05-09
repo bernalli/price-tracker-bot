@@ -61,7 +61,7 @@ async def repo_with_product() -> AsyncIterator[tuple[Repository, int]]:
         await conn.close()
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_scheduler_updates_price_on_drop(
     repo_with_product: tuple[Repository, int],
 ) -> None:
@@ -88,7 +88,7 @@ async def test_scheduler_updates_price_on_drop(
     assert stub.calls == 1
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_scheduler_increments_errors_on_scrape_failure(
     repo_with_product: tuple[Repository, int],
 ) -> None:
@@ -114,7 +114,7 @@ async def test_scheduler_increments_errors_on_scrape_failure(
     assert p.consecutive_errors == 1
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_scheduler_triggers_alert_on_threshold_drop(
     repo_with_product: tuple[Repository, int],
 ) -> None:

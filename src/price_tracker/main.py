@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from pathlib import Path
+from typing import Any
 
 import aiosqlite
 import httpx  # noqa: F401  — kept for future direct use; build_client returns AsyncClient
@@ -36,7 +37,7 @@ def setup_logging(level: str) -> None:
     logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 
-async def post_init(application: Application) -> None:
+async def post_init(application: Application[Any, Any, Any, Any, Any, Any]) -> None:
     config: Config = application.bot_data["config"]
     db_conn: aiosqlite.Connection = application.bot_data["db_conn"]
 
@@ -50,7 +51,7 @@ async def post_init(application: Application) -> None:
     application.bot_data["http_client"] = build_client(timeout=float(config.request_timeout))
 
 
-async def _setup_scheduler(application: Application) -> None:
+async def _setup_scheduler(application: Application[Any, Any, Any, Any, Any, Any]) -> None:
     config: Config = application.bot_data["config"]
     repo: Repository = application.bot_data["repo"]
     client = application.bot_data["http_client"]
@@ -68,7 +69,7 @@ async def _setup_scheduler(application: Application) -> None:
     )
 
 
-async def _combined_post_init(application: Application) -> None:
+async def _combined_post_init(application: Application[Any, Any, Any, Any, Any, Any]) -> None:
     await post_init(application)
     await _setup_scheduler(application)
 

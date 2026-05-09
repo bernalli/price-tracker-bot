@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import httpx
@@ -35,10 +35,12 @@ class _StubDB:
 @pytest.mark.asyncio
 async def test_get_rates_uses_cache_if_fresh():
     rates = {"USD": "1.08", "GBP": "0.85"}
-    cached = json.dumps({
-        "rates": rates,
-        "fetched_at": datetime.now(timezone.utc).isoformat(),
-    })
+    cached = json.dumps(
+        {
+            "rates": rates,
+            "fetched_at": datetime.now(UTC).isoformat(),
+        }
+    )
     db = _StubDB({CACHE_KEY: cached})
 
     result = await get_rates(db)
@@ -48,7 +50,7 @@ async def test_get_rates_uses_cache_if_fresh():
 
 @pytest.mark.asyncio
 async def test_get_rates_fetches_when_cache_expired():
-    expired = (datetime.now(timezone.utc) - timedelta(hours=CACHE_TTL_HOURS + 1)).isoformat()
+    expired = (datetime.now(UTC) - timedelta(hours=CACHE_TTL_HOURS + 1)).isoformat()
     db = _StubDB({CACHE_KEY: json.dumps({"rates": {"USD": "1.0"}, "fetched_at": expired})})
 
     with respx.mock(assert_all_called=True) as router:
@@ -85,10 +87,12 @@ async def test_convert_to_eur_passes_through_eur():
 @pytest.mark.asyncio
 async def test_convert_to_eur_converts_usd():
     rates = {"USD": "1.08"}
-    cached = json.dumps({
-        "rates": rates,
-        "fetched_at": datetime.now(timezone.utc).isoformat(),
-    })
+    cached = json.dumps(
+        {
+            "rates": rates,
+            "fetched_at": datetime.now(UTC).isoformat(),
+        }
+    )
     db = _StubDB({CACHE_KEY: cached})
     result = await convert_to_eur(db, Decimal("108"), "USD")
     # 108 USD / 1.08 (USD per EUR) = 100 EUR
@@ -97,9 +101,15 @@ async def test_convert_to_eur_converts_usd():
 
 @pytest.mark.asyncio
 async def test_convert_to_eur_unknown_currency_returns_unchanged():
-    db = _StubDB({CACHE_KEY: json.dumps({
-        "rates": {"USD": "1.08"},
-        "fetched_at": datetime.now(timezone.utc).isoformat(),
-    })})
+    db = _StubDB(
+        {
+            CACHE_KEY: json.dumps(
+                {
+                    "rates": {"USD": "1.08"},
+                    "fetched_at": datetime.now(UTC).isoformat(),
+                }
+            )
+        }
+    )
     result = await convert_to_eur(db, Decimal("100"), "ZZZ")
     assert result == Decimal("100")

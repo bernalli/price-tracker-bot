@@ -327,8 +327,7 @@ class Repository:
 
     async def clear_pending_alert(self, product_id: int) -> None:
         await self._conn.execute(
-            "UPDATE products SET pending_alert_price = NULL, "
-            "pending_alert_at = NULL WHERE id = ?",
+            "UPDATE products SET pending_alert_price = NULL, pending_alert_at = NULL WHERE id = ?",
             (product_id,),
         )
         await self._conn.commit()

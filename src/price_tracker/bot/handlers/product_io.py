@@ -66,7 +66,7 @@ async def cmd_export(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
                 p.get("current_price", ""),
                 p.get("lowest_price", ""),
                 p.get("target_price", ""),
-                f"{p.get('threshold_type', 'percentage')}:" f"{p.get('threshold_value', '10')}",
+                f"{p.get('threshold_type', 'percentage')}:{p.get('threshold_value', '10')}",
                 "Si" if p.get("is_active") else "No",
                 p.get("currency", "EUR"),
             ]

@@ -67,12 +67,12 @@ async def cmd_list(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             diff = (initial - current) / initial * 100
             if diff > 0:
                 parts.append(
-                    f"📌 Prezzo iniziale: €{initial:.2f} " f"(<i>-{diff:.1f}% dal tracking</i>)"
+                    f"📌 Prezzo iniziale: €{initial:.2f} (<i>-{diff:.1f}% dal tracking</i>)"
                 )
             elif diff < 0:
                 increase = abs(diff)
                 parts.append(
-                    f"📈 Prezzo iniziale: €{initial:.2f} " f"(<i>+{increase:.1f}% dal tracking</i>)"
+                    f"📈 Prezzo iniziale: €{initial:.2f} (<i>+{increase:.1f}% dal tracking</i>)"
                 )
 
         if lowest and current and lowest < current:

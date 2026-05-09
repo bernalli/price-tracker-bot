@@ -83,7 +83,7 @@ class Scheduler:
         outlier = is_outlier(info.price, history)
         if outlier.is_outlier:
             logger.warning(
-                "Product %d: OUTLIER read %s rejected " "(median=%s, ratio=%s, history_n=%d)",
+                "Product %d: OUTLIER read %s rejected (median=%s, ratio=%s, history_n=%d)",
                 p.id,
                 info.price,
                 outlier.median,
@@ -99,7 +99,7 @@ class Scheduler:
 
         if old_price is None:
             return
-        threshold_type = cast(ThresholdType, p.threshold_type)
+        threshold_type = cast("ThresholdType", p.threshold_type)
         if crosses_threshold(
             old=old_price,
             new=info.price,

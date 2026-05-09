@@ -50,8 +50,7 @@ async def cmd_add_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     await db.add_user(new_user_id, is_admin=False)
     await update.message.reply_text(
-        f"✅ Utente <code>{new_user_id}</code> aggiunto!\n"
-        f"Ora può usare il bot inviando /start.",
+        f"✅ Utente <code>{new_user_id}</code> aggiunto!\nOra può usare il bot inviando /start.",
         parse_mode=ParseMode.HTML,
     )
 
@@ -60,8 +59,7 @@ async def cmd_add_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await context.bot.send_message(
             chat_id=new_user_id,
             text=_(
-                "🎉 Sei stato autorizzato a usare il Price Tracker Bot!\n"
-                "Invia /start per iniziare."
+                "🎉 Sei stato autorizzato a usare il Price Tracker Bot!\nInvia /start per iniziare."
             ),
         )
 
@@ -145,8 +143,7 @@ async def cmd_nick(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Set nickname for a user. Usage: /nick <id> <nome>"""
     if not context.args or len(context.args) < 2:
         await update.message.reply_text(
-            "❌ Uso: /nick &lt;id&gt; &lt;nome&gt;\n\n"
-            "Esempio: <code>/nick 123456789 Marco</code>",
+            "❌ Uso: /nick &lt;id&gt; &lt;nome&gt;\n\nEsempio: <code>/nick 123456789 Marco</code>",
             parse_mode=ParseMode.HTML,
         )
         return
@@ -166,7 +163,7 @@ async def cmd_nick(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     await db.update_user_info(target_id, display_name=nickname)
     await update.message.reply_text(
-        f"✅ Nickname: <b>{_escape_html(nickname)}</b>\n" f"ID: <code>{target_id}</code>",
+        f"✅ Nickname: <b>{_escape_html(nickname)}</b>\nID: <code>{target_id}</code>",
         parse_mode=ParseMode.HTML,
     )
 

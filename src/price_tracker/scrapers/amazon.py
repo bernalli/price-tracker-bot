@@ -220,7 +220,10 @@ class AmazonScraper(AbstractScraper):
                 logger.warning(
                     "Amazon price mismatch: CSS=%s vs JSON-LD=%s (ratio=%.2f) for %s "
                     "— trusting JSON-LD (likely installment/variant parse bug)",
-                    css_price, ld_price, ratio, url[:60],
+                    css_price,
+                    ld_price,
+                    ratio,
+                    url[:60],
                 )
                 info.price = ld_price
             else:
@@ -249,7 +252,9 @@ class AmazonScraper(AbstractScraper):
             if new_price:
                 logger.info(
                     "Buybox is %s at %s, new price available at %s — using new price",
-                    info.condition, info.price, new_price,
+                    info.condition,
+                    info.price,
+                    new_price,
                 )
                 info.price = new_price
                 info.condition = "new"
@@ -288,21 +293,41 @@ class AmazonScraper(AbstractScraper):
                         pid = (parent.get("id") or "").lower()
                         pcls = " ".join(parent.get("class", [])).lower()
                         dfn = (parent.get("data-feature-name") or "").lower()
-                        if any(k in pid for k in (
-                            "installment", "monthly", "paylater", "credit",
-                            "cofidis", "pagolight", "subscribeandsave",
-                        )):
+                        if any(
+                            k in pid
+                            for k in (
+                                "installment",
+                                "monthly",
+                                "paylater",
+                                "credit",
+                                "cofidis",
+                                "pagolight",
+                                "subscribeandsave",
+                            )
+                        ):
                             skip = True
                             break
-                        if any(k in pcls for k in (
-                            "installment", "monthly", "paylater",
-                            "pay-later", "credit-option",
-                        )):
+                        if any(
+                            k in pcls
+                            for k in (
+                                "installment",
+                                "monthly",
+                                "paylater",
+                                "pay-later",
+                                "credit-option",
+                            )
+                        ):
                             skip = True
                             break
-                        if any(k in dfn for k in (
-                            "installment", "monthly", "paylater", "credit",
-                        )):
+                        if any(
+                            k in dfn
+                            for k in (
+                                "installment",
+                                "monthly",
+                                "paylater",
+                                "credit",
+                            )
+                        ):
                             skip = True
                             break
                     if skip:
@@ -314,17 +339,39 @@ class AmazonScraper(AbstractScraper):
 
         # Strategy 2: Broad selectors (fallback)
         skip_parent_ids = (
-            "olp-", "aod-", "other-seller", "snsPrice",
-            "installment", "monthlyPayment", "monthly_payment", "monthlyPricing",
-            "creditOption", "paylater", "pay-later", "financeOffer",
-            "amazonCredit", "amazonPayLater", "cofidis", "pagolight",
+            "olp-",
+            "aod-",
+            "other-seller",
+            "snsPrice",
+            "installment",
+            "monthlyPayment",
+            "monthly_payment",
+            "monthlyPricing",
+            "creditOption",
+            "paylater",
+            "pay-later",
+            "financeOffer",
+            "amazonCredit",
+            "amazonPayLater",
+            "cofidis",
+            "pagolight",
             "subscribeAndSave",
-            "sims_", "similarities_", "sp_detail", "bundle_", "askInlineWidget",
+            "sims_",
+            "similarities_",
+            "sp_detail",
+            "bundle_",
+            "askInlineWidget",
         )
         skip_parent_classes = (
-            "a-text-price", "olp-", "aod-",
-            "installment", "monthly", "pay-later", "paylater",
-            "credit-option", "finance-offer",
+            "a-text-price",
+            "olp-",
+            "aod-",
+            "installment",
+            "monthly",
+            "pay-later",
+            "paylater",
+            "credit-option",
+            "finance-offer",
         )
         for selector in self.PRICE_SELECTORS:
             elements = soup.select(selector)
@@ -340,9 +387,15 @@ class AmazonScraper(AbstractScraper):
                     if any(s.lower() in pcls for s in skip_parent_classes):
                         skip = True
                         break
-                    if any(k in dfn for k in (
-                        "installment", "monthly", "paylater", "credit",
-                    )):
+                    if any(
+                        k in dfn
+                        for k in (
+                            "installment",
+                            "monthly",
+                            "paylater",
+                            "credit",
+                        )
+                    ):
                         skip = True
                         break
                 if skip:
@@ -413,10 +466,20 @@ class AmazonScraper(AbstractScraper):
             return ("", False)
 
         amazon_domains = (
-            "Amazon.it", "Amazon.de", "Amazon.fr", "Amazon.es",
-            "Amazon.co.uk", "Amazon.com", "Amazon.nl", "Amazon.pl",
-            "Amazon.se", "Amazon.co.jp", "Amazon.com.br", "Amazon.ca",
-            "Amazon.com.au", "Amazon EU",
+            "Amazon.it",
+            "Amazon.de",
+            "Amazon.fr",
+            "Amazon.es",
+            "Amazon.co.uk",
+            "Amazon.com",
+            "Amazon.nl",
+            "Amazon.pl",
+            "Amazon.se",
+            "Amazon.co.jp",
+            "Amazon.com.br",
+            "Amazon.ca",
+            "Amazon.com.au",
+            "Amazon EU",
         )
         is_amazon = any(ad.lower() in seller_name.lower() for ad in amazon_domains)
         return (seller_name, is_amazon)
