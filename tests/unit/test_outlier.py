@@ -57,3 +57,20 @@ def test_outlier_threshold_configurable():
 def test_invalid_price_is_outlier(price, expected):
     history = _hist([100] * 10)
     assert is_outlier(price, history).is_outlier is expected
+
+
+def test_zero_median_history_returns_not_outlier():
+    """If median of history is 0, the ratio is undefined → return not-outlier."""
+    history = _hist([0, 0, 0, 0, 0, 0])
+    result = is_outlier(Decimal("100"), history)
+    assert result.is_outlier is False
+    assert result.median == Decimal("0")
+
+
+def test_low_outlier_when_price_far_below_median():
+    """Symmetric: a price < median / max_ratio is also an outlier."""
+    history = _hist([100, 100, 100, 100, 100, 100, 100])
+    result = is_outlier(Decimal("10"), history, max_ratio=Decimal("2.5"))
+    # 100/10 = 10 > 2.5 → low outlier
+    assert result.is_outlier is True
+    assert result.median == Decimal("100")

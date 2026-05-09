@@ -87,3 +87,35 @@ def test_abstract_scraper_requires_can_handle_and_scrape():
             return ProductInfo(price=Decimal("1"))
 
     GoodScraper()  # no error
+
+
+def test_parse_price_returns_none_when_only_currency_label():
+    """Input that contains ONLY currency text strips to empty after sub → None."""
+    assert parse_price("EUR") is None
+    assert parse_price("CHF ") is None
+
+
+def test_parse_price_returns_none_on_invalid_decimal_format():
+    """A cleaned string that fails Decimal() conversion → None."""
+    # Multiple dots without thousands grouping → InvalidOperation
+    assert parse_price("1.2.3.4") is None
+
+
+def test_matches_domain_returns_false_for_empty_url():
+    """matches_domain on URL with empty netloc returns False (no pattern match)."""
+    import re
+
+    class _Scraper(AbstractScraper):
+        name = "x"
+        priority = 0
+        domain_patterns = [re.compile(r"example\.")]
+
+        def can_handle(self, url: str) -> bool:
+            return self.matches_domain(url)
+
+        async def scrape(self, url, client):
+            return ProductInfo()
+
+    s = _Scraper()
+    assert s.matches_domain("") is False
+    assert s.matches_domain("not a url at all") is False
