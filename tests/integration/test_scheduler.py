@@ -12,6 +12,7 @@ import httpx
 import pytest
 import pytest_asyncio
 
+from price_tracker.core.health import HealthManager
 from price_tracker.core.registry import ScraperRegistry
 from price_tracker.core.scheduler import Scheduler, SchedulerDeps
 from price_tracker.core.scraper_base import AbstractScraper, ProductInfo
@@ -20,6 +21,8 @@ from price_tracker.db.repository import Repository
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
+
+    from price_tracker.db.models import ProductRecord
 
 MIGRATIONS_DIR = Path("src/price_tracker/db/migrations")
 
@@ -389,3 +392,124 @@ async def test_scheduler_cleanup_old_history(
         deleted = await scheduler.cleanup_old_history(retention_days=365)
     # Empty history → 0 rows deleted
     assert deleted == 0
+
+
+# ---------------------------------------------------------------------------
+# Fixtures: scheduler_factory + sample_products
+# ---------------------------------------------------------------------------
+
+
+def _make_no_op_health_mgr() -> HealthManager:
+    """Return an AsyncMock(spec=HealthManager) with is_locked/is_half_open always False."""
+    mgr: HealthManager = AsyncMock(spec=HealthManager)
+    mgr.is_locked = lambda _d: False
+    mgr.is_half_open = lambda _d: False
+    return mgr
+
+
+@pytest.fixture
+def scheduler_factory() -> object:
+    """Factory that builds a Scheduler with injectable health_mgr.
+
+    Usage::
+
+        scheduler = scheduler_factory(health_mgr=some_mock)
+        # or without health_mgr for existing tests (no-op default)
+        scheduler = scheduler_factory()
+    """
+
+    def _factory(*, health_mgr: HealthManager | None = None) -> Scheduler:
+        if health_mgr is None:
+            health_mgr = _make_no_op_health_mgr()
+        deps = SchedulerDeps(
+            repo=AsyncMock(),
+            registry=AsyncMock(),
+            client=AsyncMock(),
+            notifier=AsyncMock(),
+            max_consecutive_errors=10,
+            delay_between_products=0.0,
+            health_mgr=health_mgr,
+        )
+        return Scheduler(deps)
+
+    return _factory
+
+
+@pytest.fixture
+def sample_products() -> list[ProductRecord]:
+    """A mix of products across two domains: shop-a and example.com (1)."""
+    from price_tracker.db.models import ProductRecord  # noqa: PLC0415
+
+    def _make(pid: int, url: str) -> ProductRecord:
+        return ProductRecord(
+            id=pid,
+            user_id=1,
+            url=url,
+            name=f"Product {pid}",
+            domain=None,
+            initial_price=Decimal("100"),
+            current_price=None,
+            lowest_price=None,
+            highest_price=None,
+            target_price=None,
+            threshold_type="drop_pct",
+            threshold_value=Decimal("10"),
+            is_active=True,
+            is_available=True,
+            consecutive_errors=0,
+            currency="EUR",
+            check_interval_minutes=None,
+            last_checked_at=None,
+            last_notified_at=None,
+        )
+
+    return [
+        _make(1, "https://shop-a.com/product/1"),
+        _make(2, "https://shop-a.com/product/2"),
+        _make(3, "https://example.com/product/3"),
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Tests: skip-on-locked + half-open single probe
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_scheduler_skips_locked_domain(
+    scheduler_factory: object,
+    sample_products: list[ProductRecord],
+) -> None:
+    health_mgr: HealthManager = AsyncMock(spec=HealthManager)
+    health_mgr.is_locked = lambda d: d == "shop-a.com"
+    health_mgr.is_half_open = lambda d: False
+
+    scheduler: Scheduler = scheduler_factory(health_mgr=health_mgr)
+    products = [p for p in sample_products if "shop-a.com" in p.url]
+    scrape_calls: list[str] = []
+    scheduler._scrape_one = AsyncMock(side_effect=lambda p: scrape_calls.append(p.url))
+
+    await scheduler._run_tick(products)
+
+    assert scrape_calls == []  # all shop-a products skipped
+
+
+@pytest.mark.asyncio
+async def test_scheduler_half_open_sends_only_one_probe(
+    scheduler_factory: object,
+    sample_products: list[ProductRecord],
+) -> None:
+    health_mgr: HealthManager = AsyncMock(spec=HealthManager)
+    health_mgr.is_locked = lambda d: False
+    half_open_for: set[str] = {"shop-a.com"}
+    health_mgr.is_half_open = lambda d: d in half_open_for
+
+    scheduler: Scheduler = scheduler_factory(health_mgr=health_mgr)
+    shop_a_products = [p for p in sample_products if "shop-a.com" in p.url]
+    assert len(shop_a_products) >= 2  # ensure multiple products on same domain
+
+    calls: list[str] = []
+    scheduler._scrape_one = AsyncMock(side_effect=lambda p: calls.append(p.url))
+    await scheduler._run_tick(shop_a_products)
+
+    assert len(calls) == 1  # only one probe per half-open domain per tick
