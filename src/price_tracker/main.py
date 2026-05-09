@@ -58,7 +58,7 @@ async def _setup_scheduler(application: Application[Any, Any, Any, Any, Any, Any
     await health_mgr.load()
     application.bot_data["health_manager"] = health_mgr
 
-    notifier = TelegramNotifier(application.bot)
+    notifier = TelegramNotifier(application.bot, metrics=metrics)
     application.bot_data["scheduler"] = Scheduler(
         SchedulerDeps(
             repo=repo,
