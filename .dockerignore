@@ -1,0 +1,37 @@
+# Mirror of .gitignore + exclude dev-only dirs from Docker image
+.env
+.env.*
+!.env.example
+docker-compose.override.yml
+*.db
+data/
+plugins/*
+!plugins/README.md
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+coverage.xml
+.vscode/
+.idea/
+logs/
+*.log
+*.bak
+*.tar.gz
+*.tar.zst
+.DS_Store
+
+# Dev-only — not needed at runtime
+tests/
+docs/
+.github/
+.pre-commit-config.yaml
+.git/
+.gitignore
+README.md
+LICENSE
