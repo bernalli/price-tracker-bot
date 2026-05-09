@@ -49,7 +49,7 @@ def test_amazon_priority_high():
 # ── scrape: happy path ────────────────────────────────────────────
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_amazon_parses_fixture_html(
     load_fixture: Callable[[str], str],
     monkeypatch: pytest.MonkeyPatch,
@@ -80,7 +80,7 @@ async def test_amazon_parses_fixture_html(
 # ── scrape: error paths ──────────────────────────────────────────
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_amazon_handles_404(monkeypatch: pytest.MonkeyPatch) -> None:
     """Non-retryable 404 → ProductInfo with error, price=None, no crash."""
     scraper = AmazonScraper()
@@ -120,7 +120,7 @@ async def test_amazon_handles_404(monkeypatch: pytest.MonkeyPatch) -> None:
     assert info.error is not None
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_amazon_handles_429_after_retries(monkeypatch: pytest.MonkeyPatch) -> None:
     """Retryable 429 → after retries exhausted, return ProductInfo with error."""
     scraper = AmazonScraper()
@@ -154,7 +154,7 @@ async def test_amazon_handles_429_after_retries(monkeypatch: pytest.MonkeyPatch)
     assert info.error is not None
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_amazon_missing_price_selectors(monkeypatch: pytest.MonkeyPatch) -> None:
     """HTML without any price selector → error 'Prezzo non trovato', no crash."""
     scraper = AmazonScraper()

@@ -73,7 +73,7 @@ CREATE TABLE bot_config (
 """
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_migrator_treats_pre_existing_v2_schema_as_idempotent():
     async with aiosqlite.connect(":memory:") as conn:
         await conn.executescript(V2_SCHEMA_SQL)
@@ -89,7 +89,7 @@ async def test_migrator_treats_pre_existing_v2_schema_as_idempotent():
         await conn.commit()
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_migrator_data_preserved_across_run():
     async with aiosqlite.connect(":memory:") as conn:
         await conn.executescript(V2_SCHEMA_SQL)

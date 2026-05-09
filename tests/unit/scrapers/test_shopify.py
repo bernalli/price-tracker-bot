@@ -52,7 +52,7 @@ def test_shopify_priority():
 # ── scrape: happy path (HTML extraction) ─────────────────────────
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_shopify_parses_fixture_html(load_fixture: Callable[[str], str]) -> None:
     """Fixture HTML has og:price + JSON-LD; JSON API returns 404 → falls back to HTML."""
     html = load_fixture("shopify/sample_product.html")
@@ -74,7 +74,7 @@ async def test_shopify_parses_fixture_html(load_fixture: Callable[[str], str]) -
     assert info.error is None
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_shopify_parses_via_json_api() -> None:
     """If /products/<handle>.json returns Shopify product JSON, that path wins."""
     scraper = ShopifyScraper()
@@ -88,8 +88,7 @@ async def test_shopify_parses_via_json_api() -> None:
     }
     # Minimal HTML used downstream for currency detection
     html = (
-        '<html><head><meta property="og:price:currency" content="EUR"></head>'
-        "<body></body></html>"
+        '<html><head><meta property="og:price:currency" content="EUR"></head><body></body></html>'
     )
 
     with respx.mock(assert_all_called=False) as router:
@@ -107,7 +106,7 @@ async def test_shopify_parses_via_json_api() -> None:
 # ── scrape: error paths ──────────────────────────────────────────
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_shopify_handles_404_on_html(monkeypatch: pytest.MonkeyPatch) -> None:
     """Both JSON API and HTML 404 → error, no crash."""
     scraper = ShopifyScraper()
@@ -132,7 +131,7 @@ async def test_shopify_handles_404_on_html(monkeypatch: pytest.MonkeyPatch) -> N
     assert info.error is not None
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_shopify_handles_429_after_retries(monkeypatch: pytest.MonkeyPatch) -> None:
     """Both JSON API and HTML return 429 → after retries, error."""
     scraper = ShopifyScraper()
@@ -160,7 +159,7 @@ async def test_shopify_handles_429_after_retries(monkeypatch: pytest.MonkeyPatch
     assert info.error is not None
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_shopify_missing_price_selectors() -> None:
     """HTML with no price markup → error, no crash."""
     scraper = ShopifyScraper()

@@ -43,7 +43,7 @@ def test_generic_priority_zero():
 # ── scrape: happy path with JSON-LD fixture ──────────────────────
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_generic_parses_jsonld_fixture(
     load_fixture: Callable[[str], str],
 ) -> None:
@@ -62,7 +62,7 @@ async def test_generic_parses_jsonld_fixture(
     assert info.error is None
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_generic_parses_microdata_fixture(
     load_fixture: Callable[[str], str],
 ) -> None:
@@ -84,7 +84,7 @@ async def test_generic_parses_microdata_fixture(
 # ── scrape: error paths ──────────────────────────────────────────
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_generic_handles_404(monkeypatch: pytest.MonkeyPatch) -> None:
     """404 → curl_cffi None → httpx 404 → ProductInfo with error."""
     scraper = GenericScraper()
@@ -105,7 +105,7 @@ async def test_generic_handles_404(monkeypatch: pytest.MonkeyPatch) -> None:
     assert info.error is not None
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_generic_handles_429_after_retries(monkeypatch: pytest.MonkeyPatch) -> None:
     """429 with retries exhausted → ProductInfo with error."""
     scraper = GenericScraper()
@@ -126,7 +126,7 @@ async def test_generic_handles_429_after_retries(monkeypatch: pytest.MonkeyPatch
     assert info.error is not None
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_generic_missing_price_selectors() -> None:
     """HTML lacking any price markup → error 'Prezzo non trovato', no crash."""
     scraper = GenericScraper()

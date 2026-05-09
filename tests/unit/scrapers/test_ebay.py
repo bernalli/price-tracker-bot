@@ -43,7 +43,7 @@ def test_ebay_priority():
 # ── scrape: happy path ────────────────────────────────────────────
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_ebay_parses_fixture_html(load_fixture: Callable[[str], str]) -> None:
     """Fixture has both JSON-LD (preferred) and microdata for price 29.99 EUR."""
     html = load_fixture("ebay/sample_product.html")
@@ -63,7 +63,7 @@ async def test_ebay_parses_fixture_html(load_fixture: Callable[[str], str]) -> N
 # ── scrape: error paths ──────────────────────────────────────────
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_ebay_handles_404(monkeypatch: pytest.MonkeyPatch) -> None:
     """Non-retryable 404 → ProductInfo with error, price=None, no crash."""
     scraper = EbayScraper()
@@ -85,7 +85,7 @@ async def test_ebay_handles_404(monkeypatch: pytest.MonkeyPatch) -> None:
     assert info.error is not None
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_ebay_handles_429_after_retries(monkeypatch: pytest.MonkeyPatch) -> None:
     """Retryable 429 → after retries exhausted, return ProductInfo with error."""
     scraper = EbayScraper()
@@ -106,7 +106,7 @@ async def test_ebay_handles_429_after_retries(monkeypatch: pytest.MonkeyPatch) -
     assert info.error is not None
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_ebay_missing_price_selectors() -> None:
     """HTML without any price → error 'Prezzo non trovato', no crash."""
     scraper = EbayScraper()
