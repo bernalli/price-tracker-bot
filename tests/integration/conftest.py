@@ -19,6 +19,8 @@ from price_tracker.db.repository import Repository
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
+    from price_tracker.observability.metrics import MetricsRegistry
+
 MIGRATIONS_DIR = Path("src/price_tracker/db/migrations")
 
 
@@ -53,7 +55,11 @@ def scheduler_factory() -> object:
         scheduler = scheduler_factory()
     """
 
-    def _factory(*, health_mgr: HealthManager | None = None) -> Scheduler:
+    def _factory(
+        *,
+        health_mgr: HealthManager | None = None,
+        metrics: MetricsRegistry | None = None,
+    ) -> Scheduler:
         if health_mgr is None:
             health_mgr = _make_no_op_health_mgr()
         deps = SchedulerDeps(
@@ -64,6 +70,7 @@ def scheduler_factory() -> object:
             max_consecutive_errors=10,
             delay_between_products=0.0,
             health_mgr=health_mgr,
+            metrics=metrics,
         )
         return Scheduler(deps)
 

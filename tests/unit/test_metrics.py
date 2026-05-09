@@ -43,8 +43,10 @@ class TestMetricsRegistry:
         """Privacy invariant: no metric must accept user_id label."""
         m = MetricsRegistry(registry=fresh_registry)
         for metric_name in [
-            "price_check_total", "notification_sent_total",
-            "notification_skipped_total", "outlier_rejected_total",
+            "price_check_total",
+            "notification_sent_total",
+            "notification_skipped_total",
+            "outlier_rejected_total",
         ]:
             metric = getattr(m, metric_name)
             assert "user_id" not in metric._labelnames
