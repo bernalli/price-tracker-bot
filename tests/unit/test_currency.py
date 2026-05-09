@@ -32,7 +32,7 @@ class _StubDB:
         self.store[key] = value
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_get_rates_uses_cache_if_fresh():
     rates = {"USD": "1.08", "GBP": "0.85"}
     cached = json.dumps(
@@ -48,7 +48,7 @@ async def test_get_rates_uses_cache_if_fresh():
     assert result["GBP"] == Decimal("0.85")
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_get_rates_fetches_when_cache_expired():
     expired = (datetime.now(UTC) - timedelta(hours=CACHE_TTL_HOURS + 1)).isoformat()
     db = _StubDB({CACHE_KEY: json.dumps({"rates": {"USD": "1.0"}, "fetched_at": expired})})
@@ -63,7 +63,7 @@ async def test_get_rates_fetches_when_cache_expired():
     assert CACHE_KEY in db.store
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_get_rates_falls_back_when_api_unreachable():
     db = _StubDB()
     with respx.mock(assert_all_called=False) as router:
@@ -77,14 +77,14 @@ async def test_get_rates_falls_back_when_api_unreachable():
     assert "CHF" in result
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_convert_to_eur_passes_through_eur():
     db = _StubDB()
     result = await convert_to_eur(db, Decimal("100"), "EUR")
     assert result == Decimal("100")
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_convert_to_eur_converts_usd():
     rates = {"USD": "1.08"}
     cached = json.dumps(
@@ -99,7 +99,7 @@ async def test_convert_to_eur_converts_usd():
     assert result == Decimal("100.00")
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_convert_to_eur_unknown_currency_returns_unchanged():
     db = _StubDB(
         {
@@ -113,3 +113,44 @@ async def test_convert_to_eur_unknown_currency_returns_unchanged():
     )
     result = await convert_to_eur(db, Decimal("100"), "ZZZ")
     assert result == Decimal("100")
+
+
+@pytest.mark.asyncio()
+async def test_get_rates_corrupted_cache_falls_back_to_fetch():
+    """A cache value that is not valid JSON triggers parse-error path then network fetch."""
+    db = _StubDB({CACHE_KEY: "not-a-json-string"})
+    with respx.mock(assert_all_called=False) as router:
+        router.get(API_URL).respond(200, json={"rates": {"USD": 1.10}})
+        async with httpx.AsyncClient() as client:
+            result = await get_rates(db, client)
+    assert result["USD"] == Decimal("1.10")
+
+
+@pytest.mark.asyncio()
+async def test_get_rates_empty_api_response_falls_back():
+    """API returning rates={} → fresh is None → fallback table is used."""
+    db = _StubDB()
+    with respx.mock(assert_all_called=False) as router:
+        router.get(API_URL).respond(200, json={"rates": {}})
+        async with httpx.AsyncClient() as client:
+            result = await get_rates(db, client)
+    # Empty rates → returns None from _fetch_fresh_rates → fallback
+    assert result["USD"] == Decimal("1.08")  # fallback rate
+
+
+@pytest.mark.asyncio()
+async def test_get_rates_creates_own_client_when_none_passed():
+    """When no client is provided, get_rates should construct (and close) its own."""
+    db = _StubDB()
+    with respx.mock(assert_all_called=False) as router:
+        router.get(API_URL).respond(200, json={"rates": {"USD": 1.05}})
+        result = await get_rates(db, client=None)  # no client
+    assert result["USD"] == Decimal("1.05")
+
+
+@pytest.mark.asyncio()
+async def test_convert_to_eur_passes_through_none_price():
+    db = _StubDB()
+    # type: ignore — testing defensive None handling at line 128
+    result = await convert_to_eur(db, None, "USD")  # type: ignore[arg-type]
+    assert result is None

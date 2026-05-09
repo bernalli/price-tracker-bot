@@ -57,7 +57,7 @@ def test_is_retryable_network_error():
     assert is_retryable_http_error(err)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_with_retry_passes_through_on_success():
     calls = {"n": 0}
 
@@ -70,7 +70,7 @@ async def test_with_retry_passes_through_on_success():
     assert calls["n"] == 1
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_with_retry_retries_on_retryable_error():
     calls = {"n": 0}
 
@@ -85,7 +85,7 @@ async def test_with_retry_retries_on_retryable_error():
     assert calls["n"] == 3
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_with_retry_does_not_retry_non_retryable():
     calls = {"n": 0}
 
@@ -99,7 +99,7 @@ async def test_with_retry_does_not_retry_non_retryable():
     assert calls["n"] == 1
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio()
 async def test_with_retry_gives_up_after_max_attempts():
     calls = {"n": 0}
 
@@ -111,3 +111,32 @@ async def test_with_retry_gives_up_after_max_attempts():
     with pytest.raises(httpx.TimeoutException):
         await f()
     assert calls["n"] == 2
+
+
+@pytest.mark.asyncio()
+async def test_with_retry_max_attempts_one_runs_only_once():
+    """max_attempts=1 means no retry: function runs once and exception bubbles."""
+    calls = {"n": 0}
+
+    @with_retry(RetryConfig(max_attempts=1, base_wait=0.01, jitter=False))
+    async def f() -> str:
+        calls["n"] += 1
+        raise httpx.TimeoutException("once")
+
+    with pytest.raises(httpx.TimeoutException):
+        await f()
+    assert calls["n"] == 1
+
+
+@pytest.mark.asyncio()
+async def test_with_retry_default_config_when_none_passed():
+    """with_retry() with no config should use RetryConfig() defaults (jitter=True)."""
+    calls = {"n": 0}
+
+    @with_retry()  # no config → defaults apply, jitter branch True
+    async def f() -> str:
+        calls["n"] += 1
+        return "ok"
+
+    assert await f() == "ok"
+    assert calls["n"] == 1

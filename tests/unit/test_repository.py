@@ -142,3 +142,211 @@ async def test_add_price_history_and_query(repo: Repository):
     # Ordered DESC by checked_at
     assert history[0].price == Decimal("8")
     assert history[1].price == Decimal("9")
+
+
+async def test_get_user_returns_none_when_missing(repo: Repository):
+    """get_user on unknown user_id → None (covers line 115)."""
+    assert await repo.get_user(99999) is None
+
+
+async def test_update_user_info_sets_display_name(repo: Repository):
+    """update_user_info merges display_name and username via COALESCE."""
+    await repo.ensure_user(user_id=1)
+    await repo.update_user_info(user_id=1, display_name="Alice", username="alice42")
+    user = await repo.get_user(1)
+    assert user is not None
+    assert user.display_name == "Alice"
+    assert user.username == "alice42"
+
+
+async def test_set_admin_toggle(repo: Repository):
+    """set_admin updates is_admin both ways."""
+    await repo.ensure_user(user_id=1)
+    await repo.set_admin(1, True)
+    user = await repo.get_user(1)
+    assert user is not None
+    assert user.is_admin is True
+    await repo.set_admin(1, False)
+    user = await repo.get_user(1)
+    assert user is not None
+    assert user.is_admin is False
+
+
+async def test_remove_user_marks_inactive(repo: Repository):
+    """remove_user is a soft-delete: sets is_active=0."""
+    await repo.ensure_user(user_id=1)
+    await repo.remove_user(1)
+    user = await repo.get_user(1)
+    assert user is not None
+    assert user.is_active is False
+
+
+async def test_list_users_returns_all(repo: Repository):
+    await repo.ensure_user(user_id=1)
+    await repo.ensure_user(user_id=2)
+    users = await repo.list_users()
+    user_ids = {u.user_id for u in users}
+    assert 1 in user_ids
+    assert 2 in user_ids
+
+
+async def test_list_active_users_filters_inactive(repo: Repository):
+    await repo.ensure_user(user_id=1)
+    await repo.ensure_user(user_id=2)
+    await repo.remove_user(2)
+    active = await repo.list_active_users()
+    user_ids = {u.user_id for u in active}
+    assert 1 in user_ids
+    assert 2 not in user_ids
+
+
+async def test_ensure_admin_users_bulk(repo: Repository):
+    """ensure_admin_users calls ensure_user for each id with is_admin=True."""
+    await repo.ensure_admin_users((10, 20, 30))
+    for uid in (10, 20, 30):
+        user = await repo.get_user(uid)
+        assert user is not None
+        assert user.is_admin is True
+
+
+async def test_delete_product_returns_false_when_not_found(repo: Repository):
+    """delete_product returns False if no row matches user_id."""
+    deleted = await repo.delete_product(99999, user_id=1)
+    assert deleted is False
+
+
+async def test_delete_product_returns_true_when_deleted(repo: Repository):
+    pid = await repo.add_product(
+        user_id=1,
+        url="https://x/del",
+        name="Del",
+        domain="x",
+        initial_price=Decimal("5"),
+        currency="EUR",
+    )
+    deleted = await repo.delete_product(pid, user_id=1)
+    assert deleted is True
+    assert await repo.get_product(pid) is None
+
+
+async def test_update_price_tracks_lowest_and_highest(repo: Repository):
+    pid = await repo.add_product(
+        user_id=1,
+        url="https://x/up",
+        name="Up",
+        domain="x",
+        initial_price=Decimal("100"),
+        currency="EUR",
+    )
+    await repo.update_price(pid, Decimal("80"))
+    p = await repo.get_product(pid)
+    assert p is not None
+    assert p.current_price == Decimal("80")
+    assert p.lowest_price == Decimal("80")
+    assert p.highest_price == Decimal("100")
+    await repo.update_price(pid, Decimal("120"))
+    p = await repo.get_product(pid)
+    assert p is not None
+    assert p.highest_price == Decimal("120")
+    assert p.lowest_price == Decimal("80")
+
+
+async def test_set_threshold_and_target(repo: Repository):
+    pid = await repo.add_product(
+        user_id=1,
+        url="https://x/th",
+        name="Th",
+        domain="x",
+        initial_price=Decimal("100"),
+        currency="EUR",
+    )
+    await repo.set_threshold(pid, "fixed", Decimal("90"))
+    await repo.set_target_price(pid, Decimal("85"))
+    p = await repo.get_product(pid)
+    assert p is not None
+    assert p.threshold_type == "fixed"
+    assert p.threshold_value == Decimal("90")
+    assert p.target_price == Decimal("85")
+    # Clear target
+    await repo.set_target_price(pid, None)
+    p = await repo.get_product(pid)
+    assert p is not None
+    assert p.target_price is None
+
+
+async def test_set_check_interval(repo: Repository):
+    pid = await repo.add_product(
+        user_id=1,
+        url="https://x/iv",
+        name="Iv",
+        domain="x",
+        initial_price=Decimal("1"),
+        currency="EUR",
+    )
+    await repo.set_check_interval(pid, 60)
+    p = await repo.get_product(pid)
+    assert p is not None
+    assert p.check_interval_minutes == 60
+
+
+async def test_pause_and_reactivate_product(repo: Repository):
+    pid = await repo.add_product(
+        user_id=1,
+        url="https://x/pa",
+        name="Pa",
+        domain="x",
+        initial_price=Decimal("1"),
+        currency="EUR",
+    )
+    await repo.pause_product(pid)
+    p = await repo.get_product(pid)
+    assert p is not None
+    assert p.is_active is False
+    await repo.reactivate_product(pid)
+    p = await repo.get_product(pid)
+    assert p is not None
+    assert p.is_active is True
+    assert p.consecutive_errors == 0
+
+
+async def test_pending_alert_round_trip(repo: Repository):
+    pid = await repo.add_product(
+        user_id=1,
+        url="https://x/pe",
+        name="Pe",
+        domain="x",
+        initial_price=Decimal("100"),
+        currency="EUR",
+    )
+    await repo.mark_pending_alert(pid, Decimal("85"))
+    p = await repo.get_product(pid)
+    assert p is not None
+    assert p.pending_alert_price == Decimal("85")
+    await repo.clear_pending_alert(pid)
+    p = await repo.get_product(pid)
+    assert p is not None
+    assert p.pending_alert_price is None
+
+
+async def test_delete_old_price_history(repo: Repository):
+    pid = await repo.add_product(
+        user_id=1,
+        url="https://x/hist",
+        name="Hist",
+        domain="x",
+        initial_price=Decimal("1"),
+        currency="EUR",
+    )
+    await repo.add_price_history(pid, Decimal("9"))
+    # Nothing is older than 365 days yet → 0
+    deleted = await repo.delete_old_price_history(days=365)
+    assert deleted == 0
+
+
+async def test_dec_returns_none_on_invalid_string(repo: Repository):
+    """_dec helper returns None on un-parsable values (line 23-24)."""
+    from price_tracker.db.repository import _dec
+
+    assert _dec(None) is None
+    assert _dec("not-a-decimal") is None
+    assert _dec("1.5") == Decimal("1.5")
