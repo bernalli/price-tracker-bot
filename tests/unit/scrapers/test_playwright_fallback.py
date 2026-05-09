@@ -35,7 +35,7 @@ def test_playwright_priority_below_specific_scrapers():
     assert PlaywrightFallbackScraper.priority < ShopifyScraper.priority
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_playwright_returns_error_when_unavailable(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

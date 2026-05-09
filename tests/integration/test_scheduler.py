@@ -61,7 +61,7 @@ async def repo_with_product() -> AsyncIterator[tuple[Repository, int]]:
         await conn.close()
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_scheduler_updates_price_on_drop(
     repo_with_product: tuple[Repository, int],
 ) -> None:
@@ -88,7 +88,7 @@ async def test_scheduler_updates_price_on_drop(
     assert stub.calls == 1
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_scheduler_increments_errors_on_scrape_failure(
     repo_with_product: tuple[Repository, int],
 ) -> None:
@@ -114,7 +114,7 @@ async def test_scheduler_increments_errors_on_scrape_failure(
     assert p.consecutive_errors == 1
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_scheduler_triggers_alert_on_threshold_drop(
     repo_with_product: tuple[Repository, int],
 ) -> None:
@@ -151,7 +151,7 @@ class _RaisingScraper(AbstractScraper):
         raise httpx.ConnectError("simulated network failure")
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_scheduler_handles_scraper_exception_increments_errors(
     repo_with_product: tuple[Repository, int],
 ) -> None:
@@ -177,7 +177,7 @@ async def test_scheduler_handles_scraper_exception_increments_errors(
     assert p.consecutive_errors == 1
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_scheduler_run_check_all_iterates_users(
     repo_with_product: tuple[Repository, int],
 ) -> None:
@@ -205,7 +205,7 @@ async def test_scheduler_run_check_all_iterates_users(
     assert stub.calls == 1
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_scheduler_skips_when_no_scraper_resolves(
     repo_with_product: tuple[Repository, int],
 ) -> None:
@@ -231,7 +231,7 @@ async def test_scheduler_skips_when_no_scraper_resolves(
     assert p.current_price is None or p.current_price == Decimal("100")
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_scheduler_outlier_price_rejected(
     repo_with_product: tuple[Repository, int],
 ) -> None:
@@ -266,7 +266,7 @@ async def test_scheduler_outlier_price_rejected(
     notifier.assert_not_awaited()
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_scheduler_first_check_no_old_price_no_alert() -> None:
     """Line 101: when old_price is None, return without crossing threshold check.
 
@@ -311,7 +311,7 @@ async def test_scheduler_first_check_no_old_price_no_alert() -> None:
         await conn.close()
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_scheduler_skips_inactive_product(
     repo_with_product: tuple[Repository, int],
 ) -> None:
@@ -340,7 +340,7 @@ async def test_scheduler_skips_inactive_product(
     assert stub.calls == 0
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_scheduler_price_none_increments_errors(
     repo_with_product: tuple[Repository, int],
 ) -> None:
@@ -367,7 +367,7 @@ async def test_scheduler_price_none_increments_errors(
     assert p.consecutive_errors == 1
 
 
-@pytest.mark.asyncio()
+@pytest.mark.asyncio
 async def test_scheduler_cleanup_old_history(
     repo_with_product: tuple[Repository, int],
 ) -> None:
