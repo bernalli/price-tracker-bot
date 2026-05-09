@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Literal
 
-
 ThresholdType = Literal["percentage", "absolute", "target"]
 
 
@@ -84,7 +83,7 @@ def format_alert(alert: PriceAlert) -> str:
     return (
         f"📉 <b>Price drop!</b>\n\n"
         f"<b>{name}</b>\n"
-        f"<a href=\"{url}\">View product</a>\n\n"
+        f'<a href="{url}">View product</a>\n\n'
         f"Was: <s>{old} {sym}</s>\n"
         f"Now: <b>{new} {sym}</b>\n"
         f"Drop: -{drop} {sym} ({drop_pct:.1f}%)"
@@ -93,7 +92,7 @@ def format_alert(alert: PriceAlert) -> str:
 
 def format_error_notification(
     *,
-    product: dict,
+    product: dict[str, str],
     error_count: int,
     max_errors: int,
 ) -> str:

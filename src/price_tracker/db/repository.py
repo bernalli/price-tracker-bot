@@ -75,9 +75,7 @@ class Repository:
     # ── Config ─────────────────────────────────────────────────
 
     async def get_config(self, key: str) -> str | None:
-        cursor = await self._conn.execute(
-            "SELECT value FROM bot_config WHERE key = ?", (key,)
-        )
+        cursor = await self._conn.execute("SELECT value FROM bot_config WHERE key = ?", (key,))
         row = await cursor.fetchone()
         return row[0] if row else None
 
@@ -145,9 +143,7 @@ class Repository:
         await self._conn.commit()
 
     async def remove_user(self, user_id: int) -> None:
-        await self._conn.execute(
-            "UPDATE users SET is_active = 0 WHERE user_id = ?", (user_id,)
-        )
+        await self._conn.execute("UPDATE users SET is_active = 0 WHERE user_id = ?", (user_id,))
         await self._conn.commit()
 
     async def list_users(self) -> list[UserRecord]:
@@ -252,7 +248,7 @@ class Repository:
             (product_id, user_id),
         )
         await self._conn.commit()
-        return cursor.rowcount > 0
+        return int(cursor.rowcount) > 0
 
     async def update_price(self, product_id: int, price: Decimal) -> None:
         await self._conn.execute(
@@ -297,9 +293,7 @@ class Repository:
         await self._conn.commit()
 
     async def pause_product(self, product_id: int) -> None:
-        await self._conn.execute(
-            "UPDATE products SET is_active = 0 WHERE id = ?", (product_id,)
-        )
+        await self._conn.execute("UPDATE products SET is_active = 0 WHERE id = ?", (product_id,))
         await self._conn.commit()
 
     async def reactivate_product(self, product_id: int) -> None:
@@ -373,4 +367,4 @@ class Repository:
             (f"-{days}",),
         )
         await self._conn.commit()
-        return cursor.rowcount
+        return int(cursor.rowcount)
