@@ -53,7 +53,8 @@ async def _setup_scheduler(application: Application[Any, Any, Any, Any, Any, Any
     client = application.bot_data["http_client"]
     registry: ScraperRegistry = application.bot_data["registry"]
 
-    health_mgr = HealthManager(repo)
+    metrics: MetricsRegistry | None = application.bot_data.get("metrics")
+    health_mgr = HealthManager(repo, metrics=metrics)
     await health_mgr.load()
     application.bot_data["health_manager"] = health_mgr
 
@@ -67,6 +68,7 @@ async def _setup_scheduler(application: Application[Any, Any, Any, Any, Any, Any
             max_consecutive_errors=config.max_consecutive_errors,
             delay_between_products=config.check_delay_seconds,
             health_mgr=health_mgr,
+            metrics=metrics,
         )
     )
 

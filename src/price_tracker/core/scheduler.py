@@ -16,6 +16,7 @@ from price_tracker.core.alert import (
     crosses_threshold,
     format_alert,
 )
+from price_tracker.core.exceptions import BlockEvent, ParseError
 from price_tracker.core.health import HealthManager
 from price_tracker.core.outlier import is_outlier
 from price_tracker.core.url_utils import extract_etld_plus_one
@@ -24,6 +25,7 @@ if TYPE_CHECKING:
     from price_tracker.core.registry import ScraperRegistry
     from price_tracker.db.models import ProductRecord
     from price_tracker.db.repository import Repository
+    from price_tracker.observability.metrics import MetricsRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +67,7 @@ class SchedulerDeps:
     max_consecutive_errors: int = 10
     delay_between_products: float = 5.0
     health_mgr: HealthManager = field(default_factory=_no_op_health_mgr)
+    metrics: MetricsRegistry | None = None
 
 
 class Scheduler:
@@ -74,11 +77,38 @@ class Scheduler:
         self.deps = deps
 
     async def _scrape_one(self, product: ProductRecord) -> None:
-        """Scrape a single product and persist results (delegates to _check_product)."""
+        """Scrape a single product and persist results (delegates to _check_product).
+
+        Resolves scraper_name + domain at the top so that block/parse/error
+        metric emissions all share the same labels regardless of where the
+        exception is raised within the scrape pipeline.
+        """
+        domain = extract_etld_plus_one(product.url) or "unknown"
+        scraper = self.deps.registry.resolve(product.url)
+        scraper_name = scraper.name if scraper is not None else "unknown"
+        metrics = self.deps.metrics
         try:
-            await self._check_product(product.id)
+            await self._check_product(product.id, scraper_name=scraper_name, domain=domain)
+        except BlockEvent as e:
+            logger.warning("Block detected for product %d: %s", product.id, e)
+            if metrics is not None:
+                metrics.price_check_total.labels(
+                    scraper=scraper_name, domain=domain, status="block"
+                ).inc()
+            await self.deps.repo.increment_errors(product.id)
+        except ParseError as e:
+            logger.warning("Parse error for product %d: %s", product.id, e)
+            if metrics is not None:
+                metrics.price_check_total.labels(
+                    scraper=scraper_name, domain=domain, status="error"
+                ).inc()
+            await self.deps.repo.increment_errors(product.id)
         except (httpx.HTTPError, ValueError, KeyError) as e:
             logger.warning("Check failed for product %d: %s", product.id, e)
+            if metrics is not None:
+                metrics.price_check_total.labels(
+                    scraper=scraper_name, domain=domain, status="error"
+                ).inc()
             await self.deps.repo.increment_errors(product.id)
 
     async def _run_tick(self, products: list[ProductRecord]) -> None:
@@ -91,6 +121,9 @@ class Scheduler:
         Rate-limiting pacing (`delay_between_products`) is applied between scrapes
         to be friendly to upstream servers.
         """
+        metrics = self.deps.metrics
+        if metrics is not None:
+            metrics.scheduler_jobs_active.set(len(products))
         half_open_seen: set[str] = set()
         for product in products:
             domain = extract_etld_plus_one(product.url)
@@ -101,6 +134,8 @@ class Scheduler:
                 continue
 
             if self.deps.health_mgr.is_locked(domain):
+                if metrics is not None:
+                    metrics.quarantine_skip_total.labels(domain=domain).inc()
                 continue  # skip — domain is in quarantine lockout; no sleep needed
 
             if self.deps.health_mgr.is_half_open(domain):
@@ -125,7 +160,13 @@ class Scheduler:
             )
             await self._run_tick(products)
 
-    async def _check_product(self, product_id: int) -> None:
+    async def _check_product(
+        self,
+        product_id: int,
+        *,
+        scraper_name: str = "unknown",
+        domain: str = "unknown",
+    ) -> None:
         p = await self.deps.repo.get_product(product_id)
         if p is None or not p.is_active:
             return
@@ -133,10 +174,27 @@ class Scheduler:
         scraper = self.deps.registry.resolve(p.url)
         if scraper is None:
             logger.warning("No scraper for %s", p.url)
+            metrics = self.deps.metrics
+            if metrics is not None:
+                metrics.price_check_total.labels(
+                    scraper=scraper_name, domain=domain, status="error"
+                ).inc()
             return
 
-        info = await scraper.scrape(p.url, self.deps.client)
+        metrics = self.deps.metrics
+        if metrics is not None:
+            with metrics.scraper_duration_seconds.labels(
+                scraper=scraper_name, domain=domain
+            ).time():
+                info = await scraper.scrape(p.url, self.deps.client)
+        else:
+            info = await scraper.scrape(p.url, self.deps.client)
+
         if info.price is None:
+            if metrics is not None:
+                metrics.price_check_total.labels(
+                    scraper=scraper_name, domain=domain, status="error"
+                ).inc()
             await self.deps.repo.increment_errors(p.id)
             return
 
@@ -152,12 +210,21 @@ class Scheduler:
                 outlier.ratio,
                 outlier.history_n,
             )
+            if metrics is not None:
+                metrics.outlier_rejected_total.labels(scraper=scraper_name, domain=domain).inc()
+                metrics.price_check_total.labels(
+                    scraper=scraper_name, domain=domain, status="outlier_rejected"
+                ).inc()
             return
 
         old_price = p.current_price or p.initial_price
         await self.deps.repo.update_price(p.id, info.price)
         await self.deps.repo.add_price_history(p.id, info.price)
         await self.deps.repo.reset_errors(p.id)
+        if metrics is not None:
+            metrics.price_check_total.labels(
+                scraper=scraper_name, domain=domain, status="success"
+            ).inc()
 
         if old_price is None:
             return

@@ -17,6 +17,7 @@ from price_tracker.db.models import ScraperHealth
 
 if TYPE_CHECKING:
     from price_tracker.db.repository import Repository
+    from price_tracker.observability.metrics import MetricsRegistry
 
 
 class QuarantineState(enum.StrEnum):
@@ -51,10 +52,16 @@ def _now_utc() -> datetime:
 class HealthManager:
     """In-memory health state with write-through persistence to the Repository."""
 
-    def __init__(self, repo: Repository) -> None:
+    def __init__(
+        self,
+        repo: Repository,
+        *,
+        metrics: MetricsRegistry | None = None,
+    ) -> None:
         self._repo = repo
         self._records: dict[str, ScraperHealth] = {}
         self._lock = asyncio.Lock()
+        self._metrics = metrics
 
     async def load(self) -> None:
         rows = await self._repo.list_all_scraper_health()
@@ -146,12 +153,23 @@ class HealthManager:
             )
             self._records[domain] = updated
             await self._repo.upsert_scraper_health(updated)
+            if self._metrics is not None:
+                if current_state != new_state:
+                    self._metrics.quarantine_transitions_total.labels(
+                        domain=domain,
+                        from_state=current_state.value,
+                        to_state=new_state.value,
+                    ).inc()
+                self._metrics.quarantine_state.labels(domain=domain, state=new_state.value).set(
+                    _state_to_int(new_state)
+                )
             return new_state
 
     async def record_success(self, domain: str) -> QuarantineState:
         async with self._lock:
             now = _now_utc()
             current = self._records.get(domain)
+            current_state = self.state(domain)
             updated = ScraperHealth(
                 domain=domain,
                 state=QuarantineState.CLOSED.value,
@@ -163,6 +181,16 @@ class HealthManager:
             )
             self._records[domain] = updated
             await self._repo.upsert_scraper_health(updated)
+            if self._metrics is not None:
+                if current_state != QuarantineState.CLOSED:
+                    self._metrics.quarantine_transitions_total.labels(
+                        domain=domain,
+                        from_state=current_state.value,
+                        to_state=QuarantineState.CLOSED.value,
+                    ).inc()
+                self._metrics.quarantine_state.labels(
+                    domain=domain, state=QuarantineState.CLOSED.value
+                ).set(_state_to_int(QuarantineState.CLOSED))
             return QuarantineState.CLOSED
 
 
@@ -177,3 +205,19 @@ _HALF_OPEN_TO_NEXT_TIER: dict[QuarantineState, _TierConfig | None] = {
     QuarantineState.HALF_OPEN_T2: _TIERS[2],
     QuarantineState.HALF_OPEN_T3: None,  # sentinel — stay LOCKED_T3
 }
+
+
+_STATE_TO_INT: dict[QuarantineState, int] = {
+    QuarantineState.CLOSED: 0,
+    QuarantineState.LOCKED_T1: 1,
+    QuarantineState.LOCKED_T2: 2,
+    QuarantineState.LOCKED_T3: 3,
+    QuarantineState.HALF_OPEN_T1: 4,
+    QuarantineState.HALF_OPEN_T2: 4,
+    QuarantineState.HALF_OPEN_T3: 4,
+}
+
+
+def _state_to_int(state: QuarantineState) -> int:
+    """Map QuarantineState to numeric gauge value (0=CLOSED 1=T1 2=T2 3=T3 4=HALF_OPEN)."""
+    return _STATE_TO_INT[state]
