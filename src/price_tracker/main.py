@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from pathlib import Path
 from typing import Any
 
@@ -104,6 +105,7 @@ async def amain() -> None:
 
     metrics = MetricsRegistry()
     application.bot_data["metrics"] = metrics
+    application.bot_data["start_time"] = time.monotonic()
 
     metrics_server: MetricsServer | None = None
     if config.metrics_enabled:
