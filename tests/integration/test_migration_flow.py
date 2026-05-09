@@ -80,7 +80,7 @@ async def test_migrator_treats_pre_existing_v2_schema_as_idempotent():
         await conn.commit()
 
         new_version = await apply_migrations(conn, MIGRATIONS_DIR)
-        assert new_version == 9
+        assert new_version == 10
 
         await conn.execute(
             "INSERT INTO products(url, name, initial_price, currency) VALUES(?, ?, ?, ?)",
@@ -107,3 +107,32 @@ async def test_migrator_data_preserved_across_run():
         row = await cursor.fetchone()
         assert row is not None
         assert row[0] == "Existing"
+
+
+@pytest.mark.asyncio
+async def test_migrate_from_v0_1_0_to_v0_2_0(tmp_db_path: Path) -> None:
+    """v0.1.0-foundation schema (migrations 1..7) → 1..10 preserves data."""
+    from price_tracker.db.migrator import Migrator
+
+    # 1. bootstrap up to migration 007 only
+    migrator = Migrator(db_path=tmp_db_path, max_version=7)
+    await migrator.migrate()
+    async with aiosqlite.connect(tmp_db_path) as conn:
+        await conn.execute("INSERT INTO users (user_id) VALUES (42)")
+        await conn.execute(
+            "INSERT INTO products (id, user_id, url, name, current_price)"
+            " VALUES (1, 42, 'https://amazon.com/dp/B01', 'P', 99.0)"
+        )
+        await conn.commit()
+    # 2. apply 008..010
+    migrator2 = Migrator(db_path=tmp_db_path)
+    await migrator2.migrate()
+    async with aiosqlite.connect(tmp_db_path) as conn:
+        cursor = await conn.execute("SELECT user_id FROM users WHERE user_id=42")
+        row = await cursor.fetchone()
+        assert row is not None
+        assert row[0] == 42
+        cursor = await conn.execute("SELECT MAX(version) FROM schema_version")
+        row = await cursor.fetchone()
+        assert row is not None
+        assert row[0] >= 10
