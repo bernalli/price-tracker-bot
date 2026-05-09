@@ -88,3 +88,15 @@ class NotificationPrefs:
     timezone: str = "Europe/Rome"
     throttle_state_json: str | None = None
     updated_at: datetime | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class DigestEntry:
+    """A queued alert waiting for digest flush."""
+
+    id: int | None
+    user_id: int
+    product_id: int
+    alert_payload_json: str
+    enqueued_at: datetime | None = None
+    flushed_at: datetime | None = None
