@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import re
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
-import httpx
 import pytest
 
 from price_tracker.core.registry import ScraperRegistry
 from price_tracker.core.scraper_base import AbstractScraper, ProductInfo
+
+if TYPE_CHECKING:
+    import httpx
 
 
 class FakeAmazon(AbstractScraper):

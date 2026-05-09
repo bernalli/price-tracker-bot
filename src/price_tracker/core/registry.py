@@ -6,10 +6,13 @@ import importlib
 import importlib.util
 import logging
 import pkgutil
-from collections.abc import Iterator
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from price_tracker.core.scraper_base import AbstractScraper
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
 
 logger = logging.getLogger(__name__)
 

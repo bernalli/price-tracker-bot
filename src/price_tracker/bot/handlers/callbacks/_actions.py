@@ -88,7 +88,7 @@ async def handle_pause_button(
     name = (product.get("name") or "Sconosciuto")[:50]
     await db.deactivate_product(product_id)
     await query.edit_message_text(
-        f"⏸ <b>In pausa:</b> {_escape_html(name)}\n" f"Usa /riattiva {product_id} per riattivarlo.",
+        f"⏸ <b>In pausa:</b> {_escape_html(name)}\nUsa /riattiva {product_id} per riattivarlo.",
         parse_mode=ParseMode.HTML,
     )
     return True

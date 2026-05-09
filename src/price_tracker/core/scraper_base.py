@@ -119,10 +119,22 @@ def parse_price(price_str: str | None) -> Decimal | None:
 
 _CURRENCY_SIGNS: list[tuple[str, str]] = [
     # Order matters: longer matches first (CHF before generic letter triggers)
-    ("CHF", "CHF"), ("EUR", "EUR"), ("USD", "USD"), ("GBP", "GBP"), ("JPY", "JPY"),
-    ("SEK", "SEK"), ("NOK", "NOK"), ("DKK", "DKK"), ("PLN", "PLN"), ("CZK", "CZK"),
-    ("€", "EUR"), ("$", "USD"), ("£", "GBP"), ("¥", "JPY"),
-    ("zł", "PLN"), ("kr", "SEK"),  # 'kr' last — overlaps with NOK/DKK; ambiguous, default SEK
+    ("CHF", "CHF"),
+    ("EUR", "EUR"),
+    ("USD", "USD"),
+    ("GBP", "GBP"),
+    ("JPY", "JPY"),
+    ("SEK", "SEK"),
+    ("NOK", "NOK"),
+    ("DKK", "DKK"),
+    ("PLN", "PLN"),
+    ("CZK", "CZK"),
+    ("€", "EUR"),
+    ("$", "USD"),
+    ("£", "GBP"),
+    ("¥", "JPY"),
+    ("zł", "PLN"),
+    ("kr", "SEK"),  # 'kr' last — overlaps with NOK/DKK; ambiguous, default SEK
 ]
 
 

@@ -155,8 +155,7 @@ async def cmd_refresh(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         display = f"{minutes} minuti"
 
     await update.message.reply_text(
-        f"🔄 Intervallo check: <b>ogni {display}</b>\n"
-        f"📦 #{product_id} — {_escape_html(name[:80])}",
+        f"🔄 Intervallo check: <b>ogni {display}</b>\n📦 #{product_id} — {_escape_html(name[:80])}",
         parse_mode=ParseMode.HTML,
     )
 

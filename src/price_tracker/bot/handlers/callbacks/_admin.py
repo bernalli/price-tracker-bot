@@ -76,8 +76,7 @@ async def handle_admin_menu(
             role = "👑" if u.get("is_admin") else "👤"
             st = await db.get_stats(uid)
             txt.append(
-                f"{role} <code>{uid}</code> {_escape_html(str(nm))} — "
-                f"{st['active_products']} prod."
+                f"{role} <code>{uid}</code> {_escape_html(str(nm))} — {st['active_products']} prod."
             )
         await query.edit_message_text(
             chr(10).join(txt),
@@ -91,7 +90,7 @@ async def handle_admin_menu(
             return True
         context.user_data["pending_action"] = ("admin_adduser", 0)
         await query.edit_message_text(
-            "➕ <b>Aggiungi utente</b>\n\n" "Scrivi l'ID Telegram dell'utente da aggiungere:",
+            "➕ <b>Aggiungi utente</b>\n\nScrivi l'ID Telegram dell'utente da aggiungere:",
             parse_mode=ParseMode.HTML,
         )
         return True
@@ -184,7 +183,7 @@ async def handle_admin_menu(
             return True
         context.user_data["pending_action"] = ("admin_debug", 0)
         await query.edit_message_text(
-            "🔧 <b>Debug scraper</b>\n\n" "Incolla l'URL del prodotto da analizzare:",
+            "🔧 <b>Debug scraper</b>\n\nIncolla l'URL del prodotto da analizzare:",
             parse_mode=ParseMode.HTML,
         )
         return True
