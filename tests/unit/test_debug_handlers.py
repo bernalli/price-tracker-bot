@@ -1,4 +1,4 @@
-"""Unit tests for debug handler commands: health_command."""
+"""Unit tests for debug handler commands: health_command, status_command."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from price_tracker.bot.handlers.debug import health_command
+from price_tracker.bot.handlers.debug import health_command, status_command
 from price_tracker.db.models import ScraperHealth
 
 
@@ -169,3 +169,22 @@ async def test_health_command_handles_locked_without_locked_until() -> None:
 
     await health_command(update, context)
     update.message.reply_html.assert_awaited()
+
+
+@pytest.mark.asyncio
+async def test_status_shows_uptime_and_products_tracked() -> None:
+    """status_command renders uptime + products_tracked from metrics gauges."""
+    update = MagicMock()
+    update.message.reply_html = AsyncMock()
+    metrics = MagicMock()
+    metrics.bot_uptime_seconds._value.get = lambda: 3700.0  # ~1h 1m 40s
+    metrics.products_tracked_total._value.get = lambda: 42
+    context = MagicMock()
+    context.bot_data = {"metrics": metrics}
+
+    await status_command(update, context)
+
+    update.message.reply_html.assert_awaited_once()
+    rendered: str = update.message.reply_html.call_args.args[0]
+    assert "1h" in rendered or "uptime" in rendered.lower()
+    assert "42" in rendered

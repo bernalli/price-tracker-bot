@@ -10,6 +10,7 @@ from __future__ import annotations
 import json as _json
 import logging
 import re as _re
+import time
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
@@ -24,6 +25,8 @@ from price_tracker.bot.messages import _
 if TYPE_CHECKING:
     from telegram import Update
     from telegram.ext import ContextTypes
+
+    from price_tracker.observability.metrics import MetricsRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +43,48 @@ def _format_remaining(until: datetime | None) -> str:
     if hours:
         return f"{hours}h {minutes:02d}m"
     return f"{minutes}m"
+
+
+def _format_uptime(seconds: float) -> str:
+    """Render seconds as a compact `Xh Ym Zs` / `Ym Zs` string."""
+    total = int(seconds)
+    hours, rem = divmod(total, 3600)
+    minutes, secs = divmod(rem, 60)
+    if hours:
+        return f"{hours}h {minutes}m {secs}s"
+    return f"{minutes}m {secs}s"
+
+
+def _render_metrics_lines(
+    metrics: MetricsRegistry | None,
+    *,
+    start_time: float | None = None,
+    products_tracked: int | None = None,
+) -> list[str]:
+    """Return the metrics-snapshot lines for /status.
+
+    Reads `bot_uptime_seconds` and `products_tracked_total` gauges. When
+    `start_time` is provided, refreshes the uptime gauge to `monotonic - start`
+    before reading. When `products_tracked` is provided, refreshes that gauge
+    too. Uses the prometheus_client private `_value.get()` accessor to read the
+    current Gauge value (no public read API exists on Gauge).
+    """
+    if metrics is None:
+        return ["Metrics unavailable"]
+    try:
+        if start_time is not None:
+            metrics.bot_uptime_seconds.set(time.monotonic() - start_time)
+        if products_tracked is not None:
+            metrics.products_tracked_total.set(int(products_tracked))
+        uptime = metrics.bot_uptime_seconds._value.get()
+        tracked = metrics.products_tracked_total._value.get()
+    except (AttributeError, TypeError):
+        return ["Metrics unavailable"]
+    return [
+        "<b>📡 Bot Status</b>",
+        f"Uptime: {_format_uptime(float(uptime or 0))}",
+        f"Products tracked: {int(tracked or 0)}",
+    ]
 
 
 def _tier_label(state: str) -> str:
@@ -284,9 +329,11 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         f"⏱ Intervallo check: ogni {interval_str}",
     ]
 
+    products_tracked: int | None = None
     if is_admin:
         global_stats = await db.get_stats()
         users = await db.get_all_users()
+        products_tracked = int(global_stats["active_products"])
         lines.extend(
             [
                 "",
@@ -297,7 +344,33 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             ]
         )
 
+    metrics = context.bot_data.get("metrics")
+    start_time = context.bot_data.get("start_time")
+    if metrics is not None:
+        lines.append("")
+        lines.extend(
+            _render_metrics_lines(
+                metrics,
+                start_time=start_time,
+                products_tracked=products_tracked,
+            )
+        )
+
     await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML)
+
+
+async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Render a metrics-only snapshot (uptime + products tracked).
+
+    Slim handler that reads only the metrics registry — suitable for
+    out-of-band uses where DB/admin context is not available. The full
+    user-stats command remains `cmd_status` (registered as /status, /stato).
+    """
+    metrics = context.bot_data.get("metrics")
+    start_time = context.bot_data.get("start_time")
+    lines = ["📊 <b>Bot Status</b>", ""]
+    lines.extend(_render_metrics_lines(metrics, start_time=start_time))
+    await update.message.reply_html("\n".join(lines))
 
 
 @admin_only
