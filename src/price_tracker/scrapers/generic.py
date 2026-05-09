@@ -37,10 +37,17 @@ logger = logging.getLogger(__name__)
 
 
 # Product types recognised in JSON-LD
-PRODUCT_TYPES: frozenset[str] = frozenset({
-    "Product", "IndividualProduct", "ProductModel", "SomeProducts",
-    "ProductGroup", "Vehicle", "Car",
-})
+PRODUCT_TYPES: frozenset[str] = frozenset(
+    {
+        "Product",
+        "IndividualProduct",
+        "ProductModel",
+        "SomeProducts",
+        "ProductGroup",
+        "Vehicle",
+        "Car",
+    }
+)
 
 
 @with_retry(RetryConfig(max_attempts=3, base_wait=2.0, max_wait=10.0))
@@ -232,10 +239,13 @@ class GenericScraper(AbstractScraper):
 
         # Method 2: Regex fallback directly on HTML
         html_str = str(soup)
-        for i, m in enumerate(re.finditer(
-            r'<script[^>]*type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
-            html_str, re.DOTALL,
-        )):
+        for i, m in enumerate(
+            re.finditer(
+                r'<script[^>]*type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
+                html_str,
+                re.DOTALL,
+            )
+        ):
             raw = m.group(1).strip()
             if not raw:
                 continue
@@ -413,9 +423,8 @@ class GenericScraper(AbstractScraper):
     def _try_opengraph(self, soup: BeautifulSoup) -> dict | None:
         result: dict = {}
 
-        og_price = (
-            soup.find("meta", property="og:price:amount")
-            or soup.find("meta", attrs={"name": "og:price:amount"})
+        og_price = soup.find("meta", property="og:price:amount") or soup.find(
+            "meta", attrs={"name": "og:price:amount"}
         )
         if og_price:
             parsed = parse_price(og_price.get("content", ""))
@@ -477,8 +486,12 @@ class GenericScraper(AbstractScraper):
                 continue
             for el in elements:
                 for attr in (
-                    "data-price", "data-product-price", "data-current-price",
-                    "data-sale-price", "content", "value",
+                    "data-price",
+                    "data-product-price",
+                    "data-current-price",
+                    "data-sale-price",
+                    "content",
+                    "value",
                 ):
                     data_val = el.get(attr)
                     if data_val:
@@ -545,9 +558,7 @@ class GenericScraper(AbstractScraper):
                         return {"price": parsed}
 
             if "variants" in text and "price" in text:
-                for json_match in re.finditer(
-                    r'\{[^{}]*"price"\s*:\s*"?\d+\.?\d*"?[^{}]*\}', text
-                ):
+                for json_match in re.finditer(r'\{[^{}]*"price"\s*:\s*"?\d+\.?\d*"?[^{}]*\}', text):
                     try:
                         obj = json.loads(json_match.group())
                         price = obj.get("price")

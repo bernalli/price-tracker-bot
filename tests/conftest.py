@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import aiosqlite
 import httpx
@@ -12,6 +12,8 @@ import pytest
 import pytest_asyncio
 import respx
 
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
@@ -25,8 +27,10 @@ def fixtures_dir() -> Path:
 @pytest.fixture
 def load_fixture(fixtures_dir: Path):
     """Helper to load a fixture file as text."""
+
     def _loader(rel_path: str) -> str:
         return (fixtures_dir / rel_path).read_text(encoding="utf-8")
+
     return _loader
 
 

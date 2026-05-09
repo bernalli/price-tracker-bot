@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from functools import wraps
-from typing import Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 import httpx
 from tenacity import (
@@ -17,6 +17,8 @@ from tenacity import (
     wait_random_exponential,
 )
 
+if TYPE_CHECKING:
+    from tenacity.wait import wait_base
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -39,9 +41,7 @@ def is_retryable_http_error(exc: BaseException) -> bool:
     """Return True if `exc` represents a transient HTTP failure worth retrying."""
     if isinstance(exc, httpx.HTTPStatusError):
         return exc.response.status_code in _RETRYABLE_STATUS
-    if isinstance(exc, (httpx.TimeoutException, httpx.NetworkError, httpx.ConnectError)):
-        return True
-    return False
+    return isinstance(exc, (httpx.TimeoutException, httpx.NetworkError, httpx.ConnectError))
 
 
 def with_retry(config: RetryConfig | None = None) -> Callable[[F], F]:
@@ -53,6 +53,7 @@ def with_retry(config: RetryConfig | None = None) -> Callable[[F], F]:
     """
     cfg = config or RetryConfig()
 
+    wait_strategy: wait_base
     if cfg.jitter:
         wait_strategy = wait_random_exponential(multiplier=cfg.base_wait, max=cfg.max_wait)
     else:
@@ -72,7 +73,10 @@ def with_retry(config: RetryConfig | None = None) -> Callable[[F], F]:
                         return await func(*args, **kwargs)
             except RetryError as e:
                 # Should not reach here because reraise=True, but be explicit.
-                raise e.last_attempt.exception() from e
+                last_exc = e.last_attempt.exception()
+                if last_exc is not None:
+                    raise last_exc from e
+                raise
             return None  # unreachable; kept for type checker
 
         return wrapper  # type: ignore[return-value]

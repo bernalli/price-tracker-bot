@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import logging
 import re
-from pathlib import Path
+from typing import TYPE_CHECKING
 
-import aiosqlite
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    import aiosqlite
 
 logger = logging.getLogger(__name__)
 

@@ -31,6 +31,7 @@ def available() -> bool:
     try:
         import playwright  # noqa: F401
         from playwright.async_api import async_playwright  # noqa: F401
+
         return True
     except ImportError:
         return False

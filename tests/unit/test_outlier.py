@@ -50,8 +50,8 @@ def test_outlier_threshold_configurable():
 @pytest.mark.parametrize(
     ("price", "expected"),
     [
-        (Decimal("0"), True),    # zero price = always outlier
-        (Decimal("-5"), True),   # negative = always outlier
+        (Decimal("0"), True),  # zero price = always outlier
+        (Decimal("-5"), True),  # negative = always outlier
     ],
 )
 def test_invalid_price_is_outlier(price, expected):

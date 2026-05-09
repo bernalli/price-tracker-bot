@@ -102,7 +102,7 @@ async def handle_text_input(  # noqa: PLR0915 — verbatim port; cyclomatic spli
             if current and target < current:
                 diff_pct = ((current - target) / current) * 100
                 current_display = _convert_display(current, currency)
-                msg += f"\n💰 Attuale: {current_display} " f"(-{diff_pct:.1f}% necessario)"
+                msg += f"\n💰 Attuale: {current_display} (-{diff_pct:.1f}% necessario)"
             await update.message.reply_text(msg, parse_mode=ParseMode.HTML)
 
     elif action_type == "threshold":

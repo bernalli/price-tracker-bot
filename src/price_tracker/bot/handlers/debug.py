@@ -71,8 +71,7 @@ async def cmd_debug(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                             },
                         )
                         lines.append(
-                            f"📡 httpx fresh: <b>HTTP {r2.status_code}</b> "
-                            f"({len(r2.text)} chars)"
+                            f"📡 httpx fresh: <b>HTTP {r2.status_code}</b> ({len(r2.text)} chars)"
                         )
                         if r2.status_code == 200 and len(r2.text) > len(html):
                             html = r2.text
@@ -87,7 +86,7 @@ async def cmd_debug(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 async with AsyncSession(impersonate="chrome") as session:
                     r2 = await session.get(url, allow_redirects=True, timeout=30)
                     lines.append(
-                        f"📡 curl_cffi: <b>HTTP {r2.status_code}</b> " f"({len(r2.text)} chars)"
+                        f"📡 curl_cffi: <b>HTTP {r2.status_code}</b> ({len(r2.text)} chars)"
                     )
                     if r2.status_code == 200:
                         html = r2.text
@@ -142,14 +141,14 @@ async def cmd_debug(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             try:
                 raw = s.string or s.get_text(strip=True)
                 if not raw:
-                    lines.append(f"📦 JSON-LD #{i+1}: contenuto vuoto")
+                    lines.append(f"📦 JSON-LD #{i + 1}: contenuto vuoto")
                     continue
                 data = _json.loads(raw)
                 tp = data.get("@type", "?")
                 offers = data.get("offers", data.get("Offers"))
                 has_offers = offers is not None
                 lines.append(
-                    f"📦 JSON-LD #{i+1}: type=<b>{tp}</b> " f"offers={'✅' if has_offers else '❌'}"
+                    f"📦 JSON-LD #{i + 1}: type=<b>{tp}</b> offers={'✅' if has_offers else '❌'}"
                 )
                 if has_offers:
                     if isinstance(offers, dict):
@@ -160,7 +159,7 @@ async def cmd_debug(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                         for o in offers[:2]:
                             lines.append(f"   → price: {o.get('price', '?')}")
             except Exception as e:  # noqa: BLE001 — debug parse surface
-                lines.append(f"📦 JSON-LD #{i+1}: parse error: {str(e)[:40]}")
+                lines.append(f"📦 JSON-LD #{i + 1}: parse error: {str(e)[:40]}")
     else:
         lines.append("📦 JSON-LD: ❌ non trovato")
 
@@ -169,17 +168,17 @@ async def cmd_debug(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "meta", attrs={"name": "og:price:amount"}
     )
     if og_price:
-        lines.append(f"🏷 og:price:amount: <b>{og_price.get('content', '?')}</b>")  # type: ignore[union-attr]
+        lines.append(f"🏷 og:price:amount: <b>{og_price.get('content', '?')}</b>")
     product_price = soup.find("meta", property="product:price:amount")
     if product_price:
-        lines.append(f"🏷 product:price:amount: <b>{product_price.get('content', '?')}</b>")  # type: ignore[union-attr]
+        lines.append(f"🏷 product:price:amount: <b>{product_price.get('content', '?')}</b>")
     if not og_price and not product_price:
         lines.append("🏷 OG/meta price: ❌ non trovato")
 
     # Step 4: Check microdata
     itemprop_price = soup.find(attrs={"itemprop": "price"})
     if itemprop_price:
-        val = itemprop_price.get("content") or itemprop_price.get_text(strip=True)  # type: ignore[union-attr]
+        val = itemprop_price.get("content") or itemprop_price.get_text(strip=True)
         lines.append(f"🔖 itemprop=price: <b>{str(val)[:30]}</b>")
     else:
         lines.append("🔖 itemprop=price: ❌ non trovato")
@@ -216,8 +215,8 @@ async def cmd_debug(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     # Step 7: Title
     title = soup.find("title")
-    if title and title.string:  # type: ignore[union-attr]
-        lines.append(f"\n📝 Title: {_escape_html(title.string.strip()[:80])}")  # type: ignore[union-attr]
+    if title and title.string:
+        lines.append(f"\n📝 Title: {_escape_html(title.string.strip()[:80])}")
 
     # Step 8: Run actual scraper
     scraper = _scraper(context)
