@@ -33,6 +33,7 @@ NotifierFn = Callable[[int, str], Awaitable[None]]
 
 def _no_op_health_mgr() -> HealthManager:
     """Return a HealthManager subclass that never locks or half-opens anything."""
+    from price_tracker.core.health import QuarantineState  # local import avoids circularity
 
     class _NoOpHealthManager(HealthManager):
         def __init__(self) -> None:
@@ -43,6 +44,12 @@ def _no_op_health_mgr() -> HealthManager:
 
         def is_half_open(self, domain: str) -> bool:  # noqa: ARG002
             return False
+
+        async def record_block(self, domain: str, *, reason: str) -> QuarantineState:  # noqa: ARG002
+            return QuarantineState.CLOSED
+
+        async def record_success(self, domain: str) -> QuarantineState:  # noqa: ARG002
+            return QuarantineState.CLOSED
 
     return _NoOpHealthManager()
 
@@ -80,6 +87,9 @@ class Scheduler:
         Filtering rules per Feature B:
           - skip products on LOCKED domains entirely
           - on HALF_OPEN domains send exactly one probe (first product per domain per tick)
+
+        Rate-limiting pacing (`delay_between_products`) is applied between scrapes
+        to be friendly to upstream servers.
         """
         half_open_seen: set[str] = set()
         for product in products:
@@ -87,34 +97,33 @@ class Scheduler:
             if not domain:
                 # Unknown domain — best-effort scrape (Generic scraper handles it)
                 await self._scrape_one(product)
+                await asyncio.sleep(self.deps.delay_between_products)
                 continue
 
             if self.deps.health_mgr.is_locked(domain):
-                continue  # skip — domain is in quarantine lockout
+                continue  # skip — domain is in quarantine lockout; no sleep needed
 
             if self.deps.health_mgr.is_half_open(domain):
                 if domain in half_open_seen:
-                    continue  # only one probe per half-open domain per tick
+                    continue  # only one probe per half-open domain per tick; no sleep needed
                 half_open_seen.add(domain)
 
             await self._scrape_one(product)
+            await asyncio.sleep(self.deps.delay_between_products)
 
     async def run_check_for_user(self, *, user_id: int) -> None:
         """Check every active product owned by `user_id` sequentially."""
         products = await self.deps.repo.list_products_for_user(user_id=user_id, only_active=True)
-        for p in products:
-            try:
-                await self._check_product(p.id)
-            except (httpx.HTTPError, ValueError, KeyError) as e:
-                logger.warning("Check failed for product %d: %s", p.id, e)
-                await self.deps.repo.increment_errors(p.id)
-            await asyncio.sleep(self.deps.delay_between_products)
+        await self._run_tick(products)
 
     async def run_check_all(self) -> None:
         """Check every active product across every active user."""
         users = await self.deps.repo.list_active_users()
         for u in users:
-            await self.run_check_for_user(user_id=u.user_id)
+            products = await self.deps.repo.list_products_for_user(
+                user_id=u.user_id, only_active=True
+            )
+            await self._run_tick(products)
 
     async def _check_product(self, product_id: int) -> None:
         p = await self.deps.repo.get_product(product_id)
