@@ -146,3 +146,26 @@ async def test_health_command_shows_recent_blocks() -> None:
 
     rendered: str = update.message.reply_html.call_args.args[0]
     assert "HTTP 403" in rendered or "blocked.com" in rendered
+
+
+@pytest.mark.asyncio
+async def test_health_command_handles_locked_without_locked_until() -> None:
+    """Regression: sort key must not crash when locked_until is None."""
+    update = MagicMock()
+    update.effective_user.id = 12345
+    update.message.reply_html = AsyncMock()
+
+    context = _make_context(
+        health_records=[
+            ScraperHealth(
+                domain="x.com",
+                state="LOCKED_T1",
+                consecutive_blocks=3,
+                locked_until=None,  # edge case: no expiry set
+            ),
+        ],
+        is_admin=True,
+    )
+
+    await health_command(update, context)
+    update.message.reply_html.assert_awaited()
