@@ -10,6 +10,7 @@ from __future__ import annotations
 import json as _json
 import logging
 import re as _re
+from datetime import UTC
 from typing import TYPE_CHECKING
 
 import httpx
@@ -271,8 +272,80 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML)
 
 
+@admin_only
+async def health_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Admin: show scraper health report (English output)."""
+    from datetime import datetime  # noqa: PLC0415 — localised import avoids circular
+
+    from price_tracker.core.health import QuarantineState  # noqa: PLC0415
+
+    def _format_remaining(until: datetime | None) -> str:
+        if until is None:
+            return "—"
+        delta = until - datetime.now(UTC)
+        if delta.total_seconds() <= 0:
+            return "expired"
+        hours, rem = divmod(int(delta.total_seconds()), 3600)
+        minutes = rem // 60
+        if hours:
+            return f"{hours}h {minutes:02d}m"
+        return f"{minutes}m"
+
+    def _tier_label(state: str) -> str:
+        return {
+            QuarantineState.LOCKED_T1.value: "T1 (1h)",
+            QuarantineState.LOCKED_T2.value: "T2 (6h)",
+            QuarantineState.LOCKED_T3.value: "T3 (24h)",
+            QuarantineState.HALF_OPEN_T1.value: "T1 half-open",
+            QuarantineState.HALF_OPEN_T2.value: "T2 half-open",
+            QuarantineState.HALF_OPEN_T3.value: "T3 half-open",
+        }.get(state, state)
+
+    health_mgr = context.bot_data["health_manager"]
+    records = health_mgr.all_records()
+
+    healthy = [r for r in records if r.state == QuarantineState.CLOSED.value]
+    locked = [r for r in records if r.state.startswith("LOCKED_")]
+    half_open = [r for r in records if r.state.startswith("HALF_OPEN_")]
+
+    lines: list[str] = ["🏥 <b>Scraper Health Report</b>", ""]
+    lines.append(f"✅ Healthy domains: {len(healthy)}")
+    lines.append(f"⚠️ Half-open: {len(half_open)}")
+    lines.append(f"🔒 Locked: {len(locked)}")
+    lines.append("")
+
+    if locked:
+        lines.append("<b>Locked:</b>")
+        for r in sorted(locked, key=lambda x: x.locked_until or datetime.max):
+            lines.append(
+                f"  • {r.domain} — {_tier_label(r.state)}, "
+                f"expires in {_format_remaining(r.locked_until)}"
+            )
+        lines.append("")
+
+    if half_open:
+        lines.append("<b>Half-open:</b>")
+        for r in half_open:
+            lines.append(f"  • {r.domain} — probing on next tick")
+        lines.append("")
+
+    recent_blocks = sorted(
+        (r for r in records if r.last_block_at),
+        key=lambda x: x.last_block_at,
+        reverse=True,
+    )[:5]
+    if recent_blocks:
+        lines.append("<b>Last 5 block events:</b>")
+        for r in recent_blocks:
+            ts = r.last_block_at.strftime("%Y-%m-%d %H:%M:%SZ") if r.last_block_at else "—"
+            lines.append(f"  • {r.domain} — {r.last_block_reason or '?'} — {ts}")
+
+    await update.message.reply_html("\n".join(lines))
+
+
 def register(app: Application) -> None:
     """Register debug/status command handlers on `app`."""
     app.add_handler(CommandHandler("debug", cmd_debug))
     app.add_handler(CommandHandler("stato", cmd_status))
     app.add_handler(CommandHandler("status", cmd_status))
+    app.add_handler(CommandHandler("health", health_command))
