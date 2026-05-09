@@ -3,16 +3,17 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 from pathlib import Path
 from typing import Any
 
 import aiosqlite
 import httpx  # noqa: F401  — kept for future direct use; build_client returns AsyncClient
+import structlog
 from telegram.ext import Application, ContextTypes
 
 from price_tracker.bot.handlers import register_handlers
-from price_tracker.config import Config
+from price_tracker.config import Config, parse_bind
+from price_tracker.core.health import HealthManager
 from price_tracker.core.http_client import build_client
 from price_tracker.core.registry import (
     ScraperRegistry,
@@ -23,18 +24,13 @@ from price_tracker.core.scheduler import Scheduler, SchedulerDeps
 from price_tracker.db.migrator import apply_migrations
 from price_tracker.db.repository import Repository
 from price_tracker.notifier.telegram import TelegramNotifier
+from price_tracker.observability.logging import configure_logging
+from price_tracker.observability.metrics import MetricsRegistry, MetricsServer
 
 MIGRATIONS_DIR = Path(__file__).parent / "db" / "migrations"
 PLUGIN_DIR_DEFAULT = Path("/app/plugins")
 
-
-def setup_logging(level: str) -> None:
-    logging.basicConfig(
-        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        level=getattr(logging, level.upper(), logging.INFO),
-    )
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    logging.getLogger("httpcore").setLevel(logging.WARNING)
+log = structlog.get_logger(__name__)
 
 
 async def post_init(application: Application[Any, Any, Any, Any, Any, Any]) -> None:
@@ -56,6 +52,11 @@ async def _setup_scheduler(application: Application[Any, Any, Any, Any, Any, Any
     repo: Repository = application.bot_data["repo"]
     client = application.bot_data["http_client"]
     registry: ScraperRegistry = application.bot_data["registry"]
+
+    health_mgr = HealthManager(repo)
+    await health_mgr.load()
+    application.bot_data["health_manager"] = health_mgr
+
     notifier = TelegramNotifier(application.bot)
     application.bot_data["scheduler"] = Scheduler(
         SchedulerDeps(
@@ -65,6 +66,7 @@ async def _setup_scheduler(application: Application[Any, Any, Any, Any, Any, Any
             notifier=notifier,
             max_consecutive_errors=config.max_consecutive_errors,
             delay_between_products=config.check_delay_seconds,
+            health_mgr=health_mgr,
         )
     )
 
@@ -81,7 +83,8 @@ async def scheduled_check_job(context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def amain() -> None:
     config = Config.from_env()
-    setup_logging(config.log_level)
+    configure_logging(level=config.log_level)
+    log.info("bot.starting", log_level=config.log_level)
 
     Path(config.database_path).parent.mkdir(parents=True, exist_ok=True)
     db_conn = await aiosqlite.connect(config.database_path)
@@ -96,6 +99,18 @@ async def amain() -> None:
 
     application.bot_data["config"] = config
     application.bot_data["db_conn"] = db_conn
+
+    metrics = MetricsRegistry()
+    application.bot_data["metrics"] = metrics
+
+    metrics_server: MetricsServer | None = None
+    if config.metrics_enabled:
+        host, port = parse_bind(config.prometheus_bind)
+        metrics_server = MetricsServer(host=host, port=port, metrics=metrics)
+        await metrics_server.start()
+        log.info("metrics_server.start", host=host, port=port)
+    else:
+        log.info("metrics_server.disabled")
 
     registry = ScraperRegistry()
     discover_builtin_scrapers(registry)
@@ -119,6 +134,9 @@ async def amain() -> None:
     try:
         await asyncio.Event().wait()
     finally:
+        if metrics_server is not None:
+            await metrics_server.stop()
+            log.info("metrics_server.stop")
         await application.updater.stop()
         await application.stop()
         await application.shutdown()
