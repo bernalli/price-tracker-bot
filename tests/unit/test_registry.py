@@ -84,3 +84,118 @@ def test_registry_register_rejects_duplicates():
     r.register(FakeAmazon())
     with pytest.raises(ValueError, match="already registered"):
         r.register(FakeAmazon())
+
+
+def test_registry_len_and_empty_resolve():
+    r = ScraperRegistry()
+    assert len(r) == 0
+    r.register(FakeAmazon())
+    assert len(r) == 1
+
+
+def test_discover_builtin_scrapers_loads_real_modules():
+    """Smoke test for the discover-builtin path: scans price_tracker.scrapers package."""
+    from price_tracker.core.registry import discover_builtin_scrapers
+
+    r = ScraperRegistry()
+    discover_builtin_scrapers(r)
+    # Built-in scrapers from item 24: amazon, ebay, shopify, generic, playwright_fallback
+    names = {s.name for s in r}
+    # We don't pin the exact set (drop-in changes are possible) — just check non-empty
+    assert len(names) >= 1
+
+
+def test_discover_builtin_scrapers_skips_duplicates_silently():
+    """If a scraper class is found twice (re-discovery), the ValueError branch swallows."""
+    from price_tracker.core.registry import discover_builtin_scrapers
+
+    r = ScraperRegistry()
+    discover_builtin_scrapers(r)
+    initial_count = len(r)
+    # Second call should not raise — duplicate names hit the swallow branch (lines 71-73)
+    discover_builtin_scrapers(r)
+    assert len(r) == initial_count
+
+
+def test_discover_dropin_scrapers_no_dir_returns_silently(tmp_path):
+    """When plugin_dir doesn't exist, discover returns without error."""
+    from price_tracker.core.registry import discover_dropin_scrapers
+
+    r = ScraperRegistry()
+    missing = tmp_path / "does-not-exist"
+    discover_dropin_scrapers(r, missing)
+    assert len(r) == 0
+
+
+def test_discover_dropin_scrapers_loads_py_file(tmp_path):
+    """Drop-in: a *.py file with a Scraper subclass gets registered."""
+    from price_tracker.core.registry import discover_dropin_scrapers
+
+    plugin_file = tmp_path / "myplugin.py"
+    plugin_file.write_text(
+        "import re\n"
+        "from decimal import Decimal\n"
+        "from price_tracker.core.scraper_base import AbstractScraper, ProductInfo\n"
+        "\n"
+        "class MyDropIn(AbstractScraper):\n"
+        "    name = 'mydropin'\n"
+        "    priority = 50\n"
+        "    domain_patterns = [re.compile(r'mysite\\.')]\n"
+        "    def can_handle(self, url):\n"
+        "        return self.matches_domain(url)\n"
+        "    async def scrape(self, url, client):\n"
+        "        return ProductInfo(price=Decimal('9.99'))\n"
+    )
+
+    r = ScraperRegistry()
+    discover_dropin_scrapers(r, tmp_path)
+    names = {s.name for s in r}
+    assert "mydropin" in names
+
+
+def test_discover_dropin_scrapers_skips_underscore_files(tmp_path):
+    """Files starting with _ (e.g. _helpers.py) are ignored."""
+    from price_tracker.core.registry import discover_dropin_scrapers
+
+    (tmp_path / "_helper.py").write_text(
+        "from price_tracker.core.scraper_base import AbstractScraper\n"
+        "class Hidden(AbstractScraper):\n"
+        "    name = 'hidden'\n"
+        "    priority = 1\n"
+        "    domain_patterns = []\n"
+        "    def can_handle(self, url):\n"
+        "        return False\n"
+        "    async def scrape(self, url, client):\n"
+        "        from price_tracker.core.scraper_base import ProductInfo\n"
+        "        return ProductInfo()\n"
+    )
+    r = ScraperRegistry()
+    discover_dropin_scrapers(r, tmp_path)
+    assert len(r) == 0
+
+
+def test_discover_dropin_scrapers_swallows_duplicate(tmp_path):
+    """Drop-in twice → ValueError branch swallows (lines 98-99)."""
+    from price_tracker.core.registry import discover_dropin_scrapers
+
+    plugin_file = tmp_path / "dup.py"
+    plugin_file.write_text(
+        "from decimal import Decimal\n"
+        "from price_tracker.core.scraper_base import AbstractScraper, ProductInfo\n"
+        "\n"
+        "class DupOne(AbstractScraper):\n"
+        "    name = 'dupone'\n"
+        "    priority = 1\n"
+        "    domain_patterns = []\n"
+        "    def can_handle(self, url):\n"
+        "        return False\n"
+        "    async def scrape(self, url, client):\n"
+        "        return ProductInfo(price=Decimal('1'))\n"
+    )
+
+    r = ScraperRegistry()
+    discover_dropin_scrapers(r, tmp_path)
+    assert len(r) == 1
+    # Second call: same class definition reloaded → duplicate name → swallowed
+    discover_dropin_scrapers(r, tmp_path)
+    assert len(r) == 1
