@@ -6,13 +6,16 @@ user_id as label (privacy + cardinality invariant).
 
 from __future__ import annotations
 
-from prometheus_client import REGISTRY as DEFAULT_REGISTRY
+from aiohttp import web
 from prometheus_client import (
+    CONTENT_TYPE_LATEST,
     CollectorRegistry,
     Counter,
     Gauge,
     Histogram,
+    generate_latest,
 )
+from prometheus_client import REGISTRY as DEFAULT_REGISTRY
 
 NAMESPACE = "price_tracker"
 
@@ -110,3 +113,41 @@ class MetricsRegistry:
     @property
     def registry(self) -> CollectorRegistry:
         return self._registry
+
+
+class MetricsServer:
+    """aiohttp HTTP server exposing /metrics on a configurable bind address.
+
+    Default bind is 127.0.0.1:9090 (localhost only, no auth).
+    """
+
+    def __init__(
+        self,
+        *,
+        host: str = "127.0.0.1",
+        port: int = 9090,
+        metrics: MetricsRegistry,
+    ) -> None:
+        self._host = host
+        self._port = port
+        self._metrics = metrics
+        self._app = web.Application()
+        self._app.router.add_get("/metrics", self._handle_metrics)
+        self._runner: web.AppRunner | None = None
+        self._site: web.TCPSite | None = None
+
+    async def _handle_metrics(self, request: web.Request) -> web.Response:  # noqa: ARG002
+        body = generate_latest(self._metrics.registry)
+        return web.Response(body=body, content_type=CONTENT_TYPE_LATEST.split(";")[0].strip())
+
+    async def start(self) -> None:
+        self._runner = web.AppRunner(self._app)
+        await self._runner.setup()
+        self._site = web.TCPSite(self._runner, host=self._host, port=self._port)
+        await self._site.start()
+
+    async def stop(self) -> None:
+        if self._site is not None:
+            await self._site.stop()
+        if self._runner is not None:
+            await self._runner.cleanup()
