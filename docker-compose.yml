@@ -1,0 +1,33 @@
+services:
+  price-tracker:
+    build: .
+    image: price-tracker:dev
+    container_name: price-tracker-bot
+    restart: unless-stopped
+    env_file: .env
+    user: "1000:1000"
+    read_only: true
+    tmpfs:
+      - /tmp:size=64M
+      - /home/botuser/.cache:size=512M
+    volumes:
+      - ./data:/data
+      - ./plugins:/app/plugins:ro
+    mem_limit: 512m
+    cpus: 1.0
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sqlite3; sqlite3.connect('/data/pricetracker.db').execute('SELECT 1')"]
+      interval: 5m
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
