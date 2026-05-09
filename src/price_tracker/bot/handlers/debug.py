@@ -10,7 +10,7 @@ from __future__ import annotations
 import json as _json
 import logging
 import re as _re
-from datetime import UTC
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 import httpx
@@ -26,6 +26,34 @@ if TYPE_CHECKING:
     from telegram.ext import ContextTypes
 
 logger = logging.getLogger(__name__)
+
+
+def _format_remaining(until: datetime | None) -> str:
+    """Return a human-readable time-until string for a tz-aware expiry datetime."""
+    if until is None:
+        return "—"
+    delta = until - datetime.now(UTC)
+    if delta.total_seconds() <= 0:
+        return "expired"
+    hours, rem = divmod(int(delta.total_seconds()), 3600)
+    minutes = rem // 60
+    if hours:
+        return f"{hours}h {minutes:02d}m"
+    return f"{minutes}m"
+
+
+def _tier_label(state: str) -> str:
+    """Map a QuarantineState value to a short human-readable tier label."""
+    from price_tracker.core.health import QuarantineState  # noqa: PLC0415
+
+    return {
+        QuarantineState.LOCKED_T1.value: "T1 (1h)",
+        QuarantineState.LOCKED_T2.value: "T2 (6h)",
+        QuarantineState.LOCKED_T3.value: "T3 (24h)",
+        QuarantineState.HALF_OPEN_T1.value: "T1 half-open",
+        QuarantineState.HALF_OPEN_T2.value: "T2 half-open",
+        QuarantineState.HALF_OPEN_T3.value: "T3 half-open",
+    }.get(state, state)
 
 
 @admin_only
@@ -275,31 +303,7 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 @admin_only
 async def health_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Admin: show scraper health report (English output)."""
-    from datetime import datetime  # noqa: PLC0415 — localised import avoids circular
-
     from price_tracker.core.health import QuarantineState  # noqa: PLC0415
-
-    def _format_remaining(until: datetime | None) -> str:
-        if until is None:
-            return "—"
-        delta = until - datetime.now(UTC)
-        if delta.total_seconds() <= 0:
-            return "expired"
-        hours, rem = divmod(int(delta.total_seconds()), 3600)
-        minutes = rem // 60
-        if hours:
-            return f"{hours}h {minutes:02d}m"
-        return f"{minutes}m"
-
-    def _tier_label(state: str) -> str:
-        return {
-            QuarantineState.LOCKED_T1.value: "T1 (1h)",
-            QuarantineState.LOCKED_T2.value: "T2 (6h)",
-            QuarantineState.LOCKED_T3.value: "T3 (24h)",
-            QuarantineState.HALF_OPEN_T1.value: "T1 half-open",
-            QuarantineState.HALF_OPEN_T2.value: "T2 half-open",
-            QuarantineState.HALF_OPEN_T3.value: "T3 half-open",
-        }.get(state, state)
 
     health_mgr = context.bot_data["health_manager"]
     records = health_mgr.all_records()
@@ -316,7 +320,7 @@ async def health_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     if locked:
         lines.append("<b>Locked:</b>")
-        for r in sorted(locked, key=lambda x: x.locked_until or datetime.max):
+        for r in sorted(locked, key=lambda x: x.locked_until or datetime.max.replace(tzinfo=UTC)):
             lines.append(
                 f"  • {r.domain} — {_tier_label(r.state)}, "
                 f"expires in {_format_remaining(r.locked_until)}"
