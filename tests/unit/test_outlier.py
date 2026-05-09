@@ -5,8 +5,10 @@ from __future__ import annotations
 from decimal import Decimal
 
 import pytest
+from prometheus_client import CollectorRegistry
 
 from price_tracker.core.outlier import OutlierResult, is_outlier
+from price_tracker.observability.metrics import MetricsRegistry
 
 
 def _hist(values: list[float]) -> list[Decimal]:
@@ -74,3 +76,41 @@ def test_low_outlier_when_price_far_below_median():
     # 100/10 = 10 > 2.5 → low outlier
     assert result.is_outlier is True
     assert result.median == Decimal("100")
+
+
+def test_outlier_detector_emits_metric_when_rejecting():
+    reg = CollectorRegistry()
+    metrics = MetricsRegistry(registry=reg)
+    history = [Decimal("100")] * 10
+    result = is_outlier(
+        Decimal("1"),
+        history,
+        metrics=metrics,
+        scraper="amazon",
+        domain="amazon.com",
+    )
+    assert result.is_outlier is True
+    val = reg.get_sample_value(
+        "price_tracker_outlier_rejected_total",
+        {"scraper": "amazon", "domain": "amazon.com"},
+    )
+    assert val == 1
+
+
+def test_outlier_detector_does_not_emit_when_not_rejecting():
+    reg = CollectorRegistry()
+    metrics = MetricsRegistry(registry=reg)
+    history = [Decimal("100")] * 10
+    result = is_outlier(
+        Decimal("105"),
+        history,
+        metrics=metrics,
+        scraper="amazon",
+        domain="amazon.com",
+    )
+    assert result.is_outlier is False
+    val = reg.get_sample_value(
+        "price_tracker_outlier_rejected_total",
+        {"scraper": "amazon", "domain": "amazon.com"},
+    )
+    assert val is None
