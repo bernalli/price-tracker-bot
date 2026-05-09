@@ -19,10 +19,10 @@ MIGRATIONS_DIR = Path("src/price_tracker/db/migrations")
 
 
 @pytest.mark.asyncio
-async def test_list_migrations_finds_001_to_009():
+async def test_list_migrations_finds_001_to_010():
     files = list_migrations(MIGRATIONS_DIR)
     versions = [v for v, _ in files]
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
 
 @pytest.mark.asyncio
@@ -37,7 +37,7 @@ async def test_apply_migrations_brings_fresh_db_to_latest():
     async with aiosqlite.connect(":memory:") as conn:
         await apply_migrations(conn, MIGRATIONS_DIR)
         version = await get_current_version(conn)
-        assert version == 9
+        assert version == 10
         cursor = await conn.execute("PRAGMA table_info(products)")
         cols = [row[1] async for row in cursor]
         assert "id" in cols
@@ -56,7 +56,7 @@ async def test_apply_migrations_is_idempotent():
         await apply_migrations(conn, MIGRATIONS_DIR)
         await apply_migrations(conn, MIGRATIONS_DIR)
         version = await get_current_version(conn)
-        assert version == 9
+        assert version == 10
 
 
 @pytest.mark.asyncio
@@ -91,7 +91,7 @@ async def test_apply_migrations_partial_then_complete():
 
         await apply_migrations(conn, MIGRATIONS_DIR)
         version = await get_current_version(conn)
-        assert version == 9
+        assert version == 10
 
 
 class TestMigration008:
@@ -185,3 +185,26 @@ def test_notification_prefs_dataclass():
     assert p.user_id == 1
     assert p.product_id is None
     assert p.timezone == "Europe/Rome"
+
+
+class TestMigration010:
+    @pytest.mark.asyncio
+    async def test_creates_digest_queue_table(self, tmp_db_path):
+        migrator = Migrator(db_path=tmp_db_path)
+        await migrator.migrate()
+        async with migrator._connect() as conn:
+            cursor = await conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='digest_queue'"
+            )
+            assert await cursor.fetchone() is not None
+
+    @pytest.mark.asyncio
+    async def test_idempotent_replay_010(self, tmp_db_path):
+        migrator = Migrator(db_path=tmp_db_path)
+        await migrator.migrate()
+        await migrator.migrate()
+        async with migrator._connect() as conn:
+            cursor = await conn.execute("SELECT MAX(version) FROM schema_version")
+            row = await cursor.fetchone()
+            assert row is not None
+            assert row[0] >= 10

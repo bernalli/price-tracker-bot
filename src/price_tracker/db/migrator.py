@@ -79,11 +79,22 @@ async def _execute_migration_sql(conn: aiosqlite.Connection, sql: str) -> None:
         await conn.execute(stmt)
 
 
-async def apply_migrations(conn: aiosqlite.Connection, migrations_dir: Path) -> int:
-    """Apply all unapplied migrations in order. Returns the new current version."""
+async def apply_migrations(
+    conn: aiosqlite.Connection,
+    migrations_dir: Path,
+    *,
+    max_version: int | None = None,
+) -> int:
+    """Apply all unapplied migrations in order. Returns the new current version.
+
+    If ``max_version`` is given, only migrations with version ``<= max_version``
+    are applied. Useful in tests to bootstrap an older schema baseline.
+    """
     await _ensure_schema_version_table(conn)
     current = await get_current_version(conn)
     pending = [(v, p) for v, p in list_migrations(migrations_dir) if v > current]
+    if max_version is not None:
+        pending = [(v, p) for v, p in pending if v <= max_version]
 
     for version, path in pending:
         logger.info("Applying migration %03d (%s)", version, path.name)
@@ -115,15 +126,18 @@ class Migrator:
     def __init__(
         self,
         db_path: Path,
+        *,
         migrations_dir: Path = _DEFAULT_MIGRATIONS_DIR,
+        max_version: int | None = None,
     ) -> None:
         self._db_path = db_path
         self._migrations_dir = migrations_dir
+        self._max_version = max_version
 
     async def migrate(self) -> int:
         """Apply all pending migrations. Returns the resulting schema version."""
         async with self._connect() as conn:
-            return await apply_migrations(conn, self._migrations_dir)
+            return await apply_migrations(conn, self._migrations_dir, max_version=self._max_version)
 
     @contextlib.asynccontextmanager
     async def _connect(self) -> AsyncIterator[aiosqlite.Connection]:
