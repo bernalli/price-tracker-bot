@@ -1,0 +1,209 @@
+{
+  "title": "price-tracker",
+  "schemaVersion": 39,
+  "version": 1,
+  "timezone": "browser",
+  "tags": ["price-tracker"],
+  "editable": true,
+  "graphTooltip": 0,
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "DS_PROMETHEUS",
+        "type": "datasource",
+        "query": "prometheus",
+        "label": "Prometheus datasource",
+        "hide": 0,
+        "refresh": 1
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Uptime",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "targets": [{"expr": "price_tracker_bot_uptime_seconds", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
+      "gridPos": {"h": 4, "w": 8, "x": 0, "y": 0}
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Products tracked",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "targets": [{"expr": "price_tracker_products_tracked_total", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
+      "gridPos": {"h": 4, "w": 8, "x": 8, "y": 0}
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Scheduler jobs active",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "targets": [{"expr": "price_tracker_scheduler_jobs_active", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
+      "gridPos": {"h": 4, "w": 8, "x": 16, "y": 0}
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Scrape rate by status",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "targets": [
+        {
+          "expr": "sum by (status) (rate(price_tracker_price_check_total[5m]))",
+          "refId": "A",
+          "legendFormat": "{{status}}"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "ops"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4}
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Scraper p95 latency",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, scraper) (rate(price_tracker_scraper_duration_seconds_bucket[5m])))",
+          "refId": "A",
+          "legendFormat": "{{scraper}}"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4}
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Locked domains",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "targets": [{"expr": "count(price_tracker_quarantine_state >= 1)", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 6, "x": 0, "y": 12}
+    },
+    {
+      "id": 7,
+      "type": "table",
+      "title": "Quarantine state matrix",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "targets": [
+        {
+          "expr": "price_tracker_quarantine_state",
+          "refId": "A",
+          "format": "table",
+          "instant": true
+        }
+      ],
+      "transformations": [],
+      "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 10, "x": 6, "y": 12}
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Quarantine transitions",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "targets": [
+        {
+          "expr": "sum by (to_state) (rate(price_tracker_quarantine_transitions_total[15m]))",
+          "refId": "A",
+          "legendFormat": "{{to_state}}"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "ops"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 12}
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Notifications sent",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "targets": [
+        {
+          "expr": "sum by (type) (rate(price_tracker_notification_sent_total[5m]))",
+          "refId": "A",
+          "legendFormat": "{{type}}"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "ops"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 20}
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Notifications skipped",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "targets": [
+        {
+          "expr": "sum by (reason) (rate(price_tracker_notification_skipped_total[5m]))",
+          "refId": "A",
+          "legendFormat": "{{reason}}"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "ops"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 20}
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Digest queue size",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "targets": [
+        {
+          "expr": "price_tracker_digest_queue_size",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "short"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 20}
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Outlier rejections",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "targets": [
+        {
+          "expr": "sum by (scraper) (rate(price_tracker_outlier_rejected_total[15m]))",
+          "refId": "A",
+          "legendFormat": "{{scraper}}"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "ops"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 16, "x": 0, "y": 28}
+    },
+    {
+      "id": 13,
+      "type": "stat",
+      "title": "Currency cache hit rate",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "targets": [{"expr": "price_tracker_currency_cache_hit_rate", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1}, "overrides": []},
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 28}
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "Errors by domain",
+      "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+      "targets": [
+        {
+          "expr": "topk(10, sum by (domain) (rate(price_tracker_price_check_total{status=~\"block|error\"}[15m])))",
+          "refId": "A",
+          "legendFormat": "{{domain}}"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "ops"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 36}
+    }
+  ]
+}
