@@ -1,0 +1,63 @@
+"""Outlier detection for price history (median-ratio rejection)."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from decimal import Decimal
+from statistics import median
+
+
+@dataclass(frozen=True)
+class OutlierResult:
+    """Result of outlier check."""
+
+    is_outlier: bool
+    median: Decimal | None = None
+    ratio: Decimal | None = None
+    history_n: int = 0
+
+
+# Minimum history points to enable detection (avoid false positives on short series)
+MIN_HISTORY = 5
+
+# Default tolerance: a price more than `max_ratio` × median is flagged
+DEFAULT_MAX_RATIO = Decimal("2.5")
+
+
+def is_outlier(
+    price: Decimal,
+    history: list[Decimal],
+    *,
+    max_ratio: Decimal = DEFAULT_MAX_RATIO,
+) -> OutlierResult:
+    """Return whether `price` is anomalously high vs `history`.
+
+    Logic:
+    - Zero or negative prices are always outliers.
+    - Histories shorter than MIN_HISTORY skip detection (return False).
+    - A price > max_ratio × median(history) is an outlier.
+    - A price < median / max_ratio is also an outlier (sudden drop, likely
+      installment scrape or wrong-variant). Symmetric ratio check.
+    """
+    if price <= 0:
+        return OutlierResult(is_outlier=True, history_n=len(history))
+
+    if len(history) < MIN_HISTORY:
+        return OutlierResult(is_outlier=False, history_n=len(history))
+
+    med = Decimal(str(median(history)))
+    if med == 0:
+        return OutlierResult(is_outlier=False, median=med, history_n=len(history))
+
+    ratio = price / med
+    inv_ratio = med / price
+
+    is_high_outlier = ratio > max_ratio
+    is_low_outlier = inv_ratio > max_ratio
+
+    return OutlierResult(
+        is_outlier=is_high_outlier or is_low_outlier,
+        median=med,
+        ratio=ratio,
+        history_n=len(history),
+    )
