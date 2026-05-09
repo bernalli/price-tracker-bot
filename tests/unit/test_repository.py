@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import aiosqlite
+import pytest
 import pytest_asyncio
 
 from price_tracker.db.migrator import apply_migrations
+from price_tracker.db.models import ScraperHealth
 from price_tracker.db.repository import Repository
 
 if TYPE_CHECKING:
@@ -350,3 +353,59 @@ async def test_dec_returns_none_on_invalid_string(repo: Repository):
     assert _dec(None) is None
     assert _dec("not-a-decimal") is None
     assert _dec("1.5") == Decimal("1.5")
+
+
+class TestScraperHealthRepository:
+    @pytest.mark.asyncio
+    async def test_get_returns_none_for_missing_domain(self, repo: Repository):
+        result = await repo.get_scraper_health("nonexistent.com")
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_upsert_then_get_roundtrip(self, repo: Repository):
+        now = datetime.now(UTC).replace(microsecond=0)
+        record = ScraperHealth(
+            domain="xteink.com",
+            state="LOCKED_T1",
+            consecutive_blocks=3,
+            locked_until=now + timedelta(hours=1),
+            last_block_at=now,
+            last_block_reason="HTTP 429",
+            last_success_at=None,
+        )
+        await repo.upsert_scraper_health(record)
+        loaded = await repo.get_scraper_health("xteink.com")
+        assert loaded is not None
+        assert loaded.domain == "xteink.com"
+        assert loaded.state == "LOCKED_T1"
+        assert loaded.consecutive_blocks == 3
+        assert loaded.last_block_reason == "HTTP 429"
+
+    @pytest.mark.asyncio
+    async def test_upsert_overwrites(self, repo: Repository):
+        first = ScraperHealth(domain="x.com", state="CLOSED", consecutive_blocks=0)
+        await repo.upsert_scraper_health(first)
+        second = ScraperHealth(domain="x.com", state="LOCKED_T2", consecutive_blocks=6)
+        await repo.upsert_scraper_health(second)
+        loaded = await repo.get_scraper_health("x.com")
+        assert loaded.state == "LOCKED_T2"
+        assert loaded.consecutive_blocks == 6
+
+    @pytest.mark.asyncio
+    async def test_list_locked_filters_correctly(self, repo: Repository):
+        now = datetime.now(UTC)
+        future = now + timedelta(hours=1)
+        await repo.upsert_scraper_health(ScraperHealth(domain="closed.com", state="CLOSED"))
+        await repo.upsert_scraper_health(
+            ScraperHealth(domain="locked.com", state="LOCKED_T1", locked_until=future)
+        )
+        locked = await repo.list_locked_domains()
+        assert {h.domain for h in locked} == {"locked.com"}
+
+    @pytest.mark.asyncio
+    async def test_list_all_returns_every_record(self, repo: Repository):
+        await repo.upsert_scraper_health(ScraperHealth(domain="a.com", state="CLOSED"))
+        await repo.upsert_scraper_health(ScraperHealth(domain="b.com", state="LOCKED_T1"))
+        all_records = await repo.list_all_scraper_health()
+        domains = {h.domain for h in all_records}
+        assert domains == {"a.com", "b.com"}
