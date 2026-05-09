@@ -14,7 +14,9 @@ from urllib.parse import urlparse
 if TYPE_CHECKING:
     import httpx
 
-from price_tracker.core.exceptions import CaptchaDetected, HTTPBlockStatus, WAFBlocked
+    from price_tracker.core.health import HealthManager
+
+from price_tracker.core.exceptions import BlockEvent, CaptchaDetected, HTTPBlockStatus, WAFBlocked
 
 logger = logging.getLogger(__name__)
 
@@ -234,3 +236,35 @@ def detect_block_event(*, status_code: int, body: str, url: str) -> None:
             raise CaptchaDetected(marker=marker, url=url)
 
     return None
+
+
+# ── Pipeline helpers (HealthManager integration) ─────────────────
+
+
+def _block_reason(exc: BlockEvent) -> str:
+    if isinstance(exc, HTTPBlockStatus):
+        return f"HTTP {exc.status}"
+    if isinstance(exc, WAFBlocked):
+        return f"WAF/{exc.provider}"
+    if isinstance(exc, CaptchaDetected):
+        return f"CAPTCHA/{exc.marker}"
+    return "BlockEvent"
+
+
+async def handle_block_in_pipeline(
+    exc: BlockEvent,
+    *,
+    health_mgr: HealthManager,
+    domain: str,
+) -> None:
+    """Record block event in HealthManager. Caller re-raises the exception."""
+    await health_mgr.record_block(domain, reason=_block_reason(exc))
+
+
+async def handle_success_in_pipeline(
+    *,
+    health_mgr: HealthManager,
+    domain: str,
+) -> None:
+    """Record successful scrape in HealthManager."""
+    await health_mgr.record_success(domain)
