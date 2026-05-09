@@ -154,3 +154,80 @@ async def test_convert_to_eur_passes_through_none_price():
     # type: ignore — testing defensive None handling at line 128
     result = await convert_to_eur(db, None, "USD")  # type: ignore[arg-type]
     assert result is None
+
+
+def _count_currency_label(reg: object, label: str) -> float:
+    """Sum samples for currency_lookups_total{result=<label>} on a registry."""
+    from prometheus_client import CollectorRegistry  # noqa: PLC0415
+
+    assert isinstance(reg, CollectorRegistry)
+    return sum(
+        sample.value
+        for metric in reg.collect()
+        if metric.name == "price_tracker_currency_lookups"
+        for sample in metric.samples
+        if sample.name == "price_tracker_currency_lookups_total"
+        and sample.labels.get("result") == label
+    )
+
+
+@pytest.mark.asyncio
+async def test_get_rates_network_error_emits_error_only_not_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Lock invariant: a network failure increments `error` exactly once and
+    does NOT also increment `fallback` (the labels must be mutually exclusive)."""
+    from prometheus_client import CollectorRegistry  # noqa: PLC0415
+
+    from price_tracker.core import currency as currency_mod  # noqa: PLC0415
+    from price_tracker.observability.metrics import MetricsRegistry  # noqa: PLC0415
+
+    reg = CollectorRegistry()
+    metrics = MetricsRegistry(registry=reg)
+    db = _StubDB()
+
+    async def _raise(_client: httpx.AsyncClient) -> dict[str, object] | None:
+        raise httpx.NetworkError("simulated offline")
+
+    monkeypatch.setattr(currency_mod, "_fetch_fresh_rates", _raise)
+
+    async with httpx.AsyncClient() as client:
+        result = await currency_mod.get_rates(db, client, metrics=metrics)
+
+    # Static fallback table should still be returned
+    assert "USD" in result
+    # Mutual exclusion invariant
+    assert _count_currency_label(reg, "error") == 1.0
+    assert _count_currency_label(reg, "fallback") == 0.0
+    # And `miss` was emitted once (cache empty path)
+    assert _count_currency_label(reg, "miss") == 1.0
+
+
+@pytest.mark.asyncio
+async def test_get_rates_parse_failure_emits_fallback_only_not_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Lock invariant: when `_fetch_fresh_rates` returns None for non-network
+    reasons (e.g. parse failure / empty payload), `fallback` is incremented
+    and `error` is NOT (mutually exclusive)."""
+    from prometheus_client import CollectorRegistry  # noqa: PLC0415
+
+    from price_tracker.core import currency as currency_mod  # noqa: PLC0415
+    from price_tracker.observability.metrics import MetricsRegistry  # noqa: PLC0415
+
+    reg = CollectorRegistry()
+    metrics = MetricsRegistry(registry=reg)
+    db = _StubDB()
+
+    async def _none(_client: httpx.AsyncClient) -> dict[str, object] | None:
+        return None  # parse failure / empty rates
+
+    monkeypatch.setattr(currency_mod, "_fetch_fresh_rates", _none)
+
+    async with httpx.AsyncClient() as client:
+        result = await currency_mod.get_rates(db, client, metrics=metrics)
+
+    assert "USD" in result
+    assert _count_currency_label(reg, "fallback") == 1.0
+    assert _count_currency_label(reg, "error") == 0.0
+    assert _count_currency_label(reg, "miss") == 1.0

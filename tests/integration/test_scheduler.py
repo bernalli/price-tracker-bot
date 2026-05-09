@@ -451,10 +451,15 @@ async def test_scheduler_half_open_sends_only_one_probe(
 
 
 @pytest.mark.asyncio
-async def test_scheduler_emits_price_check_total_on_success(
+async def test_scheduler_sets_jobs_active_gauge(
     scheduler_factory: object,
     sample_products: list[ProductRecord],
 ) -> None:
+    """`_run_tick` must set `scheduler_jobs_active` to the number of products
+    in the current tick. `_scrape_one` is mocked because this test scopes
+    only to the gauge — the success-counter path is covered end-to-end by the
+    full pipeline integration tests (see `test_quarantine_flow.py`).
+    """
     from prometheus_client import CollectorRegistry  # noqa: PLC0415
 
     from price_tracker.observability.metrics import MetricsRegistry  # noqa: PLC0415
@@ -462,19 +467,10 @@ async def test_scheduler_emits_price_check_total_on_success(
     reg = CollectorRegistry()
     metrics = MetricsRegistry(registry=reg)
     scheduler: Scheduler = scheduler_factory(metrics=metrics)
-    scheduler._scrape_one = AsyncMock(return_value=None)  # simulate success path
+    scheduler._scrape_one = AsyncMock(return_value=None)
 
     await scheduler._run_tick(sample_products[:1])
-    total = sum(
-        sample.value
-        for metric in reg.collect()
-        if metric.name == "price_tracker_price_check"
-        for sample in metric.samples
-        if sample.name == "price_tracker_price_check_total"
-        and sample.labels.get("status") == "success"
-    )
-    # _scrape_one is mocked so no internal price_check_total emission;
-    # but at minimum the gauge scheduler_jobs_active must reflect the tick.
+
     jobs_active = sum(
         sample.value
         for metric in reg.collect()
@@ -482,9 +478,6 @@ async def test_scheduler_emits_price_check_total_on_success(
         for sample in metric.samples
     )
     assert jobs_active == 1
-    # success counter is exercised through real _check_product paths; here we
-    # accept zero since _scrape_one is mocked. Keep the spec assertion soft.
-    assert total >= 0
 
 
 @pytest.mark.asyncio

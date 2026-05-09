@@ -108,13 +108,15 @@ async def get_rates(
         client = httpx.AsyncClient(timeout=15.0)
     else:
         assert client is not None
+    network_errored = False
     try:
         fresh = await _fetch_fresh_rates(client)
     except httpx.HTTPError as e:
         logger.warning("FX rates fetch retried-out: %s", e)
+        fresh = None
+        network_errored = True
         if metrics is not None:
             metrics.currency_lookups_total.labels(result="error").inc()
-        fresh = None
     finally:
         if own_client and client is not None:
             await client.aclose()
@@ -123,7 +125,10 @@ async def get_rates(
         await db.set_config(CACHE_KEY, json.dumps(fresh))
         return {k: Decimal(str(v)) for k, v in fresh["rates"].items()}
 
-    if metrics is not None:
+    # `error` and `fallback` are mutually exclusive: error covers network/HTTP
+    # failure; fallback covers returning the static table when the API didn't
+    # yield a usable result for non-network reasons (e.g. parse failure).
+    if metrics is not None and not network_errored:
         metrics.currency_lookups_total.labels(result="fallback").inc()
     return dict(_FALLBACK_RATES)
 
