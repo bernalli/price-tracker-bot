@@ -15,6 +15,8 @@ from typing import TYPE_CHECKING, Protocol
 if TYPE_CHECKING:
     from typing import Any
 
+    from price_tracker.observability.metrics import MetricsRegistry
+
 import httpx
 from tenacity import (
     retry,
@@ -79,6 +81,8 @@ async def _fetch_fresh_rates(client: httpx.AsyncClient) -> dict[str, Any] | None
 async def get_rates(
     db: _ConfigStore,
     client: httpx.AsyncClient | None = None,
+    *,
+    metrics: MetricsRegistry | None = None,
 ) -> dict[str, Decimal]:
     """Return {CUR: Decimal(rate_to_EUR)} using a 24h-cached snapshot.
 
@@ -90,9 +94,14 @@ async def get_rates(
             cached = json.loads(cached_raw)
             fetched = datetime.fromisoformat(cached["fetched_at"])
             if datetime.now(UTC) - fetched < timedelta(hours=CACHE_TTL_HOURS):
+                if metrics is not None:
+                    metrics.currency_lookups_total.labels(result="hit").inc()
                 return {k: Decimal(str(v)) for k, v in cached["rates"].items()}
         except (json.JSONDecodeError, KeyError, ValueError) as e:
             logger.warning("Cache parse failed: %s", e)
+
+    if metrics is not None:
+        metrics.currency_lookups_total.labels(result="miss").inc()
 
     own_client = client is None
     if own_client:
@@ -103,6 +112,8 @@ async def get_rates(
         fresh = await _fetch_fresh_rates(client)
     except httpx.HTTPError as e:
         logger.warning("FX rates fetch retried-out: %s", e)
+        if metrics is not None:
+            metrics.currency_lookups_total.labels(result="error").inc()
         fresh = None
     finally:
         if own_client and client is not None:
@@ -112,6 +123,8 @@ async def get_rates(
         await db.set_config(CACHE_KEY, json.dumps(fresh))
         return {k: Decimal(str(v)) for k, v in fresh["rates"].items()}
 
+    if metrics is not None:
+        metrics.currency_lookups_total.labels(result="fallback").inc()
     return dict(_FALLBACK_RATES)
 
 
@@ -120,6 +133,8 @@ async def convert_to_eur(
     price: Decimal,
     from_currency: str,
     client: httpx.AsyncClient | None = None,
+    *,
+    metrics: MetricsRegistry | None = None,
 ) -> Decimal:
     """Convert `price` from `from_currency` to EUR.
 
@@ -130,7 +145,7 @@ async def convert_to_eur(
     cur = (from_currency or "EUR").upper()
     if cur == "EUR":
         return price
-    rates = await get_rates(db, client)
+    rates = await get_rates(db, client, metrics=metrics)
     rate = rates.get(cur)
     if rate is None or rate == 0:
         logger.warning("No FX rate for %s; leaving price as-is", cur)
