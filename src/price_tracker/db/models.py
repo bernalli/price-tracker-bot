@@ -66,3 +66,25 @@ class ScraperHealth:
     last_block_reason: str | None = None
     last_success_at: datetime | None = None
     updated_at: datetime | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class NotificationPrefs:
+    """Per-user (and optional per-product) notification preferences.
+
+    A row with ``product_id=None`` represents the user's global default.
+    A row with ``product_id`` set overrides the global default for that product.
+    """
+
+    user_id: int
+    product_id: int | None = None
+    mute: bool = False
+    mute_until: datetime | None = None
+    digest_mode: bool = False
+    digest_interval_minutes: int = 60
+    quiet_hours_start: str | None = None
+    quiet_hours_end: str | None = None
+    throttle_per_hour: int | None = None
+    timezone: str = "Europe/Rome"
+    throttle_state_json: str | None = None
+    updated_at: datetime | None = None

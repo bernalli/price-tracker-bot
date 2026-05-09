@@ -19,10 +19,10 @@ MIGRATIONS_DIR = Path("src/price_tracker/db/migrations")
 
 
 @pytest.mark.asyncio
-async def test_list_migrations_finds_001_to_008():
+async def test_list_migrations_finds_001_to_009():
     files = list_migrations(MIGRATIONS_DIR)
     versions = [v for v, _ in files]
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8]
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9]
 
 
 @pytest.mark.asyncio
@@ -37,7 +37,7 @@ async def test_apply_migrations_brings_fresh_db_to_latest():
     async with aiosqlite.connect(":memory:") as conn:
         await apply_migrations(conn, MIGRATIONS_DIR)
         version = await get_current_version(conn)
-        assert version == 8
+        assert version == 9
         cursor = await conn.execute("PRAGMA table_info(products)")
         cols = [row[1] async for row in cursor]
         assert "id" in cols
@@ -56,7 +56,7 @@ async def test_apply_migrations_is_idempotent():
         await apply_migrations(conn, MIGRATIONS_DIR)
         await apply_migrations(conn, MIGRATIONS_DIR)
         version = await get_current_version(conn)
-        assert version == 8
+        assert version == 9
 
 
 @pytest.mark.asyncio
@@ -91,7 +91,7 @@ async def test_apply_migrations_partial_then_complete():
 
         await apply_migrations(conn, MIGRATIONS_DIR)
         version = await get_current_version(conn)
-        assert version == 8
+        assert version == 9
 
 
 class TestMigration008:
@@ -137,3 +137,51 @@ class TestScraperHealthModel:
         )
         assert h.domain == "amazon.com"
         assert h.state == "CLOSED"
+
+
+class TestMigration009:
+    @pytest.mark.asyncio
+    async def test_creates_notification_prefs_table(self, tmp_db_path):
+        migrator = Migrator(db_path=tmp_db_path)
+        await migrator.migrate()
+        async with migrator._connect() as conn:
+            cursor = await conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='notification_prefs'"
+            )
+            assert await cursor.fetchone() is not None
+
+    @pytest.mark.asyncio
+    async def test_default_timezone_is_europe_rome(self, tmp_db_path):
+        migrator = Migrator(db_path=tmp_db_path)
+        await migrator.migrate()
+        async with migrator._connect() as conn:
+            await conn.execute("INSERT INTO users (user_id) VALUES (1)")
+            await conn.execute(
+                "INSERT INTO notification_prefs (user_id, product_id) VALUES (1, NULL)"
+            )
+            await conn.commit()
+            cursor = await conn.execute(
+                "SELECT timezone FROM notification_prefs WHERE user_id=1 AND product_id IS NULL"
+            )
+            row = await cursor.fetchone()
+            assert row is not None
+            assert row[0] == "Europe/Rome"
+
+
+def test_notification_prefs_dataclass():
+    from price_tracker.db.models import NotificationPrefs
+
+    p = NotificationPrefs(
+        user_id=1,
+        product_id=None,
+        mute=False,
+        digest_mode=False,
+        digest_interval_minutes=60,
+        quiet_hours_start=None,
+        quiet_hours_end=None,
+        throttle_per_hour=None,
+        timezone="Europe/Rome",
+    )
+    assert p.user_id == 1
+    assert p.product_id is None
+    assert p.timezone == "Europe/Rome"
