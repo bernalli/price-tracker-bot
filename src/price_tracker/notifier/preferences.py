@@ -7,8 +7,9 @@ NULL fields fall through.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, time
 from typing import TYPE_CHECKING, TypeVar
+from zoneinfo import ZoneInfo
 
 if TYPE_CHECKING:
     from price_tracker.db.repository import Repository
@@ -121,3 +122,40 @@ class PreferencesManager:
             throttle_per_hour=_pick_optional_int("throttle_per_hour"),
             timezone=_pick_str("timezone", _DEFAULTS.timezone),
         )
+
+
+def _parse_hhmm(hhmm: str) -> time:
+    """Parse a ``"HH:MM"`` string into a :class:`datetime.time`."""
+    h, _, m = hhmm.partition(":")
+    return time(int(h), int(m))
+
+
+def is_quiet_now(prefs: EffectivePrefs, *, now_utc: datetime) -> bool:
+    """Return True if ``now_utc`` falls inside the user's quiet-hours window.
+
+    The window is defined in the user's local timezone (``prefs.timezone``) and
+    may wrap midnight (e.g. ``22:00`` → ``08:00``). If either bound is missing
+    the function returns False (no window configured).
+    """
+    if not prefs.quiet_hours_start or not prefs.quiet_hours_end:
+        return False
+    user_now = now_utc.astimezone(ZoneInfo(prefs.timezone))
+    start = _parse_hhmm(prefs.quiet_hours_start)
+    end = _parse_hhmm(prefs.quiet_hours_end)
+    cur = user_now.time()
+    if start <= end:
+        return start <= cur < end
+    return cur >= start or cur < end  # wraps midnight
+
+
+def is_muted_now(prefs: EffectivePrefs, *, now_utc: datetime) -> bool:
+    """Return True if mute is currently active.
+
+    Mute can be permanent (``mute_until is None``) or expire at a given UTC
+    instant. If ``mute`` is False, mute is never active.
+    """
+    if not prefs.mute:
+        return False
+    if prefs.mute_until is None:
+        return True
+    return now_utc < prefs.mute_until
