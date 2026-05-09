@@ -62,3 +62,9 @@ def mock_router() -> respx.Router:
 def event_loop_policy():
     """Pytest-asyncio event loop policy fixture (one per session)."""
     return asyncio.DefaultEventLoopPolicy()
+
+
+@pytest.fixture
+def tmp_db_path(tmp_path: Path) -> Path:
+    """Return a path to a temporary SQLite database file (does not yet exist)."""
+    return tmp_path / "test.db"

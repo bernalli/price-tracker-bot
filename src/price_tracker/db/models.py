@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from datetime import datetime
     from decimal import Decimal
 
 
@@ -51,3 +52,17 @@ class PriceHistoryRecord:
     product_id: int
     price: Decimal
     checked_at: str
+
+
+@dataclass(frozen=True, slots=True)
+class ScraperHealth:
+    """Persistent health state for a single eTLD+1 domain."""
+
+    domain: str
+    state: str = "CLOSED"
+    consecutive_blocks: int = 0
+    locked_until: datetime | None = None
+    last_block_at: datetime | None = None
+    last_block_reason: str | None = None
+    last_success_at: datetime | None = None
+    updated_at: datetime | None = None
