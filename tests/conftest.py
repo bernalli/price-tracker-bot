@@ -18,13 +18,13 @@ if TYPE_CHECKING:
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 
-@pytest.fixture
+@pytest.fixture()
 def fixtures_dir() -> Path:
     """Path to the tests/fixtures directory."""
     return FIXTURES_DIR
 
 
-@pytest.fixture
+@pytest.fixture()
 def load_fixture(fixtures_dir: Path):
     """Helper to load a fixture file as text."""
 
@@ -52,13 +52,13 @@ async def http_client() -> AsyncIterator[httpx.AsyncClient]:
         yield client
 
 
-@pytest.fixture
+@pytest.fixture()
 def mock_router() -> respx.Router:
     """respx router for HTTP mocking. Use with `with router:` or `router.start()`."""
     return respx.mock(assert_all_called=False)
 
 
-@pytest.fixture
+@pytest.fixture()
 def event_loop_policy():
     """Pytest-asyncio event loop policy fixture (one per session)."""
     return asyncio.DefaultEventLoopPolicy()
