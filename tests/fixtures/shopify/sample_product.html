@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<title>Sample Product – Sample Store</title>
+<meta property="og:title" content="Sample Product">
+<meta property="og:price:amount" content="29.99">
+<meta property="og:price:currency" content="EUR">
+<meta property="product:price:amount" content="29.99">
+<meta property="product:price:currency" content="EUR">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org/",
+  "@type": "Product",
+  "name": "Sample Product",
+  "offers": {
+    "@type": "Offer",
+    "priceCurrency": "EUR",
+    "price": "29.99",
+    "availability": "https://schema.org/InStock",
+    "url": "https://example.com/products/sample"
+  }
+}
+</script>
+</head>
+<body>
+<main class="product">
+  <h1 class="product__title">Sample Product</h1>
+  <span class="product__price money" data-price="2999">€29,99</span>
+  <button class="product-form__cart-submit">Aggiungi al carrello</button>
+</main>
+</body>
+</html>
