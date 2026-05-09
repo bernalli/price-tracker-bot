@@ -680,3 +680,12 @@ class Repository:
             ids,
         )
         await self._conn.commit()
+
+    async def list_users_with_pending_digest(self) -> list[tuple[int, datetime]]:
+        """Return (user_id, oldest_enqueued_at) for users with pending digest entries."""
+        cursor = await self._conn.execute(
+            "SELECT user_id, MIN(enqueued_at) FROM digest_queue "
+            "WHERE flushed_at IS NULL GROUP BY user_id"
+        )
+        rows = await cursor.fetchall()
+        return [(r[0], dt) for r in rows if (dt := _parse_ts(r[1])) is not None]
