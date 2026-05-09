@@ -79,3 +79,65 @@ def test_config_is_frozen(monkeypatch: pytest.MonkeyPatch) -> None:
     cfg = Config.from_env()
     with pytest.raises(FrozenInstanceError):
         cfg.log_level = "ERROR"  # type: ignore[misc]
+
+
+class TestObservabilityConfig:
+    """Observability env vars: PROMETHEUS_BIND, LOG_LEVEL, METRICS_ENABLED."""
+
+    def test_default_prometheus_bind_localhost_9090(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "tok")
+        monkeypatch.delenv("PROMETHEUS_BIND", raising=False)
+        from price_tracker.config import load_config
+
+        cfg = load_config()
+        assert cfg.prometheus_bind == "127.0.0.1:9090"
+
+    def test_prometheus_bind_overridable(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "tok")
+        monkeypatch.setenv("PROMETHEUS_BIND", "127.0.0.1:9999")
+        from price_tracker.config import load_config
+
+        cfg = load_config()
+        assert cfg.prometheus_bind == "127.0.0.1:9999"
+
+    def test_default_log_level_info(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "tok")
+        monkeypatch.delenv("LOG_LEVEL", raising=False)
+        from price_tracker.config import load_config
+
+        cfg = load_config()
+        assert cfg.log_level == "INFO"
+
+    def test_parse_prometheus_bind_into_host_port(self) -> None:
+        from price_tracker.config import parse_bind
+
+        assert parse_bind("127.0.0.1:9090") == ("127.0.0.1", 9090)
+        assert parse_bind("0.0.0.0:8000") == ("0.0.0.0", 8000)  # noqa: S104
+
+    def test_metrics_enabled_default_true(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "tok")
+        monkeypatch.delenv("METRICS_ENABLED", raising=False)
+        from price_tracker.config import load_config
+
+        cfg = load_config()
+        assert cfg.metrics_enabled is True
+
+    def test_metrics_enabled_disabled_via_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "tok")
+        monkeypatch.setenv("METRICS_ENABLED", "false")
+        from price_tracker.config import load_config
+
+        cfg = load_config()
+        assert cfg.metrics_enabled is False
+
+    def test_metrics_enabled_truthy_strings(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "tok")
+        from price_tracker.config import load_config
+
+        for truthy in ("1", "true", "TRUE", "yes", "YES", "True"):
+            monkeypatch.setenv("METRICS_ENABLED", truthy)
+            assert load_config().metrics_enabled is True
+
+        for falsy in ("0", "false", "no", "FALSE", "False", "off"):
+            monkeypatch.setenv("METRICS_ENABLED", falsy)
+            assert load_config().metrics_enabled is False

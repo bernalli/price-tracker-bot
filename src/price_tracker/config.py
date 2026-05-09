@@ -12,6 +12,16 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 
+_TRUTHY = frozenset({"1", "true", "yes", "on"})
+
+
+def _parse_bool(value: str, *, default: bool) -> bool:
+    """Parse a string env var into a bool; empty/None falls back to default."""
+    if not value:
+        return default
+    return value.strip().lower() in _TRUTHY
+
+
 @dataclass(frozen=True)
 class Config:
     telegram_bot_token: str
@@ -26,6 +36,8 @@ class Config:
     request_timeout: int
     log_level: str
     lang: str
+    prometheus_bind: str = "127.0.0.1:9090"
+    metrics_enabled: bool = True
 
     @classmethod
     def from_env(cls) -> Config:
@@ -35,6 +47,11 @@ class Config:
 
         raw_users = os.getenv("ALLOWED_USERS", "")
         admin_users = tuple(int(x.strip()) for x in raw_users.split(",") if x.strip())
+
+        metrics_enabled_raw = os.getenv("METRICS_ENABLED")
+        metrics_enabled = (
+            True if metrics_enabled_raw is None else _parse_bool(metrics_enabled_raw, default=True)
+        )
 
         return cls(
             telegram_bot_token=token,
@@ -49,4 +66,20 @@ class Config:
             request_timeout=int(os.getenv("REQUEST_TIMEOUT", "30")),
             log_level=os.getenv("LOG_LEVEL", "INFO"),
             lang=os.getenv("LANG", "en"),
+            prometheus_bind=os.getenv("PROMETHEUS_BIND", "127.0.0.1:9090"),
+            metrics_enabled=metrics_enabled,
         )
+
+
+def load_config() -> Config:
+    """Thin wrapper alias for ``Config.from_env`` used by the bot startup path."""
+    return Config.from_env()
+
+
+def parse_bind(value: str) -> tuple[str, int]:
+    """Split ``host:port`` (or just ``port``) into ``(host, port)``.
+
+    Defaults to ``127.0.0.1`` when no host is provided.
+    """
+    host, _, port = value.rpartition(":")
+    return host or "127.0.0.1", int(port)
