@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock
 
 import pytest
@@ -11,6 +11,7 @@ from price_tracker.db.models import NotificationPrefs
 from price_tracker.notifier.preferences import (
     EffectivePrefs,
     PreferencesManager,
+    ThrottleWindow,
     is_muted_now,
     is_quiet_now,
 )
@@ -226,3 +227,38 @@ class TestIsMutedNow:
             timezone="UTC",
         )
         assert not is_muted_now(eff, now_utc=datetime(2026, 5, 9, tzinfo=UTC))
+
+
+class TestThrottleWindow:
+    def test_initial_window_empty(self) -> None:
+        w = ThrottleWindow()
+        assert w.timestamps == []
+
+    def test_serialize_roundtrip(self) -> None:
+        w = ThrottleWindow(timestamps=[1715258400.0, 1715258500.0])
+        data = w.to_json()
+        loaded = ThrottleWindow.from_json(data)
+        assert loaded.timestamps == w.timestamps
+
+    def test_record_and_count_within_hour(self) -> None:
+        now = datetime(2026, 5, 9, 12, 0, tzinfo=UTC)
+        w = ThrottleWindow()
+        w.record(now)
+        w.record(now + timedelta(minutes=30))
+        assert w.count_within_hour(now + timedelta(minutes=45)) == 2
+
+    def test_evicts_old_entries(self) -> None:
+        old = datetime(2026, 5, 9, 10, 0, tzinfo=UTC)
+        new = datetime(2026, 5, 9, 12, 0, tzinfo=UTC)
+        w = ThrottleWindow()
+        w.record(old)
+        # 2h later → eviction
+        assert w.count_within_hour(new) == 0
+
+    def test_throttle_exceeded_predicate(self) -> None:
+        now = datetime(2026, 5, 9, 12, 0, tzinfo=UTC)
+        w = ThrottleWindow()
+        for i in range(5):
+            w.record(now + timedelta(minutes=i))
+        assert w.exceeded(limit=5, now=now + timedelta(minutes=10))
+        assert not w.exceeded(limit=10, now=now + timedelta(minutes=10))
