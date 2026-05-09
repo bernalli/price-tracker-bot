@@ -380,6 +380,8 @@ class TestScraperHealthRepository:
         assert loaded.state == "LOCKED_T1"
         assert loaded.consecutive_blocks == 3
         assert loaded.last_block_reason == "HTTP 429"
+        assert loaded.locked_until == record.locked_until
+        assert loaded.last_block_at == record.last_block_at
 
     @pytest.mark.asyncio
     async def test_upsert_overwrites(self, repo: Repository):
@@ -401,6 +403,19 @@ class TestScraperHealthRepository:
         )
         locked = await repo.list_locked_domains()
         assert {h.domain for h in locked} == {"locked.com"}
+
+    @pytest.mark.asyncio
+    async def test_list_locked_ordering_nulls_last(self, repo: Repository):
+        """HALF_OPEN rows (locked_until IS NULL) must come after LOCKED rows."""
+        now = datetime.now(UTC)
+        future = now + timedelta(hours=1)
+        await repo.upsert_scraper_health(ScraperHealth(domain="half.com", state="HALF_OPEN_T1"))
+        await repo.upsert_scraper_health(
+            ScraperHealth(domain="locked.com", state="LOCKED_T2", locked_until=future)
+        )
+        results = await repo.list_locked_domains()
+        domains = [h.domain for h in results]
+        assert domains.index("locked.com") < domains.index("half.com")
 
     @pytest.mark.asyncio
     async def test_list_all_returns_every_record(self, repo: Repository):
