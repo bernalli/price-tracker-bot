@@ -1,0 +1,9 @@
+# Copy to docker-compose.override.yml and customize for your deploy.
+# Override file is gitignored — keep secrets and host-specific paths here.
+
+services:
+  price-tracker:
+    volumes:
+      - the deploy dir/plugins:/app/plugins:ro
+    environment:
+      TZ: Europe/Rome
