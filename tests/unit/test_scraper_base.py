@@ -173,3 +173,29 @@ class TestDetectBlockEvent:
         body = '<form id="captcha-form">...</form>'
         with pytest.raises(CaptchaDetected):
             detect_block_event(status_code=200, body=body, url="x")
+
+
+# ── Pipeline helper tests ─────────────────────────────────────────
+
+
+from unittest.mock import AsyncMock  # noqa: E402
+
+
+@pytest.mark.asyncio
+async def test_scraper_base_invokes_health_on_block_event():
+    from price_tracker.core.exceptions import HTTPBlockStatus
+    from price_tracker.core.scraper_base import handle_block_in_pipeline
+
+    health_mgr = AsyncMock()
+    exc = HTTPBlockStatus(status=429, url="https://xteink.com/p/1")
+    await handle_block_in_pipeline(exc, health_mgr=health_mgr, domain="xteink.com")
+    health_mgr.record_block.assert_awaited_once_with("xteink.com", reason="HTTP 429")
+
+
+@pytest.mark.asyncio
+async def test_scraper_base_invokes_health_on_success():
+    from price_tracker.core.scraper_base import handle_success_in_pipeline
+
+    health_mgr = AsyncMock()
+    await handle_success_in_pipeline(health_mgr=health_mgr, domain="amazon.com")
+    health_mgr.record_success.assert_awaited_once_with("amazon.com")
