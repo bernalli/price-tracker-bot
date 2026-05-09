@@ -200,7 +200,13 @@ class Scheduler:
 
         # Outlier check against price history
         history = [h.price for h in await self.deps.repo.get_price_history(p.id, limit=50)]
-        outlier = is_outlier(info.price, history)
+        outlier = is_outlier(
+            info.price,
+            history,
+            metrics=metrics,
+            scraper=scraper_name,
+            domain=domain,
+        )
         if outlier.is_outlier:
             logger.warning(
                 "Product %d: OUTLIER read %s rejected (median=%s, ratio=%s, history_n=%d)",
@@ -211,7 +217,6 @@ class Scheduler:
                 outlier.history_n,
             )
             if metrics is not None:
-                metrics.outlier_rejected_total.labels(scraper=scraper_name, domain=domain).inc()
                 metrics.price_check_total.labels(
                     scraper=scraper_name, domain=domain, status="outlier_rejected"
                 ).inc()
