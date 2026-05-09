@@ -6,9 +6,15 @@ from decimal import Decimal
 
 import pytest
 
+from price_tracker.core.exceptions import (
+    CaptchaDetected,
+    HTTPBlockStatus,
+    WAFBlocked,
+)
 from price_tracker.core.scraper_base import (
     AbstractScraper,
     ProductInfo,
+    detect_block_event,
     detect_currency,
     parse_price,
 )
@@ -119,3 +125,51 @@ def test_matches_domain_returns_false_for_empty_url():
     s = _Scraper()
     assert s.matches_domain("") is False
     assert s.matches_domain("not a url at all") is False
+
+
+class TestDetectBlockEvent:
+    def test_status_429_raises(self):
+        with pytest.raises(HTTPBlockStatus) as exc_info:
+            detect_block_event(status_code=429, body="", url="https://x.com")
+        assert exc_info.value.status == 429
+
+    def test_status_403_raises(self):
+        with pytest.raises(HTTPBlockStatus):
+            detect_block_event(status_code=403, body="", url="https://x.com")
+
+    def test_status_200_no_raise(self):
+        # No raise — function returns None on no block detected
+        assert detect_block_event(status_code=200, body="<html>ok</html>", url="x") is None
+
+    def test_status_500_no_raise(self):
+        # 5xx is server error, not block
+        assert detect_block_event(status_code=502, body="", url="x") is None
+
+    def test_cloudflare_marker(self):
+        body = "<html><head><title>Just a moment...</title></head><body>...</body></html>"
+        with pytest.raises(WAFBlocked) as exc_info:
+            detect_block_event(status_code=200, body=body, url="https://x.com")
+        assert exc_info.value.provider == "cloudflare"
+
+    def test_akamai_marker(self):
+        body = "<html><body>Access Denied</body></html>"
+        with pytest.raises(WAFBlocked) as exc_info:
+            detect_block_event(status_code=200, body=body, url="x")
+        assert exc_info.value.provider == "akamai"
+
+    def test_imperva_marker(self):
+        body = "Request unsuccessful. Incapsula incident ID: 123-456"
+        with pytest.raises(WAFBlocked) as exc_info:
+            detect_block_event(status_code=200, body=body, url="x")
+        assert exc_info.value.provider == "imperva"
+
+    def test_recaptcha_marker(self):
+        body = '<div class="g-recaptcha" data-sitekey="..."></div>'
+        with pytest.raises(CaptchaDetected) as exc_info:
+            detect_block_event(status_code=200, body=body, url="x")
+        assert exc_info.value.marker == "g-recaptcha"
+
+    def test_generic_captcha_marker(self):
+        body = '<form id="captcha-form">...</form>'
+        with pytest.raises(CaptchaDetected):
+            detect_block_event(status_code=200, body=body, url="x")

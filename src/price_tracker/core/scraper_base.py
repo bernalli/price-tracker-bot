@@ -14,6 +14,8 @@ from urllib.parse import urlparse
 if TYPE_CHECKING:
     import httpx
 
+from price_tracker.core.exceptions import CaptchaDetected, HTTPBlockStatus, WAFBlocked
+
 logger = logging.getLogger(__name__)
 
 
@@ -187,3 +189,48 @@ class AbstractScraper(ABC):
         except (ValueError, TypeError):
             return False
         return any(p.search(netloc) for p in self.domain_patterns)
+
+
+# ── Block detection ──────────────────────────────────────────────
+
+_WAF_FINGERPRINTS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("cloudflare", re.compile(r"Just a moment\.\.\.|<title>Attention Required", re.IGNORECASE)),
+    ("akamai", re.compile(r"\bAccess Denied\b", re.IGNORECASE)),
+    ("imperva", re.compile(r"Incapsula incident ID", re.IGNORECASE)),
+)
+
+_CAPTCHA_FINGERPRINTS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("g-recaptcha", re.compile(r'class\s*=\s*["\']g-recaptcha', re.IGNORECASE)),
+    ("hcaptcha", re.compile(r'class\s*=\s*["\']h-captcha', re.IGNORECASE)),
+    ("captcha-form", re.compile(r'id\s*=\s*["\']captcha[\w-]*', re.IGNORECASE)),
+)
+
+
+def detect_block_event(*, status_code: int, body: str, url: str) -> None:
+    """Inspect HTTP response for block markers; raise BlockEvent subclass if blocked.
+
+    Block triggers (raise BlockEvent):
+      - HTTP 429 (Too Many Requests) or 403 (Forbidden)
+      - WAF challenge page (Cloudflare/Akamai/Imperva)
+      - CAPTCHA challenge in body
+
+    Non-block (returns None):
+      - 2xx/3xx with normal product HTML
+      - 4xx other than 403/429 (likely client error)
+      - 5xx (server problem)
+      - Network timeouts (raised by httpx, never reach here)
+
+    Caller (scraper) must invoke this AFTER httpx call and BEFORE parsing.
+    """
+    if status_code in (403, 429):
+        raise HTTPBlockStatus(status=status_code, url=url)
+
+    for provider, pattern in _WAF_FINGERPRINTS:
+        if pattern.search(body):
+            raise WAFBlocked(provider=provider, url=url)
+
+    for marker, pattern in _CAPTCHA_FINGERPRINTS:
+        if pattern.search(body):
+            raise CaptchaDetected(marker=marker, url=url)
+
+    return None
