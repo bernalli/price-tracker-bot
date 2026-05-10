@@ -39,27 +39,25 @@ Self-hosted Telegram bot for multi-site price tracking with auto-quarantine, str
 git clone https://github.com/bernalli/price-tracker-bot.git
 cd price-tracker-bot
 cp .env.example .env
-# edit .env: set TELEGRAM_BOT_TOKEN and ADMIN_USERS
+# edit .env: set TELEGRAM_BOT_TOKEN and ALLOWED_USERS
 docker compose up -d
 docker compose logs -f price-tracker-bot
 ```
 
-Send `/start` to your bot from Telegram. The first user listed in `ADMIN_USERS` is auto-promoted to admin.
+Send `/start` to your bot from Telegram. The first user listed in `ALLOWED_USERS` is auto-promoted to admin.
 
 ## Configuration
 
 All configuration is via environment variables. Copy `.env.example` to `.env` and fill in:
 
-| Variable                | Default                  | Description                                              |
-| ----------------------- | ------------------------ | -------------------------------------------------------- |
-| `TELEGRAM_BOT_TOKEN`    | (required)               | Telegram bot API token                                   |
-| `ADMIN_USERS`           | (required)               | Comma-separated Telegram user IDs with admin privileges  |
-| `ALLOWED_USERS`         | (empty)                  | Legacy allowlist; replaced by DB-managed users           |
-| `DB_PATH`               | `/data/pricetracker.db`  | SQLite database path                                     |
-| `LOCALE`                | `en`                     | Default locale fallback when Telegram lang missing       |
-| `METRICS_PORT`          | `9090`                   | Prometheus exporter bind port (127.0.0.1)                |
-| `LOG_LEVEL`             | `INFO`                   | structlog log level                                      |
-| `LOG_FORMAT`            | `json`                   | `json` or `text`                                         |
+| Variable                | Default                  | Description                                                                      |
+| ----------------------- | ------------------------ | -------------------------------------------------------------------------------- |
+| `TELEGRAM_BOT_TOKEN`    | (required)               | Telegram bot API token                                                           |
+| `ALLOWED_USERS`         | (required)               | Comma-separated Telegram user IDs authorized to use the bot (first listed becomes admin) |
+| `DATABASE_PATH`         | `/data/pricetracker.db`  | SQLite database path                                                             |
+| `LANG`                  | `en`                     | Default locale fallback when Telegram language_code missing                      |
+| `PROMETHEUS_BIND`       | `127.0.0.1:9090`         | Prometheus exporter bind address (host:port)                                     |
+| `LOG_LEVEL`             | `INFO`                   | structlog log level                                                              |
 
 See [docs/operations.md](docs/operations.md) for full operational reference.
 
@@ -110,7 +108,7 @@ Drop a custom scraper file in `plugins/<name>.py` (gitignored except `README.md`
 
 ## Localization
 
-Two locales shipped: `en` (source language) and `it` (Italian translation). Runtime selection auto-detects from Telegram `language_code`, falls back to the `LOCALE` environment variable, then to `en`. To add a translation, see [docs/i18n.md](docs/i18n.md).
+Two locales shipped: `en` (source language) and `it` (Italian translation). Runtime selection auto-detects from Telegram `language_code`, falls back to the `LANG` environment variable, then to `en`. To add a translation, see [docs/i18n.md](docs/i18n.md).
 
 ## Project structure
 
