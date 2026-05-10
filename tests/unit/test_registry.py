@@ -53,6 +53,7 @@ def test_registry_resolve_returns_first_matching():
     r.register(FakeAmazon())
     r.register(FakeGeneric())
     s = r.resolve("https://www.amazon.it/dp/B01")
+    assert s is not None
     assert s.name == "amazon"
 
 
@@ -61,6 +62,7 @@ def test_registry_resolve_falls_back_to_generic():
     r.register(FakeAmazon())
     r.register(FakeGeneric())
     s = r.resolve("https://random-site.example.com/product")
+    assert s is not None
     assert s.name == "generic"
 
 

@@ -6,6 +6,10 @@ Exercises the full pipeline:
   from CLOSED through LOCKED_T1 → HALF_OPEN_T1 → LOCKED_T2.
 """
 
+# mypy: disable-error-code="method-assign,assignment,operator"
+# Tests intentionally replace HealthManager methods on AsyncMock(spec=...) instances
+# (lambda assignments to is_locked/is_half_open) — mypy can't validate cleanly.
+
 from __future__ import annotations
 
 from datetime import UTC, datetime

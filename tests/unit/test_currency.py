@@ -151,7 +151,7 @@ async def test_get_rates_creates_own_client_when_none_passed():
 @pytest.mark.asyncio
 async def test_convert_to_eur_passes_through_none_price():
     db = _StubDB()
-    # type: ignore — testing defensive None handling at line 128
+    # NOTE: testing defensive None handling at line 128
     result = await convert_to_eur(db, None, "USD")  # type: ignore[arg-type]
     assert result is None
 

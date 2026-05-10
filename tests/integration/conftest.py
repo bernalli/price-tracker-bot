@@ -1,5 +1,9 @@
 """Shared fixtures for integration tests."""
 
+# mypy: disable-error-code="method-assign,assignment"
+# Tests intentionally replace HealthManager methods on AsyncMock(spec=...) instances
+# (lambda assignments to is_locked/is_half_open) — mypy can't validate cleanly.
+
 from __future__ import annotations
 
 from decimal import Decimal
@@ -19,6 +23,7 @@ from price_tracker.db.repository import Repository
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
+    from price_tracker.db.models import ProductRecord
     from price_tracker.observability.metrics import MetricsRegistry
 
 MIGRATIONS_DIR = Path("src/price_tracker/db/migrations")
@@ -78,7 +83,7 @@ def scheduler_factory() -> object:
 
 
 @pytest.fixture
-def sample_products() -> list:
+def sample_products() -> list[ProductRecord]:
     """A mix of products across two domains: xteink and example.com (1)."""
     from price_tracker.db.models import ProductRecord  # noqa: PLC0415
 
