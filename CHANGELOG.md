@@ -52,7 +52,7 @@ auto-quarantine, and a plugin extension point.
 
 ### Changed
 - `bot.py` monolith (2664 LOC) split into modular
-  `bot/handlers/{auth,monitoring,settings,prefs,...}.py`.
+  `bot/handlers/{auth,monitoring,settings,product,history,debug,...}.py`.
 - `database.py` monolith (807 LOC) split into
   `db/{models,repository,migrator}.py`.
 - `checker.py` (609 LOC) split into `core/{scheduler,alert,outlier}.py`.
