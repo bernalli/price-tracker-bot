@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 (empty)
 
-## [0.1.0] - 2026-05-DD
+## [0.1.0] - 2026-05-10
 
 First public release. Self-hosted Telegram bot for multi-site price tracking
 with full observability, fine-grained notification preferences, scraper
