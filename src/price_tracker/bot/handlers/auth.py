@@ -27,8 +27,8 @@ async def cmd_add_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if not context.args:
         await update.message.reply_text(
             _(
-                "❌ Uso: /adduser &lt;telegram_id&gt;\n\n"
-                "L'utente deve prima inviare /start al bot per ottenere il suo ID."
+                "❌ Usage: /adduser &lt;telegram_id&gt;\n\n"
+                "The user must send /start to the bot first to obtain their ID."
             ),
             parse_mode=ParseMode.HTML,
         )
@@ -37,21 +37,23 @@ async def cmd_add_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     try:
         new_user_id = int(context.args[0])
     except ValueError:
-        await update.message.reply_text(_("❌ ID non valido. Deve essere un numero."))
+        await update.message.reply_text(_("❌ Invalid ID. Must be a number."))
         return
 
     db = _db(context)
     existing = await db.get_user(new_user_id)
     if existing and existing.get("is_active"):
         await update.message.reply_text(
-            f"ℹ️ L'utente <code>{new_user_id}</code> è già autorizzato.",
+            _("ℹ️ User <code>{tg_id}</code> is already authorized.").format(tg_id=new_user_id),
             parse_mode=ParseMode.HTML,
         )
         return
 
     await db.add_user(new_user_id, is_admin=False)
     await update.message.reply_text(
-        f"✅ Utente <code>{new_user_id}</code> aggiunto!\nOra può usare il bot inviando /start.",
+        _(
+            "✅ User <code>{tg_id}</code> added.\nThey can now use the bot by sending /start."
+        ).format(tg_id=new_user_id),
         parse_mode=ParseMode.HTML,
     )
 
@@ -59,9 +61,7 @@ async def cmd_add_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     with contextlib.suppress(Exception):
         await context.bot.send_message(
             chat_id=new_user_id,
-            text=_(
-                "🎉 Sei stato autorizzato a usare il Price Tracker Bot!\nInvia /start per iniziare."
-            ),
+            text=_("🎉 You have been authorized to use Price Tracker Bot.\nSend /start to begin."),
         )
 
 
@@ -71,7 +71,7 @@ async def cmd_remove_user(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     """Remove a user. Usage: /removeuser <telegram_id>"""
     if not context.args:
         await update.message.reply_text(
-            "❌ Uso: /removeuser &lt;telegram_id&gt;",
+            _("❌ Usage: /removeuser &lt;telegram_id&gt;"),
             parse_mode=ParseMode.HTML,
         )
         return
@@ -79,31 +79,36 @@ async def cmd_remove_user(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     try:
         target_id = int(context.args[0])
     except ValueError:
-        await update.message.reply_text(_("❌ ID non valido."))
+        await update.message.reply_text(_("❌ Invalid ID."))
         return
 
     db = _db(context)
 
     # Prevent removing yourself
     if target_id == update.effective_user.id:
-        await update.message.reply_text(_("❌ Non puoi rimuovere te stesso."))
+        await update.message.reply_text(_("❌ You cannot remove yourself."))
         return
 
     # Prevent removing other admins
     if await db.is_user_admin(target_id):
-        await update.message.reply_text(_("❌ Non puoi rimuovere un altro amministratore."))
+        await update.message.reply_text(_("❌ You cannot remove another administrator."))
         return
 
     removed = await db.remove_user(target_id)
     if removed:
         await update.message.reply_text(
-            f"✅ Utente <code>{target_id}</code> rimosso.\n"
-            f"I suoi prodotti restano nel database ma non riceverà più notifiche.",
+            _("✅ User <code>{tg_id}</code> removed.").format(tg_id=target_id)
+            + "\n"
+            + _(
+                "Their products remain in the database"
+                " but they will no longer receive notifications."
+            ),
             parse_mode=ParseMode.HTML,
         )
     else:
         await update.message.reply_text(
-            f"❌ Utente <code>{target_id}</code> non trovato.", parse_mode=ParseMode.HTML
+            _("❌ User <code>{tg_id}</code> not found.").format(tg_id=target_id),
+            parse_mode=ParseMode.HTML,
         )
 
 
@@ -115,24 +120,32 @@ async def cmd_users(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     users = await db.get_all_users()
 
     if not users:
-        await update.message.reply_text(_("📭 Nessun utente registrato."))
+        await update.message.reply_text(_("📭 No registered users."))
         return
 
-    lines = ["<b>👥 Utenti autorizzati</b>\n"]
+    lines = [_("<b>👥 Authorized Users</b>\n")]
     for u in users:
         uid = u["user_id"]
         display = u.get("display_name") or ""
         uname = u.get("username") or ""
-        name = display or uname or "N/D"
+        name = display or uname or _("N/A")
         name_extra = f" (@{uname})" if uname and display else ""
-        role = "👑 Admin" if u.get("is_admin") else "👤 Utente"
+        role = _("👑 Admin") if u.get("is_admin") else _("👤 User")
         # Count their products
         stats = await db.get_stats(uid)
         lines.append(
-            f"  {role} — <code>{uid}</code>\n"
-            f"    Nome: {_escape_html(str(name))}{name_extra}\n"
-            f"    Prodotti: {stats['active_products']} attivi / "
-            f"{stats['total_products']} totali"
+            _(
+                "  {role} — <code>{uid}</code>\n"
+                "    Name: {name}{name_extra}\n"
+                "    Products: {active} active / {total} total"
+            ).format(
+                role=role,
+                uid=uid,
+                name=_escape_html(str(name)),
+                name_extra=name_extra,
+                active=stats["active_products"],
+                total=stats["total_products"],
+            )
         )
 
     await update.message.reply_text(
@@ -147,27 +160,32 @@ async def cmd_nick(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Set nickname for a user. Usage: /nick <id> <nome>"""
     if not context.args or len(context.args) < 2:
         await update.message.reply_text(
-            "❌ Uso: /nick &lt;id&gt; &lt;nome&gt;\n\nEsempio: <code>/nick 123456789 Marco</code>",
+            _(
+                "❌ Usage: /nick &lt;id&gt; &lt;name&gt;\n\n"
+                "Example: <code>/nick 123456789 Alice</code>"
+            ),
             parse_mode=ParseMode.HTML,
         )
         return
     try:
         target_id = int(context.args[0])
     except ValueError:
-        await update.message.reply_text(_("❌ ID non valido."))
+        await update.message.reply_text(_("❌ Invalid ID."))
         return
     nickname = " ".join(context.args[1:])
     db = _db(context)
     user = await db.get_user(target_id)
     if not user:
         await update.message.reply_text(
-            f"❌ Utente <code>{target_id}</code> non trovato.",
+            _("❌ User <code>{tg_id}</code> not found.").format(tg_id=target_id),
             parse_mode=ParseMode.HTML,
         )
         return
     await db.update_user_info(target_id, display_name=nickname)
     await update.message.reply_text(
-        f"✅ Nickname: <b>{_escape_html(nickname)}</b>\nID: <code>{target_id}</code>",
+        _("✅ Nickname: <b>{nick}</b>\nID: <code>{tg_id}</code>").format(
+            nick=_escape_html(nickname), tg_id=target_id
+        ),
         parse_mode=ParseMode.HTML,
     )
 
