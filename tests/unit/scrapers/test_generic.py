@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
@@ -139,6 +140,114 @@ async def test_generic_missing_price_selectors() -> None:
         router.get("https://example.com/empty").respond(200, text=html_no_price)
         async with httpx.AsyncClient() as client:
             info = await scraper.scrape("https://example.com/empty", client)
+
+    assert info.price is None
+    assert info.error is not None
+
+
+# ── chain strategy fallback ───────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_jsonld_strategy_first(load_fixture: Callable[[str], str]) -> None:
+    """JSON-LD wins when present: price>0 and currency populated."""
+    html = load_fixture("generic/sample_jsonld.html")
+    scraper = GenericScraper()
+    url = "https://example.com/chain/jsonld"
+
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).respond(200, text=html)
+        async with httpx.AsyncClient() as client:
+            info = await scraper.scrape(url, client)
+
+    assert info.price is not None
+    assert info.price > Decimal("0")
+    assert info.currency != ""
+    assert info.currency is not None
+
+
+@pytest.mark.asyncio
+async def test_falls_back_to_microdata(load_fixture: Callable[[str], str]) -> None:
+    """Without JSON-LD, microdata yields a positive price."""
+    html = load_fixture("generic/sample_microdata.html")
+    scraper = GenericScraper()
+    url = "https://example.com/chain/microdata"
+
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).respond(200, text=html)
+        async with httpx.AsyncClient() as client:
+            info = await scraper.scrape(url, client)
+
+    assert info.price is not None
+    assert info.price > Decimal("0")
+
+
+@pytest.mark.asyncio
+async def test_falls_back_to_opengraph(load_fixture: Callable[[str], str]) -> None:
+    """Without JSON-LD/microdata, OpenGraph meta yields a positive price."""
+    html = load_fixture("generic/sample_opengraph.html")
+    scraper = GenericScraper()
+    url = "https://example.com/chain/og"
+
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).respond(200, text=html)
+        async with httpx.AsyncClient() as client:
+            info = await scraper.scrape(url, client)
+
+    assert info.price is not None
+    assert info.price > Decimal("0")
+
+
+@pytest.mark.asyncio
+async def test_falls_back_to_rdfa(load_fixture: Callable[[str], str]) -> None:
+    """Without JSON-LD/microdata/OG, RDFa Product+Offer yields a positive price."""
+    html = load_fixture("generic/sample_rdfa.html")
+    scraper = GenericScraper()
+    url = "https://example.com/chain/rdfa"
+
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).respond(200, text=html)
+        async with httpx.AsyncClient() as client:
+            info = await scraper.scrape(url, client)
+
+    assert info.price is not None
+    assert info.price > Decimal("0")
+
+
+@pytest.mark.asyncio
+async def test_heuristic_last_resort(
+    load_fixture: Callable[[str], str], caplog: pytest.LogCaptureFixture
+) -> None:
+    """Regex on visible text recovers a price AND emits a heuristic-fallback warning."""
+    caplog.set_level(logging.WARNING)
+    html = load_fixture("generic/sample_heuristic.html")
+    scraper = GenericScraper()
+    url = "https://example.com/chain/heuristic"
+
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).respond(200, text=html)
+        async with httpx.AsyncClient() as client:
+            info = await scraper.scrape(url, client)
+
+    assert info.price is not None
+    assert info.price > Decimal("0")
+    assert any("heuristic" in r.message.lower() for r in caplog.records)
+
+
+@pytest.mark.asyncio
+async def test_no_strategy_matches_returns_error() -> None:
+    """When no strategy matches, ProductInfo carries an error and no price."""
+    scraper = GenericScraper()
+    html_no_markup = """
+    <!DOCTYPE html><html><head><title>Bare Page</title></head>
+    <body><p>This page has no structured data and no price text.</p></body></html>
+    """
+    url = "https://example.com/chain/none"
+
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).respond(200, text=html_no_markup)
+        async with httpx.AsyncClient() as client:
+            info = await scraper.scrape(url, client)
 
     assert info.price is None
     assert info.error is not None

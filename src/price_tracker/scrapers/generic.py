@@ -1,16 +1,17 @@
 """Generic scraper — extracts product info using standard web markup.
 
-Works on any site using JSON-LD, microdata, Open Graph, or common HTML
-patterns. Extraction priority:
+Works on any site using JSON-LD, microdata, Open Graph, RDFa, or common
+HTML patterns. Extraction priority:
 
   1. JSON-LD structured data (schema.org Product)
   2. Microdata attributes (itemprop="price")
   3. Open Graph meta tags (og:price:amount)
-  4. Additional meta tags (product:price:amount, twitter:data1)
-  5. Common CSS selectors for e-commerce sites
-  6. data-* attributes containing price info
-  7. Inline JS product data
-  8. Regex fallback on visible text
+  4. RDFa attributes (typeof="Product"/"Offer", property="price")
+  5. Additional meta tags (product:price:amount, twitter:data1)
+  6. Common CSS selectors for e-commerce sites
+  7. data-* attributes containing price info
+  8. Inline JS product data
+  9. Regex fallback on visible text (heuristic; logs a warning)
 """
 
 from __future__ import annotations
@@ -22,7 +23,7 @@ from decimal import Decimal
 from typing import ClassVar
 
 import httpx
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
 from price_tracker.core.retry_policy import RetryConfig, with_retry
 from price_tracker.core.scraper_base import (
@@ -177,6 +178,7 @@ class GenericScraper(AbstractScraper):
             ("JSON-LD", self._try_json_ld),
             ("Microdata", self._try_microdata),
             ("OpenGraph", self._try_opengraph),
+            ("RDFa", self._try_rdfa),
             ("Meta tags", self._try_meta_tags),
             ("CSS selectors", self._try_css_selectors),
             ("Data attributes", self._try_data_attributes),
@@ -184,12 +186,14 @@ class GenericScraper(AbstractScraper):
             ("Regex", self._try_regex),
         ]
 
+        successful_strategy: str | None = None
         for strategy_name, strategy_fn in strategies:
             try:
                 result = strategy_fn(soup)
                 if result:
                     if result.get("price") is not None and info.price is None:
                         info.price = result["price"]
+                        successful_strategy = strategy_name
                         logger.debug("Price found via %s: %s", strategy_name, info.price)
                     if result.get("name") and info.name is None:
                         info.name = result["name"]
@@ -201,6 +205,14 @@ class GenericScraper(AbstractScraper):
             except (ValueError, KeyError, AttributeError) as e:
                 logger.debug("Strategy %s error: %s", strategy_name, e)
                 continue
+
+        if successful_strategy == "Regex":
+            # Heuristic regex on visible text is the last-resort path. Log a
+            # warning so operators can spot domains that need a tuned scraper.
+            logger.warning(
+                "generic.heuristic_fallback: price extracted via regex heuristic for %s",
+                url,
+            )
 
         # Fallback name from <title>
         if not info.name:
@@ -443,7 +455,34 @@ class GenericScraper(AbstractScraper):
 
         return result if result.get("price") else None
 
-    # ── Strategy 4: Additional meta tags ───────────────────────────
+    # ── Strategy 4: RDFa ───────────────────────────────────────────
+
+    def _try_rdfa(self, soup: BeautifulSoup) -> dict | None:
+        product = soup.find(attrs={"typeof": re.compile(r"\bProduct\b")})
+        if not isinstance(product, Tag):
+            return None
+        offer_match = product.find(attrs={"typeof": re.compile(r"\bOffer\b")})
+        offer: Tag = offer_match if isinstance(offer_match, Tag) else product
+        price_tag = offer.find(attrs={"property": "price"})
+        if not isinstance(price_tag, Tag):
+            return None
+        price_str = price_tag.get("content") or price_tag.get_text(strip=True)
+        parsed = parse_price(str(price_str))
+        if parsed is None or parsed <= 0:
+            return None
+        currency_tag = offer.find(attrs={"property": "priceCurrency"})
+        currency_val = (
+            currency_tag.get("content") if isinstance(currency_tag, Tag) else None
+        ) or "EUR"
+        result: dict = {"price": parsed, "currency": currency_val}
+        name_tag = product.find(attrs={"property": "name"})
+        if isinstance(name_tag, Tag):
+            name = name_tag.get_text(strip=True)
+            if name:
+                result["name"] = name[:200]
+        return result
+
+    # ── Strategy 5: Additional meta tags ───────────────────────────
 
     def _try_meta_tags(self, soup: BeautifulSoup) -> dict | None:
         result: dict = {}
@@ -476,7 +515,7 @@ class GenericScraper(AbstractScraper):
 
         return result if result.get("price") else None
 
-    # ── Strategy 5: CSS selectors ──────────────────────────────────
+    # ── Strategy 6: CSS selectors ──────────────────────────────────
 
     def _try_css_selectors(self, soup: BeautifulSoup) -> dict | None:
         for selector in self.PRICE_SELECTORS:
@@ -506,7 +545,7 @@ class GenericScraper(AbstractScraper):
                         return {"price": parsed}
         return None
 
-    # ── Strategy 6: Data attributes ────────────────────────────────
+    # ── Strategy 7: Data attributes ────────────────────────────────
 
     def _try_data_attributes(self, soup: BeautifulSoup) -> dict | None:
         price_data_attrs = [
@@ -531,7 +570,7 @@ class GenericScraper(AbstractScraper):
 
         return None
 
-    # ── Strategy 7: JS embedded product data ───────────────────────
+    # ── Strategy 8: JS embedded product data ───────────────────────
 
     def _try_js_product_data(self, soup: BeautifulSoup) -> dict | None:
         scripts = soup.find_all("script")
@@ -574,7 +613,7 @@ class GenericScraper(AbstractScraper):
 
         return None
 
-    # ── Strategy 8: Regex fallback ─────────────────────────────────
+    # ── Strategy 9: Regex fallback ─────────────────────────────────
 
     def _try_regex(self, soup: BeautifulSoup) -> dict | None:
         body = soup.find("body")
