@@ -22,15 +22,15 @@ All metric names are prefixed with `price_tracker_` (NAMESPACE constant at `obse
 
 | Metric                                       | Type      | Labels                                | Description                                                       |
 | -------------------------------------------- | --------- | ------------------------------------- | ----------------------------------------------------------------- |
-| `price_tracker_price_check_total`            | Counter   | `domain`, `status`                    | Price-check attempts; `status` ∈ `success`/`outlier`/`error`/`no_alert` |
+| `price_tracker_price_check_total`            | Counter   | `scraper`, `domain`, `status`         | Price-check attempts; `status` ∈ `success`/`outlier`/`error`/`no_alert` |
 | `price_tracker_scraper_duration_seconds`     | Histogram | `domain`, `scraper`                   | End-to-end scrape duration (HTTP + parse)                         |
-| `price_tracker_outlier_rejected_total`       | Counter   | `domain`                              | Outlier-detection rejections (median ratio)                       |
-| `price_tracker_notification_sent_total`      | Counter   | `kind`                                | Notifications delivered; `kind` ∈ `immediate`/`digest`            |
+| `price_tracker_outlier_rejected_total`       | Counter   | `scraper`, `domain`                   | Outlier-detection rejections (median ratio)                       |
+| `price_tracker_notification_sent_total`      | Counter   | `type`, `channel`                     | Notifications delivered; `type` ∈ `immediate`/`digest`, `channel=telegram` |
 | `price_tracker_notification_skipped_total`   | Counter   | `reason`                              | Notifications skipped; `reason` ∈ `mute`/`quiet_hours`/`throttle`/`digest_pending` |
-| `price_tracker_quarantine_state`             | Gauge     | `domain`                              | Per-domain HealthManager state: `0` open, `1` half-open, `2` locked |
+| `price_tracker_quarantine_state`             | Gauge     | `domain`, `state`                     | Per-domain quarantine state: 0=CLOSED, 1/2/3=LOCKED (tiers T1/T2/T3), 4=HALF_OPEN |
 | `price_tracker_quarantine_transitions_total` | Counter   | `domain`, `from_state`, `to_state`    | State machine transitions in HealthManager                         |
 | `price_tracker_quarantine_skip_total`        | Counter   | `domain`                              | Scrape attempts skipped because domain is locked                   |
-| `price_tracker_currency_lookups_total`       | Counter   | `cached`, `source`                    | FX-rate lookups; `cached` ∈ `hit`/`miss`, `source=ecb`             |
+| `price_tracker_currency_lookups_total`       | Counter   | `result`                              | FX-rate lookups; `result` ∈ `hit`/`miss`/`error`/`fallback` (ECB source) |
 | `price_tracker_currency_cache_hit_rate`      | Gauge     | (none)                                | Rolling cache hit ratio (0.0–1.0)                                  |
 | `price_tracker_products_tracked_total`       | Gauge     | (none)                                | Active product rows in the database                                |
 | `price_tracker_bot_uptime_seconds`           | Gauge     | (none)                                | Bot uptime since process start                                     |
@@ -48,10 +48,10 @@ The 14 panels (in default order):
 3. **Scheduler jobs active** — `price_tracker_scheduler_jobs_active`
 4. **Scrape rate by status** — `rate(price_tracker_price_check_total[5m])` grouped by `status`
 5. **Scraper p95 latency** — `histogram_quantile(0.95, sum by (le, domain) (rate(price_tracker_scraper_duration_seconds_bucket[5m])))`
-6. **Locked domains** — count of `price_tracker_quarantine_state == 2`
+6. **Locked domains** — count of `price_tracker_quarantine_state` in [1, 3] (locked tiers; T1/T2/T3)
 7. **Quarantine state matrix** — heatmap of `price_tracker_quarantine_state` over `domain` × time
 8. **Quarantine transitions** — `rate(price_tracker_quarantine_transitions_total[15m])` by `from_state`, `to_state`
-9. **Notifications sent** — `rate(price_tracker_notification_sent_total[5m])` by `kind`
+9. **Notifications sent** — `rate(price_tracker_notification_sent_total[5m])` by `type`
 10. **Notifications skipped** — `rate(price_tracker_notification_skipped_total[5m])` by `reason`
 11. **Digest queue size** — `price_tracker_digest_queue_size`
 12. **Outlier rejections** — `rate(price_tracker_outlier_rejected_total[15m])` by `domain`
@@ -60,7 +60,7 @@ The 14 panels (in default order):
 
 ## Structured logs
 
-Logging uses [structlog](https://www.structlog.org/) with a JSON renderer to stdout. Configuration is in `src/price_tracker/observability/logging.py`. Bind keys are added via `structlog.contextvars` so they propagate through the async call stack without explicit threading.
+Logging uses [structlog](https://www.structlog.org/) with a JSON renderer to stdout. Configuration is in `src/price_tracker/observability/logging.py`. Some keys are bound via `structlog.contextvars` for async-stack propagation; others are passed as keyword arguments to individual log calls. The boundary depends on the call site.
 
 Set the level via `LOG_LEVEL` (default `INFO`). Other valid values: `DEBUG`, `WARNING`, `ERROR`.
 
@@ -102,13 +102,13 @@ groups:
   - name: price-tracker
     rules:
       - alert: ScraperBlockRateHigh
-        expr: rate(price_tracker_quarantine_transitions_total{to_state="locked"}[5m]) > 0.05
+        expr: rate(price_tracker_quarantine_transitions_total{to_state=~"LOCKED_.*"}[5m]) > 0.05
         for: 10m
         annotations:
           summary: "Scraper block rate elevated on {{ $labels.domain }}"
 
       - alert: MultipleQuarantines
-        expr: count(price_tracker_quarantine_state == 2) > 3
+        expr: count(price_tracker_quarantine_state >= 1 and price_tracker_quarantine_state <= 3) > 3
         for: 5m
         annotations:
           summary: "More than 3 domains quarantined simultaneously"
