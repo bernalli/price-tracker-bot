@@ -46,7 +46,7 @@ All configuration is via environment variables, loaded from `.env` (or the host 
 | `MAX_CONSECUTIVE_ERRORS`      | `10`                    | Threshold before HealthManager quarantines a domain                                                                    |
 | `REQUEST_TIMEOUT`             | `30`                    | HTTP timeout in seconds for scraper requests                                                                           |
 | `NOTIFICATION_COOLDOWN_HOURS` | `24`                    | Per-product alert cooldown                                                                                             |
-| `METRICS_ENABLED`             | (auto-detected)         | Set `1` or `true` to force-enable Prometheus exporter even when no port is set                                         |
+| `METRICS_ENABLED`             | `true`                  | Prometheus exporter is on by default. Set `0` or `false` to disable.                                                  |
 
 For the full set including outlier detection thresholds and currency tuning, see `src/price_tracker/config.py`.
 
@@ -118,7 +118,7 @@ Notes:
 | -------------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Scraper silently stops fetching        | Domain is quarantined by HealthManager     | `/health` shows the domain in `LOCKED` state; logs `quarantine_locked` event with `block_count` and `locked_until`                                                  |
 | All scrapers slow                      | Telegram rate limit (429)                  | Built-in tenacity backoff handles automatically; check logs for `tg_429`                                                                                            |
-| Currency conversion shows stale rates  | ECB cache TTL not refreshed                | Cache TTL is 24h; force refresh by stopping the bot and removing the cache row: `sqlite3 /data/pricetracker.db "DELETE FROM bot_config WHERE key='currency_cache'"` |
+| Currency conversion shows stale rates  | ECB cache TTL not refreshed                | Cache TTL is 24h; force refresh by stopping the bot and removing the cache row: `sqlite3 /data/pricetracker.db "DELETE FROM bot_config WHERE key='fx_rates_eur'"` |
 | Playwright fails with cache error      | `/home/botuser/.cache` tmpfs not mounted   | Verify compose `tmpfs` block; check `docker inspect` for the mount                                                                                                  |
 | `database is locked` error             | Multiple writers or interrupted WAL        | Stop the bot, run `sqlite3 /data/pricetracker.db "PRAGMA wal_checkpoint(FULL);"`, restart                                                                           |
 | Metrics endpoint returns 404           | `PROMETHEUS_BIND` unset or off-localhost   | Confirm env var; default binds to `127.0.0.1:9090` (not reachable from outside container without explicit port mapping)                                             |
