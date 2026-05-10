@@ -39,7 +39,7 @@ All configuration is via environment variables, loaded from `.env` (or the host 
 | `TELEGRAM_BOT_TOKEN`          | (required)              | Telegram bot API token                                                                                                 |
 | `ALLOWED_USERS`               | (required)              | Comma-separated Telegram user IDs authorized to use the bot (first listed becomes admin)                               |
 | `DATABASE_PATH`               | `/data/pricetracker.db` | SQLite database path                                                                                                   |
-| `LANG`                        | `en`                    | Default locale fallback when Telegram `language_code` missing (`en`, `it`)                                             |
+| `LOCALE`                      | `en`                    | Default locale fallback when Telegram `language_code` missing (`en`, `it`)                                             |
 | `LOG_LEVEL`                   | `INFO`                  | structlog log level (`DEBUG`, `INFO`, `WARNING`, `ERROR`)                                                              |
 | `PROMETHEUS_BIND`             | `127.0.0.1:9090`        | Prometheus exporter bind address (host:port)                                                                           |
 | `CHECK_INTERVAL_MINUTES`      | `360`                   | Default polling interval (per-product overridable via `/set_interval`)                                                 |
