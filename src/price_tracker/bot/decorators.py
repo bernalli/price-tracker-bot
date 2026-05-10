@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any
 
 from telegram.constants import ParseMode
 
-from price_tracker.bot.messages import set_locale
+from price_tracker.bot.messages import _, set_locale
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable
@@ -66,10 +66,12 @@ def restricted(func: HandlerFn) -> HandlerFn:
         if not allowed:
             if update.message:
                 await update.message.reply_text(
-                    f"⛔ Non sei autorizzato.\n"
-                    f"Il tuo ID Telegram è: <code>{user.id}</code>\n\n"
-                    f"Chiedi all'amministratore di aggiungerti con:\n"
-                    f"<code>/adduser {user.id}</code>",
+                    _(
+                        "⛔ You are not authorized.\n"
+                        "Your Telegram ID: <code>{tg_id}</code>\n\n"
+                        "Ask the administrator to add you with:\n"
+                        "<code>/adduser {tg_id}</code>"
+                    ).format(tg_id=user.id),
                     parse_mode=ParseMode.HTML,
                 )
             return None
@@ -99,9 +101,7 @@ def admin_only(func: HandlerFn) -> HandlerFn:
         is_admin = await db.is_user_admin(user.id)
         if not is_admin:
             if update.message:
-                await update.message.reply_text(
-                    "⛔ Solo l'amministratore può usare questo comando."
-                )
+                await update.message.reply_text(_("⛔ Admin-only command."))
             return None
         return await func(update, context, *args, **kwargs)
 
