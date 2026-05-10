@@ -11,16 +11,19 @@ Both forms must subclass `AbstractScraper` from `price_tracker.core.scraper_base
 
 Every scraper subclasses `AbstractScraper` and provides:
 
-- `name: ClassVar[str]` — unique stable identifier (defaults to lowercased class name with `Scraper` suffix stripped).
+- `name: ClassVar[str]` — unique stable identifier. Must be set explicitly; the base class default is an empty string `""`. A blank `name` will collide with any other plugin that also omits it.
 - `priority: ClassVar[int]` — resolution priority. Higher wins. Site-specific scrapers use 50; the Shopify generic uses 80; Amazon and eBay use 100. Pick a value that fits your scraper's specificity.
-- `domain_patterns: ClassVar[list[re.Pattern[str]]]` — list of compiled regexes against URL netloc (`urlparse(url).netloc`). The default `can_handle()` returns `True` if any pattern matches.
+- `domain_patterns: ClassVar[list[re.Pattern[str]]]` — list of compiled regexes against URL netloc (`urlparse(url).netloc`).
+- `def can_handle(self, url: str) -> bool` — required abstract method. For typical domain-based matching, just `return self.matches_domain(url)` (the helper in the base class checks each `domain_patterns` regex against the URL netloc).
 - `async def scrape(self, url: str, client: httpx.AsyncClient) -> ProductInfo` — fetch the URL with the injected `httpx.AsyncClient` (already configured with timeout, proxies, retry policy) and return a populated `ProductInfo`. Never raise on network or parse errors — return `ProductInfo(error="...")` instead.
 
-`ProductInfo` is a dataclass with these fields (see `scraper_base.py:160`):
-- `title: str | None`
+`ProductInfo` is a dataclass with these fields (see `scraper_base.py:159`):
+- `name: str | None` — product title/name
 - `price: Decimal | None` — always `Decimal`, never `float`
 - `currency: str | None` — ISO 4217 (e.g. `"EUR"`, `"USD"`)
-- `is_available: bool` — `False` for out-of-stock pages
+- `available: bool` — `False` for out-of-stock pages
+- `seller: str | None` — third-party seller name (optional)
+- `condition: str | None` — `"new"`, `"used"`, etc. (optional)
 - `error: str | None` — human-readable error if the parse failed
 
 ## Minimal example
@@ -40,6 +43,9 @@ class MyShopScraper(AbstractScraper):
         re.compile(r"^(www\.)?myshop\.(com|eu)$"),
     ]
 
+    def can_handle(self, url: str) -> bool:
+        return self.matches_domain(url)
+
     async def scrape(self, url: str, client: httpx.AsyncClient) -> ProductInfo:
         try:
             response = await client.get(url, follow_redirects=True)
@@ -51,20 +57,19 @@ class MyShopScraper(AbstractScraper):
         # Always wrap price string with parse_price() to get Decimal.
         # Return early with ProductInfo(error=...) on parse failure.
 
-        title = "..."         # extract from HTML
+        name = "..."          # extract title/name from HTML
         price_str = "..."     # raw price text
         price = parse_price(price_str)
         currency = "EUR"
-        is_available = True
 
         if price is None:
             return ProductInfo(error="Could not parse price")
 
         return ProductInfo(
-            title=title,
+            name=name,
             price=price,
             currency=currency,
-            is_available=is_available,
+            available=True,
         )
 ```
 
@@ -83,22 +88,25 @@ Restart the bot to pick up new files. Errors during import are logged but do not
 
 ## Pip-installable plugin
 
-In your distribution's `pyproject.toml`:
+> **Status**: planned, not yet wired into startup. The `[project.entry-points."price_tracker.scrapers"]` group is reserved in `pyproject.toml`, but the registry does not currently call `importlib.metadata.entry_points` at startup. Until that path is wired, prefer the drop-in directory above.
+
+When entry-point loading lands, plugin distributions will declare their scrapers like this:
 
 ```toml
 [project.entry-points."price_tracker.scrapers"]
 myshop = "my_plugin.scraper:MyShopScraper"
 ```
 
-Install with `pip install my-plugin` (in the same environment as `price-tracker-bot`). The registry walks `importlib.metadata.entry_points(group="price_tracker.scrapers")` at startup and registers every advertised class.
+Track the implementation status via the project changelog and the `core.registry` module.
 
 ## Auto-discovery order
 
 At startup the registry assembles the scraper pool from three sources, in this order:
 
-1. **Built-in** scrapers from `src/price_tracker/scrapers/` (always loaded).
-2. **Entry-point** plugins from installed pip packages (loaded if any).
-3. **Drop-in** plugins from `plugins/` (loaded if any).
+1. **Built-in** scrapers from `src/price_tracker/scrapers/` (always loaded via `discover_builtin_scrapers`).
+2. **Drop-in** plugins from `plugins/` (loaded via `discover_dropin_scrapers` if the directory exists and contains `.py` files).
+
+Entry-point plugins are documented in the [Pip-installable plugin](#pip-installable-plugin) section above but are not yet wired into startup; they will become a third loading stage when implementation lands.
 
 After all three sources are loaded, the registry sorts by `priority` (descending) and tie-breaks by registration order. There is no namespace conflict check — pick a stable, unique `name` to avoid surprises.
 
@@ -116,27 +124,33 @@ Minimal `tests/unit/scrapers/test_myshop.py`:
 ```python
 from pathlib import Path
 
+import httpx
 import pytest
+import respx
+
 from price_tracker.core.scraper_base import ProductInfo
 
 from my_plugin.scraper import MyShopScraper  # or `plugins.myshop` for drop-in
 
 
 @pytest.mark.asyncio
-async def test_myshop_parses_sample(httpx_mock):
+async def test_myshop_parses_sample():
     fixture = Path("tests/fixtures/myshop/sample_product.html").read_text()
-    httpx_mock.add_response(text=fixture)
 
-    import httpx
-    async with httpx.AsyncClient() as client:
-        scraper = MyShopScraper()
-        info = await scraper.scrape("https://myshop.com/p/1", client)
+    with respx.mock(assert_all_called=False) as router:
+        router.get("https://myshop.com/p/1").mock(
+            return_value=httpx.Response(200, text=fixture)
+        )
+
+        async with httpx.AsyncClient() as client:
+            scraper = MyShopScraper()
+            info = await scraper.scrape("https://myshop.com/p/1", client)
 
     assert info.error is None
     assert info.price is not None
-    assert info.title
+    assert info.name
     assert info.currency == "EUR"
-    assert info.is_available is True
+    assert info.available is True
 ```
 
 Run with `pytest tests/unit/scrapers/test_myshop.py -v`. Coverage target: ≥80% for the plugin module (same gate as built-in scrapers — see [CONTRIBUTING.md](../CONTRIBUTING.md)).
