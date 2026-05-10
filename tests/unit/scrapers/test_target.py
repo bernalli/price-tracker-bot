@@ -9,6 +9,7 @@ import httpx
 import pytest
 import respx
 
+from price_tracker.scrapers import target as target_module
 from price_tracker.scrapers.target import TargetScraper
 
 if TYPE_CHECKING:
@@ -56,3 +57,62 @@ async def test_target_returns_error_on_missing_data() -> None:
             info = await scraper.scrape(url, client)
     assert info.price is None
     assert info.error is not None
+
+
+@pytest.mark.asyncio
+async def test_target_jsonld_fallback_when_no_dom(
+    load_fixture: Callable[[str], str],
+) -> None:
+    """Fixture with only JSON-LD (no DOM data-test) → JSON-LD fallback yields price."""
+    html = load_fixture("target/sample_target_fallback.html")
+    scraper = TargetScraper()
+    url = "https://www.target.com/p/-/A-1235"
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).respond(200, text=html)
+        async with httpx.AsyncClient() as client:
+            info = await scraper.scrape(url, client)
+    assert info.price == Decimal("12.49")
+    assert info.currency == "USD"
+    assert info.name == "Fallback Target Product"
+    assert info.error is None
+
+
+@pytest.mark.asyncio
+async def test_target_returns_error_on_http_500(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """5xx response (after retry exhaustion) → ProductInfo with HTTP error."""
+    scraper = TargetScraper()
+
+    async def _fast_fetch(url: str, client: httpx.AsyncClient) -> httpx.Response:
+        return await client.get(url)
+
+    monkeypatch.setattr(target_module, "_fetch_target_html", _fast_fetch)
+
+    url = "https://www.target.com/p/-/A-5555"
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).respond(500)
+        async with httpx.AsyncClient() as client:
+            info = await scraper.scrape(url, client)
+    assert info.price is None
+    assert info.error is not None
+    assert "HTTP error" in info.error
+
+
+@pytest.mark.asyncio
+async def test_target_handles_malformed_jsonld_gracefully() -> None:
+    """Malformed JSON-LD does not crash; price still extracted from DOM."""
+    scraper = TargetScraper()
+    url = "https://www.target.com/p/-/A-7777"
+    html = """
+    <html><head><title>Sample</title></head><body>
+    <script type="application/ld+json">{not valid json</script>
+    <span data-test="product-price">$8.50</span>
+    </body></html>
+    """
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).respond(200, text=html)
+        async with httpx.AsyncClient() as client:
+            info = await scraper.scrape(url, client)
+    assert info.price == Decimal("8.50")
+    assert info.currency == "USD"
