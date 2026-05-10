@@ -60,12 +60,12 @@ async def _product_picker(
     user_id = update.effective_user.id
     products = await db.get_active_products(user_id)
     if not products:
-        await update.message.reply_text(_("📭 Non hai prodotti tracciati."))
+        await update.message.reply_text(_("📭 You have no tracked products."))
         return True
 
     buttons = []
     for p in products:
-        name = (p.get("name") or "Sconosciuto")[:35]
+        name = (p.get("name") or _("Unknown"))[:35]
         current = _safe_dec(p.get("current_price"))
         price_tag = f" €{current:.2f}" if current else ""
         prefix = callback_prefix or action
@@ -95,35 +95,37 @@ async def cmd_refresh(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             update,
             context,
             "refresh",
-            "Scegli prodotto per impostare intervallo",
+            _("Choose product to set interval"),
             "setrefresh",
         )
         return
     if len(context.args) < 2:
         await update.message.reply_text(
-            "❌ Uso: /refresh &lt;id&gt; &lt;minuti&gt;\n\n"
-            "Esempi:\n"
-            "<code>/refresh 3 30</code> — controlla ogni 30 minuti\n"
-            "<code>/refresh 3 720</code> — controlla ogni 12 ore\n"
-            "<code>/refresh 3 0</code> — torna all'intervallo globale",
+            _(
+                "❌ Usage: /refresh &lt;id&gt; &lt;minutes&gt;\n\n"
+                "Examples:\n"
+                "<code>/refresh 3 30</code> — check every 30 minutes\n"
+                "<code>/refresh 3 720</code> — check every 12 hours\n"
+                "<code>/refresh 3 0</code> — return to global interval"
+            ),
             parse_mode=ParseMode.HTML,
         )
         return
 
     product_id = _parse_id(context.args[0])
     if product_id is None:
-        await update.message.reply_text(_("❌ ID non valido."))
+        await update.message.reply_text(_("❌ Invalid ID."))
         return
 
     try:
         minutes = int(context.args[1])
     except ValueError:
-        await update.message.reply_text(_("❌ Valore non valido. Inserisci un numero di minuti."))
+        await update.message.reply_text(_("❌ Invalid value. Enter a number of minutes."))
         return
 
     product = await _get_user_product(context, product_id, update.effective_user.id)
     if not product:
-        await update.message.reply_text(_("❌ Prodotto non trovato."))
+        await update.message.reply_text(_("❌ Product not found."))
         return
 
     db = _db(context)
@@ -131,33 +133,36 @@ async def cmd_refresh(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if minutes <= 0:
         await db.set_product_interval(product_id, None)
         config = _config(context)
+        name_safe = _escape_html((product.get("name") or _("Unknown"))[:80])
         await update.message.reply_text(
-            f"🔄 Intervallo ripristinato a quello globale "
-            f"(ogni {config.check_interval_minutes} min)\n"
-            f"📦 #{product_id} — "
-            f"{_escape_html((product.get('name') or 'Sconosciuto')[:80])}",
+            _("🔄 Interval reset to global (every {min} min)\n📦 #{pid} — {name}").format(
+                min=config.check_interval_minutes, pid=product_id, name=name_safe
+            ),
             parse_mode=ParseMode.HTML,
         )
         return
 
     if minutes < 5:
-        await update.message.reply_text(_("❌ L'intervallo minimo è 5 minuti."))
+        await update.message.reply_text(_("❌ Minimum interval is 5 minutes."))
         return
     if minutes > 1440 * 7:
-        await update.message.reply_text(_("❌ L'intervallo massimo è 7 giorni."))
+        await update.message.reply_text(_("❌ Maximum interval is 7 days."))
         return
 
     await db.set_product_interval(product_id, minutes)
-    name = product.get("name") or "Sconosciuto"
+    name = product.get("name") or _("Unknown")
 
     if minutes >= 60:
         hours = minutes / 60
-        display = f"{hours:.0f} ore" if hours == int(hours) else f"{hours:.1f} ore"
+        hours_str = f"{hours:.0f}" if hours == int(hours) else f"{hours:.1f}"
+        display = _("{n} hours").format(n=hours_str)
     else:
-        display = f"{minutes} minuti"
+        display = _("{n} minutes").format(n=minutes)
 
     await update.message.reply_text(
-        f"🔄 Intervallo check: <b>ogni {display}</b>\n📦 #{product_id} — {_escape_html(name[:80])}",
+        _("🔄 Check interval: <b>every {display}</b>\n📦 #{pid} — {name}").format(
+            display=display, pid=product_id, name=_escape_html(name[:80])
+        ),
         parse_mode=ParseMode.HTML,
     )
 
@@ -167,25 +172,25 @@ async def cmd_refresh(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 async def cmd_check(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Check a single product price on demand."""
     if not context.args:
-        await _product_picker(update, context, "check", "Scegli prodotto da controllare", "check")
+        await _product_picker(update, context, "check", _("Choose product to check"), "check")
         return
 
     product_id = _parse_id(context.args[0])
     if product_id is None:
-        await update.message.reply_text(_("❌ ID non valido."))
+        await update.message.reply_text(_("❌ Invalid ID."))
         return
 
     product = await _get_user_product(context, product_id, update.effective_user.id)
     if not product:
-        await update.message.reply_text(_("❌ Prodotto non trovato."))
+        await update.message.reply_text(_("❌ Product not found."))
         return
 
     is_active = product.get("is_active", 0)
     if not is_active:
-        await update.message.reply_text(_("❌ Prodotto non attivo. Usa /riattiva per riattivarlo."))
+        await update.message.reply_text(_("❌ Product paused. Use /reactivate to resume tracking."))
         return
 
-    msg = await update.message.reply_text(_("🔍 Controllo in corso..."))
+    msg = await update.message.reply_text(_("🔍 Checking..."))
     # Deferred import: PriceChecker lives in legacy `checker.py` for now.
     from checker import PriceChecker  # noqa: PLC0415
 
@@ -193,9 +198,9 @@ async def cmd_check(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     alert = await checker.check_product(product, _client(context))
 
     product = await _db(context).get_product(product_id) or {}
-    name = product.get("name") or "Sconosciuto"
+    name = product.get("name") or _("Unknown")
     current = _safe_dec(product.get("current_price"))
-    price_str = f"€{current:.2f}" if current else "N/D"
+    price_str = f"€{current:.2f}" if current else _("N/A")
 
     if alert:
         # Manual /check command: delete placeholder and send photo+caption when possible
@@ -204,9 +209,9 @@ async def cmd_check(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await _send_alert(context.bot, alert, _db(context))
     else:
         await msg.edit_text(
-            f"✅ <b>{_escape_html(name[:80])}</b>\n"
-            f"💰 Prezzo: {price_str}\n"
-            f"📊 Nessuna variazione significativa.",
+            _("✅ <b>{name}</b>\n💰 Price: {price}\n📊 No significant change.").format(
+                name=_escape_html(name[:80]), price=price_str
+            ),
             parse_mode=ParseMode.HTML,
         )
 
@@ -220,10 +225,10 @@ async def cmd_checkall(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     products = await db.get_active_products(user_id)
 
     if not products:
-        await update.message.reply_text(_("📭 Nessun prodotto da controllare."))
+        await update.message.reply_text(_("📭 No products to check."))
         return
 
-    msg = await update.message.reply_text(f"🔍 Controllo di {len(products)} prodotti in corso...")
+    msg = await update.message.reply_text(_("🔍 Checking {n} products...").format(n=len(products)))
     # Deferred import: PriceChecker lives in legacy `checker.py` for now.
     from checker import (  # noqa: PLC0415,E501
         PriceChecker,
@@ -235,12 +240,14 @@ async def cmd_checkall(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     # Build summary of all products after check
     updated_products = await db.get_active_products(user_id)
-    summary_lines = [f"✅ <b>Controllo completato</b> — {len(updated_products)} prodotti" + chr(10)]
+    summary_lines = [
+        _("✅ <b>Check complete</b> — {n} products").format(n=len(updated_products)) + chr(10)
+    ]
     for p in updated_products:
-        name = (p.get("name") or "Sconosciuto")[:40]
+        name = (p.get("name") or _("Unknown"))[:40]
         current = _safe_dec(p.get("current_price"))
         initial = _safe_dec(p.get("initial_price"))
-        price_str = f"€{current:.2f}" if current else "N/D"
+        price_str = f"€{current:.2f}" if current else _("N/A")
         diff_str = ""
         if initial and current and initial > 0 and initial != current:
             diff = (initial - current) / initial * 100
@@ -253,7 +260,7 @@ async def cmd_checkall(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         summary_lines.append(f"  #{p['id']} {_escape_html(name)} — {price_str}{diff_str}{err_str}")
 
     if alerts:
-        summary_lines.append(chr(10) + f"🔔 <b>{len(alerts)} variazioni trovate!</b>")
+        summary_lines.append(chr(10) + _("🔔 <b>{n} changes found!</b>").format(n=len(alerts)))
 
     await msg.edit_text(chr(10).join(summary_lines), parse_mode=ParseMode.HTML)
 
@@ -280,34 +287,34 @@ async def cmd_reactivate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         all_products = await db.get_all_products(user_id)
         paused = [p for p in all_products if not p.get("is_active")]
         if not paused:
-            await update.message.reply_text(_("✅ Non hai prodotti in pausa."))
+            await update.message.reply_text(_("✅ You have no paused products."))
             return
         buttons = []
         for p in paused:
-            name = (p.get("name") or "Sconosciuto")[:35]
+            name = (p.get("name") or _("Unknown"))[:35]
             buttons.append(
                 [InlineKeyboardButton(f"#{p['id']} {name}", callback_data=f"reactivate_{p['id']}")]
             )
         await update.message.reply_text(
-            "⏸ <b>Prodotti in pausa — scegli da riattivare:</b>",
+            _("⏸ <b>Paused products — choose to reactivate:</b>"),
             parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup(buttons),
         )
         return
     product_id = _parse_id(context.args[0])
     if product_id is None:
-        await update.message.reply_text(_("❌ ID non valido."))
+        await update.message.reply_text(_("❌ Invalid ID."))
         return
 
     product = await _get_user_product(context, product_id, update.effective_user.id)
     if not product:
-        await update.message.reply_text(_("❌ Prodotto non trovato."))
+        await update.message.reply_text(_("❌ Product not found."))
         return
 
     await _db(context).reactivate_product(product_id)
-    name = product.get("name") or "Sconosciuto"
+    name = product.get("name") or _("Unknown")
     await update.message.reply_text(
-        f"✅ Riattivato: <b>{_escape_html(name[:80])}</b>",
+        _("✅ Reactivated: <b>{name}</b>").format(name=_escape_html(name[:80])),
         parse_mode=ParseMode.HTML,
     )
 
@@ -317,25 +324,24 @@ async def cmd_reactivate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 async def cmd_pause(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Pause a tracked product."""
     if not context.args:
-        await _product_picker(
-            update, context, "pause", "Scegli prodotto da mettere in pausa", "pause"
-        )
+        await _product_picker(update, context, "pause", _("Choose product to pause"), "pause")
         return
     product_id = _parse_id(context.args[0])
     if product_id is None:
-        await update.message.reply_text(_("❌ ID non valido."))
+        await update.message.reply_text(_("❌ Invalid ID."))
         return
 
     product = await _get_user_product(context, product_id, update.effective_user.id)
     if not product:
-        await update.message.reply_text(_("❌ Prodotto non trovato."))
+        await update.message.reply_text(_("❌ Product not found."))
         return
 
     await _db(context).deactivate_product(product_id)
-    name = product.get("name") or "Sconosciuto"
+    name = product.get("name") or _("Unknown")
     await update.message.reply_text(
-        f"⏸ Tracking in pausa: <b>{_escape_html(name[:80])}</b>\n"
-        f"Usa /riattiva {product_id} per riprendere.",
+        _("⏸ Tracking paused: <b>{name}</b>").format(name=_escape_html(name[:80]))
+        + "\n"
+        + _("Use /reactivate {pid} to resume tracking.").format(pid=product_id),
         parse_mode=ParseMode.HTML,
     )
 
