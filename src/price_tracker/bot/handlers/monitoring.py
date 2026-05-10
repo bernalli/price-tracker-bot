@@ -26,6 +26,7 @@ from price_tracker.bot.decorators import (
     _db,
     _scraper,
     restricted,
+    with_locale,
 )
 from price_tracker.bot.handlers._helpers import (
     _escape_html,
@@ -85,6 +86,7 @@ async def _product_picker(
     return True
 
 
+@with_locale
 @restricted
 async def cmd_refresh(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Set per-product check interval. Usage: /refresh <id> <minuti>"""
@@ -160,6 +162,7 @@ async def cmd_refresh(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     )
 
 
+@with_locale
 @restricted
 async def cmd_check(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Check a single product price on demand."""
@@ -208,6 +211,7 @@ async def cmd_check(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         )
 
 
+@with_locale
 @restricted
 async def cmd_checkall(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Force-check every active product owned by the caller."""
@@ -265,6 +269,7 @@ async def cmd_checkall(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             )
 
 
+@with_locale
 @restricted
 async def cmd_reactivate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Re-enable a paused product."""
@@ -307,6 +312,7 @@ async def cmd_reactivate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     )
 
 
+@with_locale
 @restricted
 async def cmd_pause(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Pause a tracked product."""

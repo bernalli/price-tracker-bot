@@ -28,6 +28,7 @@ from price_tracker.bot.decorators import (
     _db,
     _scraper,
     restricted,
+    with_locale,
 )
 from price_tracker.bot.handlers._helpers import (
     _escape_html,
@@ -87,6 +88,7 @@ async def _product_picker(
     return True
 
 
+@with_locale
 @restricted
 async def cmd_add(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Track a new product. Usage: /add <url>"""
@@ -104,6 +106,7 @@ async def cmd_add(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await _add_product(update, context, url)
 
 
+@with_locale
 @restricted
 async def cmd_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Delete a tracked product (with confirmation)."""
@@ -163,6 +166,7 @@ async def cmd_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     )
 
 
+@with_locale
 @restricted
 async def cmd_target(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Set or clear the target price for a product."""
@@ -224,6 +228,7 @@ async def cmd_target(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML)
 
 
+@with_locale
 @restricted
 async def cmd_threshold(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Set the price-drop threshold for a product."""

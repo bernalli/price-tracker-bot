@@ -16,7 +16,7 @@ from zoneinfo import available_timezones
 from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler
 
-from price_tracker.bot.decorators import _config, _db, admin_only
+from price_tracker.bot.decorators import _config, _db, admin_only, with_locale
 from price_tracker.bot.messages import _
 from price_tracker.db.models import NotificationPrefs
 
@@ -30,6 +30,7 @@ if TYPE_CHECKING:
 _VALID_TIMEZONES: frozenset[str] = frozenset(available_timezones())
 
 
+@with_locale
 @admin_only
 async def cmd_set_interval(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Set the global price-check interval (admin)."""
@@ -84,6 +85,7 @@ def _valid_hhmm(value: str) -> bool:
     return 0 <= h <= 23 and 0 <= m <= 59
 
 
+@with_locale
 async def mute_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Usage: ``/mute [product_id|all] [hours|forever]`` (default: all 24h)."""
     repo = context.bot_data["repository"]
@@ -136,6 +138,7 @@ async def mute_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     await update.message.reply_text(f"Muted {scope} {when}.")
 
 
+@with_locale
 async def unmute_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Usage: ``/unmute [product_id|all]``."""
     repo = context.bot_data["repository"]
@@ -165,6 +168,7 @@ async def unmute_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await update.message.reply_text("Unmuted.")
 
 
+@with_locale
 async def digest_mode_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Usage: ``/digest_mode on|off [interval_min]``."""
     repo = context.bot_data["repository"]
@@ -200,6 +204,7 @@ async def digest_mode_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     await update.message.reply_text(f"Digest mode {'on' if enabled else 'off'}{suffix}.")
 
 
+@with_locale
 async def quiet_hours_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Usage: ``/quiet_hours HH:MM-HH:MM`` or ``/quiet_hours off``."""
     repo = context.bot_data["repository"]
@@ -248,6 +253,7 @@ async def quiet_hours_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     await update.message.reply_text(f"Quiet hours set to {start}-{end}.")
 
 
+@with_locale
 async def timezone_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Usage: ``/timezone <TZ>`` (e.g. ``Europe/Berlin``)."""
     repo = context.bot_data["repository"]
@@ -269,6 +275,7 @@ async def timezone_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     await update.message.reply_text(f"Timezone set to {tz}.")
 
 
+@with_locale
 async def throttle_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Usage: ``/throttle <N>`` or ``/throttle off``."""
     repo = context.bot_data["repository"]
@@ -300,6 +307,7 @@ async def throttle_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     await update.message.reply_text("Throttle updated.")
 
 
+@with_locale
 async def prefs_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Usage: ``/prefs [product_id]`` — render resolved (effective) preferences."""
     from price_tracker.notifier.preferences import PreferencesManager
@@ -332,6 +340,7 @@ async def prefs_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     await update.message.reply_html("\n".join(lines))
 
 
+@with_locale
 async def digest_now_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Usage: ``/digest_now`` — flush pending digest entries immediately."""
     digest_svc = context.bot_data["digest_service"]
