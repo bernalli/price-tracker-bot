@@ -57,3 +57,10 @@ repos:
         additional_dependencies: ["babel>=2.13.0"]
         files: ^src/price_tracker/locale/.*\.po$
         pass_filenames: false
+
+      - id: audit-english
+        name: English-only audit (src/)
+        entry: bash scripts/audit_english.sh
+        language: system
+        files: ^src/price_tracker/.*\.py$
+        pass_filenames: false
