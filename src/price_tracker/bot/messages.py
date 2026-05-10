@@ -88,7 +88,10 @@ def get_translation(lang_code: str | None) -> gettext.NullTranslations:
                 localedir=_LOCALE_DIR,
                 languages=[resolved],
             )
-        except FileNotFoundError:
+        except OSError:
+            # FileNotFoundError (catalog absent) or corrupt .mo (Bad magic
+            # number, truncated file, permission error) — fall through to
+            # next candidate so the runtime never crashes on bad locale data.
             continue
     return gettext.NullTranslations()
 
