@@ -19,7 +19,7 @@ from telegram.ext import (
     filters,
 )
 
-from price_tracker.bot.decorators import _config, _convert_display, _db, restricted
+from price_tracker.bot.decorators import _config, _convert_display, _db, restricted, with_locale
 from price_tracker.bot.handlers._helpers import (
     _escape_html,
     _format_threshold,
@@ -36,6 +36,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+@with_locale
 @restricted
 async def handle_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Detect URLs in plain-text messages and treat them as /add input."""
@@ -51,6 +52,7 @@ async def handle_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     await _add_product(update, context, url)
 
 
+@with_locale
 @restricted
 async def handle_text_input(  # noqa: PLR0915 — verbatim port; cyclomatic split planned for F6
     update: Update, context: ContextTypes.DEFAULT_TYPE

@@ -16,7 +16,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, InputFile, Upda
 from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler, ContextTypes
 
-from price_tracker.bot.decorators import _db, restricted
+from price_tracker.bot.decorators import _db, restricted, with_locale
 from price_tracker.bot.handlers._helpers import (
     _escape_html,
     _get_user_product,
@@ -107,6 +107,7 @@ async def _generate_chart(db: Any, product_id: int, product: dict[str, Any]) -> 
     return buf
 
 
+@with_locale
 @restricted
 async def cmd_history(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send a price-history chart for a product."""
@@ -164,6 +165,7 @@ async def cmd_history(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         )
 
 
+@with_locale
 @restricted
 async def cmd_reset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Reset initial_price to current_price for a product."""

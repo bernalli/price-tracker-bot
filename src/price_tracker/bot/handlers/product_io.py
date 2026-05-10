@@ -23,12 +23,13 @@ from telegram.ext import (
     filters,
 )
 
-from price_tracker.bot.decorators import _client, _db, _scraper, restricted
+from price_tracker.bot.decorators import _client, _db, _scraper, restricted, with_locale
 from price_tracker.bot.messages import _
 
 logger = logging.getLogger(__name__)
 
 
+@with_locale
 @restricted
 async def cmd_export(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Export user products as CSV file."""
@@ -80,6 +81,7 @@ async def cmd_export(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     )
 
 
+@with_locale
 @restricted
 async def cmd_import(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Import products from a CSV file."""

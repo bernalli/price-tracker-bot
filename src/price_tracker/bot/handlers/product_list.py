@@ -13,7 +13,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler, ContextTypes
 
-from price_tracker.bot.decorators import _convert_display, _db, restricted
+from price_tracker.bot.decorators import _convert_display, _db, restricted, with_locale
 from price_tracker.bot.handlers._helpers import (
     _escape_html,
     _format_threshold,
@@ -24,6 +24,7 @@ from price_tracker.bot.messages import _
 logger = logging.getLogger(__name__)
 
 
+@with_locale
 @restricted
 async def cmd_list(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """List the user's tracked products."""

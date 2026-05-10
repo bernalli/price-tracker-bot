@@ -17,7 +17,7 @@ from telegram import (
 from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler, ContextTypes
 
-from price_tracker.bot.decorators import _db, restricted
+from price_tracker.bot.decorators import _db, restricted, with_locale
 from price_tracker.bot.handlers import (
     auth,
     callbacks,
@@ -38,6 +38,7 @@ logger = logging.getLogger(__name__)
 # ── Home commands ────────────────────────────────────────────────
 
 
+@with_locale
 @restricted
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """`/start` — welcome message."""
@@ -53,6 +54,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
 
 
+@with_locale
 @restricted
 async def cmd_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """`/menu` — render the main menu."""
