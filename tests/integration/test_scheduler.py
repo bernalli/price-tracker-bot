@@ -1,5 +1,9 @@
 """Integration test for scheduled price check (no real network)."""
 
+# mypy: disable-error-code="method-assign,assignment,operator"
+# Tests intentionally replace HealthManager methods on AsyncMock(spec=...) instances
+# (lambda assignments to is_locked/is_half_open) — mypy can't validate cleanly.
+
 from __future__ import annotations
 
 from decimal import Decimal

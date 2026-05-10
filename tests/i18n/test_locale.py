@@ -112,7 +112,7 @@ def test_with_locale_decorator_sets_var(fake_catalog) -> None:
     async def handler(upd, ctx) -> None:  # noqa: ARG001
         captured["msg"] = _("❌ Invalid ID.")
 
-    asyncio.run(handler(update, context))
+    asyncio.run(handler(update, context))  # type: ignore[arg-type]  # with_locale returns Awaitable
     assert captured["msg"] == "❌ ID non valido."
 
 
@@ -130,7 +130,7 @@ def test_with_locale_decorator_no_user(fake_catalog, monkeypatch: pytest.MonkeyP
     async def handler(upd, ctx) -> None:  # noqa: ARG001
         captured["msg"] = _("❌ Invalid ID.")
 
-    asyncio.run(handler(update, context))
+    asyncio.run(handler(update, context))  # type: ignore[arg-type]  # with_locale returns Awaitable
     assert captured["msg"] == "❌ ID non valido."
 
 
