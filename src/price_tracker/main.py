@@ -24,6 +24,7 @@ from price_tracker.core.registry import (
 from price_tracker.core.scheduler import Scheduler, SchedulerDeps
 from price_tracker.db.migrator import apply_migrations
 from price_tracker.db.repository import Repository
+from price_tracker.notifier.digest import DigestService
 from price_tracker.notifier.telegram import TelegramNotifier
 from price_tracker.observability.logging import configure_logging
 from price_tracker.observability.metrics import MetricsRegistry, MetricsServer
@@ -41,11 +42,20 @@ async def post_init(application: Application[Any, Any, Any, Any, Any, Any]) -> N
     await apply_migrations(db_conn, MIGRATIONS_DIR)
     repo = Repository(db_conn)
     application.bot_data["repo"] = repo
+    # Alias used by Phase 2 F3.D notification handlers.
+    application.bot_data["repository"] = repo
 
     for uid in config.admin_users:
         await repo.ensure_user(user_id=uid, is_admin=True)
 
     application.bot_data["http_client"] = build_client(timeout=float(config.request_timeout))
+
+    # Wire DigestService so /digest_now and other digest-driven flows can
+    # reach it via context.bot_data.
+    metrics: MetricsRegistry | None = application.bot_data.get("metrics")
+    application.bot_data["digest_service"] = DigestService(
+        repo=repo, bot=application.bot, metrics=metrics
+    )
 
 
 async def _setup_scheduler(application: Application[Any, Any, Any, Any, Any, Any]) -> None:
