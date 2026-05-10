@@ -82,7 +82,9 @@ class PreferencesManager:
             pp = getattr(per_product, name, None) if per_product is not None else None
             pu = getattr(per_user, name, None) if per_user is not None else None
             v = _coalesce(pp, pu)
-            return int(v) if v is not None else default
+            if v is None:
+                return default
+            return int(v)
 
         def _pick_str(name: str, default: str) -> str:
             pp = getattr(per_product, name, None) if per_product is not None else None
@@ -100,7 +102,9 @@ class PreferencesManager:
             pp = getattr(per_product, name, None) if per_product is not None else None
             pu = getattr(per_user, name, None) if per_user is not None else None
             v = _coalesce(pp, pu)
-            return int(v) if v is not None else None
+            if v is None:
+                return None
+            return int(v)
 
         def _pick_optional_dt(name: str) -> datetime | None:
             pp = getattr(per_product, name, None) if per_product is not None else None
