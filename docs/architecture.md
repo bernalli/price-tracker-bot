@@ -15,7 +15,7 @@ src/price_tracker/
 ├── core/            # scheduler, alert, outlier, health, currency, retry, http_client
 ├── scrapers/        # 17 site-specific scrapers + generic chain + playwright fallback
 ├── db/              # repository, models, versioned migrations (001-010)
-├── notifier/        # delivery (telegram), preferences, digest, throttle
+├── notifier/        # telegram delivery, preferences, digest queue
 ├── observability/   # Prometheus metrics + structured JSON logging
 └── locale/          # gettext catalogs (en, it_IT) — populated in F5
 plugins/             # extension point for custom scrapers (gitignored except README.md)
@@ -27,25 +27,30 @@ Each top-level package has one responsibility and exposes a clear interface to t
 
 ```
 1. core.scheduler tick (every CHECK_INTERVAL_MINUTES, default 360)
-2. db.repository.list_active_products() → [Product]
+2. db.repository.list_active_users() → [UserRecord]
+   for each user:
+     db.repository.list_products_for_user(user_id, only_active=True) → [ProductRecord]
 3. for each product:
-   a. core.health.HealthManager.check(domain)
-      - state = OPEN | HALF_OPEN | LOCKED
-      - if LOCKED: skip, record skipped_locked metric
-   b. core.scraper_base.lookup_scraper(url) → AbstractScraper instance
+   a. core.health.HealthManager
+      - if is_locked(domain): skip, record skipped_locked metric
+      - elif is_half_open(domain): allow one probe only
+      - else (open): proceed normally
+   b. registry.resolve(url) → AbstractScraper | None  (registry from core.registry)
    c. await scraper.scrape(url, http_client) → ProductInfo
       - tenacity retry with exponential backoff
-      - on failure: HealthManager.record_block(domain), continue
+      - on failure: HealthManager.record_block(domain, reason); continue
       - on success: HealthManager.record_success(domain)
-   d. core.outlier.is_outlier(new_price, history)
+   d. core.outlier.is_outlier(new_price, history) → bool
       - reject if median ratio outside acceptable band
-   e. db.repository.insert_price_history(product_id, price)
-   f. core.alert.evaluate_threshold(product, new_price, prev_price)
+   e. db.repository.add_price_history(product_id, price)
+   f. core.alert.crosses_threshold(old, new, threshold_type, threshold_value) → bool
       - threshold types: percentage / fixed / target_price
    g. if alert triggered:
-      - notifier.preferences.resolve(user_id, product_id, alert_kind)
-        - mute, digest_mode, quiet_hours, throttle, timezone
-      - notifier.delivery.dispatch(alert) — immediate or queued to digest
+      - notifier.preferences.resolve(user_id=..., product_id=...) → EffectivePrefs
+        - encapsulates mute, digest_mode, quiet_hours, throttle, timezone
+      - if EffectivePrefs allows immediate send: deps.notifier(user_id, formatted_text)
+        (callable is wired to TelegramNotifier.send_alert)
+      - else if digest mode: notifier.digest.enqueue(user_id, alert)
 4. observability.metrics records counters/histograms throughout
 5. observability.logging emits structured JSON events for every state change
 ```
@@ -58,7 +63,7 @@ SQLite database at `DATABASE_PATH` (default `/data/pricetracker.db`). 8 tables:
 | -------------------- | ---------------------------------------------------------- | --------------- |
 | `users`              | Authorized Telegram users + admin flag + nickname          | 001/003         |
 | `products`           | Tracked products: URL, threshold, interval, state          | 001/002/006/007 |
-| `price_history`      | Price points (Decimal as TEXT) + currency + ts             | 001/004/005     |
+| `price_history`      | Price points (Decimal as TEXT) + currency + ts             | 001             |
 | `bot_config`         | Singleton key/value runtime config                         | 001             |
 | `scraper_health`     | Per-domain block count + locked_until timestamp            | 008             |
 | `notification_prefs` | Per-user mute, digest, quiet hours, timezone, throttle     | 009             |
