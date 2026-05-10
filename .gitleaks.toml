@@ -1,0 +1,21 @@
+title = "price-tracker-bot gitleaks config"
+
+[extend]
+# Inherit gitleaks default rules
+useDefault = true
+
+[allowlist]
+description = "Allowlist for legitimate test fixtures and placeholder samples"
+
+paths = [
+    '''^tests/fixtures/.*\.html$''',
+    '''^tests/fixtures/.*\.json$''',
+    '''^docs/grafana/.*\.json$''',
+]
+
+# Allow placeholder tokens explicitly visible in environment example
+regexes = [
+    '''TELEGRAM_BOT_TOKEN=your_token_here''',
+    '''TELEGRAM_BOT_TOKEN=stub''',
+    '''ALLOWED_USERS=123456789,987654321''',
+]
