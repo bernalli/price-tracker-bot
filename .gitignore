@@ -47,6 +47,9 @@ backup/
 *.tar.gz
 *.tar.zst
 
+# i18n: extraction artifact, regenerated
+messages.pot
+
 # OS
 .DS_Store
 Thumbs.db
