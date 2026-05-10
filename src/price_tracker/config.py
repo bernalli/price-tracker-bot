@@ -65,7 +65,7 @@ class Config:
             notification_cooldown_hours=int(os.getenv("NOTIFICATION_COOLDOWN_HOURS", "24")),
             request_timeout=int(os.getenv("REQUEST_TIMEOUT", "30")),
             log_level=os.getenv("LOG_LEVEL", "INFO"),
-            lang=os.getenv("LANG", "en"),
+            lang=os.getenv("LOCALE", "en"),
             prometheus_bind=os.getenv("PROMETHEUS_BIND", "127.0.0.1:9090"),
             metrics_enabled=metrics_enabled,
         )
