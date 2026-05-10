@@ -4,9 +4,15 @@ in a tmp_path so tests don't depend on the production catalog state."""
 from __future__ import annotations
 
 import struct
+from collections.abc import Iterator  # noqa: TCH003
 from pathlib import Path  # noqa: TCH003
 
 import pytest
+
+# GNU gettext metadata entry that declares the .mo charset. Without this,
+# GNUTranslations._parse defaults to ASCII and raises UnicodeDecodeError
+# on the first non-ASCII msgid.
+_MO_METADATA: dict[str, str] = {"": "Content-Type: text/plain; charset=UTF-8\n"}
 
 
 def _make_mo(translations: dict[str, str]) -> bytes:
@@ -43,7 +49,7 @@ def _make_mo(translations: dict[str, str]) -> bytes:
 
 
 @pytest.fixture
-def fake_catalog(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+def fake_catalog(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
     """Create an isolated locale dir with en + it_IT catalogs, return its path."""
     locale_dir = tmp_path / "locale"
     en_dir = locale_dir / "en" / "LC_MESSAGES"
@@ -51,12 +57,16 @@ def fake_catalog(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     en_dir.mkdir(parents=True)
     it_dir.mkdir(parents=True)
 
-    en_translations = {
-        "❌ Invalid ID.": "",  # source language: empty msgstr means passthrough
-        "❌ Product not found.": "",
-        "1 product": "",
+    # en is the source language: msgstr equals msgid (explicit passthrough).
+    # gettext returns msgstr verbatim; an empty msgstr would return "" not msgid.
+    en_translations: dict[str, str] = {
+        **_MO_METADATA,
+        "❌ Invalid ID.": "❌ Invalid ID.",
+        "❌ Product not found.": "❌ Product not found.",
+        "1 product": "1 product",
     }
-    it_translations = {
+    it_translations: dict[str, str] = {
+        **_MO_METADATA,
         "❌ Invalid ID.": "❌ ID non valido.",
         "❌ Product not found.": "❌ Prodotto non trovato.",
         "1 product": "1 prodotto",
@@ -70,4 +80,7 @@ def fake_catalog(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setattr(msgs_mod, "_LOCALE_DIR", locale_dir, raising=False)
     monkeypatch.setattr(msgs_mod, "_AVAILABLE", {"en", "it_IT"}, raising=False)
     msgs_mod.get_translation.cache_clear()
-    return locale_dir
+    yield locale_dir
+    # Teardown: clear LRU so the fake GNUTranslations objects don't leak into
+    # subsequent tests that don't use this fixture.
+    msgs_mod.get_translation.cache_clear()
