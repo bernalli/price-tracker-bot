@@ -9,6 +9,7 @@ import httpx
 import pytest
 import respx
 
+from price_tracker.scrapers import etsy as etsy_module
 from price_tracker.scrapers.etsy import EtsyScraper
 
 if TYPE_CHECKING:
@@ -56,3 +57,65 @@ async def test_etsy_returns_error_on_missing_data() -> None:
             info = await scraper.scrape(url, client)
     assert info.price is None
     assert info.error is not None
+
+
+@pytest.mark.asyncio
+async def test_etsy_dom_fallback_when_no_jsonld(
+    load_fixture: Callable[[str], str],
+) -> None:
+    """Fixture with only DOM data-buy-box (no JSON-LD) → DOM fallback yields price."""
+    html = load_fixture("etsy/sample_etsy_fallback.html")
+    scraper = EtsyScraper()
+    url = "https://www.etsy.com/listing/124/fallback"
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).respond(200, text=html)
+        async with httpx.AsyncClient() as client:
+            info = await scraper.scrape(url, client)
+    assert info.price == Decimal("14.25")
+    assert info.currency == "USD"
+    assert info.error is None
+
+
+@pytest.mark.asyncio
+async def test_etsy_returns_error_on_http_500(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """5xx response → ProductInfo with HTTP error."""
+    scraper = EtsyScraper()
+
+    async def _fast_fetch(url: str, client: httpx.AsyncClient) -> httpx.Response:
+        return await client.get(url)
+
+    monkeypatch.setattr(etsy_module, "_fetch_etsy_html", _fast_fetch)
+
+    url = "https://www.etsy.com/listing/5555/sample"
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).respond(500)
+        async with httpx.AsyncClient() as client:
+            info = await scraper.scrape(url, client)
+    assert info.price is None
+    assert info.error is not None
+    assert "HTTP error" in info.error
+
+
+@pytest.mark.asyncio
+async def test_etsy_handles_malformed_jsonld_falls_back_to_dom() -> None:
+    """Invalid JSON-LD does not crash; DOM fallback still extracts price."""
+    scraper = EtsyScraper()
+    url = "https://www.etsy.com/listing/7777/sample"
+    html = """
+    <html><head><title>Sample</title>
+    <script type="application/ld+json">not valid json {{{</script>
+    </head><body>
+    <h1>Etsy Sample</h1>
+    <div data-buy-box-listing-price>
+      <p><span class="currency-symbol">$</span><span class="currency-value">7.50</span></p>
+    </div>
+    </body></html>
+    """
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).respond(200, text=html)
+        async with httpx.AsyncClient() as client:
+            info = await scraper.scrape(url, client)
+    assert info.price == Decimal("7.50")
+    assert info.currency == "USD"
