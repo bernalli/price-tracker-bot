@@ -8,15 +8,19 @@ When the alert engine triggers an alert for a user/product pair, the notifier wa
 
 ```
 1. mute (per-product or "all") — if active and not expired: DROP
-2. quiet hours — if alert falls inside the user's quiet window: QUEUE for next allowed time
-3. throttle (sliding window, per user) — if user has reached their hourly cap: DROP (with warning)
+2. quiet hours — if alert falls inside the user's quiet window:
+   - if digest_mode=on: ENQUEUE in digest_queue (sent at next flush)
+   - else: DROP silently
+3. throttle (sliding window, per user) — if user has reached their hourly cap:
+   - if digest_mode=on: ENQUEUE in digest_queue
+   - else: DROP silently
 4. digest mode — if user has digest_mode=on:
-   - QUEUE the alert in digest_queue
-   - flush at the next periodic interval (default 30 min) or on /digest_now
+   - ENQUEUE the alert in digest_queue
+   - flush at the next periodic interval (default 60 min) or on /digest_now
 5. immediate dispatch — otherwise: send via TelegramNotifier.send_alert
 ```
 
-Every step records a metric (`alerts_skipped_total{reason="muted|quiet|throttled|queued"}` or `alerts_sent_total`). Logged at INFO with the user_id and product_id for traceability.
+Every step records a Prometheus metric. Drops increment `price_tracker_notification_skipped_total{reason="..."}` with one of `mute`, `quiet_hours`, `throttle`, `digest_pending`. Sends increment `price_tracker_notification_sent_total`. INFO-level logs include `user_id` and `product_id` for traceability.
 
 ## Commands
 
@@ -39,8 +43,8 @@ Remove an active mute.
 ### `/digest_mode <on|off> [interval_min]`
 Switch between immediate and digest delivery.
 
-- **Examples**: `/digest_mode on 30`, `/digest_mode off`
-- **Default interval**: 30 minutes when no value given.
+- **Examples**: `/digest_mode on 60`, `/digest_mode off`
+- **Default interval**: 60 minutes when no value given.
 - **Behavior**: alerts arriving in `on` mode are batched in `digest_queue` and flushed periodically. Switching to `off` does NOT auto-flush — pending entries stay until `/digest_now` or the next scheduled flush.
 
 ### `/digest_now`
@@ -53,26 +57,26 @@ Set a daily silent window (timezone-aware).
 
 - **Examples**: `/quiet_hours 22:00-07:00` (overnight), `/quiet_hours 12:00-13:00` (lunch break)
 - **Wraparound**: `22:00-07:00` is interpreted as crossing midnight.
-- **Disable**: send `/quiet_hours` with no args (or any input that fails parsing) — the prompt explains the syntax.
+- **Disable**: send `/quiet_hours off`. Sending the command with no arguments returns a usage hint but does NOT disable.
 
 ### `/timezone <IANA>`
 Set the user's timezone for quiet hours and digest scheduling.
 
 - **Examples**: `/timezone Europe/Rome`, `/timezone America/New_York`
-- **Default**: server timezone (typically UTC).
+- **Default**: `Europe/Rome` (hardcoded; not derived from the server timezone).
 - **Validation**: invalid IANA names are rejected with a usage hint.
 
 ### `/throttle <max_per_hour>`
 Cap the number of alerts the user receives per sliding hour.
 
-- **Examples**: `/throttle 5` (max 5/h), `/throttle 0` (disable throttle, unlimited)
+- **Examples**: `/throttle 5` (max 5/h), `/throttle off` (disable throttle, unlimited)
 - **Behavior**: a sliding 60-minute window of recent sends is kept per user. When the window is full, further alerts are dropped (logged as `throttled`, counted in metrics) until older entries fall out.
 
-### `/prefs`
+### `/prefs [product_id]`
 Show the user's current preferences in a single message.
 
+- **Optional argument**: `product_id` — when provided, the output includes the per-product mute state for that specific product alongside the user-level prefs.
 - **Output includes**: digest mode + interval, quiet hours window, timezone, throttle cap, current mutes (per-product list + global), recent throttle window status.
-- **No arguments**.
 
 ## Defaults for new users
 
@@ -82,10 +86,10 @@ A first-time `/start` user is created with these defaults (until they explicitly
 | ----------------- | -------------------- |
 | Mute              | none                 |
 | Digest mode       | off (immediate send) |
-| Digest interval   | 30 min (when enabled)|
+| Digest interval   | 60 min (when enabled)|
 | Quiet hours       | none                 |
-| Timezone          | server (UTC if unset)|
-| Throttle          | 0 (unlimited)        |
+| Timezone          | `Europe/Rome`        |
+| Throttle          | unlimited (stored as `NULL`) |
 | Notification mode | immediate            |
 
 ## Persistence
