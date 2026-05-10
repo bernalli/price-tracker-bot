@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -18,6 +19,9 @@ from price_tracker.core.scraper_base import (
     detect_currency,
     parse_price,
 )
+
+if TYPE_CHECKING:
+    import re
 
 
 def test_product_info_defaults():
@@ -55,7 +59,7 @@ def test_parse_price_returns_decimal(raw, expected):
 def test_parse_price_returns_none_on_garbage():
     assert parse_price("") is None
     assert parse_price("not a price") is None
-    assert parse_price(None) is None  # type: ignore[arg-type]
+    assert parse_price(None) is None
 
 
 @pytest.mark.parametrize(
@@ -76,15 +80,16 @@ def test_abstract_scraper_requires_can_handle_and_scrape():
     class BadScraper(AbstractScraper):
         name = "bad"
         priority = 0
-        domain_patterns: list = []
+        # Test subclass: ClassVar override with empty list to verify ABC enforcement.
+        domain_patterns: list[re.Pattern[str]] = []  # type: ignore[misc]
 
     with pytest.raises(TypeError):
-        BadScraper()  # missing can_handle and scrape
+        BadScraper()  # type: ignore[abstract]  # missing can_handle and scrape
 
     class GoodScraper(AbstractScraper):
         name = "good"
         priority = 0
-        domain_patterns: list = []
+        domain_patterns: list[re.Pattern[str]] = []  # type: ignore[misc]
 
         def can_handle(self, url: str) -> bool:
             return True
@@ -139,11 +144,11 @@ class TestDetectBlockEvent:
 
     def test_status_200_no_raise(self):
         # No raise — function returns None on no block detected
-        assert detect_block_event(status_code=200, body="<html>ok</html>", url="x") is None
+        detect_block_event(status_code=200, body="<html>ok</html>", url="x")
 
     def test_status_500_no_raise(self):
         # 5xx is server error, not block
-        assert detect_block_event(status_code=502, body="", url="x") is None
+        detect_block_event(status_code=502, body="", url="x")
 
     def test_cloudflare_marker(self):
         body = "<html><head><title>Just a moment...</title></head><body>...</body></html>"

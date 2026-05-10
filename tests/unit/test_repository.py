@@ -390,6 +390,7 @@ class TestScraperHealthRepository:
         second = ScraperHealth(domain="x.com", state="LOCKED_T2", consecutive_blocks=6)
         await repo.upsert_scraper_health(second)
         loaded = await repo.get_scraper_health("x.com")
+        assert loaded is not None
         assert loaded.state == "LOCKED_T2"
         assert loaded.consecutive_blocks == 6
 

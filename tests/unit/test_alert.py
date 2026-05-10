@@ -121,7 +121,7 @@ def test_format_alert_escapes_html():
 
 def test_format_error_notification_mentions_count():
     text = format_error_notification(
-        product={"id": 1, "name": "Widget", "url": "https://x"},
+        product={"id": "1", "name": "Widget", "url": "https://x"},
         error_count=10,
         max_errors=10,
     )

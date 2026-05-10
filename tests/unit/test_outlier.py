@@ -37,6 +37,7 @@ def test_3x_median_is_outlier():
     result = is_outlier(Decimal("310"), history)
     assert result.is_outlier is True
     assert result.median == Decimal("100")
+    assert result.ratio is not None
     assert result.ratio >= Decimal("3.0")
 
 
