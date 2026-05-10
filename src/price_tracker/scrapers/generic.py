@@ -197,7 +197,7 @@ class GenericScraper(AbstractScraper):
                         logger.debug("Price found via %s: %s", strategy_name, info.price)
                     if result.get("name") and info.name is None:
                         info.name = result["name"]
-                    if result.get("currency"):
+                    if result.get("currency") and info.currency is None:
                         info.currency = result["currency"]
 
                 if info.price is not None and info.name is not None:
@@ -470,11 +470,11 @@ class GenericScraper(AbstractScraper):
         parsed = parse_price(str(price_str))
         if parsed is None or parsed <= 0:
             return None
+        result: dict = {"price": parsed}
         currency_tag = offer.find(attrs={"property": "priceCurrency"})
-        currency_val = (
-            currency_tag.get("content") if isinstance(currency_tag, Tag) else None
-        ) or "EUR"
-        result: dict = {"price": parsed, "currency": currency_val}
+        currency_val = currency_tag.get("content") if isinstance(currency_tag, Tag) else None
+        if currency_val:
+            result["currency"] = currency_val
         name_tag = product.find(attrs={"property": "name"})
         if isinstance(name_tag, Tag):
             name = name_tag.get_text(strip=True)

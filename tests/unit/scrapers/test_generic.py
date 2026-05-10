@@ -196,6 +196,7 @@ async def test_falls_back_to_opengraph(load_fixture: Callable[[str], str]) -> No
 
     assert info.price is not None
     assert info.price > Decimal("0")
+    assert info.currency == "USD"
 
 
 @pytest.mark.asyncio
@@ -212,6 +213,7 @@ async def test_falls_back_to_rdfa(load_fixture: Callable[[str], str]) -> None:
 
     assert info.price is not None
     assert info.price > Decimal("0")
+    assert info.currency == "EUR"
 
 
 @pytest.mark.asyncio
@@ -219,7 +221,7 @@ async def test_heuristic_last_resort(
     load_fixture: Callable[[str], str], caplog: pytest.LogCaptureFixture
 ) -> None:
     """Regex on visible text recovers a price AND emits a heuristic-fallback warning."""
-    caplog.set_level(logging.WARNING)
+    caplog.set_level(logging.WARNING, logger="price_tracker.scrapers.generic")
     html = load_fixture("generic/sample_heuristic.html")
     scraper = GenericScraper()
     url = "https://example.com/chain/heuristic"
@@ -231,7 +233,8 @@ async def test_heuristic_last_resort(
 
     assert info.price is not None
     assert info.price > Decimal("0")
-    assert any("heuristic" in r.message.lower() for r in caplog.records)
+    heuristic_records = [r for r in caplog.records if "heuristic" in r.message.lower()]
+    assert len(heuristic_records) == 1
 
 
 @pytest.mark.asyncio
