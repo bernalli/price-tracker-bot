@@ -37,12 +37,12 @@ pre-commit install
 
 ```bash
 pytest                                       # all tests
-pytest -m "not integration"                  # unit tests only
+pytest -m "not e2e"                          # skip end-to-end tests
 pytest --cov=src/price_tracker               # with coverage report
 pytest tests/unit/scrapers/test_amazon.py -v # single file verbose
 ```
 
-Coverage gates: global ≥90%, core ≥93%, per-scraper ≥80%.
+Coverage: current enforced gate is ≥75% (`pyproject.toml`). Phase 3 closure targets: global ≥90%, core ≥93%, per-scraper ≥80%.
 
 ## Linting & type-checking
 
@@ -50,7 +50,7 @@ Coverage gates: global ≥90%, core ≥93%, per-scraper ≥80%.
 ruff check .
 ruff format --check .       # check only
 ruff format .               # apply
-mypy --strict src/price_tracker tests
+mypy                                          # respects pyproject.toml [tool.mypy] config
 ```
 
 ## i18n workflow
@@ -76,8 +76,8 @@ See [docs/i18n.md](docs/i18n.md) for full reference.
 
 See [docs/plugins.md](docs/plugins.md) for the contract and a minimal example. Quick reference:
 1. Create `plugins/<name>.py` (gitignored).
-2. Subclass `AbstractScraper`, set `domains` and optional `priority`.
-3. Implement `async def scrape(self, url) -> ProductInfo`.
+2. Subclass `AbstractScraper`, set `domain_patterns` (compiled regex patterns matching the URL host) and optional `priority`.
+3. Implement `async def scrape(self, url: str, client: httpx.AsyncClient) -> ProductInfo`.
 4. Add an HTML fixture under `tests/fixtures/<name>/` (e.g. `sample_product.html`).
 5. Add a test in `tests/unit/scrapers/test_<name>.py`.
 
