@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
@@ -13,7 +13,7 @@ repos:
       - id: check-merge-conflict
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.5.7
+    rev: v0.15.12
     hooks:
       - id: ruff
         args: [--fix, --exit-non-zero-on-fix]
@@ -27,8 +27,33 @@ repos:
         additional_dependencies:
           - types-requests
           - types-beautifulsoup4
+          - types-python-dateutil
+          - tenacity
+          - httpx
+          - structlog
+          - aiosqlite
+          - python-telegram-bot
+          - prometheus-client
 
   - repo: https://github.com/gitleaks/gitleaks
-    rev: v8.18.4
+    rev: v8.30.0
     hooks:
       - id: gitleaks
+
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.9
+    hooks:
+      - id: bandit
+        args: [-r, src/, -lll]
+        files: ^src/
+        pass_filenames: false
+
+  - repo: local
+    hooks:
+      - id: pybabel-compile-check
+        name: pybabel compile (locale .po -> .mo)
+        entry: pybabel compile -d src/price_tracker/locale
+        language: python
+        additional_dependencies: ["babel>=2.13.0"]
+        files: ^src/price_tracker/locale/.*\.po$
+        pass_filenames: false

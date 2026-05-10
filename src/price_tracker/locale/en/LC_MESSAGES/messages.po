@@ -428,4 +428,3 @@ msgstr "❌ Minimo 5 minuti."
 #: src/price_tracker/bot/handlers/text_input.py:199
 msgid "❌ Numero non valido. Riprova."
 msgstr "❌ Numero non valido. Riprova."
-
