@@ -17,6 +17,8 @@ from typing import TYPE_CHECKING, Any
 
 from telegram.constants import ParseMode
 
+from price_tracker.bot.messages import set_locale
+
 if TYPE_CHECKING:
     from collections.abc import Awaitable
 
@@ -26,6 +28,27 @@ if TYPE_CHECKING:
 
 
 HandlerFn = Callable[..., "Awaitable[Any]"]
+
+
+def with_locale(handler: HandlerFn) -> HandlerFn:
+    """Decorator that sets the request locale from Telegram update before
+    invoking the wrapped handler.
+
+    Reads `update.effective_user.language_code` and falls through the
+    fallback chain in `bot.messages.get_translation`. ContextVar isolates
+    locale across concurrent asyncio tasks.
+
+    MUST be applied as the OUTERMOST decorator so error replies from
+    `@restricted` / `@admin_only` are already localized.
+    """
+
+    @wraps(handler)
+    async def wrapper(update: Any, context: Any, *args: Any, **kwargs: Any) -> Any:
+        lang = update.effective_user.language_code if update.effective_user is not None else None
+        set_locale(lang)
+        return await handler(update, context, *args, **kwargs)
+
+    return wrapper
 
 
 def restricted(func: HandlerFn) -> HandlerFn:

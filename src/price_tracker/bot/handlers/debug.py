@@ -18,7 +18,15 @@ import httpx
 from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler
 
-from price_tracker.bot.decorators import _client, _config, _db, _scraper, admin_only, restricted
+from price_tracker.bot.decorators import (
+    _client,
+    _config,
+    _db,
+    _scraper,
+    admin_only,
+    restricted,
+    with_locale,
+)
 from price_tracker.bot.handlers._helpers import _escape_html
 from price_tracker.bot.messages import _
 
@@ -101,6 +109,7 @@ def _tier_label(state: str) -> str:
     }.get(state, state)
 
 
+@with_locale
 @admin_only
 async def cmd_debug(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Debug scraping for a URL — shows what each strategy finds."""
@@ -303,6 +312,7 @@ async def cmd_debug(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await msg.edit_text("\n".join(lines), parse_mode=ParseMode.HTML, disable_web_page_preview=True)
 
 
+@with_locale
 @restricted
 async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show user / admin statistics for the active bot."""
@@ -373,6 +383,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await update.message.reply_html("\n".join(lines))
 
 
+@with_locale
 @admin_only
 async def health_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Admin: show scraper health report (English output)."""

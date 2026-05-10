@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 
 from telegram.ext import Application, CallbackQueryHandler
 
-from price_tracker.bot.decorators import _db
+from price_tracker.bot.decorators import _db, with_locale
 from price_tracker.bot.handlers.callbacks import _actions, _admin, _menu, _product
 
 if TYPE_CHECKING:
@@ -23,6 +23,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+@with_locale
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Dispatch every inline-button click to the matching per-domain helper."""
     query = update.callback_query

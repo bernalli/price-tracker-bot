@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler
 
-from price_tracker.bot.decorators import _db, admin_only
+from price_tracker.bot.decorators import _db, admin_only, with_locale
 from price_tracker.bot.handlers._helpers import _escape_html
 from price_tracker.bot.messages import _
 
@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from telegram.ext import ContextTypes
 
 
+@with_locale
 @admin_only
 async def cmd_add_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Add a user. Usage: /adduser <telegram_id>"""
@@ -64,6 +65,7 @@ async def cmd_add_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         )
 
 
+@with_locale
 @admin_only
 async def cmd_remove_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Remove a user. Usage: /removeuser <telegram_id>"""
@@ -105,6 +107,7 @@ async def cmd_remove_user(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         )
 
 
+@with_locale
 @admin_only
 async def cmd_users(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """List all authorized users."""
@@ -138,6 +141,7 @@ async def cmd_users(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
 
 
+@with_locale
 @admin_only
 async def cmd_nick(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Set nickname for a user. Usage: /nick <id> <nome>"""
