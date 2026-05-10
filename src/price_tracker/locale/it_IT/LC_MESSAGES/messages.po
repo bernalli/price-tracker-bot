@@ -1,0 +1,429 @@
+# Italian (Italy) translations for PROJECT.
+# Copyright (C) 2026 ORGANIZATION
+# This file is distributed under the same license as the PROJECT project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2026-05-10 20:26+0200\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: it_IT\n"
+"Language-Team: it_IT <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
+
+#: src/price_tracker/bot/decorators.py:70
+#, python-brace-format
+msgid ""
+"⛔ You are not authorized.\n"
+"Your Telegram ID: <code>{tg_id}</code>\n"
+"\n"
+"Ask the administrator to add you with:\n"
+"<code>/adduser {tg_id}</code>"
+msgstr ""
+"⛔ Non sei autorizzato.\n"
+"Il tuo ID Telegram è: <code>{tg_id}</code>\n"
+"\n"
+"Chiedi all'amministratore di aggiungerti con:\n"
+"<code>/adduser {tg_id}</code>"
+
+#: src/price_tracker/bot/decorators.py:104
+msgid "⛔ Admin-only command."
+msgstr "⛔ Solo l'amministratore può usare questo comando."
+
+#: src/price_tracker/bot/handlers/auth.py:30
+msgid ""
+"❌ Usage: /adduser &lt;telegram_id&gt;\n"
+"\n"
+"The user must send /start to the bot first to obtain their ID."
+msgstr ""
+"❌ Uso: /adduser &lt;telegram_id&gt;\n"
+"\n"
+"L'utente deve prima inviare /start al bot per ottenere il suo ID."
+
+#: src/price_tracker/bot/handlers/auth.py:40
+msgid "❌ Invalid ID. Must be a number."
+msgstr "❌ ID non valido. Deve essere un numero."
+
+#: src/price_tracker/bot/handlers/auth.py:47
+#, python-brace-format
+msgid "ℹ️ User <code>{tg_id}</code> is already authorized."
+msgstr "ℹ️ L'utente <code>{tg_id}</code> è già autorizzato."
+
+#: src/price_tracker/bot/handlers/auth.py:55
+#, python-brace-format
+msgid ""
+"✅ User <code>{tg_id}</code> added.\n"
+"They can now use the bot by sending /start."
+msgstr ""
+"✅ Utente <code>{tg_id}</code> aggiunto!\n"
+"Ora può usare il bot inviando /start."
+
+#: src/price_tracker/bot/handlers/auth.py:64
+msgid ""
+"🎉 You have been authorized to use Price Tracker Bot.\n"
+"Send /start to begin."
+msgstr ""
+"🎉 Sei stato autorizzato a usare il Price Tracker Bot!\n"
+"Invia /start per iniziare."
+
+#: src/price_tracker/bot/handlers/auth.py:74
+msgid "❌ Usage: /removeuser &lt;telegram_id&gt;"
+msgstr "❌ Uso: /removeuser &lt;telegram_id&gt;"
+
+#: src/price_tracker/bot/handlers/auth.py:82
+#: src/price_tracker/bot/handlers/auth.py:173
+#: src/price_tracker/bot/handlers/monitoring.py:117
+#: src/price_tracker/bot/handlers/monitoring.py:181
+#: src/price_tracker/bot/handlers/monitoring.py:307
+#: src/price_tracker/bot/handlers/monitoring.py:332
+msgid "❌ Invalid ID."
+msgstr "❌ ID non valido."
+
+#: src/price_tracker/bot/handlers/auth.py:89
+msgid "❌ You cannot remove yourself."
+msgstr "❌ Non puoi rimuovere te stesso."
+
+#: src/price_tracker/bot/handlers/auth.py:94
+msgid "❌ You cannot remove another administrator."
+msgstr "❌ Non puoi rimuovere un altro amministratore."
+
+#: src/price_tracker/bot/handlers/auth.py:100
+#, python-brace-format
+msgid "✅ User <code>{tg_id}</code> removed."
+msgstr "✅ Utente <code>{tg_id}</code> rimosso."
+
+#: src/price_tracker/bot/handlers/auth.py:103
+msgid ""
+"Their products remain in the database but they will no longer receive "
+"notifications."
+msgstr "I suoi prodotti restano nel database ma non riceverà più notifiche."
+
+#: src/price_tracker/bot/handlers/auth.py:110
+#: src/price_tracker/bot/handlers/auth.py:180
+#, python-brace-format
+msgid "❌ User <code>{tg_id}</code> not found."
+msgstr "❌ Utente <code>{tg_id}</code> non trovato."
+
+#: src/price_tracker/bot/handlers/auth.py:123
+msgid "📭 No registered users."
+msgstr "📭 Nessun utente registrato."
+
+#: src/price_tracker/bot/handlers/auth.py:126
+msgid "<b>👥 Authorized Users</b>\n"
+msgstr "<b>👥 Utenti autorizzati</b>\n"
+
+#: src/price_tracker/bot/handlers/auth.py:131
+#: src/price_tracker/bot/handlers/monitoring.py:204
+#: src/price_tracker/bot/handlers/monitoring.py:251
+msgid "N/A"
+msgstr "N/D"
+
+#: src/price_tracker/bot/handlers/auth.py:133
+msgid "👑 Admin"
+msgstr "👑 Admin"
+
+#: src/price_tracker/bot/handlers/auth.py:133
+msgid "👤 User"
+msgstr "👤 Utente"
+
+#: src/price_tracker/bot/handlers/auth.py:138
+#, python-brace-format
+msgid ""
+"  {role} — <code>{uid}</code>\n"
+"    Name: {name}{name_extra}\n"
+"    Products: {active} active / {total} total"
+msgstr ""
+"  {role} — <code>{uid}</code>\n"
+"    Nome: {name}{name_extra}\n"
+"    Prodotti: {active} attivi / {total} totali"
+
+#: src/price_tracker/bot/handlers/auth.py:164
+msgid ""
+"❌ Usage: /nick &lt;id&gt; &lt;name&gt;\n"
+"\n"
+"Example: <code>/nick 123456789 Alice</code>"
+msgstr ""
+"❌ Uso: /nick &lt;id&gt; &lt;nome&gt;\n"
+"\n"
+"Esempio: <code>/nick 123456789 Marco</code>"
+
+#: src/price_tracker/bot/handlers/auth.py:186
+#, python-brace-format
+msgid ""
+"✅ Nickname: <b>{nick}</b>\n"
+"ID: <code>{tg_id}</code>"
+msgstr ""
+"✅ Nickname: <b>{nick}</b>\n"
+"ID: <code>{tg_id}</code>"
+
+#: src/price_tracker/bot/handlers/debug.py:121
+msgid "🔍 Analisi in corso..."
+msgstr "🔍 Analisi in corso..."
+
+#: src/price_tracker/bot/handlers/history.py:120
+#: src/price_tracker/bot/handlers/product.py:65
+#: src/price_tracker/bot/handlers/product.py:118
+msgid "📭 Non hai prodotti tracciati."
+msgstr "📭 Non hai prodotti tracciati."
+
+#: src/price_tracker/bot/handlers/history.py:138
+#: src/price_tracker/bot/handlers/history.py:183
+#: src/price_tracker/bot/handlers/product.py:143
+#: src/price_tracker/bot/handlers/product.py:193
+#: src/price_tracker/bot/handlers/product.py:257
+msgid "❌ ID non valido."
+msgstr "❌ ID non valido."
+
+#: src/price_tracker/bot/handlers/history.py:143
+#: src/price_tracker/bot/handlers/history.py:188
+#: src/price_tracker/bot/handlers/product.py:148
+#: src/price_tracker/bot/handlers/product.py:203
+#: src/price_tracker/bot/handlers/product.py:267
+#: src/price_tracker/bot/handlers/text_input.py:84
+msgid "❌ Prodotto non trovato."
+msgstr "❌ Prodotto non trovato."
+
+#: src/price_tracker/bot/handlers/history.py:164
+msgid "📭 Dati insufficienti per generare il grafico (servono almeno 2 punti)."
+msgstr "📭 Dati insufficienti per generare il grafico (servono almeno 2 punti)."
+
+#: src/price_tracker/bot/handlers/history.py:204
+msgid "❌ Impossibile aggiornare il prezzo iniziale."
+msgstr "❌ Impossibile aggiornare il prezzo iniziale."
+
+#: src/price_tracker/bot/handlers/monitoring.py:63
+msgid "📭 You have no tracked products."
+msgstr "📭 Non hai prodotti tracciati."
+
+#: src/price_tracker/bot/handlers/monitoring.py:68
+#: src/price_tracker/bot/handlers/monitoring.py:136
+#: src/price_tracker/bot/handlers/monitoring.py:153
+#: src/price_tracker/bot/handlers/monitoring.py:202
+#: src/price_tracker/bot/handlers/monitoring.py:248
+#: src/price_tracker/bot/handlers/monitoring.py:295
+#: src/price_tracker/bot/handlers/monitoring.py:316
+#: src/price_tracker/bot/handlers/monitoring.py:341
+msgid "Unknown"
+msgstr "Sconosciuto"
+
+#: src/price_tracker/bot/handlers/monitoring.py:98
+msgid "Choose product to set interval"
+msgstr "Scegli prodotto per impostare intervallo"
+
+#: src/price_tracker/bot/handlers/monitoring.py:105
+msgid ""
+"❌ Usage: /refresh &lt;id&gt; &lt;minutes&gt;\n"
+"\n"
+"Examples:\n"
+"<code>/refresh 3 30</code> — check every 30 minutes\n"
+"<code>/refresh 3 720</code> — check every 12 hours\n"
+"<code>/refresh 3 0</code> — return to global interval"
+msgstr ""
+"❌ Uso: /refresh &lt;id&gt; &lt;minuti&gt;\n"
+"\n"
+"Esempi:\n"
+"<code>/refresh 3 30</code> — controlla ogni 30 minuti\n"
+"<code>/refresh 3 720</code> — controlla ogni 12 ore\n"
+"<code>/refresh 3 0</code> — torna all'intervallo globale"
+
+#: src/price_tracker/bot/handlers/monitoring.py:123
+msgid "❌ Invalid value. Enter a number of minutes."
+msgstr "❌ Valore non valido. Inserisci un numero di minuti."
+
+#: src/price_tracker/bot/handlers/monitoring.py:128
+#: src/price_tracker/bot/handlers/monitoring.py:186
+#: src/price_tracker/bot/handlers/monitoring.py:312
+#: src/price_tracker/bot/handlers/monitoring.py:337
+msgid "❌ Product not found."
+msgstr "❌ Prodotto non trovato."
+
+#: src/price_tracker/bot/handlers/monitoring.py:138
+#, python-brace-format
+msgid ""
+"🔄 Interval reset to global (every {min} min)\n"
+"📦 #{pid} — {name}"
+msgstr ""
+"🔄 Intervallo ripristinato a quello globale (ogni {min} min)\n"
+"📦 #{pid} — {name}"
+
+#: src/price_tracker/bot/handlers/monitoring.py:146
+msgid "❌ Minimum interval is 5 minutes."
+msgstr "❌ L'intervallo minimo è 5 minuti."
+
+#: src/price_tracker/bot/handlers/monitoring.py:149
+msgid "❌ Maximum interval is 7 days."
+msgstr "❌ L'intervallo massimo è 7 giorni."
+
+#: src/price_tracker/bot/handlers/monitoring.py:159
+#, python-brace-format
+msgid "{n} hour"
+msgstr "{n} ora"
+
+#: src/price_tracker/bot/handlers/monitoring.py:161
+#, python-brace-format
+msgid "{n} minutes"
+msgstr "{n} minuti"
+
+#: src/price_tracker/bot/handlers/monitoring.py:164
+#, python-brace-format
+msgid ""
+"🔄 Check interval: <b>every {display}</b>\n"
+"📦 #{pid} — {name}"
+msgstr ""
+"🔄 Intervallo check: <b>ogni {display}</b>\n"
+"📦 #{pid} — {name}"
+
+#: src/price_tracker/bot/handlers/monitoring.py:176
+msgid "Choose product to check"
+msgstr "Scegli prodotto da controllare"
+
+#: src/price_tracker/bot/handlers/monitoring.py:191
+msgid "❌ Product paused. Use /reactivate to resume tracking."
+msgstr "❌ Prodotto non attivo. Usa /riattiva per riattivarlo."
+
+#: src/price_tracker/bot/handlers/monitoring.py:194
+msgid "🔍 Checking..."
+msgstr "🔍 Controllo in corso..."
+
+#: src/price_tracker/bot/handlers/monitoring.py:213
+#, python-brace-format
+msgid ""
+"✅ <b>{name}</b>\n"
+"💰 Price: {price}\n"
+"📊 No significant change."
+msgstr ""
+"✅ <b>{name}</b>\n"
+"💰 Prezzo: {price}\n"
+"📊 Nessuna variazione significativa."
+
+#: src/price_tracker/bot/handlers/monitoring.py:229
+msgid "📭 No products to check."
+msgstr "📭 Nessun prodotto da controllare."
+
+#: src/price_tracker/bot/handlers/monitoring.py:232
+#, python-brace-format
+msgid "🔍 Checking {n} products..."
+msgstr "🔍 Controllo di {n} prodotti in corso..."
+
+#: src/price_tracker/bot/handlers/monitoring.py:245
+#, python-brace-format
+msgid "✅ <b>Check complete</b> — {n} products"
+msgstr "✅ <b>Controllo completato</b> — {n} prodotti"
+
+#: src/price_tracker/bot/handlers/monitoring.py:264
+#, python-brace-format
+msgid "🔔 <b>{n} changes found!</b>"
+msgstr "🔔 <b>{n} variazioni trovate!</b>"
+
+#: src/price_tracker/bot/handlers/monitoring.py:291
+msgid "✅ You have no paused products."
+msgstr "✅ Non hai prodotti in pausa."
+
+#: src/price_tracker/bot/handlers/monitoring.py:300
+msgid "⏸ <b>Paused products — choose to reactivate:</b>"
+msgstr "⏸ <b>Prodotti in pausa — scegli da riattivare:</b>"
+
+#: src/price_tracker/bot/handlers/monitoring.py:318
+#, python-brace-format
+msgid "✅ Reactivated: <b>{name}</b>"
+msgstr "✅ Riattivato: <b>{name}</b>"
+
+#: src/price_tracker/bot/handlers/monitoring.py:328
+msgid "Choose product to pause"
+msgstr "Scegli prodotto da mettere in pausa"
+
+#: src/price_tracker/bot/handlers/monitoring.py:343
+#, python-brace-format
+msgid "⏸ Tracking paused: <b>{name}</b>"
+msgstr "⏸ Tracking in pausa: <b>{name}</b>"
+
+#: src/price_tracker/bot/handlers/monitoring.py:345
+#, python-brace-format
+msgid "Use /reactivate {pid} to resume tracking."
+msgstr "Usa /riattiva {pid} per riprendere."
+
+#: src/price_tracker/bot/handlers/product.py:198
+msgid "❌ Prezzo non valido."
+msgstr "❌ Prezzo non valido."
+
+#: src/price_tracker/bot/handlers/product.py:314
+msgid "🔍 Analizzo il prodotto..."
+msgstr "🔍 Analizzo il prodotto..."
+
+#: src/price_tracker/bot/handlers/product_io.py:41
+msgid "📭 Non hai prodotti da esportare."
+msgstr "📭 Non hai prodotti da esportare."
+
+#: src/price_tracker/bot/handlers/product_io.py:99
+msgid "❌ Il file deve essere un CSV."
+msgstr "❌ Il file deve essere un CSV."
+
+#: src/price_tracker/bot/handlers/product_io.py:121
+msgid "⏳ Importazione in corso..."
+msgstr "⏳ Importazione in corso..."
+
+#: src/price_tracker/bot/handlers/product_list.py:37
+msgid ""
+"📭 Non hai prodotti tracciati.\n"
+"Incollami un link per iniziare!"
+msgstr ""
+"📭 Non hai prodotti tracciati.\n"
+"Incollami un link per iniziare!"
+
+#: src/price_tracker/bot/handlers/settings.py:50
+msgid "❌ Valore non valido."
+msgstr "❌ Valore non valido."
+
+#: src/price_tracker/bot/handlers/settings.py:53
+msgid "❌ L'intervallo minimo è 5 minuti."
+msgstr "❌ L'intervallo minimo è 5 minuti."
+
+#: src/price_tracker/bot/handlers/settings.py:56
+msgid "❌ L'intervallo massimo è 7 giorni."
+msgstr "❌ L'intervallo massimo è 7 giorni."
+
+#: src/price_tracker/bot/handlers/text_input.py:78
+msgid "👍 Ok, nessuna modifica."
+msgstr "👍 Ok, nessuna modifica."
+
+#: src/price_tracker/bot/handlers/text_input.py:92
+msgid "❌ Prezzo non valido. Riprova."
+msgstr "❌ Prezzo non valido. Riprova."
+
+#: src/price_tracker/bot/handlers/text_input.py:114
+#, python-format
+msgid "❌ Valore non valido. Riprova (es. 20% o 50)."
+msgstr "❌ Valore non valido. Riprova (es. 20% o 50)."
+
+#: src/price_tracker/bot/handlers/text_input.py:128
+msgid "❌ ID non valido. Deve essere un numero."
+msgstr "❌ ID non valido. Deve essere un numero."
+
+#: src/price_tracker/bot/handlers/text_input.py:152
+msgid "❌ Nickname vuoto."
+msgstr "❌ Nickname vuoto."
+
+#: src/price_tracker/bot/handlers/text_input.py:163
+msgid "❌ URL non valido."
+msgstr "❌ URL non valido."
+
+#: src/price_tracker/bot/handlers/text_input.py:175
+msgid "❌ Numero non valido."
+msgstr "❌ Numero non valido."
+
+#: src/price_tracker/bot/handlers/text_input.py:179
+#: src/price_tracker/bot/handlers/text_input.py:212
+msgid "❌ Minimo 5 minuti."
+msgstr "❌ Minimo 5 minuti."
+
+#: src/price_tracker/bot/handlers/text_input.py:199
+msgid "❌ Numero non valido. Riprova."
+msgstr "❌ Numero non valido. Riprova."
+
