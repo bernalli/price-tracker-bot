@@ -86,7 +86,7 @@ See [docs/plugins.md](docs/plugins.md) for the contract and a minimal example. Q
 - Fork the repo, branch from `main`: `feat/<topic>` or `fix/<issue-ref>`.
 - Use [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`, `ci:`, `build:`.
 - Tests required for new code; coverage on touched files ≥80%.
-- `ruff check` + `ruff format --check` + `mypy --strict` must pass.
+- `ruff check` + `ruff format --check` + `mypy` (configured strict in `pyproject.toml`) must pass.
 - All new tests must pass; baseline must not regress.
 - Add a `[Unreleased]` entry to `CHANGELOG.md` for user-visible changes.
 - Fill the PR template checklist.
