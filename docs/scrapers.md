@@ -21,8 +21,8 @@
 | `walmart.com`                                                            | `WalmartScraper`           | 50       | NextData JSON parsing                                 |
 | `wayfair.{com,co.uk,ca,de}`                                              | `WayfairScraper`           | 50       | Furniture/home goods                                  |
 | `zalando.{it,de,fr,es,nl,co.uk,pl,...}`                                  | `ZalandoScraper`           | 50       | EU fashion locales                                    |
-| (any URL exposing JSON-LD/microdata/OG/RDFa product metadata)            | `GenericScraper`           | 0        | Default fallback; extraction chain                    |
-| (any URL after `GenericScraper` miss)                                    | `PlaywrightFallbackScraper`| 10       | Headless Chromium render; opt-in via env             |
+| (any URL not matched by a site-specific scraper)                         | `PlaywrightFallbackScraper`| 10       | Headless Chromium render; requires `playwright` package, returns error if unavailable |
+| (rare; only if PlaywrightFallback errors before resolution)              | `GenericScraper`           | 0        | Last-resort structured-data extractor; runs the 9-strategy chain |
 
 > Total: **17** (15 site-specific + `GenericScraper` + `PlaywrightFallbackScraper`).
 
@@ -30,7 +30,7 @@ All scrapers return prices as `Decimal` (never `float`). Outlier detection via m
 
 ## Resolution algorithm
 
-The registry sorts scrapers by `priority` (descending). On each URL lookup (`registry.resolve(url)`), the registry walks the sorted list and returns the first scraper whose `domain_patterns` (compiled regex against the URL netloc) match. The two fallbacks (`GenericScraper` priority 0, `PlaywrightFallbackScraper` priority 10) only run when no site-specific match exists.
+The registry sorts scrapers by `priority` (descending). On each URL lookup (`registry.resolve(url)`), the registry walks the sorted list and returns the first scraper whose `can_handle(url)` returns `True`. Site-specific scrapers implement `can_handle` as a regex match against `domain_patterns`. Both fallbacks (`PlaywrightFallbackScraper`, `GenericScraper`) override `can_handle` to broaden their reach: `PlaywrightFallbackScraper` returns `True` for every URL (and earns precedence via its higher priority), so `GenericScraper` is reached only when Playwright is selectively unregistered or its `can_handle` is bypassed by the caller.
 
 ```
 resolution order:
@@ -41,7 +41,7 @@ resolution order:
   EtsyScraper, GoogleStoreScraper, MediamarktScraper,
   NeweggScraper, OttoScraper, TargetScraper, WalmartScraper,
   WayfairScraper, ZalandoScraper (50, alphabetical tie-break)
-  PlaywrightFallbackScraper (10, opt-in)
+  PlaywrightFallbackScraper (10, always-handles)
   GenericScraper (0, last resort)
 ```
 
@@ -49,15 +49,19 @@ The first match wins; lower-priority scrapers are not tried even on parse failur
 
 ## Generic scraper extraction chain
 
-`GenericScraper` is the default fallback for any site without a dedicated scraper. It tries the following extractors in order, returning on the first success:
+`GenericScraper` runs a 9-strategy extraction chain when no site-specific scraper handles a URL. Each strategy attempts to fill `price`, `name`, and `currency` from a different source. The loop **accumulates** results across strategies (a strategy contributing `price` does not block a later strategy from contributing `name`) and **breaks** as soon as both `price` and `name` are resolved. If all 9 strategies leave either field empty, the parser returns a `ProductInfo` with the partial data and a low-confidence flag.
+
+Strategy order (executed top-to-bottom):
 
 1. **JSON-LD** — `<script type="application/ld+json">` with `Product` / `Offer` schema
 2. **Microdata** — `itemtype="http://schema.org/Product"` and friends
-3. **OpenGraph** — `<meta property="product:price:amount">`
-4. **RDFa** — `property="schema:price"` / `property="og:price:amount"` etc.
-5. **Heuristic regex** — last-resort price hint extraction (warn-only, marked low confidence in logs)
-
-If all five extractors fail, `GenericScraper` returns a `ProductInfo` with `is_available=False` and the URL is recorded as a scraper_health block.
+3. **OpenGraph** — `<meta property="product:price:amount">`, `og:title`
+4. **RDFa** — `property="schema:price"`, `property="og:price:amount"`
+5. **Meta tags** — non-OG/non-RDFa price/title `<meta>` hints
+6. **CSS selectors** — common e-commerce class names (`.price`, `.product-title`, etc.)
+7. **Data attributes** — `data-price`, `data-product-*` HTML attributes
+8. **JS product data** — inline `<script>` blobs (`window.__INITIAL_STATE__`, dataLayer pushes, etc.)
+9. **Regex** — heuristic regex on visible text (warn-only; logged at low confidence)
 
 ## Test fixtures and tests pattern
 
