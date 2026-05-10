@@ -26,6 +26,7 @@ dependencies = [
     "structlog>=24.1.0",
     "prometheus_client>=0.20.0",
     "aiohttp>=3.10.0",
+    "babel>=2.13.0",
 ]
 
 [project.optional-dependencies]
@@ -47,6 +48,9 @@ dev = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/price_tracker"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/price_tracker/locale" = "price_tracker/locale"
 
 [tool.ruff]
 line-length = 100
