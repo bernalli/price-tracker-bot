@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from price_tracker.bot.handlers.settings import (
+    _VALID_TIMEZONES,
     digest_mode_command,
     digest_now_command,
     mute_command,
@@ -14,7 +15,7 @@ from price_tracker.bot.handlers.settings import (
     quiet_hours_command,
     throttle_command,
     timezone_command,
-    unmute_command,  # noqa: F401  — imported per spec for symbol-presence check
+    unmute_command,
 )
 
 
@@ -36,6 +37,7 @@ def _build_context(args: list[str], **bot_data):
 @pytest.mark.asyncio
 async def test_mute_all_forever():
     repo = AsyncMock()
+    repo.get_notification_prefs = AsyncMock(return_value=None)
     repo.upsert_notification_prefs = AsyncMock()
     update = _build_update(42, ["all", "forever"])
     context = _build_context(["all", "forever"], repository=repo)
@@ -52,6 +54,7 @@ async def test_mute_all_forever():
 @pytest.mark.asyncio
 async def test_mute_specific_product_for_24_hours():
     repo = AsyncMock()
+    repo.get_notification_prefs = AsyncMock(return_value=None)
     repo.upsert_notification_prefs = AsyncMock()
     update = _build_update(42, ["10", "24"])
     context = _build_context(["10", "24"], repository=repo)
@@ -173,3 +176,130 @@ async def test_digest_now_invokes_flush():
     digest_svc.flush_user.assert_awaited_once_with(user_id=42)
     msg = update.message.reply_text.call_args.args[0]
     assert "3" in msg
+
+
+# ── Phase 2 F3.D item 29 followup: regression coverage for read-before-write
+# in mute/unmute and for input-validation guards.
+
+
+@pytest.mark.asyncio
+async def test_mute_preserves_existing_prefs():
+    """Muting must not clobber digest_mode / timezone / throttle on the row."""
+    from price_tracker.db.models import NotificationPrefs
+
+    existing = NotificationPrefs(
+        user_id=42,
+        product_id=None,
+        digest_mode=True,
+        timezone="Europe/Berlin",
+        throttle_per_hour=5,
+    )
+    repo = AsyncMock()
+    repo.get_notification_prefs = AsyncMock(return_value=existing)
+    repo.upsert_notification_prefs = AsyncMock()
+    update = _build_update(42, ["all", "24"])
+    context = _build_context(["all", "24"], repository=repo)
+    await mute_command(update, context)
+    repo.get_notification_prefs.assert_awaited_once_with(user_id=42, product_id=None)
+    args, _ = repo.upsert_notification_prefs.call_args
+    prefs = args[0]
+    assert prefs.digest_mode is True
+    assert prefs.timezone == "Europe/Berlin"
+    assert prefs.throttle_per_hour == 5
+    assert prefs.mute is True
+    assert prefs.mute_until is not None
+
+
+@pytest.mark.asyncio
+async def test_unmute_preserves_existing_prefs():
+    """Unmuting must not clobber digest_mode / timezone / throttle on the row."""
+    from datetime import UTC, datetime, timedelta
+
+    from price_tracker.db.models import NotificationPrefs
+
+    existing = NotificationPrefs(
+        user_id=42,
+        product_id=None,
+        mute=True,
+        mute_until=datetime.now(UTC) + timedelta(hours=12),
+        digest_mode=True,
+        timezone="Europe/Berlin",
+        throttle_per_hour=5,
+    )
+    repo = AsyncMock()
+    repo.get_notification_prefs = AsyncMock(return_value=existing)
+    repo.upsert_notification_prefs = AsyncMock()
+    update = _build_update(42, ["all"])
+    context = _build_context(["all"], repository=repo)
+    await unmute_command(update, context)
+    repo.get_notification_prefs.assert_awaited_once_with(user_id=42, product_id=None)
+    args, _ = repo.upsert_notification_prefs.call_args
+    prefs = args[0]
+    assert prefs.digest_mode is True
+    assert prefs.timezone == "Europe/Berlin"
+    assert prefs.throttle_per_hour == 5
+    assert prefs.mute is False
+    assert prefs.mute_until is None
+
+
+@pytest.mark.asyncio
+async def test_mute_negative_hours_rejected():
+    """Negative duration must be rejected without persisting."""
+    repo = AsyncMock()
+    repo.get_notification_prefs = AsyncMock(return_value=None)
+    repo.upsert_notification_prefs = AsyncMock()
+    update = _build_update(42, ["all", "-5"])
+    context = _build_context(["all", "-5"], repository=repo)
+    await mute_command(update, context)
+    repo.upsert_notification_prefs.assert_not_called()
+    msg = update.message.reply_text.call_args.args[0].lower()
+    assert "positive" in msg or "must be" in msg
+
+
+@pytest.mark.asyncio
+async def test_quiet_hours_same_start_end_rejected():
+    """An empty quiet-hours window (start==end) must be rejected."""
+    repo = AsyncMock()
+    repo.get_notification_prefs = AsyncMock(return_value=None)
+    repo.upsert_notification_prefs = AsyncMock()
+    update = _build_update(42, ["10:00-10:00"])
+    context = _build_context(["10:00-10:00"], repository=repo)
+    await quiet_hours_command(update, context)
+    repo.upsert_notification_prefs.assert_not_called()
+    msg = update.message.reply_text.call_args.args[0].lower()
+    assert "same" in msg or "cannot" in msg
+
+
+@pytest.mark.asyncio
+async def test_prefs_rejects_zero_or_negative_product_id():
+    """Explicit product_id <= 0 must be rejected, not silently coerced to global."""
+    repo = AsyncMock()
+    repo.get_notification_prefs = AsyncMock(return_value=None)
+    update = _build_update(42, ["0"])
+    context = _build_context(["0"], repository=repo)
+    await prefs_command(update, context)
+    # PreferencesManager.resolve calls get_notification_prefs internally; it must
+    # never be reached when validation rejects the product_id.
+    repo.get_notification_prefs.assert_not_called()
+    msg = update.message.reply_text.call_args.args[0].lower()
+    assert "positive integer" in msg
+
+
+@pytest.mark.asyncio
+async def test_digest_mode_invalid_interval_rejected():
+    """Non-integer interval_min must be rejected without persisting."""
+    repo = AsyncMock()
+    repo.get_notification_prefs = AsyncMock(return_value=None)
+    repo.upsert_notification_prefs = AsyncMock()
+    update = _build_update(42, ["on", "abc"])
+    context = _build_context(["on", "abc"], repository=repo)
+    await digest_mode_command(update, context)
+    repo.upsert_notification_prefs.assert_not_called()
+    msg = update.message.reply_text.call_args.args[0].lower()
+    assert "positive integer" in msg
+
+
+def test_timezone_command_uses_cached_set():
+    """Sanity check: module-level cache exists and contains a known tz."""
+    assert isinstance(_VALID_TIMEZONES, frozenset)
+    assert "Europe/Berlin" in _VALID_TIMEZONES

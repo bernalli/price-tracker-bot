@@ -25,6 +25,11 @@ if TYPE_CHECKING:
     from telegram.ext import ContextTypes
 
 
+# Cache the (large) IANA timezone set once at import time — building this on
+# every /timezone invocation walks the zoneinfo dir tree unnecessarily.
+_VALID_TIMEZONES: frozenset[str] = frozenset(available_timezones())
+
+
 @admin_only
 async def cmd_set_interval(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Set the global price-check interval (admin)."""
@@ -105,14 +110,26 @@ async def mute_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         except ValueError:
             await update.message.reply_text("Duration must be a number of hours or 'forever'")
             return
+        if hours <= 0:
+            await update.message.reply_text(
+                "Duration must be a positive number of hours or 'forever'"
+            )
+            return
         mute_until = datetime.now(UTC) + timedelta(hours=hours)
 
-    prefs = NotificationPrefs(
-        user_id=update.effective_user.id,
-        product_id=product_id,
-        mute=True,
-        mute_until=mute_until,
-    )
+    user_id = update.effective_user.id
+    # Read-before-write: preserve digest_mode/timezone/throttle/quiet_hours
+    # since upsert_notification_prefs does a full-row UPDATE.
+    existing = await repo.get_notification_prefs(user_id=user_id, product_id=product_id)
+    if existing is not None:
+        prefs = dataclasses.replace(existing, mute=True, mute_until=mute_until)
+    else:
+        prefs = NotificationPrefs(
+            user_id=user_id,
+            product_id=product_id,
+            mute=True,
+            mute_until=mute_until,
+        )
     await repo.upsert_notification_prefs(prefs)
     scope = "all products" if product_id is None else f"product {product_id}"
     when = "forever" if mute_until is None else f"until {mute_until.isoformat()}"
@@ -131,12 +148,19 @@ async def unmute_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         except ValueError:
             await update.message.reply_text("Usage: /unmute [product_id|all]")
             return
-    prefs = NotificationPrefs(
-        user_id=update.effective_user.id,
-        product_id=product_id,
-        mute=False,
-        mute_until=None,
-    )
+    user_id = update.effective_user.id
+    # Read-before-write: preserve digest_mode/timezone/throttle/quiet_hours
+    # since upsert_notification_prefs does a full-row UPDATE.
+    existing = await repo.get_notification_prefs(user_id=user_id, product_id=product_id)
+    if existing is not None:
+        prefs = dataclasses.replace(existing, mute=False, mute_until=None)
+    else:
+        prefs = NotificationPrefs(
+            user_id=user_id,
+            product_id=product_id,
+            mute=False,
+            mute_until=None,
+        )
     await repo.upsert_notification_prefs(prefs)
     await update.message.reply_text("Unmuted.")
 
@@ -208,6 +232,9 @@ async def quiet_hours_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     if not _valid_hhmm(start) or not _valid_hhmm(end):
         await update.message.reply_text("Invalid time format. Use 24h HH:MM.")
         return
+    if start == end:
+        await update.message.reply_text("Quiet hours start and end cannot be the same time")
+        return
     if existing is not None:
         prefs = dataclasses.replace(existing, quiet_hours_start=start, quiet_hours_end=end)
     else:
@@ -229,7 +256,7 @@ async def timezone_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await update.message.reply_text("Usage: /timezone <TZ name>")
         return
     tz = args[0]
-    if tz not in available_timezones():
+    if tz not in _VALID_TIMEZONES:
         await update.message.reply_text(f"Unknown timezone: {tz}")
         return
     user_id = update.effective_user.id
@@ -286,6 +313,9 @@ async def prefs_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             product_id = int(args[0])
         except ValueError:
             await update.message.reply_text("product_id must be an integer")
+            return
+        if product_id <= 0:
+            await update.message.reply_text("product_id must be a positive integer")
             return
     prefs_mgr = PreferencesManager(repo=repo)
     eff = await prefs_mgr.resolve(user_id=user_id, product_id=product_id or 0)
