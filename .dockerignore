@@ -1,24 +1,55 @@
 # Mirror of .gitignore + exclude dev-only dirs from Docker image
+
+# Secrets / local env (envfile excluded except its example)
 .env
 .env.*
 !.env.example
 docker-compose.override.yml
+
+# Database / runtime data
 *.db
 data/
 plugins/*
 !plugins/README.md
+
+# Python build artifacts
 __pycache__/
-*.pyc
-.venv/
-venv/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-htmlcov/
+
+# Virtualenvs
+.venv/
+venv/
+
+# Coverage
 .coverage
 coverage.xml
+htmlcov/
+*.cover
+
+# IDE / editor
 .vscode/
 .idea/
+*.swp
+
+# Git
+.git/
+.gitignore
+.gitleaks.toml
+
+# CI / repo metadata
+.github/
+.pre-commit-config.yaml
+
+# Logs / archives / misc
 logs/
 *.log
 *.bak
@@ -29,9 +60,7 @@ logs/
 # Dev-only — not needed at runtime
 tests/
 docs/
-.github/
-.pre-commit-config.yaml
-.git/
-.gitignore
-README.md
+messages.pot
+*.md
+!README.md
 LICENSE
