@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         gcc g++ libcurl4-openssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY pyproject.toml ./
+COPY pyproject.toml README.md ./
 RUN pip install --user --no-cache-dir hatchling
 COPY src ./src
 RUN pip install --user --no-cache-dir .
