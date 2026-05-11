@@ -8,6 +8,9 @@ on:
       - ".dockerignore"
       - "pyproject.toml"
       - "src/**"
+      - ".github/workflows/docker-build.yml"
+    tags:
+      - "v*.*.*"
   pull_request:
     branches: [main]
     paths:
@@ -15,9 +18,15 @@ on:
       - ".dockerignore"
       - "pyproject.toml"
       - "src/**"
+      - ".github/workflows/docker-build.yml"
 
 permissions:
   contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   build:
@@ -31,12 +40,32 @@ jobs:
       - name: Setup Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build (multi-arch, no push)
+      - name: Login to GHCR
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-') }}
+            type=sha,format=short,prefix=sha-
+
+      - name: Build (multi-arch) ${{ startsWith(github.ref, 'refs/tags/v') && '+ push' || 'no-push' }}
         uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64,linux/arm64
-          push: false
-          tags: price-tracker:ci
+          push: ${{ startsWith(github.ref, 'refs/tags/v') }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
