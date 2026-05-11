@@ -57,7 +57,7 @@ jobs:
         uses: google/osv-scanner-action/osv-scanner-action@v2.3.8
         with:
           scan-args: |-
-            --lockfile=./pyproject.toml
+            --lockfile=./uv.lock
 
   dependency-review:
     runs-on: ubuntu-latest
