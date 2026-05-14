@@ -95,6 +95,64 @@ async def test_initialize_alone_does_not_wire_scheduler(
 
 
 @pytest.mark.asyncio
+async def test_post_init_populates_all_handler_lookup_keys(
+    fake_config: Config,
+) -> None:
+    """Regression: every key looked up by bot decorators / handlers must be
+    populated by ``_combined_post_init``.
+
+    The monolith split introduced naming drift between bootstrap
+    (sets ``bot_data["repo"]``, ``["registry"]``) and handler code (looks up
+    ``bot_data["db"]``, ``["scraper"]``). Without these aliases, every
+    command going through ``bot.decorators._db`` / ``_scraper`` crashes with
+    ``KeyError`` and the Telegram user sees the generic
+    ``"❌ Si è verificato un errore. Riprova tra qualche istante."``.
+    """
+
+    db_conn = await aiosqlite.connect(":memory:")
+    db_conn.row_factory = aiosqlite.Row
+
+    application = (
+        Application.builder()
+        .token(fake_config.telegram_bot_token)
+        .post_init(_combined_post_init)
+        .build()
+    )
+    application.bot_data["config"] = fake_config
+    application.bot_data["db_conn"] = db_conn
+
+    registry = ScraperRegistry()
+    discover_builtin_scrapers(registry)
+    application.bot_data["registry"] = registry
+
+    try:
+        await _combined_post_init(application)
+
+        required = {
+            "config",
+            "db_conn",
+            "repo",
+            "repository",
+            "db",
+            "registry",
+            "scraper",
+            "http_client",
+            "digest_service",
+            "health_manager",
+            "scheduler",
+        }
+        missing = required - set(application.bot_data.keys())
+        assert not missing, (
+            f"bot_data missing keys after post_init — handlers will KeyError: {missing}"
+        )
+    finally:
+        http_client = application.bot_data.get("http_client")
+        if http_client is not None:
+            await http_client.aclose()
+        await db_conn.close()
+
+
+@pytest.mark.asyncio
 async def test_explicit_post_init_after_initialize_wires_scheduler(
     fake_config: Config, monkeypatch: pytest.MonkeyPatch
 ) -> None:
