@@ -159,17 +159,18 @@ async def cmd_import(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
             currency = row.get("Valuta", "EUR").strip() or "EUR"
 
-            await db.add_product(
+            new_pid = await db.add_product(
                 user_id=user_id,
                 url=url,
                 name=name,
                 domain=domain,
-                price=price,
-                target_price=target,
+                initial_price=price,
                 threshold_type=th_type,
-                threshold_value=th_value,
+                threshold_value=Decimal(th_value),
                 currency=currency,
             )
+            if target is not None:
+                await db.set_target_price(new_pid, target)
             imported += 1
         except Exception as e:  # noqa: BLE001 — log + count and keep going
             logger.error("Import error for %s: %s", url[:60], e)
