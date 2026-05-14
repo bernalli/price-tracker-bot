@@ -2,16 +2,41 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from dataclasses import dataclass, fields
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from datetime import datetime
     from decimal import Decimal
 
 
+class _DictCompatMixin:
+    """Mapping-style access for legacy handlers still using dict semantics.
+
+    The original ``bot.py`` monolith spoke to a row-as-``dict`` repository.
+    The refactor split bot.py into modules and switched the repository to typed
+    ``@dataclass`` records, but most handlers still call ``record.get("key")``
+    or ``record["key"]``. Until handlers are migrated to attribute access,
+    this mixin keeps both APIs working without copying every row to a dict.
+    """
+
+    def __getitem__(self, key: str) -> Any:  # noqa: D401 — Mapping protocol
+        try:
+            return getattr(self, key)
+        except AttributeError as exc:
+            raise KeyError(key) from exc
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return getattr(self, key, default)
+
+    def __contains__(self, key: object) -> bool:
+        if not isinstance(key, str):
+            return False
+        return any(f.name == key for f in fields(self))  # type: ignore[arg-type]
+
+
 @dataclass(frozen=True)
-class UserRecord:
+class UserRecord(_DictCompatMixin):
     user_id: int
     is_admin: bool
     is_active: bool
@@ -20,7 +45,7 @@ class UserRecord:
 
 
 @dataclass(frozen=True)
-class ProductRecord:
+class ProductRecord(_DictCompatMixin):
     id: int
     user_id: int
     url: str

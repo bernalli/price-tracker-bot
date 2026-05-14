@@ -9,6 +9,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 (empty)
 
+## [0.1.4] - 2026-05-14
+
+### Fixed
+- The `/add <url>` flow crashed in production with
+  `AttributeError: 'Repository' object has no attribute
+  'get_product_by_url_for_user'` whenever a user sent a Telegram link to
+  the bot. A handler-side audit revealed that the monolith
+  split left **13 distinct `db.<method>(…)` calls** in
+  `src/price_tracker/bot/**` referencing repository methods that no
+  longer exist post-refactor: `get_product_by_url_for_user`,
+  `get_product_for_user`, `is_user_admin`, `add_user`,
+  `cleanup_old_history`, `deactivate_product`, `get_active_products`,
+  `get_all_products`, `get_all_users`, `get_stats`,
+  `reset_initial_price`, `set_product_interval`,
+  `set_product_preferences` (≈70 call sites total).
+- `ProductRecord` / `UserRecord` were defined as typed
+  `@dataclass(frozen=True)` after the refactor but most handlers still
+  treat rows as dicts (`product.get("name")`, `product["id"]`,
+  `"is_active" in product`). The mismatch was masked by a
+  `cast("dict[str, Any] | None", ...)` in `bot/handlers/_helpers.py` and
+  would have crashed every read path as soon as it was exercised.
+
+### Added
+- 13 thin wrapper methods on `Repository` that delegate to the existing
+  typed API (e.g. `get_active_products` → `list_products_for_user(only_active=True)`,
+  `cleanup_old_history` → `delete_old_price_history`, etc.) plus a new
+  query for `get_product_by_url_for_user` and a `get_stats` helper that
+  returns `{active_products, total_products, total_checks}` scoped per
+  user or globally.
+- `_DictCompatMixin` on `ProductRecord` and `UserRecord` providing
+  `__getitem__`, `get(key, default)` and `__contains__` so legacy
+  handler code keeps working without copying every row into a dict.
+- `tests/integration/test_repository_handler_contract.py` — defense in
+  depth: greps every `src/price_tracker/bot/**/*.py` for
+  `db.<method>(` and asserts the method exists on `Repository`. Any
+  future drift between handler calls and the repository surface fails
+  the test rather than the user. 13 new tests (449 total, 90.14%
+  coverage).
+
 ## [0.1.3] - 2026-05-14
 
 ### Fixed
