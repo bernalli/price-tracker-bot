@@ -120,8 +120,7 @@ async def cmd_import(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
     msg = await update.message.reply_text(_("⏳ Importazione in corso..."))
 
-    # Deferred import: legacy `scrapers.identify_site` lives outside the package.
-    from scrapers import identify_site  # noqa: PLC0415
+    from price_tracker.core.url_utils import extract_etld_plus_one  # noqa: PLC0415
 
     for row in reader:
         url = row.get("URL", "").strip()
@@ -135,8 +134,12 @@ async def cmd_import(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             continue
 
         try:
-            domain = identify_site(url)
-            result = await scraper.scrape(url, client)
+            domain = extract_etld_plus_one(url)
+            scraper_for_url = scraper.resolve(url)
+            if scraper_for_url is None:
+                errors += 1
+                continue
+            result = await scraper_for_url.scrape(url, client)
             price = result.price
             name = result.name or row.get("Nome", "Importato")
 

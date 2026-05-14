@@ -291,10 +291,8 @@ async def _add_product(
     scraper = _scraper(context)
     user_id = update.effective_user.id
 
-    # Deferred import: legacy `scrapers.identify_site` lives outside the package.
-    from scrapers import identify_site  # noqa: PLC0415
-
     from price_tracker.core.scraper_base import detect_currency  # noqa: PLC0415
+    from price_tracker.core.url_utils import extract_etld_plus_one  # noqa: PLC0415
 
     # Check for duplicates PER USER
     existing = await db.get_product_by_url_for_user(url, user_id)
@@ -312,8 +310,15 @@ async def _add_product(
         return
 
     msg = await update.message.reply_text(_("🔍 Analizzo il prodotto..."))
-    domain = identify_site(url)
-    result = await scraper.scrape(url, client)
+    domain = extract_etld_plus_one(url)
+    scraper_for_url = scraper.resolve(url)
+    if scraper_for_url is None:
+        await msg.edit_text(
+            "❌ Nessuno scraper conosciuto per questo dominio.\n\n"
+            "💡 Verifica che il link sia corretto o segnala il sito non supportato."
+        )
+        return
+    result = await scraper_for_url.scrape(url, client)
 
     if result.price is None:
         error_msg = result.error or "Prezzo non trovato"
