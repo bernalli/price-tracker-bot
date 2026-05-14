@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 (empty)
 
+## [0.1.2] - 2026-05-14
+
+### Fixed
+- Bot command handlers crashed with `KeyError: 'db'` / `KeyError:
+  'scraper'` and surfaced the generic
+  `"❌ Si è verificato un errore. Riprova tra qualche istante."` to
+  Telegram users on every command going through `bot.decorators._db` /
+  `_scraper` (add/list/history/debug/monitoring/callbacks). Root cause:
+  the Phase 1 F1 monolith split renamed the bootstrap keys to
+  `bot_data["repo"]` / `["registry"]` but left the handler-side lookups
+  expecting `["db"]` / `["scraper"]`. Added the two missing aliases in
+  `main.post_init` and a regression test
+  (`test_post_init_populates_all_handler_lookup_keys`) that enumerates
+  every key looked up by decorators/handlers and asserts none is
+  missing after `_combined_post_init` runs.
+
 ## [0.1.1] - 2026-05-14
 
 ### Fixed
