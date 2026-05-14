@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 (empty)
 
+## [0.1.3] - 2026-05-14
+
+### Fixed
+- `/add <url>` and CSV import (`/import`) crashed with
+  `ModuleNotFoundError: No module named 'scrapers'` in
+  `bot/handlers/product.py` and `bot/handlers/product_io.py`, plus the
+  `/debug` command crashed with `AttributeError` because
+  `ScraperRegistry` was being called like an individual scraper. The
+  monolith split left two stale deferred imports
+  (`from scrapers import identify_site`) and three call sites still
+  invoking `scraper.scrape(url, client)` directly on the
+  ``ScraperRegistry`` instance instead of going through
+  ``registry.resolve(url).scrape(url, client)`` like the scheduler does.
+  None of the affected flows had test coverage post-refactor.
+- Replaced `identify_site` with `core.url_utils.extract_etld_plus_one`
+  (the post-refactor equivalent for "domain"), and aligned the three
+  handler call sites to the scheduler pattern (resolve → guard against
+  ``None`` → scrape).
+- Added regression test `tests/unit/test_no_stale_imports.py` that
+  greps every `src/price_tracker/**/*.py` for top-level ``scrapers``
+  imports — future drift fails the test, not the user.
+
 ## [0.1.2] - 2026-05-14
 
 ### Fixed
