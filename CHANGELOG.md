@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 (empty)
 
+## [0.1.1] - 2026-05-14
+
+### Fixed
+- Startup wiring: `main.amain()` now invokes `_combined_post_init`
+  explicitly after `Application.initialize()`. python-telegram-bot ≥22
+  no longer auto-runs `post_init` from `initialize()` — it only does
+  so from `run_polling`/`run_webhook`. The manual
+  `initialize/start/start_polling` pattern (needed to keep the
+  Prometheus exporter lifecycle outside PTB) therefore left
+  `bot_data["scheduler"]`, `["repo"]`, `["health_manager"]`,
+  `["digest_service"]` and other post-init artefacts unset, causing
+  every scheduled `price_check` tick to raise `KeyError: 'scheduler'`
+  and the core scraping loop to never run. Added integration
+  regression test `tests/integration/test_startup_postinit.py`.
+
 ## [0.1.0] - 2026-05-10
 
 First public release. Self-hosted Telegram bot for multi-site price tracking

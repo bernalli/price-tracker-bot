@@ -141,6 +141,12 @@ async def amain() -> None:
         )
 
     await application.initialize()
+    # PTB ≥22 does not call ``post_init`` from ``initialize()`` — only
+    # ``run_polling()``/``run_webhook()`` do. We use the manual
+    # ``initialize()``+``start()``+``updater.start_polling()`` pattern to keep
+    # the metrics server lifecycle outside PTB, so we must invoke the registered
+    # post-init callback ourselves before starting the application.
+    await _combined_post_init(application)
     await application.start()
     if application.updater is None:
         raise RuntimeError("Updater not initialized")
