@@ -44,6 +44,19 @@ async def post_init(application: Application[Any, Any, Any, Any, Any, Any]) -> N
     application.bot_data["repo"] = repo
     # Alias used by the notification preference handlers.
     application.bot_data["repository"] = repo
+    # Alias used by ``bot.decorators._db`` and direct
+    # ``context.bot_data["db"]`` lookups across handler modules
+    # (product_io, history, product_list, monitoring, debug, callbacks/*).
+    # Pre-refactor monolith stored the repository under ``"db"``; the
+    # The module split renamed the post_init key to ``"repo"`` but left the
+    # handler-side lookups untouched, so this alias keeps them wired.
+    application.bot_data["db"] = repo
+    # Alias used by ``bot.decorators._scraper`` and direct
+    # ``context.bot_data["scraper"]`` lookups (product, product_io,
+    # monitoring, debug, callbacks/_menu, callbacks/_product). Same
+    # naming drift: bootstrap stores the registry under ``"registry"``,
+    # handlers expect ``"scraper"``.
+    application.bot_data["scraper"] = application.bot_data["registry"]
 
     for uid in config.admin_users:
         await repo.ensure_user(user_id=uid, is_admin=True)
