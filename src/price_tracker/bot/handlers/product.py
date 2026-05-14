@@ -337,10 +337,9 @@ async def _add_product(
         url=url,
         name=result.name,
         domain=domain,
-        price=result.price,
-        target_price=None,
+        initial_price=result.price,
         threshold_type="percentage",
-        threshold_value="10",
+        threshold_value=Decimal("10"),
         currency=currency,
     )
 
