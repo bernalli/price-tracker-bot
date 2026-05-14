@@ -9,6 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 (empty)
 
+## [0.1.5] - 2026-05-14
+
+### Fixed
+- `/add <url>` still crashed after v0.1.4 with
+  `TypeError: Repository.add_product() got an unexpected keyword
+  argument 'price'` (and `target_price`). v0.1.4 fixed the missing
+  Repository methods but did not catch **keyword-argument signature
+  drift** on methods that *did* exist. `bot/handlers/product.py:335`
+  and `bot/handlers/product_io.py:162` were still calling
+  `add_product(price=..., target_price=..., threshold_value="10")`
+  against the post-F1 signature
+  `add_product(*, initial_price=..., threshold_value: Decimal=...)`
+  (no `target_price` keyword).
+- Aligned both call sites: `price` → `initial_price`,
+  `threshold_value` is now a `Decimal`, and `target_price` is applied
+  via `set_target_price(pid, target)` after `add_product` only when a
+  target is set (CSV import path).
+
+### Added
+- Contract test
+  `test_every_db_kwarg_exists_on_repository_signature` parses every
+  `bot/**/*.py` with `ast`, extracts each `db.<method>(kw=...)` call
+  site, and asserts every `kw` is in
+  `inspect.signature(Repository.<method>).parameters` (or that the
+  method accepts `**kwargs`). Catches future signature drift before
+  it reaches a real user.
+
 ## [0.1.4] - 2026-05-14
 
 ### Fixed
