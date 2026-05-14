@@ -303,11 +303,15 @@ async def cmd_debug(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     # Step 8: Run actual scraper
     scraper = _scraper(context)
-    result = await scraper.scrape(url, client)
+    scraper_for_url = scraper.resolve(url)
     lines.append("\n🤖 <b>Risultato scraper:</b>")
-    lines.append(f"   Nome: {_escape_html((result.name or '❌')[:60])}")
-    price_repr = "€" + str(result.price) if result.price else "❌ " + (result.error or "")
-    lines.append(f"   Prezzo: {price_repr}")
+    if scraper_for_url is None:
+        lines.append("   ❌ nessuno scraper conosciuto per questo dominio")
+    else:
+        result = await scraper_for_url.scrape(url, client)
+        lines.append(f"   Nome: {_escape_html((result.name or '❌')[:60])}")
+        price_repr = "€" + str(result.price) if result.price else "❌ " + (result.error or "")
+        lines.append(f"   Prezzo: {price_repr}")
 
     await msg.edit_text("\n".join(lines), parse_mode=ParseMode.HTML, disable_web_page_preview=True)
 
