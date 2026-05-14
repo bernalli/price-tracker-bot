@@ -689,3 +689,139 @@ class Repository:
         )
         rows = await cursor.fetchall()
         return [(r[0], dt) for r in rows if (dt := _parse_ts(r[1])) is not None]
+
+    # ── Backward-compat aliases for legacy handler API ──
+    #
+    # The pre-refactor monolith spoke to a dict-row repository with a different
+    # method naming. Handlers under ``bot/handlers/`` were ported "as-is" and
+    # still use the legacy names. v0.1.4 adds these thin wrappers so the
+    # handlers keep working while the underlying repository stays typed.
+    # The contract test ``tests/integration/test_repository_handler_contract``
+    # enforces that every ``db.<method>(...)`` call in handlers resolves here.
+
+    async def get_product_by_url_for_user(self, url: str, user_id: int) -> ProductRecord | None:
+        """Look up a product by ``(url, user_id)`` — used by ``/add`` dedup."""
+        cursor = await self._conn.execute(
+            f"SELECT {_PRODUCT_COLS} FROM products WHERE url = ? AND user_id = ?",
+            (url, user_id),
+        )
+        row = await cursor.fetchone()
+        if not row:
+            return None
+        return _row_to_product(tuple(row))
+
+    async def get_product_for_user(self, product_id: int, user_id: int) -> ProductRecord | None:
+        """Like :meth:`get_product` but scoped to the caller (admin uses get_product)."""
+        cursor = await self._conn.execute(
+            f"SELECT {_PRODUCT_COLS} FROM products WHERE id = ? AND user_id = ?",
+            (product_id, user_id),
+        )
+        row = await cursor.fetchone()
+        if not row:
+            return None
+        return _row_to_product(tuple(row))
+
+    async def is_user_admin(self, user_id: int) -> bool:
+        cursor = await self._conn.execute(
+            "SELECT is_admin FROM users WHERE user_id = ?", (user_id,)
+        )
+        row = await cursor.fetchone()
+        return bool(row and row[0])
+
+    async def add_user(self, user_id: int, *, is_admin: bool = False) -> None:
+        """Alias of :meth:`ensure_user`."""
+        await self.ensure_user(user_id=user_id, is_admin=is_admin)
+
+    async def get_all_users(self) -> list[UserRecord]:
+        """Alias of :meth:`list_users`."""
+        return await self.list_users()
+
+    async def get_active_products(self, user_id: int) -> list[ProductRecord]:
+        """Alias of ``list_products_for_user(user_id, only_active=True)``."""
+        return await self.list_products_for_user(user_id=user_id, only_active=True)
+
+    async def get_all_products(self, user_id: int) -> list[ProductRecord]:
+        """Alias of :meth:`list_products_for_user`."""
+        return await self.list_products_for_user(user_id=user_id)
+
+    async def deactivate_product(self, product_id: int) -> None:
+        """Alias of :meth:`pause_product`."""
+        await self.pause_product(product_id)
+
+    async def cleanup_old_history(self, *, retention_days: int) -> int:
+        """Alias of :meth:`delete_old_price_history` (keyword-renamed)."""
+        return await self.delete_old_price_history(days=retention_days)
+
+    async def set_product_interval(self, product_id: int, minutes: int | None) -> None:
+        """Alias of :meth:`set_check_interval`."""
+        await self.set_check_interval(product_id, minutes)
+
+    async def reset_initial_price(self, product_id: int) -> bool:
+        """Reset ``initial_price`` to the current price. Returns True if a row was updated."""
+        cursor = await self._conn.execute(
+            "UPDATE products SET initial_price = current_price, "
+            "updated_at = datetime('now') "
+            "WHERE id = ? AND current_price IS NOT NULL",
+            (product_id,),
+        )
+        await self._conn.commit()
+        return int(cursor.rowcount) > 0
+
+    async def set_product_preferences(
+        self,
+        product_id: int,
+        *,
+        condition: str | None = None,
+        seller: str | None = None,
+    ) -> None:
+        """Update preferred_condition / preferred_seller for a product."""
+        await self._conn.execute(
+            "UPDATE products SET preferred_condition = ?, preferred_seller = ?, "
+            "updated_at = datetime('now') WHERE id = ?",
+            (condition, seller, product_id),
+        )
+        await self._conn.commit()
+
+    async def get_stats(self, user_id: int | None = None) -> dict[str, int]:
+        """Return ``{active_products, total_products, total_checks}``.
+
+        With ``user_id`` scopes counts to that user; without it returns globals.
+        Handlers consume the result via ``stats["active_products"]`` etc.
+        """
+        if user_id is None:
+            cur = await self._conn.execute(
+                "SELECT "
+                "COALESCE(SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END), 0), "
+                "COUNT(*) "
+                "FROM products"
+            )
+            row = await cur.fetchone()
+            active_count = int(row[0]) if row else 0
+            total_count = int(row[1]) if row else 0
+            cur2 = await self._conn.execute("SELECT COUNT(*) FROM price_history")
+            row2 = await cur2.fetchone()
+            total_checks = int(row2[0]) if row2 else 0
+        else:
+            cur = await self._conn.execute(
+                "SELECT "
+                "COALESCE(SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END), 0), "
+                "COUNT(*) "
+                "FROM products WHERE user_id = ?",
+                (user_id,),
+            )
+            row = await cur.fetchone()
+            active_count = int(row[0]) if row else 0
+            total_count = int(row[1]) if row else 0
+            cur2 = await self._conn.execute(
+                "SELECT COUNT(*) FROM price_history ph "
+                "JOIN products p ON p.id = ph.product_id "
+                "WHERE p.user_id = ?",
+                (user_id,),
+            )
+            row2 = await cur2.fetchone()
+            total_checks = int(row2[0]) if row2 else 0
+        return {
+            "active_products": active_count,
+            "total_products": total_count,
+            "total_checks": total_checks,
+        }
