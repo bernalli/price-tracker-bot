@@ -1,23 +1,29 @@
 """Repository ↔ handler contract — defense against Phase 1 F1 refactor drift.
 
 Lesson learned in CONTINUITY 2026-05-14: after the monolithic ``bot.py`` was
-split into ``bot/handlers/**`` modules, three successive hotfixes (v0.1.1,
-v0.1.2, v0.1.3) patched individual KeyErrors / AttributeErrors discovered when
-real users exercised the handlers. v0.1.4 widens the safety net so future drift
-between handler ``db.<method>(...)`` calls and ``Repository``'s public surface
-fails at CI time instead of in production.
+split into ``bot/handlers/**`` modules, four successive hotfixes (v0.1.1
+through v0.1.4) patched individual KeyErrors / AttributeErrors / TypeErrors
+discovered when real users exercised the handlers. v0.1.4 added the
+``hasattr`` contract; v0.1.5 adds **keyword-argument signature** validation
+so calls like ``db.add_product(price=...)`` against a Repository that expects
+``initial_price=...`` fail at CI time instead of in production.
 
-Two contracts enforced:
+Three contracts enforced:
 
 1. Every ``db.<method>(...)`` call in ``src/price_tracker/bot/**/*.py`` resolves
    to an attribute on :class:`price_tracker.db.repository.Repository`.
-2. ``ProductRecord`` / ``UserRecord`` support the legacy dict-like API used by
+2. Every ``kw=value`` argument used at the call sites must appear in
+   ``inspect.signature(Repository.<method>).parameters`` (or the method must
+   accept ``**kwargs``).
+3. ``ProductRecord`` / ``UserRecord`` support the legacy dict-like API used by
    the (still-not-fully-migrated) handlers: ``record.get(key, default)``,
    ``record[key]``, and ``key in record``.
 """
 
 from __future__ import annotations
 
+import ast
+import inspect
 import re
 from decimal import Decimal
 from pathlib import Path
@@ -53,6 +59,34 @@ def _collect_db_method_calls() -> dict[str, list[Path]]:
     return calls
 
 
+def _collect_db_kwargs_calls() -> list[tuple[Path, int, str, tuple[str, ...]]]:
+    """Return [(file, line, method, kwargs)] for every ``db.<method>(kw=...)``.
+
+    Uses AST so it is robust to multi-line calls (the failing case in v0.1.4
+    was a 9-line keyword argument list in ``product.py``).
+    """
+    found: list[tuple[Path, int, str, tuple[str, ...]]] = []
+    for path in BOT_DIR.rglob("*.py"):
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except SyntaxError:
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            if not (
+                isinstance(func, ast.Attribute)
+                and isinstance(func.value, ast.Name)
+                and func.value.id == "db"
+            ):
+                continue
+            kwargs = tuple(kw.arg for kw in node.keywords if kw.arg is not None)
+            if kwargs:
+                found.append((path, node.lineno, func.attr, kwargs))
+    return found
+
+
 def test_every_db_call_resolves_on_repository() -> None:
     """Each ``db.<method>(...)`` call in handlers must exist on Repository.
 
@@ -79,6 +113,43 @@ def test_every_db_call_resolves_on_repository() -> None:
             f"{len(missing)} db.<method>() handler calls have no matching "
             f"Repository attribute (drift from Phase 1 F1 split). Either add "
             f"the method to Repository or update the handler:\n{detail}"
+        )
+
+
+def test_every_db_kwarg_exists_on_repository_signature() -> None:
+    """Each ``kw=value`` at a ``db.<method>(...)`` site must be a real parameter.
+
+    Catches the v0.1.5 class of regressions where the Repository renamed a
+    keyword (``price`` → ``initial_price``) or dropped one (``target_price``)
+    during the F1 refactor but the handlers still pass the old name.
+    """
+    drift: list[str] = []
+    for path, lineno, method, kwargs in _collect_db_kwargs_calls():
+        method_fn = getattr(Repository, method, None)
+        if method_fn is None:
+            # Covered by test_every_db_call_resolves_on_repository — skip here.
+            continue
+        try:
+            params = inspect.signature(method_fn).parameters
+        except (TypeError, ValueError):
+            continue
+        # Methods declaring **kwargs accept anything.
+        if any(p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values()):
+            continue
+        unexpected = [k for k in kwargs if k not in params]
+        if unexpected:
+            drift.append(
+                f"  - {path.name}:{lineno} db.{method}({', '.join(kwargs)}) "
+                f"→ unknown kwarg(s) {unexpected} (signature accepts: "
+                f"{sorted(k for k in params if k != 'self')})"
+            )
+
+    if drift:
+        detail = "\n".join(drift)
+        pytest.fail(
+            f"{len(drift)} db.<method>(...) call sites pass keyword arguments "
+            f"not present on the Repository signature (signature drift from "
+            f"Phase 1 F1 refactor). Align caller or extend the method:\n{detail}"
         )
 
 
