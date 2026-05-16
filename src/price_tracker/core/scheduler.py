@@ -317,7 +317,9 @@ class Scheduler:
         _, alert = outcome
         return CheckResult(product_id=product_id, user_id=user_id, alert=alert)
 
-    async def check_user_products_for_user(self, *, user_id: int) -> list[CheckResult]:
+    async def check_user_products_for_user(
+        self, *, user_id: int, delay_between_products: float | None = None
+    ) -> list[CheckResult]:
         """Pull-mode batch check used by ``/checkall`` and the menu "Check all" button.
 
         Iterates over every active product owned by ``user_id``, respecting the
@@ -325,7 +327,19 @@ class Scheduler:
         ``_run_tick`` (so a quarantined domain is skipped silently rather than
         scraped). Returns one :class:`CheckResult` per attempted product so the
         caller can build a summary message inline.
+
+        ``delay_between_products`` overrides the per-product pause. The push
+        mode (periodic job) leaves it unset and inherits the gentle
+        ``deps.delay_between_products`` (default 5s) to be polite to upstream
+        servers. Interactive callers (``/checkall``, menu button) override
+        with a small value (≈0.5s) since the user is waiting in real time —
+        gentleness still matters but the UX gap matters more.
         """
+        effective_delay = (
+            delay_between_products
+            if delay_between_products is not None
+            else self.deps.delay_between_products
+        )
         products = await self.deps.repo.list_products_for_user(user_id=user_id, only_active=True)
         results: list[CheckResult] = []
         half_open_seen: set[str] = set()
@@ -377,7 +391,7 @@ class Scheduler:
             else:
                 alert = outcome[1] if outcome is not None else None
                 results.append(CheckResult(product_id=product.id, user_id=user_id, alert=alert))
-            await asyncio.sleep(self.deps.delay_between_products)
+            await asyncio.sleep(effective_delay)
         return results
 
     async def cleanup_old_history(self, *, retention_days: int = 365) -> int:

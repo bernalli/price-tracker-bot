@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 (empty)
 
+## [0.1.7] - 2026-05-17
+
+### Fixed
+- `/checkall` and the menu **🔍 Check all** button took ~5 minutes for 31
+  products because the v0.1.6 pull-mode methods inherited the same
+  `delay_between_products = 5s` gentle pacing as the periodic background
+  job. The polite 5s is correct when the bot is the one scheduling the
+  scrape; it is the wrong UX trade-off when the user is waiting live for
+  the answer.
+
+### Changed
+- `Scheduler.check_user_products_for_user` accepts an optional
+  ``delay_between_products`` kwarg. The periodic job leaves it unset and
+  inherits the default 5s (unchanged). Interactive handlers (``/checkall``,
+  menu **🔍 Check all** button) override it to ``0.5s`` — 31 products now
+  finish in ~1–2 minutes instead of ~5.
+
 ## [0.1.6] - 2026-05-16
 
 ### Fixed
