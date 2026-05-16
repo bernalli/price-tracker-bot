@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 (empty)
 
+## [0.1.8] - 2026-05-17
+
+### Fixed
+- Every ``/history`` and per-product "📊 Storico prezzo" chart silently
+  returned ``"📭 Dati insufficienti per generare il grafico (servono
+  almeno 2 punti)"`` even on products with hundreds of history rows.
+  ``_generate_chart`` accesses each row as ``record["checked_at"]`` /
+  ``record["price"]`` (dict-style); ``PriceHistoryRecord`` was the only
+  ``@dataclass`` record in ``db/models.py`` that did **not** extend
+  ``_DictCompatMixin`` (added in v0.1.4 to ``UserRecord`` and
+  ``ProductRecord``). The subscript raised ``TypeError`` and the chart
+  helper swallowed it as "no data", making the bug invisible in logs.
+
+### Added
+- Contract test ``test_price_history_record_supports_dict_access``
+  exercises the three mixin paths (``record[key]``, ``record.get(key)``,
+  ``key in record``) on a real ``PriceHistoryRecord`` returned by the
+  repository. A future refactor cannot drop the mixin without failing CI.
+
 ## [0.1.7] - 2026-05-17
 
 ### Fixed
