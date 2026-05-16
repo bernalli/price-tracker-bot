@@ -19,7 +19,7 @@ from telegram import (
 )
 from telegram.constants import ParseMode
 
-from price_tracker.bot.decorators import _client, _config, _scraper
+from price_tracker.bot.decorators import _config
 from price_tracker.bot.handlers._helpers import (
     _escape_html,
     _format_threshold,
@@ -260,14 +260,11 @@ async def _handle_menu_checkall(
         )
         return True
     await query.edit_message_text(f"🔍 Controllo {len(products)} prodotti...")
-    # Deferred imports — PriceChecker lives in legacy `checker.py` until item 18.
-    from checker import (  # noqa: PLC0415,E501
-        PriceChecker,
-        format_alert,
-    )
+    from price_tracker.core.alert import format_alert  # noqa: PLC0415
 
-    checker = PriceChecker(_config(context), db, _scraper(context))
-    alerts = await checker.check_products(products, _client(context))
+    scheduler = context.bot_data["scheduler"]
+    results = await scheduler.check_user_products_for_user(user_id=user_id)
+    alerts = [r.alert for r in results if r.alert is not None]
     updated = await db.get_active_products(user_id)
     txt_lines = [f"✅ <b>Completato</b> — {len(updated)} prodotti" + chr(10)]
     for p in updated:

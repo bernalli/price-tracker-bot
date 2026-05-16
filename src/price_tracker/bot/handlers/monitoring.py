@@ -1,9 +1,9 @@
 """Price-monitoring handlers: /check, /checkall, /refresh, /pausa, /riattiva.
 
-Ported from monolithic bot.py [item 17]. Scheduled jobs (`scheduled_check`,
-`scheduled_cleanup`) and the rich alert sender (`_send_alert`) live here for
-now — item 18 moves them into `core/scheduler.py` once the standalone
-`PriceChecker` is back online.
+Ported from monolithic bot.py [item 17]. The periodic scrape loop lives in
+``core.scheduler.Scheduler``; this module exposes the interactive Telegram
+commands and the rich :func:`_send_alert` helper used by both modes when a
+threshold fires.
 """
 
 from __future__ import annotations
@@ -20,11 +20,9 @@ from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler
 
 from price_tracker.bot.decorators import (
-    _client,
     _config,
     _convert_display,
     _db,
-    _scraper,
     restricted,
     with_locale,
 )
@@ -192,11 +190,11 @@ async def cmd_check(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     msg = await update.message.reply_text(_("🔍 Checking..."))
-    # Deferred import: PriceChecker lives in legacy `checker.py` until item 18.
-    from checker import PriceChecker  # noqa: PLC0415
-
-    checker = PriceChecker(_config(context), _db(context), _scraper(context))
-    alert = await checker.check_product(product, _client(context))
+    scheduler = context.bot_data["scheduler"]
+    result = await scheduler.check_one_product_for_user(
+        product_id=product_id, user_id=update.effective_user.id
+    )
+    alert = result.alert
 
     product = await _db(context).get_product(product_id) or {}
     name = product.get("name") or _("Unknown")
@@ -207,7 +205,7 @@ async def cmd_check(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         # Manual /check command: delete placeholder and send photo+caption when possible
         with contextlib.suppress(Exception):
             await msg.delete()
-        await _send_alert(context.bot, alert, _db(context))
+        await _send_alert(context.bot, alert, _db(context), chat_id=update.effective_user.id)
     else:
         await msg.edit_text(
             _("✅ <b>{name}</b>\n💰 Price: {price}\n📊 No significant change.").format(
@@ -230,14 +228,11 @@ async def cmd_checkall(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         return
 
     msg = await update.message.reply_text(_("🔍 Checking {n} products...").format(n=len(products)))
-    # Deferred import: PriceChecker lives in legacy `checker.py` until item 18.
-    from checker import (  # noqa: PLC0415,E501
-        PriceChecker,
-        format_alert,
-    )
+    from price_tracker.core.alert import format_alert  # noqa: PLC0415
 
-    checker = PriceChecker(_config(context), db, _scraper(context))
-    alerts = await checker.check_products(products, _client(context))
+    scheduler = context.bot_data["scheduler"]
+    results = await scheduler.check_user_products_for_user(user_id=user_id)
+    alerts = [r.alert for r in results if r.alert is not None]
 
     # Build summary of all products after check
     updated_products = await db.get_active_products(user_id)
@@ -267,7 +262,7 @@ async def cmd_checkall(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     for alert in alerts:
         try:
-            await _send_alert(context.bot, alert, _db(context))
+            await _send_alert(context.bot, alert, _db(context), chat_id=update.effective_user.id)
         except Exception as e:  # noqa: BLE001 — fall back to plain text alert
             logger.warning("failed to send rich alert: %s", e)
             await update.message.reply_text(
@@ -347,44 +342,32 @@ async def cmd_pause(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
 
 
-# ── Scheduled jobs (move to core/scheduler.py in item 18) ────────
+# ── Periodic-job helper ───────────────────────────────────────────
+# The actual periodic check is registered in ``main.scheduled_check_job`` and
+# delegates to :meth:`Scheduler.run_check_all`. The ``_send_alert`` helper
+# below is still used by the interactive commands /check and /checkall to
+# render the rich photo+caption response.
 
 
-async def scheduled_check(context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Called periodically by the job queue. Checks all products, notifies each owner."""
-    # Deferred imports to keep monitoring.py importable while
-    # `checker.PriceChecker` and `_fetch_ecb_rates` live in legacy modules.
-    from checker import PriceChecker  # noqa: PLC0415
-
-    config = context.bot_data["config"]
-    db = context.bot_data["db"]
-    scraper = context.bot_data["scraper"]
-    client = context.bot_data["http_client"]
-
-    checker = PriceChecker(config, db, scraper)
-    # Check ALL active products (across all users)
-    alerts = await checker.check_all(client)
-
-    if not alerts:
-        return
-
-    for alert in alerts:
-        try:
-            await _send_alert(context.bot, alert, db)
-        except Exception as e:  # noqa: BLE001 — telemetry only, never abort the job
-            logger.error("Failed to send alert to %s: %s", alert.owner_user_id, e)
-
-
-async def _send_alert(bot: Any, alert: Any, db: Any) -> None:
+async def _send_alert(bot: Any, alert: Any, db: Any, *, chat_id: int | None = None) -> None:
     """Send an alert with a price-history chart when possible.
 
     Falls back to plain text if chart generation fails or price data is
     insufficient (deactivation / availability alerts).
-    """
-    from checker import format_alert  # noqa: PLC0415
 
-    # Deferred import: chart module lives in legacy `chart.py` until item 18.
+    ``chat_id`` overrides the destination when supplied — used by interactive
+    handlers that hold the user's chat id locally. When omitted, falls back to
+    ``alert.owner_user_id`` (set by legacy push-mode notifiers).
+    """
+    from price_tracker.bot.handlers.history import _generate_chart  # noqa: PLC0415
+    from price_tracker.core.alert import format_alert  # noqa: PLC0415
+
     text = format_alert(alert)
+    target_chat = chat_id if chat_id is not None else getattr(alert, "owner_user_id", None)
+    if target_chat is None:
+        logger.warning("Cannot dispatch alert: no chat_id and alert has no owner_user_id")
+        return
+
     # Availability / deactivation alerts don't benefit from the chart.
     skip_chart = getattr(alert, "product_deactivated", False) or (
         getattr(alert, "availability_changed", False) and not getattr(alert, "is_available", True)
@@ -392,32 +375,25 @@ async def _send_alert(bot: Any, alert: Any, db: Any) -> None:
     png = None
     if not skip_chart:
         try:
-            from chart import (
-                render_price_history,  # noqa: PLC0415,E501
-            )
-
-            hist = await db.get_price_history(alert.product_id, limit=500)
-            png = render_price_history(
-                hist,
-                alert.product_name,
-                alert.new_price,
-                initial_price=alert.initial_price,
-                target_price=alert.target_price,
-            )
+            product = await db.get_product(alert.product_id)
+            if product is not None:
+                # ``_generate_chart`` accepts a dict-compatible record (ProductRecord
+                # implements __getitem__/get via _DictCompatMixin since v0.1.4).
+                png = await _generate_chart(db, alert.product_id, product)
         except Exception as e:  # noqa: BLE001 — fall back to plain-text alert on any failure
             logger.warning("chart build failed for product %s: %s", alert.product_id, e)
 
     if png:
         # Telegram caption limit = 1024 chars; alert text fits comfortably.
         await bot.send_photo(
-            chat_id=alert.owner_user_id,
+            chat_id=target_chat,
             photo=png,
             caption=text[:1024],
             parse_mode=ParseMode.HTML,
         )
     else:
         await bot.send_message(
-            chat_id=alert.owner_user_id,
+            chat_id=target_chat,
             text=text,
             parse_mode=ParseMode.HTML,
             disable_web_page_preview=True,
@@ -444,7 +420,6 @@ __all__ = [
     "cmd_pause",
     "cmd_reactivate",
     "cmd_refresh",
-    "scheduled_check",
     "scheduled_cleanup",
 ]
 
