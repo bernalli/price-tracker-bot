@@ -643,3 +643,49 @@ async def test_check_user_products_for_user_respects_locked_domain(
         )
         results = await scheduler.check_user_products_for_user(user_id=1)
     assert results == []
+
+
+@pytest.mark.asyncio
+async def test_check_user_products_for_user_honors_delay_override(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    """Pull-mode caller can override ``delay_between_products`` to 0 for fast
+    interactive batches without changing the gentle 5s default used by the
+    periodic job."""
+    import time  # noqa: PLC0415
+
+    repo, pid = repo_with_product
+    # Second product so the for-loop actually sleeps between iterations.
+    await repo.add_product(
+        user_id=1,
+        url="https://example.com/p/2",
+        name="Gadget",
+        domain="example.com",
+        initial_price=Decimal("50"),
+        currency="EUR",
+    )
+    stub = _StubScraper(ProductInfo(name="X", price=Decimal("40"), currency="EUR"))
+    registry = ScraperRegistry()
+    registry.register(stub)
+    notifier = AsyncMock()
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=notifier,
+                max_consecutive_errors=10,
+                # Default is gentle (5s). Test guards that the override actually
+                # short-circuits — without it this test would take >5s.
+                delay_between_products=5.0,
+            )
+        )
+        t0 = time.monotonic()
+        results = await scheduler.check_user_products_for_user(
+            user_id=1, delay_between_products=0.0
+        )
+        elapsed = time.monotonic() - t0
+    assert len(results) == 2
+    # 2 products with delay=0 must complete in well under the deps default.
+    assert elapsed < 2.0, f"override ignored: elapsed={elapsed:.2f}s with delay=0"

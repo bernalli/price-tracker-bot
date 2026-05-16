@@ -231,7 +231,11 @@ async def cmd_checkall(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     from price_tracker.core.alert import format_alert  # noqa: PLC0415
 
     scheduler = context.bot_data["scheduler"]
-    results = await scheduler.check_user_products_for_user(user_id=user_id)
+    # Interactive caller: the user is waiting live — override the polite 5s
+    # background pacing with a small per-product pause.
+    results = await scheduler.check_user_products_for_user(
+        user_id=user_id, delay_between_products=0.5
+    )
     alerts = [r.alert for r in results if r.alert is not None]
 
     # Build summary of all products after check
