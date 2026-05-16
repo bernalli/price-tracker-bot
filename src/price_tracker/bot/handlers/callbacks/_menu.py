@@ -263,7 +263,10 @@ async def _handle_menu_checkall(
     from price_tracker.core.alert import format_alert  # noqa: PLC0415
 
     scheduler = context.bot_data["scheduler"]
-    results = await scheduler.check_user_products_for_user(user_id=user_id)
+    # Interactive caller: small per-product pause (see cmd_checkall in monitoring.py).
+    results = await scheduler.check_user_products_for_user(
+        user_id=user_id, delay_between_products=0.5
+    )
     alerts = [r.alert for r in results if r.alert is not None]
     updated = await db.get_active_products(user_id)
     txt_lines = [f"✅ <b>Completato</b> — {len(updated)} prodotti" + chr(10)]
