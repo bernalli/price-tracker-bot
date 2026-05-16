@@ -147,6 +147,36 @@ async def test_add_price_history_and_query(repo: Repository):
     assert history[1].price == Decimal("9")
 
 
+async def test_price_history_record_supports_dict_access(repo: Repository):
+    """``_generate_chart`` accesses history rows as ``record["price"]`` /
+    ``record["checked_at"]``. Without the ``_DictCompatMixin`` the subscript
+    raised ``TypeError`` and the chart helper swallowed it as "Dati
+    insufficienti" — a silent regression that broke every /history call.
+    Pin the dict-compat contract here so a future refactor cannot drop the
+    mixin again.
+    """
+    pid = await repo.add_product(
+        user_id=1,
+        url="https://x/1",
+        name="A",
+        domain="x",
+        initial_price=Decimal("10"),
+        currency="EUR",
+    )
+    await repo.add_price_history(pid, Decimal("9"))
+    history = await repo.get_price_history(pid, limit=10)
+    row = history[0]
+    # Subscript path (used by _generate_chart)
+    assert row["price"] == Decimal("9")
+    assert isinstance(row["checked_at"], str)
+    # .get(key, default) path
+    assert row.get("price") == Decimal("9")
+    assert row.get("nonexistent", "default") == "default"
+    # ``in`` membership path
+    assert "price" in row
+    assert "nonexistent" not in row
+
+
 async def test_get_user_returns_none_when_missing(repo: Repository):
     """get_user on unknown user_id → None (covers line 115)."""
     assert await repo.get_user(99999) is None
