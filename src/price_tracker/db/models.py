@@ -72,7 +72,7 @@ class ProductRecord(_DictCompatMixin):
 
 
 @dataclass(frozen=True)
-class PriceHistoryRecord:
+class PriceHistoryRecord(_DictCompatMixin):
     id: int
     product_id: int
     price: Decimal
