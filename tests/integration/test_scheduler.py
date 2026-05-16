@@ -508,3 +508,138 @@ async def test_scheduler_emits_quarantine_skip_total(
         if sample.name == "price_tracker_quarantine_skip_total"
     )
     assert total == 3  # all three sample products skipped
+
+
+# ── Pull-mode methods (v0.1.6) ─────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_check_one_product_for_user_returns_alert_on_threshold(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    """Pull mode: ``check_one_product_for_user`` returns CheckResult with alert
+    set on threshold drop, and does NOT invoke the notifier (handler renders
+    its own reply).
+    """
+    from price_tracker.core.scheduler import CheckResult  # noqa: PLC0415
+
+    repo, pid = repo_with_product
+    stub = _StubScraper(ProductInfo(name="Widget", price=Decimal("80"), currency="EUR"))
+    registry = ScraperRegistry()
+    registry.register(stub)
+    notifier = AsyncMock()
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=notifier,
+                max_consecutive_errors=10,
+                delay_between_products=0.0,
+            )
+        )
+        result = await scheduler.check_one_product_for_user(product_id=pid, user_id=1)
+    assert isinstance(result, CheckResult)
+    assert result.product_id == pid
+    assert result.user_id == 1
+    assert result.alert is not None
+    assert result.alert.new_price == Decimal("80")
+    notifier.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_check_one_product_for_user_returns_none_on_no_drop(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    """No threshold cross → CheckResult.alert is None (handler renders 'no change')."""
+    repo, pid = repo_with_product
+    stub = _StubScraper(ProductInfo(name="Widget", price=Decimal("99"), currency="EUR"))
+    registry = ScraperRegistry()
+    registry.register(stub)
+    notifier = AsyncMock()
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=notifier,
+                max_consecutive_errors=10,
+                delay_between_products=0.0,
+            )
+        )
+        result = await scheduler.check_one_product_for_user(product_id=pid, user_id=1)
+    assert result.alert is None
+    notifier.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_check_user_products_for_user_accumulates_results(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    """Pull mode: ``check_user_products_for_user`` returns one CheckResult per
+    active product owned by the user. Notifier is never invoked.
+    """
+    repo, pid_first = repo_with_product
+    # Add a second product to verify accumulation
+    pid_second = await repo.add_product(
+        user_id=1,
+        url="https://example.com/p/2",
+        name="Gadget",
+        domain="example.com",
+        initial_price=Decimal("50"),
+        currency="EUR",
+    )
+    stub = _StubScraper(ProductInfo(name="Item", price=Decimal("40"), currency="EUR"))
+    registry = ScraperRegistry()
+    registry.register(stub)
+    notifier = AsyncMock()
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=notifier,
+                max_consecutive_errors=10,
+                delay_between_products=0.0,
+            )
+        )
+        results = await scheduler.check_user_products_for_user(user_id=1)
+    assert len(results) == 2
+    product_ids = {r.product_id for r in results}
+    assert product_ids == {pid_first, pid_second}
+    # Both crossed the 10% default threshold (100→40 and 50→40)
+    alerts = [r.alert for r in results if r.alert is not None]
+    assert len(alerts) == 2
+    notifier.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_check_user_products_for_user_respects_locked_domain(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    """Quarantined domain → product skipped silently, no CheckResult emitted."""
+    repo, pid = repo_with_product
+    stub = _StubScraper(ProductInfo(name="Widget", price=Decimal("80"), currency="EUR"))
+    registry = ScraperRegistry()
+    registry.register(stub)
+    notifier = AsyncMock()
+    health_mgr: HealthManager = AsyncMock(spec=HealthManager)
+    health_mgr.is_locked = lambda _d: True
+    health_mgr.is_half_open = lambda _d: False
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=notifier,
+                max_consecutive_errors=10,
+                delay_between_products=0.0,
+                health_mgr=health_mgr,
+            )
+        )
+        results = await scheduler.check_user_products_for_user(user_id=1)
+    assert results == []
