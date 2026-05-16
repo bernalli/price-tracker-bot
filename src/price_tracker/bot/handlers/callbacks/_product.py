@@ -19,10 +19,7 @@ from telegram import (
 from telegram.constants import ParseMode
 
 from price_tracker.bot.decorators import (
-    _client,
-    _config,
     _convert_display,
-    _scraper,
 )
 from price_tracker.bot.handlers._helpers import (
     _escape_html,
@@ -120,17 +117,15 @@ async def handle_check_button(
         return True
 
     await query.edit_message_text("⏳ Controllo prezzo in corso...")
-    # Deferred import — PriceChecker lives in legacy `checker.py` for now.
-    from checker import PriceChecker  # noqa: PLC0415
-
     from price_tracker.core.scraper_base import detect_currency  # noqa: PLC0415
 
-    checker = PriceChecker(_config(context), db, _scraper(context))
+    scheduler = context.bot_data["scheduler"]
     try:
-        alert = await checker.check_product(product, _client(context))
+        result = await scheduler.check_one_product_for_user(product_id=product_id, user_id=user_id)
     except Exception as e:  # noqa: BLE001 — surface error to user
         await query.edit_message_text(f"❌ Errore: {e}")
         return True
+    alert = result.alert
 
     product = await db.get_product(product_id)
     if product is None:

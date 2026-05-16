@@ -9,6 +9,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 (empty)
 
+## [0.1.6] - 2026-05-16
+
+### Fixed
+- `/check`, `/checkall`, the menu **🔍 Check all** button and the per-product
+  inline **Check now** button all crashed with `ModuleNotFoundError: No
+  module named 'checker'` (and `_send_alert` would also have crashed on
+  `chart` for the photo path). The module split left **seven** deferred imports of
+  the legacy bare module names (`from checker import PriceChecker, format_alert`
+  in `bot/handlers/monitoring.py` ×4, `bot/handlers/callbacks/_menu.py`,
+  `bot/handlers/callbacks/_product.py`; `from chart import render_price_history`
+  in `_send_alert`). The handler call sites also depended on a
+  `PriceChecker.check_product / check_products / check_all` API that no
+  longer exists in the post-refactor codebase.
+- Removed the orphan `scheduled_check` function in
+  `bot/handlers/monitoring.py` — it was a duplicate of `main.scheduled_check_job`
+  with broken imports and was never registered with the job queue.
+
+### Changed
+- `core.scheduler.Scheduler` gained a pull-mode API used by the interactive
+  Telegram handlers:
+  - `_check_product_core(product_id, ...)` — extracted from `_check_product`,
+    returns `(user_id, PriceAlert) | None` instead of pushing via notifier.
+  - `check_one_product_for_user(*, product_id, user_id)` →
+    `CheckResult` — used by `/check` and the inline **Check now** button.
+  - `check_user_products_for_user(*, user_id)` → `list[CheckResult]` — used
+    by `/checkall` and the menu **🔍 Check all** button. Respects the same
+    quarantine / half-open / per-tick pacing rules as the periodic job.
+  - New `CheckResult` dataclass (`product_id`, `user_id`,
+    `alert: PriceAlert | None`).
+- The push-mode periodic job (`Scheduler.run_check_all` /
+  `Scheduler.run_check_for_user`) is unchanged: the notifier callback still
+  receives `(user_id, formatted_text)` as before.
+- `bot/handlers/monitoring._send_alert` migrated to the new modules:
+  `format_alert` is imported from `price_tracker.core.alert` and the chart
+  is rendered through `bot/handlers/history._generate_chart`. The function
+  now accepts an explicit `chat_id` (interactive handlers pass it) and
+  falls back to `alert.owner_user_id` for legacy callers.
+
+### Added
+- `test_no_stale_imports.py` now scans for **any** legacy top-level module
+  name (`scrapers`, `checker`, `chart`, `database`, `config`, `notifier`,
+  `currency`, `health`, `utils`), not just `scrapers`. Catches the v0.1.6
+  class of bug for every legacy name in one regex.
+- `tests/integration/test_handler_import_smoke.py` literally imports every
+  module under `bot/handlers/**` and every deferred `from X import Y` inside
+  handler function bodies. A `ModuleNotFoundError` now fails CI instead of
+  crashing the bot for a real user.
+- Four scheduler tests covering the new pull-mode methods
+  (alert-on-drop, no-drop-no-alert, multi-product accumulation, locked
+  domain skip).
+
 ## [0.1.5] - 2026-05-14
 
 ### Fixed
