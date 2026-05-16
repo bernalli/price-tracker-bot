@@ -689,3 +689,101 @@ async def test_check_user_products_for_user_honors_delay_override(
     assert len(results) == 2
     # 2 products with delay=0 must complete in well under the deps default.
     assert elapsed < 2.0, f"override ignored: elapsed={elapsed:.2f}s with delay=0"
+
+
+# ── Auto-disable on max consecutive errors (v0.1.9) ─────────────────
+
+
+@pytest.mark.asyncio
+async def test_product_auto_disabled_after_max_consecutive_errors(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    """Push mode: once a product accumulates ``max_consecutive_errors`` failures,
+    the scheduler must (1) deactivate the product, (2) push a single
+    ``Tracking suspended`` notification, and (3) stop retrying it on subsequent
+    ticks (because ``list_products_for_user(only_active=True)`` filters it out).
+    """
+    repo, pid = repo_with_product
+    registry = ScraperRegistry()
+    registry.register(_RaisingScraper())
+    notifier = AsyncMock()
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=notifier,
+                max_consecutive_errors=2,
+                delay_between_products=0.0,
+            )
+        )
+        # Tick 1: increment 1 → still active, no notification yet
+        await scheduler.run_check_for_user(user_id=1)
+        p_after_1 = await repo.get_product(pid)
+        assert p_after_1 is not None
+        assert p_after_1.consecutive_errors == 1
+        assert p_after_1.is_active is True
+        notifier.assert_not_awaited()
+        # Tick 2: increment 2 → hits threshold → deactivate + notify
+        await scheduler.run_check_for_user(user_id=1)
+        p_after_2 = await repo.get_product(pid)
+        assert p_after_2 is not None
+        assert p_after_2.consecutive_errors == 2
+        assert p_after_2.is_active is False
+        notifier.assert_awaited_once()
+        # Verify notifier received the user_id and a "Tracking suspended" message
+        call_args = notifier.await_args
+        assert call_args is not None
+        sent_user_id, sent_message = call_args.args
+        assert sent_user_id == 1
+        assert "Tracking suspended" in sent_message
+        assert "2/2" in sent_message
+        # Tick 3: only_active filter hides the product → no new scrape, no new notify
+        await scheduler.run_check_for_user(user_id=1)
+        p_after_3 = await repo.get_product(pid)
+        assert p_after_3 is not None
+        assert p_after_3.consecutive_errors == 2  # unchanged
+        notifier.assert_awaited_once()  # still exactly one
+
+
+@pytest.mark.asyncio
+async def test_check_user_products_for_user_marks_disabled_on_threshold(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    """Pull mode: when a product is auto-disabled mid-batch, the returned
+    :class:`CheckResult` must carry ``disabled=True`` so the interactive
+    handler can render a visual cue in the summary. The notifier is also
+    invoked once so the user gets a persistent push record of the suspension.
+    """
+    repo, pid = repo_with_product
+    registry = ScraperRegistry()
+    registry.register(_RaisingScraper())
+    notifier = AsyncMock()
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=notifier,
+                max_consecutive_errors=2,
+                delay_between_products=0.0,
+            )
+        )
+        results_1 = await scheduler.check_user_products_for_user(user_id=1)
+        assert len(results_1) == 1
+        assert results_1[0].alert is None
+        assert results_1[0].disabled is False  # not yet at threshold
+        notifier.assert_not_awaited()
+
+        results_2 = await scheduler.check_user_products_for_user(user_id=1)
+        assert len(results_2) == 1
+        assert results_2[0].alert is None
+        assert results_2[0].disabled is True  # hit threshold this tick
+        notifier.assert_awaited_once()
+
+    p = await repo.get_product(pid)
+    assert p is not None
+    assert p.is_active is False
+    assert p.consecutive_errors == 2
