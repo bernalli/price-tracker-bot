@@ -216,13 +216,13 @@ def test_brotli_available_for_httpx_decompression() -> None:
     Nove25 scraper added in v0.1.10 silently returned ``price=None`` in
     production despite passing every offline test.
     """
-    try:
-        import brotli  # noqa: F401
-    except ImportError:
-        try:
-            import brotlicffi  # noqa: F401
-        except ImportError:
-            pytest.fail(
-                "brotli/brotlicffi not installed — httpx cannot decode "
-                "br-encoded responses (which get_headers() advertises)"
-            )
+    import importlib.util
+
+    if (
+        importlib.util.find_spec("brotli") is None
+        and importlib.util.find_spec("brotlicffi") is None
+    ):
+        pytest.fail(
+            "brotli/brotlicffi not installed — httpx cannot decode "
+            "br-encoded responses (which get_headers() advertises)"
+        )
