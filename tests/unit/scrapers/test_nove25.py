@@ -119,3 +119,168 @@ async def test_nove25_handles_http_error() -> None:
 
     assert info.price is None
     assert info.error is not None
+
+
+# ── _coerce_product (edge cases for JSON-LD shapes seen in the wild) ──
+
+
+def test_coerce_product_handles_graph_wrapper() -> None:
+    """JSON-LD payloads wrapped in `@graph` should resolve to the Product node."""
+    payload = {
+        "@context": "https://schema.org",
+        "@graph": [
+            {"@type": "BreadcrumbList", "itemListElement": []},
+            {"@type": "Product", "name": "X", "offers": {"price": "1"}},
+        ],
+    }
+    result = Nove25Scraper._coerce_product(payload)
+    assert isinstance(result, dict)
+    assert result.get("name") == "X"
+
+
+def test_coerce_product_handles_type_as_list() -> None:
+    """`@type` can be a list (e.g. ["Product", "Thing"])."""
+    payload = {"@type": ["Product", "Thing"], "offers": {"price": "1"}}
+    assert Nove25Scraper._coerce_product(payload) is payload
+
+
+def test_coerce_product_returns_none_for_non_product() -> None:
+    """Non-Product nodes (Organization, Article…) yield None."""
+    assert Nove25Scraper._coerce_product({"@type": "Organization"}) is None
+    assert Nove25Scraper._coerce_product(None) is None
+    assert Nove25Scraper._coerce_product("string") is None
+    assert Nove25Scraper._coerce_product([]) is None
+
+
+# ── JSON-LD malformed / partial branches ─────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_nove25_skips_malformed_jsonld_then_uses_opengraph() -> None:
+    """Malformed JSON-LD must not crash; scraper proceeds to OpenGraph fallback."""
+    html = """
+    <html><head>
+      <script type="application/ld+json">{not-valid-json}</script>
+      <meta property="product:price:amount" content="33.00">
+      <meta property="product:price:currency" content="EUR">
+    </head><body></body></html>
+    """
+    url = "https://www.nove25.net/it/x/malformed"
+    scraper = Nove25Scraper()
+
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).respond(200, text=html)
+        async with httpx.AsyncClient() as client:
+            info = await scraper.scrape(url, client)
+
+    assert info.price == Decimal("33.00")
+    assert info.currency == "EUR"
+
+
+@pytest.mark.asyncio
+async def test_nove25_jsonld_offers_as_list() -> None:
+    """`offers` may be a list — first element wins."""
+    html = """
+    <html><head>
+      <script type="application/ld+json">
+      {"@type":"Product","name":"Listed","offers":[{"price":"12.34","priceCurrency":"EUR"}]}
+      </script>
+    </head></html>
+    """
+    url = "https://www.nove25.net/it/x/listed"
+    scraper = Nove25Scraper()
+
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).respond(200, text=html)
+        async with httpx.AsyncClient() as client:
+            info = await scraper.scrape(url, client)
+
+    assert info.price == Decimal("12.34")
+    assert info.name == "Listed"
+
+
+@pytest.mark.asyncio
+async def test_nove25_jsonld_missing_price_falls_through_to_css() -> None:
+    """Product JSON-LD with no offers price → fall through to CSS `.product-price`."""
+    html = """
+    <html><head>
+      <script type="application/ld+json">
+      {"@type":"Product","name":"NoPrice","offers":{"sku":"X"}}
+      </script>
+    </head><body>
+      <div class="product-price">€ 17,00</div>
+    </body></html>
+    """
+    url = "https://www.nove25.net/it/x/css"
+    scraper = Nove25Scraper()
+
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).respond(200, text=html)
+        async with httpx.AsyncClient() as client:
+            info = await scraper.scrape(url, client)
+
+    assert info.price == Decimal("17.00")
+    # CSS path doesn't set a name → falls back to extract_name (no og:title, no h1)
+    assert info.currency == "EUR"
+
+
+@pytest.mark.asyncio
+async def test_nove25_opengraph_unparsable_amount_falls_through() -> None:
+    """og:price:amount with garbage content → OG path returns None, fall through."""
+    html = """
+    <html><head>
+      <meta property="product:price:amount" content="not-a-number">
+    </head><body>
+      <div class="product-price">€ 9,99</div>
+    </body></html>
+    """
+    url = "https://www.nove25.net/it/x/badog"
+    scraper = Nove25Scraper()
+
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).respond(200, text=html)
+        async with httpx.AsyncClient() as client:
+            info = await scraper.scrape(url, client)
+
+    # Fell through to CSS .product-price
+    assert info.price == Decimal("9.99")
+
+
+@pytest.mark.asyncio
+async def test_nove25_microdata_unparsable_price_returns_error() -> None:
+    """itemprop=price with non-numeric text and no other source → error."""
+    html = """
+    <html><body>
+      <span itemprop="price">free</span>
+    </body></html>
+    """
+    url = "https://www.nove25.net/it/x/badmicro"
+    scraper = Nove25Scraper()
+
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).respond(200, text=html)
+        async with httpx.AsyncClient() as client:
+            info = await scraper.scrape(url, client)
+
+    assert info.price is None
+    assert info.error is not None
+
+
+@pytest.mark.asyncio
+async def test_nove25_name_falls_back_to_h1() -> None:
+    """When og:title absent but h1 present, h1 is used as product name."""
+    html = """
+    <html><head>
+      <meta property="product:price:amount" content="50.00">
+    </head><body><h1>FALLBACK NAME H1</h1></body></html>
+    """
+    url = "https://www.nove25.net/it/x/h1name"
+    scraper = Nove25Scraper()
+
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).respond(200, text=html)
+        async with httpx.AsyncClient() as client:
+            info = await scraper.scrape(url, client)
+
+    assert info.price == Decimal("50.00")
+    assert info.name == "FALLBACK NAME H1"
