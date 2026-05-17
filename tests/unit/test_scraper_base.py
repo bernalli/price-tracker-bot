@@ -204,3 +204,25 @@ async def test_scraper_base_invokes_health_on_success():
     health_mgr = AsyncMock()
     await handle_success_in_pipeline(health_mgr=health_mgr, domain="amazon.com")
     health_mgr.record_success.assert_awaited_once_with("amazon.com")
+
+
+def test_brotli_available_for_httpx_decompression() -> None:
+    """`get_headers()` advertises ``Accept-Encoding: gzip, deflate, br`` and
+    httpx silently delivers garbage when a server responds with brotli and
+    neither ``brotli`` nor ``brotlicffi`` is installed.
+
+    Regression: nove25.net serves brotli by default; without this package,
+    its 436 KB JSON-LD+OG page came back as a 55 KB skeleton, so the
+    Nove25 scraper added in v0.1.10 silently returned ``price=None`` in
+    production despite passing every offline test.
+    """
+    import importlib.util
+
+    if (
+        importlib.util.find_spec("brotli") is None
+        and importlib.util.find_spec("brotlicffi") is None
+    ):
+        pytest.fail(
+            "brotli/brotlicffi not installed — httpx cannot decode "
+            "br-encoded responses (which get_headers() advertises)"
+        )
