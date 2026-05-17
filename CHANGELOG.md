@@ -9,6 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 (empty)
 
+## [0.1.10] - 2026-05-17
+
+### Added
+- New built-in scraper `nove25` (priority 75) for `nove25.net`.
+  Reads price/currency from static HTML via a 4-step fallback chain:
+  JSON-LD `Product.offers.price` → OpenGraph `product:price:amount` →
+  microdata `itemprop=price` → CSS `.product-price`. No JavaScript
+  required (the previous `playwright_fallback` path was failing on this
+  site even though the price is fully present in the initial document).
+
+### Fixed
+- Shopify scraper: validate the **final URL** after redirects and reject
+  any response whose path is not `/products/<slug>`. Closes two classes
+  of historical bug:
+  - dead product URLs that 301-redirected to the store home let the HTML
+    fallback parse a random price from the home and silently save the
+    home's `og:title` as the product name (e.g. `Filling Pieces®
+    Official Webshop`);
+  - collection URLs (`/collections/<slug>?page=N`) on a
+    `KNOWN_SHOPIFY_DOMAIN` passed `can_handle` and then leaked a price
+    from one of the listed products plus the collection's `og:title`
+    (e.g. `Men`) as a "product".
+
+### Internal
+- `_fetch_shopify_html` renamed to `_fetch_shopify_response` to expose
+  `response.url` for the post-redirect validation. Call sites updated.
+
 ## [0.1.8] - 2026-05-17
 
 ### Fixed
