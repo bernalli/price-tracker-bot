@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 (empty)
 
+## [0.1.11] - 2026-05-17
+
+### Fixed
+- Add `brotli>=1.1.0` as a runtime dependency. `get_headers()`
+  advertises `Accept-Encoding: gzip, deflate, br` to mimic a real
+  browser, but httpx will only decompress brotli responses when
+  `brotli` (or `brotlicffi`) is importable. Without it, sites that
+  serve brotli by default (e.g. `nove25.net`) returned a 55 KB
+  skeleton instead of the 436 KB full document, silently stripping the
+  JSON-LD `Product` block, the `og:price:amount` meta tag and the
+  `itemprop="price"` microdata. Result: the new Nove25 scraper shipped
+  in v0.1.10 returned `price=None` against the real site even though
+  every offline fixture-based test passed. Regression test
+  `test_brotli_available_for_httpx_decompression` fails CI if the
+  dependency disappears again.
+
 ## [0.1.10] - 2026-05-17
 
 ### Added
