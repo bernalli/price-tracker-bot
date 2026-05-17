@@ -27,13 +27,26 @@ from price_tracker.core.scraper_base import (
 logger = logging.getLogger(__name__)
 
 
+_SHOPIFY_PRODUCT_PATH_RE = re.compile(r"(?:^|/)products/[a-z0-9\-_]+", re.IGNORECASE)
+
+
 @with_retry(RetryConfig(max_attempts=3, base_wait=2.0, max_wait=10.0))
-async def _fetch_shopify_html(url: str, client: httpx.AsyncClient) -> str:
+async def _fetch_shopify_response(url: str, client: httpx.AsyncClient) -> httpx.Response:
     """Single GET attempt with browser headers. Tenacity handles retries."""
     headers = get_headers()
     response = await client.get(url, headers=headers, follow_redirects=True)
     response.raise_for_status()
-    return response.text
+    return response
+
+
+def _is_product_path(url: httpx.URL | str) -> bool:
+    """True when the URL path contains a Shopify-style /products/<slug> segment.
+
+    Used to reject home/collection redirects that would otherwise let the HTML
+    fallback parse a random price out of an unrelated page.
+    """
+    path = url.path if isinstance(url, httpx.URL) else urlparse(str(url)).path
+    return bool(_SHOPIFY_PRODUCT_PATH_RE.search(path))
 
 
 @with_retry(RetryConfig(max_attempts=3, base_wait=2.0, max_wait=10.0))
@@ -122,10 +135,18 @@ class ShopifyScraper(AbstractScraper):
     @staticmethod
     async def _fetch_html(url: str, client: httpx.AsyncClient) -> str | None:
         try:
-            return await _fetch_shopify_html(url, client)
+            response = await _fetch_shopify_response(url, client)
         except (httpx.HTTPError, ValueError) as e:
             logger.debug("Shopify HTML fetch failed for %s: %s", url[:60], e)
             return None
+        if not _is_product_path(response.url):
+            logger.info(
+                "Shopify rejecting non-product redirect: %s -> %s",
+                url[:80],
+                str(response.url)[:80],
+            )
+            return None
+        return response.text
 
     def _build_json_url(self, url: str) -> str | None:
         """Convert product URL to JSON API endpoint."""
