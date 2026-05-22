@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 (empty)
 
+## [0.1.12] - 2026-05-22
+
+### Fixed
+- Wire HealthManager pipeline into `Scheduler` (`_check_product_core` /
+  `_scrape_one` / `check_user_products_for_user`). Previously the scheduler
+  only *consumed* HealthManager state via `is_locked`/`is_half_open` but
+  never *produced* it via `record_success`/`record_block`, so the
+  `scraper_health` table stayed empty forever and auto-quarantine
+  (Feature B / Bug #1 xteink 429 loop) never engaged in production.
+  Each successful scrape now calls `handle_success_in_pipeline`; each
+  `BlockEvent` calls `handle_block_in_pipeline`. Both skip the call when
+  the eTLD+1 cannot be resolved (`domain == "unknown"`). New integration
+  tests under `tests/integration/test_health_pipeline_integration.py`
+  guard the contract against future regressions.
+
 ## [0.1.11] - 2026-05-17
 
 ### Fixed

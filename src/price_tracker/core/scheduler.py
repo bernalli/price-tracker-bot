@@ -32,6 +32,10 @@ from price_tracker.core.alert import (
 from price_tracker.core.exceptions import BlockEvent, ParseError
 from price_tracker.core.health import HealthManager
 from price_tracker.core.outlier import is_outlier
+from price_tracker.core.scraper_base import (
+    handle_block_in_pipeline,
+    handle_success_in_pipeline,
+)
 from price_tracker.core.url_utils import extract_etld_plus_one
 
 if TYPE_CHECKING:
@@ -127,6 +131,8 @@ class Scheduler:
                 metrics.price_check_total.labels(
                     scraper=scraper_name, domain=domain, status="block"
                 ).inc()
+            if domain != "unknown":
+                await handle_block_in_pipeline(e, health_mgr=self.deps.health_mgr, domain=domain)
             await self._record_failure_and_maybe_disable(
                 product, scraper_name=scraper_name, domain=domain, reason="block"
             )
@@ -342,6 +348,8 @@ class Scheduler:
         await self.deps.repo.update_price(p.id, info.price)
         await self.deps.repo.add_price_history(p.id, info.price)
         await self.deps.repo.reset_errors(p.id)
+        if domain != "unknown":
+            await handle_success_in_pipeline(health_mgr=self.deps.health_mgr, domain=domain)
         if metrics is not None:
             metrics.price_check_total.labels(
                 scraper=scraper_name, domain=domain, status="success"
@@ -461,6 +469,10 @@ class Scheduler:
                     metrics.price_check_total.labels(
                         scraper=scraper_name, domain=domain, status="block"
                     ).inc()
+                if domain != "unknown":
+                    await handle_block_in_pipeline(
+                        e, health_mgr=self.deps.health_mgr, domain=domain
+                    )
                 disabled = await self._record_failure_and_maybe_disable(
                     product, scraper_name=scraper_name, domain=domain, reason="block"
                 )
