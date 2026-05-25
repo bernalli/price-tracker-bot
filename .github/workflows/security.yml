@@ -14,6 +14,13 @@ permissions:
 jobs:
   gitleaks:
     runs-on: ubuntu-latest
+    # gitleaks-action fetches the PR commits via the API on pull_request events
+    # (GET /repos/.../pulls/{n}/commits); that needs pull-requests:read on top of
+    # the workflow-level contents:read. Job-level permissions replace the inherited
+    # set, so both scopes are listed here.
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -59,13 +66,8 @@ jobs:
           scan-args: |-
             --lockfile=./uv.lock
 
-  dependency-review:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Dependency review
-        uses: actions/dependency-review-action@v4
-        with:
-          fail-on-severity: high
+  # NOTE: actions/dependency-review-action was removed — it requires GitHub
+  # Advanced Security (Dependency Review API), unavailable on this private repo,
+  # so it always failed with "Resource not accessible by integration" on PRs.
+  # Dependency CVE scanning is already covered by the osv-scanner job above
+  # (scans uv.lock).
