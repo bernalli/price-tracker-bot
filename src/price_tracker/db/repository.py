@@ -354,6 +354,21 @@ class Repository:
         )
         await self._conn.commit()
 
+    async def record_alert_sent(self, product_id: int, price: Decimal) -> None:
+        """Persist that a price-drop alert was pushed for ``product_id`` at ``price``.
+
+        Anchors the anti-flap dedup used by the scheduler push path:
+        ``last_notified_at`` is the cooldown reference and ``pending_alert_price``
+        records the alerted price (the episode low-watermark used to detect a new
+        low). ``pending_alert_at`` mirrors the timestamp for observability.
+        """
+        await self._conn.execute(
+            "UPDATE products SET last_notified_at = datetime('now'), "
+            "pending_alert_price = ?, pending_alert_at = datetime('now') WHERE id = ?",
+            (_dec_str(price), product_id),
+        )
+        await self._conn.commit()
+
     # ── Price history ──────────────────────────────────────────
 
     async def add_price_history(self, product_id: int, price: Decimal) -> None:
