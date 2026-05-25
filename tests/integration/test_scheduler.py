@@ -787,3 +787,165 @@ async def test_check_user_products_for_user_marks_disabled_on_threshold(
     assert p is not None
     assert p.is_active is False
     assert p.consecutive_errors == 2
+
+
+# ── Anti-flap notification dedup (push path) ────────────────────────
+
+
+class _SequenceScraper(AbstractScraper):
+    """Scraper that returns a scripted sequence of prices, one per scrape call.
+
+    Used to reproduce an oscillating ("flapping") price that repeatedly crosses
+    the alert threshold on each downswing.
+    """
+
+    name = "sequence"
+    priority = 100
+
+    def __init__(self, prices: list[Decimal]) -> None:
+        self._prices = prices
+        self.calls = 0
+
+    def can_handle(self, url: str) -> bool:
+        return True
+
+    async def scrape(self, url: str, client: httpx.AsyncClient) -> ProductInfo:
+        price = self._prices[min(self.calls, len(self._prices) - 1)]
+        self.calls += 1
+        return ProductInfo(name="Widget", price=price, currency="EUR")
+
+
+@pytest.mark.asyncio
+async def test_scheduler_suppresses_duplicate_alert_on_flapping_price(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    """A price oscillating across the threshold must notify ONCE, not on every
+    downswing.
+
+    Reproduces the production bug where product 15 (regular 423 ↔ sale 370.8,
+    -12.3%) fired ~20 notifications because the push path had no anti-flap
+    dedup. Initial price 100, threshold 10%; the scraped price flaps 80 ↔ 100
+    over five ticks (downswings on ticks 1, 3, 5). Only the first downswing
+    should reach the user.
+    """
+    repo, pid = repo_with_product
+    stub = _SequenceScraper(
+        [Decimal("80"), Decimal("100"), Decimal("80"), Decimal("100"), Decimal("80")]
+    )
+    registry = ScraperRegistry()
+    registry.register(stub)
+    notifier = AsyncMock()
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=notifier,
+                max_consecutive_errors=10,
+                delay_between_products=0.0,
+                notification_cooldown_hours=24,
+            )
+        )
+        for _ in range(5):
+            await scheduler.run_check_for_user(user_id=1)
+    notifier.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_scheduler_any_drop_notifies_on_small_decrease(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    """An ``any_drop`` product (sentinel threshold) must notify on any decrease,
+    even one far below a percentage threshold. Guards the regression where
+    ``crosses_threshold`` ignored ``any_drop`` and these products never alerted.
+    """
+    repo, pid = repo_with_product
+    await repo.set_threshold(pid, "any_drop", Decimal("0"))
+    stub = _SequenceScraper([Decimal("99")])  # 1% drop from initial 100
+    registry = ScraperRegistry()
+    registry.register(stub)
+    notifier = AsyncMock()
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=notifier,
+                max_consecutive_errors=10,
+                delay_between_products=0.0,
+                notification_cooldown_hours=24,
+            )
+        )
+        await scheduler.run_check_for_user(user_id=1)
+    notifier.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_scheduler_renotifies_on_new_low(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    """A genuinely lower price (new low) overrides the cooldown and re-notifies
+    — a better deal is worth interrupting for, even within the cooldown window.
+    """
+    repo, pid = repo_with_product
+    stub = _SequenceScraper(
+        [Decimal("80"), Decimal("100"), Decimal("70")]  # alert, recover, new low
+    )
+    registry = ScraperRegistry()
+    registry.register(stub)
+    notifier = AsyncMock()
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=notifier,
+                max_consecutive_errors=10,
+                delay_between_products=0.0,
+                notification_cooldown_hours=24,
+            )
+        )
+        for _ in range(3):
+            await scheduler.run_check_for_user(user_id=1)
+    assert notifier.await_count == 2  # first drop (80) + new low (70)
+
+
+@pytest.mark.asyncio
+async def test_scheduler_renotifies_after_cooldown_elapsed(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    """A flapping price that re-crosses the threshold after the cooldown window
+    has elapsed re-notifies once — the cooldown caps an oscillating price at one
+    alert per window rather than silencing it forever.
+    """
+    repo, pid = repo_with_product
+    stub = _SequenceScraper([Decimal("80"), Decimal("100"), Decimal("80")])
+    registry = ScraperRegistry()
+    registry.register(stub)
+    notifier = AsyncMock()
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=notifier,
+                max_consecutive_errors=10,
+                delay_between_products=0.0,
+                notification_cooldown_hours=24,
+            )
+        )
+        await scheduler.run_check_for_user(user_id=1)  # tick 1: 80 → alert
+        notifier.assert_awaited_once()
+        # Simulate the cooldown having elapsed (last alert 25h ago).
+        await repo._conn.execute(  # noqa: SLF001
+            "UPDATE products SET last_notified_at = datetime('now', '-25 hours') WHERE id = ?",
+            (pid,),
+        )
+        await repo._conn.commit()  # noqa: SLF001
+        await scheduler.run_check_for_user(user_id=1)  # tick 2: 100 → recover, no cross
+        await scheduler.run_check_for_user(user_id=1)  # tick 3: 80 → re-cross, cooldown elapsed
+    assert notifier.await_count == 2

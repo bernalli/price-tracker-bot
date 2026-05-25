@@ -72,6 +72,32 @@ def test_crosses_threshold_target_price_above():
     )
 
 
+def test_crosses_threshold_any_drop_triggers_on_any_decrease():
+    """`any_drop` (sentinel, threshold_value 0) must fire on any price decrease."""
+    assert (
+        crosses_threshold(
+            old=Decimal("100"),
+            new=Decimal("99.99"),
+            threshold_type="any_drop",
+            threshold_value=Decimal("0"),
+        )
+        is True
+    )
+
+
+def test_crosses_threshold_any_drop_no_trigger_when_not_lower():
+    """`any_drop` must NOT fire when the price is unchanged or higher."""
+    assert (
+        crosses_threshold(
+            old=Decimal("100"),
+            new=Decimal("100"),
+            threshold_type="any_drop",
+            threshold_value=Decimal("0"),
+        )
+        is False
+    )
+
+
 def test_crosses_threshold_no_drop():
     assert (
         crosses_threshold(

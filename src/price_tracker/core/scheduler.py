@@ -18,6 +18,7 @@ import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, cast
 
 import httpx
@@ -39,6 +40,8 @@ from price_tracker.core.scraper_base import (
 from price_tracker.core.url_utils import extract_etld_plus_one
 
 if TYPE_CHECKING:
+    from decimal import Decimal
+
     from price_tracker.core.registry import ScraperRegistry
     from price_tracker.db.models import ProductRecord
     from price_tracker.db.repository import Repository
@@ -48,6 +51,23 @@ logger = logging.getLogger(__name__)
 
 # Notifier coroutine: receives a user_id and a formatted alert message.
 NotifierFn = Callable[[int, str], Awaitable[None]]
+
+
+def _parse_db_timestamp(value: str) -> datetime:
+    """Parse a DB timestamp (SQLite ``datetime('now')`` or ISO-8601) as UTC-aware.
+
+    Stored notification timestamps come from ``datetime('now')``
+    (``"YYYY-MM-DD HH:MM:SS"``, naive UTC); legacy rows migrated from v2 may use
+    ISO-8601 with a trailing ``Z``. Both are normalized to a UTC-aware datetime.
+    """
+    normalized = value.strip().replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        parsed = datetime.strptime(normalized, "%Y-%m-%d %H:%M:%S")  # noqa: DTZ007
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed
 
 
 def _no_op_health_mgr() -> HealthManager:
@@ -83,6 +103,7 @@ class SchedulerDeps:
     notifier: NotifierFn
     max_consecutive_errors: int = 10
     delay_between_products: float = 5.0
+    notification_cooldown_hours: int = 24
     health_mgr: HealthManager = field(default_factory=_no_op_health_mgr)
     metrics: MetricsRegistry | None = None
 
@@ -396,8 +417,39 @@ class Scheduler:
         if outcome is None:
             return
         user_id, alert, _disabled = outcome
-        if alert is not None:
-            await self.deps.notifier(user_id, format_alert(alert))
+        if alert is None:
+            return
+        # Anti-flap dedup: an oscillating price re-crosses the threshold on every
+        # downswing. Suppress the repeat push so the user is notified once per
+        # drop episode (re-notifying only on a new low or after the cooldown).
+        product = await self.deps.repo.get_product(alert.product_id)
+        if product is not None and self._is_duplicate_alert(product, new_price=alert.new_price):
+            if self.deps.metrics is not None:
+                self.deps.metrics.notification_skipped_total.labels(reason="cooldown").inc()
+            return
+        await self.deps.notifier(user_id, format_alert(alert))
+        await self.deps.repo.record_alert_sent(alert.product_id, alert.new_price)
+
+    def _is_duplicate_alert(
+        self, product: ProductRecord, *, new_price: Decimal, now: datetime | None = None
+    ) -> bool:
+        """Return ``True`` when a price-drop alert is a repeat to be suppressed.
+
+        A repeat is suppressed only when all of the following hold: a prior alert
+        exists for the product (``last_notified_at`` and ``pending_alert_price``
+        set), the new price is **not** a new low (``new_price >= pending_alert_price``),
+        and the cooldown window has not yet elapsed. The first alert of an
+        episode, a genuinely lower price (better deal), and an alert past the
+        cooldown window are always allowed through.
+        """
+        last_at = product.last_notified_at
+        last_price = product.pending_alert_price
+        if last_at is None or last_price is None:
+            return False
+        if new_price < last_price:
+            return False
+        elapsed = (now or datetime.now(UTC)) - _parse_db_timestamp(last_at)
+        return elapsed < timedelta(hours=self.deps.notification_cooldown_hours)
 
     async def check_one_product_for_user(self, *, product_id: int, user_id: int) -> CheckResult:
         """Pull-mode single-product check used by ``/check`` and the per-product
