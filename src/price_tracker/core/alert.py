@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Literal
 
-ThresholdType = Literal["percentage", "absolute", "target"]
+ThresholdType = Literal["percentage", "absolute", "target", "any_drop"]
 
 
 _CURRENCY_SYMBOLS: dict[str, str] = {
@@ -58,6 +58,8 @@ def crosses_threshold(
         return False
     drop = old - new
 
+    if threshold_type == "any_drop":
+        return True  # sentinel: any decrease (new < old, guaranteed above) triggers
     if threshold_type == "percentage":
         if old == 0:
             return False
