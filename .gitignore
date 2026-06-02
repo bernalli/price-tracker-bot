@@ -53,3 +53,6 @@ messages.pot
 # OS
 .DS_Store
 Thumbs.db
+
+# (internal cleanup note (details not published))
+docs/notes/
