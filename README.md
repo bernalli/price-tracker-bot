@@ -7,8 +7,6 @@
 
 Self-hosted Telegram bot for multi-site price tracking with auto-quarantine, structured observability, fine-grained notification preferences, and a plugin architecture for adding new sites.
 
-> **Status**: pre-public release. Badges go live after the first GitHub push.
-
 ## Why this bot
 
 | Feature                          | price-tracker-bot | Camelcamelcamel | Keepa | Pricepulse |
