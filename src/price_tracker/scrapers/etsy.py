@@ -22,6 +22,7 @@ from price_tracker.core.scraper_base import (
     detect_currency,
     get_headers,
     parse_price,
+    select_jsonld_offer,
 )
 
 if TYPE_CHECKING:
@@ -132,20 +133,13 @@ class EtsyScraper(AbstractScraper):
                 type_str = " ".join(type_val) if isinstance(type_val, list) else str(type_val)
                 if "Product" not in type_str:
                     continue
-                offers = item.get("offers")
-                if isinstance(offers, list):
-                    offers = offers[0] if offers else None
-                if not isinstance(offers, dict):
+                selected = select_jsonld_offer(item.get("offers"))
+                if selected is None:
                     continue
-                price_raw = offers.get("price") or offers.get("lowPrice")
-                if price_raw is None:
-                    continue
-                parsed = parse_price(str(price_raw))
-                if parsed is None:
-                    continue
+                parsed, currency = selected
                 result: StrategyResult = {
                     "price": parsed,
-                    "currency": str(offers.get("priceCurrency", "USD")),
+                    "currency": currency or "USD",
                 }
                 name = item.get("name")
                 if isinstance(name, str) and name:
