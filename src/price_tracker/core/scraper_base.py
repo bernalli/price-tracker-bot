@@ -183,6 +183,64 @@ def detect_currency(text: str | None) -> str | None:
     return None
 
 
+# ── JSON-LD offer selection (shared across scrapers) ─────────────
+
+_FINANCING_RE = re.compile(
+    r"/mo\b|/month|per month|a month|al mese|/mese|monthly|installment|financ|rate ", re.IGNORECASE
+)
+
+
+def _is_financing_offer(offer: dict[str, object]) -> bool:
+    """True when an Offer represents a recurring/monthly financing entry, not the price."""
+    spec = offer.get("priceSpecification")
+    specs = spec if isinstance(spec, list) else [spec]
+    for s in specs:
+        if isinstance(s, dict) and (
+            "UnitPrice" in str(s.get("@type", ""))
+            or s.get("billingDuration")
+            or s.get("billingIncrement")
+            or s.get("referenceQuantity")
+        ):
+            return True
+    blob = " ".join(str(offer.get(k, "")) for k in ("name", "description", "category"))
+    return bool(_FINANCING_RE.search(blob))
+
+
+def select_jsonld_offer(offers: object) -> tuple[Decimal, str | None] | None:
+    """Pick the representative (price, ISO-currency) from a JSON-LD ``offers`` value.
+
+    Robust against the common precision traps: takes neither ``offers[0]`` blindly
+    (cheapest variant / used / marketplace entry) nor an ``AggregateOffer``'s
+    ``lowPrice`` ("from" price). Filters recurring/financing offers, then returns
+    the HIGHEST remaining single ``price`` — the main buy price. The currency is
+    normalised to ISO-4217 (a bare symbol like ``€`` becomes ``EUR``; an unknown
+    value becomes ``None`` rather than leaking verbatim).
+    """
+    if isinstance(offers, dict):
+        offer_list: list[dict[str, object]] = [offers]
+    elif isinstance(offers, list):
+        offer_list = [o for o in offers if isinstance(o, dict)]
+    else:
+        return None
+
+    best: tuple[Decimal, str | None] | None = None
+    for offer in offer_list:
+        if _is_financing_offer(offer):
+            continue
+        # Only a concrete single `price`; never AggregateOffer low/highPrice.
+        price_raw = offer.get("price")
+        if price_raw is None:
+            continue
+        parsed = parse_price(str(price_raw))
+        if parsed is None:
+            continue
+        raw_currency = offer.get("priceCurrency")
+        currency = detect_currency(str(raw_currency)) if raw_currency else None
+        if best is None or parsed > best[0]:
+            best = (parsed, currency)
+    return best
+
+
 # ── ProductInfo & AbstractScraper ────────────────────────────────
 
 
