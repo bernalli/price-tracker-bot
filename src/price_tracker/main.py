@@ -148,10 +148,20 @@ async def amain() -> None:
     register_handlers(application)
 
     if application.job_queue:
+        # Prefer a persisted interval (/intervallo writes bot_config) over the
+        # env default, so a runtime change survives a restart.
+        interval_minutes = config.check_interval_minutes
+        cursor = await db_conn.execute(
+            "SELECT value FROM bot_config WHERE key = ?", ("check_interval_minutes",)
+        )
+        row = await cursor.fetchone()
+        if row and row[0] and str(row[0]).isdigit():
+            interval_minutes = max(5, int(row[0]))
         application.job_queue.run_repeating(
             scheduled_check_job,
-            interval=config.check_interval_minutes * 60,
+            interval=interval_minutes * 60,
             first=60,
+            name="periodic_check",
         )
 
     await application.initialize()
