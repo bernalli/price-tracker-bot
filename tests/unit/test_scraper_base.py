@@ -56,6 +56,41 @@ def test_parse_price_returns_decimal(raw, expected):
     assert parse_price(raw) == expected
 
 
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        # EU dot-thousands with NO decimal part (was parsed 1000x too low) — bug #3
+        ("1.299", Decimal("1299")),
+        ("2.499", Decimal("2499")),
+        ("12.999", Decimal("12999")),
+        ("1.234", Decimal("1234")),
+        ("1.299 €", Decimal("1299")),
+        # EU multi-dot integer thousands (was returning None) — bug #22
+        ("1.234.567", Decimal("1234567")),
+        ("12.345.678", Decimal("12345678")),
+        # US multi-comma integer thousands (was mis-parsed to 1234.567) — bug #23
+        ("1,234,567", Decimal("1234567")),
+        ("$12,345,678", Decimal("12345678")),
+        # German "no cents" notation 349,- / 1.299,- — bug #44
+        ("349,-", Decimal("349")),
+        ("799,-", Decimal("799")),
+        ("1.299,-", Decimal("1299")),
+        # Non-ASCII currency labels not stripped before → no price — bug #50
+        ("1 299,00 zł", Decimal("1299.00")),
+        ("129,00 zł", Decimal("129.00")),
+        ("1 299 Kč", Decimal("1299")),
+        ("1 299,00 kr", Decimal("1299.00")),
+        # Leading-zero decimals must stay decimals, NOT become thousands
+        ("0.999", Decimal("0.999")),
+        ("0,99", Decimal("0.99")),
+        # Space/thin-space thousands (French/Polish) with decimal
+        ("1 234,56", Decimal("1234.56")),
+    ],
+)
+def test_parse_price_international_formats(raw, expected):
+    assert parse_price(raw) == expected
+
+
 def test_parse_price_returns_none_on_garbage():
     assert parse_price("") is None
     assert parse_price("not a price") is None
