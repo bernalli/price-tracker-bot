@@ -61,6 +61,11 @@ _PRODUCT_COLS = (
 
 
 def _row_to_product(row: tuple[Any, ...]) -> ProductRecord:
+    # Default only on NULL — a stored 0 (e.g. 0% threshold / any_drop) is valid
+    # and must not be coalesced away by a falsy `or` (#24).
+    threshold_value = _dec(row[11])
+    if threshold_value is None:
+        threshold_value = Decimal("10")
     return ProductRecord(
         id=row[0],
         user_id=row[1],
@@ -73,7 +78,7 @@ def _row_to_product(row: tuple[Any, ...]) -> ProductRecord:
         highest_price=_dec(row[8]),
         target_price=_dec(row[9]),
         threshold_type=row[10],
-        threshold_value=_dec(row[11]) or Decimal("10"),
+        threshold_value=threshold_value,
         is_active=bool(row[12]),
         is_available=bool(row[13]),
         consecutive_errors=int(row[14]),

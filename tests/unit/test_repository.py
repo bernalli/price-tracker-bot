@@ -61,6 +61,25 @@ async def test_get_product_round_trip(repo: Repository):
     assert p.currency == "EUR"
 
 
+async def test_threshold_value_zero_is_preserved(repo: Repository):
+    """A stored threshold_value of 0 must not be coalesced to the 10 default (#24)."""
+    pid = await repo.add_product(
+        user_id=1,
+        url="https://example.com/p/1",
+        name="Widget",
+        domain="example.com",
+        initial_price=Decimal("100"),
+        currency="EUR",
+    )
+    await repo._conn.execute(  # noqa: SLF001
+        "UPDATE products SET threshold_value = '0' WHERE id = ?", (pid,)
+    )
+    await repo._conn.commit()  # noqa: SLF001
+    p = await repo.get_product(pid)
+    assert p is not None
+    assert p.threshold_value == Decimal("0")
+
+
 async def test_list_products_for_user(repo: Repository):
     await repo.add_product(
         user_id=1,
