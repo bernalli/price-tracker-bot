@@ -22,6 +22,7 @@ from price_tracker.core.scraper_base import (
     ProductInfo,
     detect_block_event,
     detect_currency,
+    find_microdata_price_el,
     get_headers,
     parse_price,
     select_jsonld_offer,
@@ -136,7 +137,7 @@ class WalmartScraper(AbstractScraper):
         return None
 
     def _try_microdata(self, soup: BeautifulSoup) -> StrategyResult | None:
-        price_el = soup.find(attrs={"itemprop": "price"})
+        price_el = find_microdata_price_el(soup)
         if not isinstance(price_el, Tag):
             return None
         raw = price_el.get("content") or price_el.get_text(strip=True)

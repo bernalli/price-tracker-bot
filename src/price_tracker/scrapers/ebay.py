@@ -21,6 +21,7 @@ from price_tracker.core.retry_policy import RetryConfig, with_retry
 from price_tracker.core.scraper_base import (
     AbstractScraper,
     ProductInfo,
+    find_microdata_price_el,
     get_headers,
     parse_price,
 )
@@ -136,7 +137,7 @@ class EbayScraper(AbstractScraper):
         return None
 
     def _try_microdata(self, soup: BeautifulSoup, info: ProductInfo) -> None:
-        price_el = soup.find(attrs={"itemprop": "price"})
+        price_el = find_microdata_price_el(soup)
         if price_el:
             val = price_el.get("content") or price_el.get_text(strip=True)
             parsed = parse_price(str(val))

@@ -23,6 +23,7 @@ from price_tracker.core.retry_policy import RetryConfig, with_retry
 from price_tracker.core.scraper_base import (
     AbstractScraper,
     ProductInfo,
+    find_microdata_price_el,
     get_headers,
     parse_price,
 )
@@ -164,7 +165,7 @@ class Nove25Scraper(AbstractScraper):
 
     @staticmethod
     def _parse_microdata(soup: BeautifulSoup) -> ProductInfo | None:
-        price_tag = soup.find(attrs={"itemprop": "price"})
+        price_tag = find_microdata_price_el(soup)
         if not isinstance(price_tag, Tag):
             return None
         raw = _tag_attr(price_tag, "content") or price_tag.get_text(strip=True) or None
