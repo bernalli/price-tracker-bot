@@ -18,6 +18,7 @@ from price_tracker.core.scraper_base import (
     detect_block_event,
     detect_currency,
     parse_price,
+    select_jsonld_offer,
 )
 
 if TYPE_CHECKING:
@@ -105,6 +106,49 @@ def test_parse_price_international_formats(raw, expected):
 )
 def test_parse_price_rejects_split_span_concatenation(raw):
     assert parse_price(raw) is None
+
+
+def test_select_jsonld_offer_skips_financing_and_takes_highest():
+    offers = [
+        {"price": "1299.00", "priceCurrency": "USD"},
+        {"price": "54.08", "priceCurrency": "USD", "name": "$54.08/mo. financing"},
+        {"price": "1199.00", "priceCurrency": "USD"},
+    ]
+    result = select_jsonld_offer(offers)
+    assert result == (Decimal("1299.00"), "USD")
+
+
+def test_select_jsonld_offer_filters_unit_price_specification():
+    offers = [
+        {
+            "price": "50.00",
+            "priceCurrency": "EUR",
+            "priceSpecification": {"@type": "UnitPriceSpecification", "billingDuration": 24},
+        }
+    ]
+    assert select_jsonld_offer(offers) is None
+
+
+def test_select_jsonld_offer_ignores_aggregate_low_price():
+    # AggregateOffer with no concrete `price` → must NOT leak the 'from' lowPrice.
+    offers = {"@type": "AggregateOffer", "lowPrice": "999", "highPrice": "1299"}
+    assert select_jsonld_offer(offers) is None
+
+
+def test_select_jsonld_offer_uses_aggregate_price_when_present():
+    offers = {"@type": "AggregateOffer", "price": "1099", "lowPrice": "999"}
+    assert select_jsonld_offer(offers) == (Decimal("1099"), None)
+
+
+def test_select_jsonld_offer_normalizes_symbol_currency():
+    offers = {"price": "29,99", "priceCurrency": "€"}
+    assert select_jsonld_offer(offers) == (Decimal("29.99"), "EUR")
+
+
+def test_select_jsonld_offer_handles_empty_and_invalid():
+    assert select_jsonld_offer([]) is None
+    assert select_jsonld_offer(None) is None
+    assert select_jsonld_offer("nope") is None
 
 
 def test_parse_price_returns_none_on_garbage():
