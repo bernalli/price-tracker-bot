@@ -19,6 +19,7 @@ from price_tracker.core.retry_policy import RetryConfig, with_retry
 from price_tracker.core.scraper_base import (
     AbstractScraper,
     ProductInfo,
+    detect_block_event,
     detect_currency,
     get_headers,
     parse_price,
@@ -139,6 +140,8 @@ class ShopifyScraper(AbstractScraper):
         except (httpx.HTTPError, ValueError) as e:
             logger.debug("Shopify HTML fetch failed for %s: %s", url[:60], e)
             return None
+        # Surface WAF/CAPTCHA challenge bodies as a BlockEvent → domain quarantine (#7).
+        detect_block_event(status_code=response.status_code, body=response.text, url=url)
         if not _is_product_path(response.url):
             logger.info(
                 "Shopify rejecting non-product redirect: %s -> %s",
