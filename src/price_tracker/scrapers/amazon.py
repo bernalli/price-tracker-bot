@@ -62,6 +62,7 @@ async def _fetch_with_fresh_client(url: str) -> str | None:
 async def _fetch_via_curl_cffi(url: str) -> str | None:
     """Last-resort fetch with Chrome JA3/TLS impersonation. Returns None on any failure."""
     try:
+        from curl_cffi import CurlError
         from curl_cffi.requests import AsyncSession
     except ImportError:
         logger.debug("curl_cffi not available for Amazon fallback")
@@ -73,7 +74,7 @@ async def _fetch_via_curl_cffi(url: str) -> str | None:
                 logger.info("curl_cffi fallback succeeded for %s", url[:60])
                 return resp.text
             logger.warning("curl_cffi fallback got %s for %s", resp.status_code, url[:60])
-    except (httpx.HTTPError, ValueError, OSError) as e:
+    except (CurlError, httpx.HTTPError, ValueError, OSError) as e:
         logger.warning("curl_cffi fallback failed for %s: %s", url[:60], e)
     return None
 
