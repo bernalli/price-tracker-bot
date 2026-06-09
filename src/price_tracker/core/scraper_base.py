@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 
 if TYPE_CHECKING:
     import httpx
+    from bs4 import BeautifulSoup, Tag
 
     from price_tracker.core.health import HealthManager
 
@@ -239,6 +240,26 @@ def select_jsonld_offer(offers: object) -> tuple[Decimal, str | None] | None:
         if best is None or parsed > best[0]:
             best = (parsed, currency)
     return best
+
+
+def find_microdata_price_el(soup: BeautifulSoup) -> Tag | None:
+    """Return the listing's microdata price element, preferring an Offer/Product scope.
+
+    A bare ``soup.find(itemprop="price")`` often returns a related/recommended item's
+    price (carousels appearing before the main listing). Prefer a price nested under
+    ``itemprop="offers"`` or an Offer/Product ``itemscope`` before falling back to the
+    first occurrence (#34/#49).
+    """
+    from bs4 import Tag  # noqa: PLC0415 — keep bs4 off the module import path
+
+    for scope_sel in ('[itemprop="offers"]', '[itemtype*="Offer"]', '[itemtype*="Product"]'):
+        scope = soup.select_one(scope_sel)
+        if scope is not None:
+            el = scope.find(attrs={"itemprop": "price"})
+            if isinstance(el, Tag):
+                return el
+    el = soup.find(attrs={"itemprop": "price"})
+    return el if isinstance(el, Tag) else None
 
 
 # ── ProductInfo & AbstractScraper ────────────────────────────────
