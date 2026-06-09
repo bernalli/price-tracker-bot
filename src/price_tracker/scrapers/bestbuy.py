@@ -95,15 +95,17 @@ class BestbuyScraper(AbstractScraper):
         ):
             try:
                 result = strategy_fn(soup)
-                if result and result.get("price") is not None and info.price is None:
+                if not result:
+                    continue
+                if result.get("price") is not None and info.price is None:
                     info.price = result["price"]
-                    if result.get("currency") and info.currency is None:
-                        info.currency = result["currency"]
-                    if result.get("name") and info.name is None:
-                        info.name = result["name"]
                     logger.debug("bestbuy price via %s: %s", strategy_name, info.price)
-                    if info.price is not None and info.name is not None:
-                        break
+                if result.get("currency") and info.currency is None:
+                    info.currency = result["currency"]
+                if result.get("name") and info.name is None:
+                    info.name = result["name"]
+                if info.price is not None and info.name is not None:
+                    break
             except (ValueError, KeyError, AttributeError) as e:
                 logger.debug("bestbuy strategy %s error: %s", strategy_name, e)
                 continue
