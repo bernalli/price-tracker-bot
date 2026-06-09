@@ -169,6 +169,12 @@ class ShopifyScraper(AbstractScraper):
             return f"{parsed.scheme}://{parsed.netloc}{product_path}.json"
         return None
 
+    @staticmethod
+    def _extract_requested_handle(json_url: str) -> str | None:
+        """Return the product handle from a /products/<handle>.json URL, if present."""
+        match = re.search(r"/products/([a-z0-9\-_]+)\.json", json_url, re.IGNORECASE)
+        return match.group(1) if match else None
+
     async def _try_json_api(self, json_url: str, client: httpx.AsyncClient) -> ProductInfo | None:
         """Fetch product data from Shopify JSON API."""
         try:
@@ -189,6 +195,23 @@ class ShopifyScraper(AbstractScraper):
             product = data.get("product", {})
             if not product:
                 logger.warning("Shopify JSON API: no 'product' key in response")
+                return None
+
+            # Guard against a dead-slug redirect landing on a DIFFERENT product:
+            # the JSON path follows redirects, so verify the returned handle still
+            # matches the one we requested (the HTML path guards via _is_product_path).
+            requested_handle = self._extract_requested_handle(json_url)
+            returned_handle = product.get("handle")
+            if (
+                requested_handle
+                and returned_handle
+                and requested_handle.lower() != str(returned_handle).lower()
+            ):
+                logger.info(
+                    "Shopify JSON redirected to a different product (%s != %s) — rejecting",
+                    requested_handle,
+                    returned_handle,
+                )
                 return None
 
             name = product.get("title")
