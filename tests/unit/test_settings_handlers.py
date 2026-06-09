@@ -30,6 +30,13 @@ def _build_update(user_id: int, args: list[str]):
 def _build_context(args: list[str], **bot_data):
     context = MagicMock()
     context.args = args
+    # @restricted now gates these handlers via db.is_user_allowed; provision an
+    # allowed user by default so the handler body still runs under test.
+    if "db" not in bot_data:
+        db = AsyncMock()
+        db.is_user_allowed = AsyncMock(return_value=True)
+        db.update_user_info = AsyncMock()
+        bot_data["db"] = db
     context.bot_data = bot_data
     return context
 
