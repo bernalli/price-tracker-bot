@@ -59,64 +59,89 @@ def get_headers(extra: dict[str, str] | None = None) -> dict[str, str]:
 
 # ── Price parsing (returns Decimal, never float) ──────────────────
 
-_CURRENCY_LABEL_RE = re.compile(r"(EUR|USD|GBP|CHF|JPY|SEK|NOK|DKK|PLN|CZK)", re.IGNORECASE)
-_NUMERIC_NOISE_RE = re.compile(r"[€$£¥₹\s ​]")
+# Trailing German "no cents" marker: "349,-" / "1.299,-" → keep the separator, drop the dash.
+_NO_CENTS_RE = re.compile(r"([.,])\s*-\s*$")
+# Anything that is NOT a digit or a thousands/decimal separator. Strips currency symbols
+# and labels (€, $, zł, Kč, kr, EUR, ...), spaces, thin/zero-width spaces and stray chars.
+_NON_NUMERIC_RE = re.compile(r"[^\d.,']")
+
+
+def _to_decimal(s: str) -> Decimal | None:
+    try:
+        return Decimal(s)
+    except (InvalidOperation, ValueError):
+        return None
+
+
+def _is_thousands_grouping(groups: list[str]) -> bool:
+    """True if `groups` form a valid thousands grouping: first 1–3 digits, the rest exactly 3."""
+    if len(groups) < 2 or not groups[0] or len(groups[0]) > 3 or not groups[0].isdigit():
+        return False
+    return all(len(g) == 3 and g.isdigit() for g in groups[1:])
 
 
 def parse_price(price_str: str | None) -> Decimal | None:
     """Parse a price string in arbitrary international format into Decimal.
 
-    Handles european comma decimal, US comma thousands, swiss apostrophe,
-    multi-comma european thousands, and currency labels mixed in.
+    Handles EU comma-decimal, US comma-thousands, Swiss apostrophe, EU/US thousands
+    with NO decimal part, German "349,-" notation, and currency labels/symbols mixed
+    in (€, $, zł, Kč, kr, ISO codes).
+
+    Disambiguation: a lone separator followed by exactly three digits (e.g. "1.299"
+    or "1,234") is read as thousands grouping, NOT a three-decimal fraction — retail
+    prices never carry three decimals, while EU dot-thousands integers ("1.299 €" =
+    1299) are extremely common. (Trade-off: 3-decimal niche prices like fuel/crypto
+    are out of scope for this e-commerce tracker.)
     """
     if not price_str:
         return None
 
-    cleaned = _NUMERIC_NOISE_RE.sub("", price_str)
-    cleaned = _CURRENCY_LABEL_RE.sub("", cleaned).strip()
+    # "349,-" → "349," so the integer survives the rest of the pipeline.
+    s = _NO_CENTS_RE.sub(r"\1", price_str)
+    cleaned = _NON_NUMERIC_RE.sub("", s)
+    cleaned = cleaned.replace("'", "")  # Swiss apostrophe is always a thousands sep.
     if not cleaned:
         return None
 
-    # Swiss apostrophe = thousands sep
-    if "'" in cleaned:
-        cleaned = cleaned.replace("'", "")
+    has_dot = "." in cleaned
+    has_comma = "," in cleaned
 
-    last_dot = cleaned.rfind(".")
-    last_comma = cleaned.rfind(",")
+    # No separators → plain integer.
+    if not has_dot and not has_comma:
+        return _to_decimal(cleaned)
 
-    if last_dot == -1 and last_comma == -1:
-        # Integer
-        try:
-            return Decimal(cleaned)
-        except (InvalidOperation, ValueError):
-            return None
+    # Both separators present → whichever appears LAST is the decimal point.
+    if has_dot and has_comma:
+        if cleaned.rfind(".") > cleaned.rfind(","):
+            # US: dot decimal, comma thousands.
+            return _to_decimal(cleaned.replace(",", ""))
+        # EU: comma decimal, dot thousands.
+        last = cleaned.rfind(",")
+        whole = cleaned[:last].replace(".", "").replace(",", "")
+        return _to_decimal(whole + "." + cleaned[last + 1 :])
 
-    if last_dot > last_comma:
-        # US-style: dot is decimal, comma is thousands
-        cleaned = cleaned.replace(",", "")
-    elif last_comma > last_dot:
-        # Comma after dot (or no dot): could be euro decimal or US thousands
-        if last_dot == -1 and cleaned.count(",") == 1:
-            # Single comma, no dot — disambiguate by digits after the comma:
-            #   3 digits after → US thousands (e.g. "$1,234")
-            #   1–2 digits after → euro decimal (e.g. "29,99")
-            #   else → treat as decimal
-            after = cleaned[last_comma + 1 :]
-            if len(after) == 3 and after.isdigit():
-                cleaned = cleaned.replace(",", "")
-            else:
-                cleaned = cleaned.replace(",", ".")
-        else:
-            # Euro-style with thousands: comma is decimal, dot is thousands
-            cleaned = cleaned.replace(".", "")
-            # Replace ONLY the rightmost comma with a decimal point; drop earlier ones
-            last = cleaned.rfind(",")
-            cleaned = cleaned[:last].replace(",", "") + "." + cleaned[last + 1 :]
+    # Exactly one kind of separator present.
+    sep = "." if has_dot else ","
+    if cleaned.count(sep) == 1:
+        before, after = cleaned.split(sep)
+        # Lone separator + exactly 3 trailing digits + non-zero leading group → thousands.
+        if len(after) == 3 and after.isdigit() and before[:1] not in ("", "0"):
+            return _to_decimal(before + after)
+        return _to_decimal(before + "." + after)
 
-    try:
-        return Decimal(cleaned)
-    except (InvalidOperation, ValueError):
-        return None
+    # Multiple separators of the same kind.
+    groups = cleaned.split(sep)
+    if sep == ",":
+        # US thousands only if every group lines up ("1,234,567"); otherwise the last
+        # comma is an EU decimal ("5,250,00" → 5250.00).
+        if _is_thousands_grouping(groups):
+            return _to_decimal(cleaned.replace(",", ""))
+        last = cleaned.rfind(",")
+        return _to_decimal(cleaned[:last].replace(",", "") + "." + cleaned[last + 1 :])
+    # Multiple dots: only valid as EU thousands grouping, else malformed ("1.2.3.4").
+    if _is_thousands_grouping(groups):
+        return _to_decimal(cleaned.replace(".", ""))
+    return None
 
 
 # ── Currency detection ───────────────────────────────────────────
