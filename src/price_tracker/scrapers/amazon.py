@@ -17,6 +17,7 @@ from typing import ClassVar
 import httpx
 from bs4 import BeautifulSoup
 
+from price_tracker.core.exceptions import CaptchaDetected, HTTPBlockStatus
 from price_tracker.core.retry_policy import RetryConfig, with_retry
 from price_tracker.core.scraper_base import (
     USER_AGENTS,
@@ -100,14 +101,19 @@ async def _fetch_via_scrapling(url: str) -> str | None:
 async def _fetch_amazon_page(
     url: str, client: httpx.AsyncClient, extra_headers: dict[str, str] | None = None
 ) -> str | None:
-    """Fetch Amazon page with retry + fallback chain. Always returns str | None."""
+    """Fetch Amazon page with retry + fallback chain.
+
+    Returns the page HTML, or None on a non-block failure. On a hard block
+    (HTTP 403/429) that survives every fallback, raises :class:`HTTPBlockStatus`
+    so the scheduler quarantines the domain instead of recording a generic error.
+    """
     html: str | None = None
-    got_403 = False
+    block_status: int | None = None
     try:
         html = await _fetch_amazon_html(url, client, extra_headers)
     except httpx.HTTPStatusError as e:
-        if e.response.status_code == 403:
-            got_403 = True
+        if e.response.status_code in (403, 429):
+            block_status = e.response.status_code
         logger.warning("HTTP %s for %s after retries", e.response.status_code, url[:60])
     except (httpx.HTTPError, ValueError) as e:
         logger.warning("Fetch error for %s: %s", url[:60], e)
@@ -123,13 +129,15 @@ async def _fetch_amazon_page(
     if html:
         return html
 
-    if got_403:
+    if block_status is not None:
         html = await _fetch_via_curl_cffi(url)
         if html:
             return html
         html = await _fetch_via_scrapling(url)
         if html:
             return html
+        # Hard block survived every fallback → signal quarantine to the scheduler.
+        raise HTTPBlockStatus(status=block_status, url=url)
 
     return None
 
@@ -200,9 +208,10 @@ class AmazonScraper(AbstractScraper):
         soup = BeautifulSoup(html, "lxml")
         info = ProductInfo()
 
-        # Check for captcha page
+        # Check for captcha page — raise so the scheduler quarantines the domain
+        # instead of recording a generic "price not found" error.
         if soup.find("form", action=re.compile(r"validateCaptcha")):
-            return ProductInfo(error="Amazon ha richiesto un CAPTCHA — riprovo più tardi")
+            raise CaptchaDetected(marker="amazon-validateCaptcha", url=url)
 
         # Check for "currently unavailable"
         unavail = soup.find(id="availability")

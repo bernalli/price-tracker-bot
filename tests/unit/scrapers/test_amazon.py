@@ -122,7 +122,9 @@ async def test_amazon_handles_404(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.mark.asyncio
 async def test_amazon_handles_429_after_retries(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Retryable 429 → after retries exhausted, return ProductInfo with error."""
+    """Retryable 429 → after retries+fallbacks exhausted, raise HTTPBlockStatus (quarantine)."""
+    from price_tracker.core.exceptions import HTTPBlockStatus
+
     scraper = AmazonScraper()
 
     # Bypass the retry decorator by replacing the module-level fetcher.
@@ -148,10 +150,8 @@ async def test_amazon_handles_429_after_retries(monkeypatch: pytest.MonkeyPatch)
     with respx.mock(assert_all_called=False) as router:
         router.get("https://www.amazon.it/dp/RATE").respond(429)
         async with httpx.AsyncClient() as client:
-            info = await scraper.scrape("https://www.amazon.it/dp/RATE", client)
-
-    assert info.price is None
-    assert info.error is not None
+            with pytest.raises(HTTPBlockStatus):
+                await scraper.scrape("https://www.amazon.it/dp/RATE", client)
 
 
 @pytest.mark.asyncio
