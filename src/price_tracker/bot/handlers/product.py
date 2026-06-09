@@ -334,7 +334,17 @@ async def _add_product(
             "💡 Verifica che il link sia corretto o segnala il sito non supportato."
         )
         return
-    result = await scraper_for_url.scrape(url, client)
+    from price_tracker.core.exceptions import BlockEvent  # noqa: PLC0415
+
+    try:
+        result = await scraper_for_url.scrape(url, client)
+    except BlockEvent:
+        logger.info("Add blocked by site protection for %s", url[:60])
+        await msg.edit_text(
+            "🛡 Il sito sta bloccando le richieste automatiche in questo momento.\n"
+            "Riprova tra qualche minuto."
+        )
+        return
 
     if result.price is None:
         error_msg = result.error or "Prezzo non trovato"
