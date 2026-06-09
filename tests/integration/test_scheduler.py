@@ -949,3 +949,110 @@ async def test_scheduler_renotifies_after_cooldown_elapsed(
         await scheduler.run_check_for_user(user_id=1)  # tick 2: 100 → recover, no cross
         await scheduler.run_check_for_user(user_id=1)  # tick 3: 80 → re-cross, cooldown elapsed
     assert notifier.await_count == 2
+
+
+class _SelectiveScraper(AbstractScraper):
+    """Raises an *unexpected* exception for one URL, returns a good price otherwise."""
+
+    name = "selective"
+    priority = 100
+
+    def __init__(self, raise_on_url: str, good: ProductInfo) -> None:
+        self._raise_on_url = raise_on_url
+        self._good = good
+        self.calls = 0
+
+    def can_handle(self, url: str) -> bool:
+        return True
+
+    async def scrape(self, url: str, client: httpx.AsyncClient) -> ProductInfo:
+        self.calls += 1
+        if url == self._raise_on_url:
+            # Not in the scheduler's caught set (Block/Parse/httpx/ValueError/KeyError).
+            raise RuntimeError("unexpected scraper explosion")
+        return self._good
+
+
+@pytest.mark.asyncio
+async def test_run_tick_survives_unexpected_scraper_exception(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    """One product raising an unexpected exception must not abort the whole sweep.
+
+    Regression for bug #2: a non-(Block/Parse/httpx/ValueError/KeyError) error
+    (e.g. sqlite 'database is locked', RuntimeError) escaped ``_scrape_one`` and
+    the un-guarded ``_run_tick`` loop, silently skipping every later product.
+    """
+    repo, pid1 = repo_with_product
+    pid2 = await repo.add_product(
+        user_id=1,
+        url="https://example.com/p/2",
+        name="Widget2",
+        domain="example.com",
+        initial_price=Decimal("100"),
+        currency="EUR",
+    )
+    scraper = _SelectiveScraper(
+        raise_on_url="https://example.com/p/1",
+        good=ProductInfo(name="Widget2", price=Decimal("80"), currency="EUR"),
+    )
+    registry = ScraperRegistry()
+    registry.register(scraper)
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=AsyncMock(),
+                max_consecutive_errors=10,
+                delay_between_products=0.0,
+            )
+        )
+        await scheduler.run_check_for_user(user_id=1)  # must NOT raise
+    p2 = await repo.get_product(pid2)
+    assert p2 is not None
+    assert p2.current_price == Decimal("80")  # later product still processed
+    p1 = await repo.get_product(pid1)
+    assert p1 is not None
+    assert p1.consecutive_errors == 1  # crashing product's failure recorded
+
+
+@pytest.mark.asyncio
+async def test_checkall_survives_unexpected_exception(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    """Pull-mode /checkall must not abort mid-list on an unexpected exception (#2)."""
+    repo, _pid1 = repo_with_product
+    pid2 = await repo.add_product(
+        user_id=1,
+        url="https://example.com/p/2",
+        name="Widget2",
+        domain="example.com",
+        initial_price=Decimal("100"),
+        currency="EUR",
+    )
+    scraper = _SelectiveScraper(
+        raise_on_url="https://example.com/p/1",
+        good=ProductInfo(name="Widget2", price=Decimal("80"), currency="EUR"),
+    )
+    registry = ScraperRegistry()
+    registry.register(scraper)
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=AsyncMock(),
+                max_consecutive_errors=10,
+                delay_between_products=0.0,
+            )
+        )
+        results = await scheduler.check_user_products_for_user(
+            user_id=1, delay_between_products=0.0
+        )
+    assert len(results) == 2  # both products produced a result; sweep did not abort
+    p2 = await repo.get_product(pid2)
+    assert p2 is not None
+    assert p2.current_price == Decimal("80")
