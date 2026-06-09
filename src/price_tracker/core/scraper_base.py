@@ -124,6 +124,11 @@ def parse_price(price_str: str | None) -> Decimal | None:
     sep = "." if has_dot else ","
     if cleaned.count(sep) == 1:
         before, after = cleaned.split(sep)
+        # >3 trailing digits is neither a 2-decimal fraction nor a 3-digit thousands
+        # group — typically a split-span concatenation ("$1,299"+"99" → "1,29999").
+        # Reject so the scraper can fall back to a reliable source (bug #12).
+        if len(after) > 3:
+            return None
         # Lone separator + exactly 3 trailing digits + non-zero leading group → thousands.
         if len(after) == 3 and after.isdigit() and before[:1] not in ("", "0"):
             return _to_decimal(before + after)
