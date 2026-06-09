@@ -56,9 +56,8 @@ async def cmd_set_interval(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await update.message.reply_text(_("❌ L'intervallo massimo è 7 giorni."))
         return
 
-    config = _config(context)
-    config.check_interval_minutes = minutes
     await _db(context).set_config("check_interval_minutes", str(minutes))
+    _reschedule_periodic_check(context, minutes)
 
     if minutes >= 60:
         hours = minutes / 60
@@ -72,6 +71,24 @@ async def cmd_set_interval(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 
 # ── Notification preference commands ──────────────────────────────
+
+
+def _reschedule_periodic_check(context: ContextTypes.DEFAULT_TYPE, minutes: int) -> None:
+    """Reschedule the periodic price-check job so a new interval takes effect live.
+
+    Config is frozen and the job interval is fixed at startup, so a runtime change
+    must remove the existing job and re-add it at the new cadence.
+    """
+    job_queue = getattr(context, "job_queue", None)
+    if job_queue is None:
+        return
+    from price_tracker.main import scheduled_check_job  # noqa: PLC0415 — avoid import cycle
+
+    for job in job_queue.get_jobs_by_name("periodic_check"):
+        job.schedule_removal()
+    job_queue.run_repeating(
+        scheduled_check_job, interval=minutes * 60, first=minutes * 60, name="periodic_check"
+    )
 
 
 def _valid_hhmm(value: str) -> bool:
