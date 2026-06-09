@@ -153,6 +153,66 @@ def test_every_db_kwarg_exists_on_repository_signature() -> None:
         )
 
 
+def _collect_all_db_calls() -> list[tuple[Path, int, str, bool, tuple[str, ...]]]:
+    """Return [(file, line, method, has_kwargs_spread, kwarg_names)] for every db.<method>()."""
+    found: list[tuple[Path, int, str, bool, tuple[str, ...]]] = []
+    for path in BOT_DIR.rglob("*.py"):
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except SyntaxError:
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            if not (
+                isinstance(func, ast.Attribute)
+                and isinstance(func.value, ast.Name)
+                and func.value.id == "db"
+            ):
+                continue
+            has_spread = any(kw.arg is None for kw in node.keywords)
+            kwargs = tuple(kw.arg for kw in node.keywords if kw.arg is not None)
+            found.append((path, node.lineno, func.attr, has_spread, kwargs))
+    return found
+
+
+def test_required_keyword_only_args_supplied_at_call_sites() -> None:
+    """Each required keyword-only Repository param must be supplied at the call site.
+
+    Catches the regression class behind bug #5: ``delete_product(self, id, *, user_id)``
+    called as ``db.delete_product(id)`` raises ``TypeError`` only when a real user runs
+    the delete flow. The existing kwarg test only checks that *supplied* kwargs are
+    valid; it cannot see a *missing* required keyword-only argument.
+    """
+    missing: list[str] = []
+    for path, lineno, method, has_spread, kwargs in _collect_all_db_calls():
+        fn = getattr(Repository, method, None)
+        if fn is None or has_spread:
+            continue
+        try:
+            params = inspect.signature(fn).parameters
+        except (TypeError, ValueError):
+            continue
+        for name, param in params.items():
+            if (
+                name != "self"
+                and param.kind is inspect.Parameter.KEYWORD_ONLY
+                and param.default is inspect.Parameter.empty
+                and name not in kwargs
+            ):
+                missing.append(
+                    f"  - {path.name}:{lineno} db.{method}(...) missing required "
+                    f"keyword-only arg '{name}'"
+                )
+
+    if missing:
+        pytest.fail(
+            f"{len(missing)} db.<method>() call sites omit a required keyword-only "
+            f"argument (guaranteed TypeError at runtime):\n" + "\n".join(missing)
+        )
+
+
 def test_product_record_supports_dict_api() -> None:
     """``ProductRecord`` must behave dict-like for legacy handler code."""
     record = ProductRecord(
