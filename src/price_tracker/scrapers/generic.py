@@ -29,6 +29,7 @@ from price_tracker.core.retry_policy import RetryConfig, with_retry
 from price_tracker.core.scraper_base import (
     AbstractScraper,
     ProductInfo,
+    detect_block_event,
     detect_currency,
     get_headers,
     parse_price,
@@ -171,6 +172,10 @@ class GenericScraper(AbstractScraper):
                 # Keep curl_cffi result (if any)
         if not html:
             return ProductInfo(error="Impossibile caricare la pagina")
+
+        # Surface WAF/CAPTCHA challenge bodies (often served with HTTP 200) as a
+        # BlockEvent so the scheduler quarantines the domain (#7).
+        detect_block_event(status_code=200, body=html, url=url)
 
         soup = BeautifulSoup(html, "lxml")
         info = ProductInfo()
