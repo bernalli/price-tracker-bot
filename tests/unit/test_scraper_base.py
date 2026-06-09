@@ -91,6 +91,22 @@ def test_parse_price_international_formats(raw, expected):
     assert parse_price(raw) == expected
 
 
+@pytest.mark.parametrize(
+    "raw",
+    [
+        # Split-span React concatenation "$1,299" + "99" → "$1,29999": a single
+        # separator with >3 trailing digits is neither a 2-decimal nor a 3-digit
+        # thousands group → reject so the scraper falls back to JSON-LD (bug #12).
+        "$1,29999",
+        "1,29999",
+        "1.29999",
+        "1234,5678",
+    ],
+)
+def test_parse_price_rejects_split_span_concatenation(raw):
+    assert parse_price(raw) is None
+
+
 def test_parse_price_returns_none_on_garbage():
     assert parse_price("") is None
     assert parse_price("not a price") is None
