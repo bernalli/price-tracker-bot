@@ -47,7 +47,7 @@ async def handle_delete_flow(
         product = await _get_user_product(context, product_id, user_id)
         if product:
             name = product.get("name") or "Sconosciuto"
-            await db.delete_product(product_id)
+            await db.delete_product(product_id, user_id=user_id)
             await query.edit_message_text(
                 f"🗑 Eliminato definitivamente: <b>{_escape_html(name[:80])}</b>",
                 parse_mode=ParseMode.HTML,
@@ -92,7 +92,7 @@ async def handle_delete_flow(
         products = await db.get_active_products(user_id)
         count = 0
         for p in products:
-            await db.delete_product(p["id"])
+            await db.delete_product(p["id"], user_id=user_id)
             count += 1
         await query.edit_message_text(
             f"🗑 <b>Eliminati {count} prodotti</b> e tutto il loro storico.",
