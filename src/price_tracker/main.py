@@ -108,6 +108,27 @@ async def scheduled_check_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     await scheduler.run_check_all()
 
 
+# How often the digest-flush job runs, and the fallback cadence for users with no
+# stored digest_interval_minutes preference.
+DIGEST_FLUSH_INTERVAL_SECONDS = 60
+DIGEST_FLUSH_DEFAULT_MINUTES = 60
+
+
+async def digest_flush_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Flush due per-user notification digests (Feature D).
+
+    Without this scheduled job, enqueued digest entries were never delivered
+    except via manual /digest_now — they piled up indefinitely (#25).
+    """
+    digest_service = context.bot_data.get("digest_service")
+    if digest_service is None:
+        return
+    try:
+        await digest_service.flush_due(interval_minutes=DIGEST_FLUSH_DEFAULT_MINUTES)
+    except Exception:  # noqa: BLE001 — a flush failure must not kill the job
+        log.exception("digest_flush_job failed")
+
+
 async def amain() -> None:
     config = Config.from_env()
     configure_logging(level=config.log_level)
@@ -162,6 +183,12 @@ async def amain() -> None:
             interval=interval_minutes * 60,
             first=60,
             name="periodic_check",
+        )
+        application.job_queue.run_repeating(
+            digest_flush_job,
+            interval=DIGEST_FLUSH_INTERVAL_SECONDS,
+            first=DIGEST_FLUSH_INTERVAL_SECONDS,
+            name="digest_flush",
         )
 
     await application.initialize()

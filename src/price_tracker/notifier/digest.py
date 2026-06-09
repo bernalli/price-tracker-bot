@@ -85,12 +85,22 @@ class DigestService:
         return len(entries)
 
     async def flush_due(self, *, interval_minutes: int) -> int:
-        """Iterate users with pending entries; flush those whose oldest exceeds interval."""
+        """Flush each user whose oldest pending entry exceeds their digest interval.
+
+        Per-user ``digest_interval_minutes`` is honoured; ``interval_minutes`` is the
+        fallback when a user has no stored preference.
+        """
         flushed_total = 0
         users = await self._repo.list_users_with_pending_digest()
         now = datetime.now(UTC)
         for user_id, oldest_enqueued_at in users:
+            prefs = await self._repo.get_notification_prefs(user_id=user_id, product_id=None)
+            threshold = (
+                prefs.digest_interval_minutes
+                if prefs is not None and prefs.digest_interval_minutes
+                else interval_minutes
+            )
             age = (now - oldest_enqueued_at).total_seconds() / 60.0
-            if age >= interval_minutes:
+            if age >= threshold:
                 flushed_total += await self.flush_user(user_id=user_id)
         return flushed_total
