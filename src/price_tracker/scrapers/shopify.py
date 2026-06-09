@@ -222,6 +222,7 @@ class ShopifyScraper(AbstractScraper):
     async def _fetch_json_via_curl_cffi(json_url: str) -> dict | None:
         """Fallback for 403 from Shopify JSON endpoint."""
         try:
+            from curl_cffi import CurlError
             from curl_cffi.requests import AsyncSession
         except ImportError:
             return None
@@ -230,7 +231,7 @@ class ShopifyScraper(AbstractScraper):
                 resp = await session.get(json_url, allow_redirects=True, timeout=30)
                 if resp.status_code == 200:
                     return resp.json()
-        except (ValueError, OSError, AttributeError) as e:
+        except (CurlError, ValueError, OSError, AttributeError) as e:
             logger.debug("Shopify curl_cffi fallback failed: %s", e)
         return None
 

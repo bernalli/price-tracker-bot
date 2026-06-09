@@ -63,6 +63,7 @@ async def _fetch_generic_html(url: str, client: httpx.AsyncClient) -> str:
 async def _fetch_with_curl_cffi(url: str) -> str | None:
     """Fetch via curl_cffi with Chrome JA3/TLS impersonation. Returns None on failure."""
     try:
+        from curl_cffi import CurlError
         from curl_cffi.requests import AsyncSession
     except ImportError:
         return None
@@ -72,7 +73,7 @@ async def _fetch_with_curl_cffi(url: str) -> str | None:
             if 200 <= resp.status_code < 300 and resp.text:
                 return resp.text
             logger.debug("curl_cffi got %s for %s", resp.status_code, url[:60])
-    except (ValueError, OSError, AttributeError) as e:
+    except (CurlError, ValueError, OSError, AttributeError) as e:
         logger.debug("curl_cffi fetch failed for %s: %s", url[:60], e)
     return None
 
