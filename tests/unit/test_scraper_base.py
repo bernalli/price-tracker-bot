@@ -6,6 +6,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 
 import pytest
+from bs4 import BeautifulSoup
 
 from price_tracker.core.exceptions import (
     CaptchaDetected,
@@ -17,6 +18,7 @@ from price_tracker.core.scraper_base import (
     ProductInfo,
     detect_block_event,
     detect_currency,
+    find_microdata_price_el,
     parse_price,
     select_jsonld_offer,
 )
@@ -149,6 +151,24 @@ def test_select_jsonld_offer_handles_empty_and_invalid():
     assert select_jsonld_offer([]) is None
     assert select_jsonld_offer(None) is None
     assert select_jsonld_offer("nope") is None
+
+
+def test_find_microdata_price_el_prefers_offer_scope():
+    html = (
+        '<div class="recs"><span itemprop="price" content="9.99">9.99</span></div>'
+        '<div itemprop="offers"><span itemprop="price" content="199.99">199.99</span></div>'
+    )
+    el = find_microdata_price_el(BeautifulSoup(html, "lxml"))
+    assert el is not None
+    assert el.get("content") == "199.99"
+
+
+def test_find_microdata_price_el_falls_back_to_first():
+    el = find_microdata_price_el(
+        BeautifulSoup('<span itemprop="price" content="50.00">50.00</span>', "lxml")
+    )
+    assert el is not None
+    assert el.get("content") == "50.00"
 
 
 def test_parse_price_returns_none_on_garbage():
