@@ -32,3 +32,37 @@ def test_google_jsonld_skips_financing_offer() -> None:
     result = GoogleStoreScraper()._try_jsonld(BeautifulSoup(_HTML, "lxml"))
     assert result is not None
     assert result["price"] == Decimal("1299.00")
+
+
+import pytest  # noqa: E402
+
+from price_tracker.scrapers.bestbuy import BestbuyScraper  # noqa: E402
+from price_tracker.scrapers.etsy import EtsyScraper  # noqa: E402
+from price_tracker.scrapers.mediamarkt import MediamarktScraper  # noqa: E402
+from price_tracker.scrapers.newegg import NeweggScraper  # noqa: E402
+from price_tracker.scrapers.otto import OttoScraper  # noqa: E402
+from price_tracker.scrapers.target import TargetScraper  # noqa: E402
+from price_tracker.scrapers.walmart import WalmartScraper  # noqa: E402
+from price_tracker.scrapers.wayfair import WayfairScraper  # noqa: E402
+from price_tracker.scrapers.zalando import ZalandoScraper  # noqa: E402
+
+
+@pytest.mark.parametrize(
+    "scraper_cls",
+    [
+        TargetScraper,
+        NeweggScraper,
+        EtsyScraper,
+        OttoScraper,
+        BestbuyScraper,
+        WayfairScraper,
+        WalmartScraper,
+        MediamarktScraper,
+        ZalandoScraper,
+    ],
+    ids=lambda c: c.__name__,
+)
+def test_scraper_jsonld_skips_financing_offer(scraper_cls) -> None:
+    result = scraper_cls()._try_jsonld(BeautifulSoup(_HTML, "lxml"))
+    assert result is not None
+    assert result["price"] == Decimal("1299.00")
