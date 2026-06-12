@@ -567,58 +567,44 @@ class Repository:
 
     async def upsert_notification_prefs(self, prefs: NotificationPrefs) -> None:
         if prefs.product_id is None:
-            # NULL-product upsert needs partial-uniqueness emulation:
-            # SQLite treats NULLs as distinct in PK, so ON CONFLICT does not fire.
-            existing = await self._conn.execute(
-                "SELECT 1 FROM notification_prefs WHERE user_id = ? AND product_id IS NULL",
-                (prefs.user_id,),
+            # The (user_id, product_id) PK never fires for NULL product_id
+            # because SQLite treats NULLs as distinct; the partial unique
+            # index ux_notification_prefs_global (migration 011) makes a
+            # single atomic upsert possible — the previous SELECT-then-INSERT
+            # emulation raced under concurrency and duplicated rows (#58).
+            await self._conn.execute(
+                """
+                INSERT INTO notification_prefs (
+                    user_id, product_id, mute, mute_until, digest_mode,
+                    digest_interval_minutes, quiet_hours_start, quiet_hours_end,
+                    throttle_per_hour, timezone, throttle_state_json
+                )
+                VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(user_id) WHERE product_id IS NULL DO UPDATE SET
+                    mute = excluded.mute,
+                    mute_until = excluded.mute_until,
+                    digest_mode = excluded.digest_mode,
+                    digest_interval_minutes = excluded.digest_interval_minutes,
+                    quiet_hours_start = excluded.quiet_hours_start,
+                    quiet_hours_end = excluded.quiet_hours_end,
+                    throttle_per_hour = excluded.throttle_per_hour,
+                    timezone = excluded.timezone,
+                    throttle_state_json = excluded.throttle_state_json,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (
+                    prefs.user_id,
+                    int(prefs.mute),
+                    prefs.mute_until.isoformat() if prefs.mute_until else None,
+                    int(prefs.digest_mode),
+                    prefs.digest_interval_minutes,
+                    prefs.quiet_hours_start,
+                    prefs.quiet_hours_end,
+                    prefs.throttle_per_hour,
+                    prefs.timezone,
+                    prefs.throttle_state_json,
+                ),
             )
-            if await existing.fetchone() is None:
-                await self._conn.execute(
-                    """
-                    INSERT INTO notification_prefs (
-                        user_id, product_id, mute, mute_until, digest_mode,
-                        digest_interval_minutes, quiet_hours_start, quiet_hours_end,
-                        throttle_per_hour, timezone, throttle_state_json
-                    )
-                    VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        prefs.user_id,
-                        int(prefs.mute),
-                        prefs.mute_until.isoformat() if prefs.mute_until else None,
-                        int(prefs.digest_mode),
-                        prefs.digest_interval_minutes,
-                        prefs.quiet_hours_start,
-                        prefs.quiet_hours_end,
-                        prefs.throttle_per_hour,
-                        prefs.timezone,
-                        prefs.throttle_state_json,
-                    ),
-                )
-            else:
-                await self._conn.execute(
-                    """
-                    UPDATE notification_prefs SET
-                        mute = ?, mute_until = ?, digest_mode = ?,
-                        digest_interval_minutes = ?, quiet_hours_start = ?,
-                        quiet_hours_end = ?, throttle_per_hour = ?, timezone = ?,
-                        throttle_state_json = ?, updated_at = CURRENT_TIMESTAMP
-                    WHERE user_id = ? AND product_id IS NULL
-                    """,
-                    (
-                        int(prefs.mute),
-                        prefs.mute_until.isoformat() if prefs.mute_until else None,
-                        int(prefs.digest_mode),
-                        prefs.digest_interval_minutes,
-                        prefs.quiet_hours_start,
-                        prefs.quiet_hours_end,
-                        prefs.throttle_per_hour,
-                        prefs.timezone,
-                        prefs.throttle_state_json,
-                        prefs.user_id,
-                    ),
-                )
         else:
             await self._conn.execute(
                 """
