@@ -147,12 +147,22 @@ class WalmartScraper(AbstractScraper):
         if parsed is None:
             return None
         result: StrategyResult = {"price": parsed}
-        currency_el = soup.find(attrs={"itemprop": "priceCurrency"})
+        # Scope currency/name to the price element's own itemscope (Offer for the
+        # currency, enclosing Product for the name): a page-wide find would pick
+        # up a related-items carousel's values (#37). Flat markup without any
+        # itemscope keeps the page-wide lookup.
+        offer_scope = price_el.find_parent(attrs={"itemscope": True})
+        currency_root: Tag | BeautifulSoup = offer_scope if isinstance(offer_scope, Tag) else soup
+        name_root: Tag | BeautifulSoup = soup
+        if isinstance(offer_scope, Tag):
+            product_scope = offer_scope.find_parent(attrs={"itemscope": True})
+            name_root = product_scope if isinstance(product_scope, Tag) else offer_scope
+        currency_el = currency_root.find(attrs={"itemprop": "priceCurrency"})
         if isinstance(currency_el, Tag):
             currency_val = currency_el.get("content") or currency_el.get_text(strip=True)
             if currency_val:
                 result["currency"] = str(currency_val)
-        name_el = soup.find(attrs={"itemprop": "name"})
+        name_el = name_root.find(attrs={"itemprop": "name"})
         if isinstance(name_el, Tag):
             name_val = name_el.get("content") or name_el.get_text(strip=True)
             if name_val:
