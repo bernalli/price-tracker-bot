@@ -105,6 +105,26 @@ async def test_shopify_prefers_available_variant_price() -> None:
 
 
 @pytest.mark.asyncio
+async def test_shopify_mixed_variant_without_available_key_is_purchasable() -> None:
+    """One variant declares available=False, another omits the key entirely:
+    the keyless variant must be treated as purchasable (absent = available),
+    not skipped as sold-out because ``None`` is falsy (#33 hardening).
+    """
+    payload = {
+        "product": {
+            "title": "Mixed Shape",
+            "variants": [
+                {"id": 1, "price": "0.01", "available": False},
+                {"id": 2, "price": "39.99"},
+            ],
+        }
+    }
+    info = await _scrape_shopify(payload)
+    assert info.price == Decimal("39.99")
+    assert info.available is True
+
+
+@pytest.mark.asyncio
 async def test_shopify_no_availability_key_keeps_default_true() -> None:
     """Variants without 'available' key → previous behavior, available=True."""
     payload = {

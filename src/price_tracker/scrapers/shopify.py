@@ -227,7 +227,8 @@ class ShopifyScraper(AbstractScraper):
             # Prefer variants the shop declares purchasable: sold-out products
             # often keep a placeholder price on the first variant (#33).
             for variant in variants:
-                if declares_availability and not variant.get("available"):
+                # Absent key = purchasable: only an explicit False marks sold-out.
+                if declares_availability and not variant.get("available", True):
                     continue
                 variant_price = variant.get("price")
                 if variant_price:
