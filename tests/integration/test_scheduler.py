@@ -274,6 +274,70 @@ async def test_scheduler_outlier_price_rejected(
 
 
 @pytest.mark.asyncio
+async def test_scheduler_currency_mismatch_skips_persist_and_alert(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    """Bug #20: scraped currency != stored currency → warn + skip, no persist.
+
+    A USD read against a EUR product (wrong variant / marketplace redirect)
+    must not be persisted as price/history, must not alert, must not count
+    as a scrape error, and must NOT silently rewrite the stored currency.
+    """
+    repo, pid = repo_with_product  # stored currency = EUR
+    stub = _StubScraper(ProductInfo(name="Widget", price=Decimal("80"), currency="USD"))
+    registry = ScraperRegistry()
+    registry.register(stub)
+    notifier = AsyncMock()
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=notifier,
+                max_consecutive_errors=10,
+                delay_between_products=0.0,
+            )
+        )
+        await scheduler.run_check_for_user(user_id=1)
+    p = await repo.get_product(pid)
+    assert p is not None
+    assert p.current_price != Decimal("80")  # not persisted
+    assert p.currency == "EUR"  # NO update_currency
+    assert p.consecutive_errors == 0  # not a scrape failure
+    history = await repo.get_price_history(pid, limit=50)
+    assert all(h.price != Decimal("80") for h in history)  # no history row
+    notifier.assert_not_awaited()  # no alert
+
+
+@pytest.mark.asyncio
+async def test_scheduler_currency_none_persists_normally(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    """Guard #20 must not fire when the scraper reports no currency."""
+    repo, pid = repo_with_product
+    stub = _StubScraper(ProductInfo(name="Widget", price=Decimal("80"), currency=None))
+    registry = ScraperRegistry()
+    registry.register(stub)
+    notifier = AsyncMock()
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=notifier,
+                max_consecutive_errors=10,
+                delay_between_products=0.0,
+            )
+        )
+        await scheduler.run_check_for_user(user_id=1)
+    p = await repo.get_product(pid)
+    assert p is not None
+    assert p.current_price == Decimal("80")
+
+
+@pytest.mark.asyncio
 async def test_scheduler_first_check_no_old_price_no_alert() -> None:
     """Line 101: when old_price is None, return without crossing threshold check.
 
