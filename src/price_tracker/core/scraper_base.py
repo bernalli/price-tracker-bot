@@ -242,19 +242,39 @@ def select_jsonld_offer(offers: object) -> tuple[Decimal, str | None] | None:
     return best
 
 
+# id/class keywords marking related-items modules (carousels, rails, sponsored).
+_CAROUSEL_CONTEXT_RE = re.compile(
+    r"carousel|related|recommend|sponsored|aside|rail|recently", re.IGNORECASE
+)
+
+
+def _in_carousel_context(el: Tag) -> bool:
+    """True when `el` or an ancestor is id/class-marked as a related-items module."""
+    node: Tag | None = el
+    while node is not None:
+        classes = node.get("class") or []
+        class_str = " ".join(classes) if isinstance(classes, list) else str(classes)
+        if _CAROUSEL_CONTEXT_RE.search(f"{node.get('id') or ''} {class_str}"):
+            return True
+        node = node.parent
+    return False
+
+
 def find_microdata_price_el(soup: BeautifulSoup) -> Tag | None:
     """Return the listing's microdata price element, preferring an Offer/Product scope.
 
     A bare ``soup.find(itemprop="price")`` often returns a related/recommended item's
     price (carousels appearing before the main listing). Prefer a price nested under
     ``itemprop="offers"`` or an Offer/Product ``itemscope`` before falling back to the
-    first occurrence (#34/#49).
+    first occurrence (#34/#49). With multiple scopes, prefer one NOT nested in a
+    carousel/related-items container; if every scope sits in one, keep the previous
+    first-match behavior (#37).
     """
     from bs4 import Tag  # noqa: PLC0415 — keep bs4 off the module import path
 
     for scope_sel in ('[itemprop="offers"]', '[itemtype*="Offer"]', '[itemtype*="Product"]'):
-        scope = soup.select_one(scope_sel)
-        if scope is not None:
+        # Stable sort: non-carousel scopes first, document order preserved within groups.
+        for scope in sorted(soup.select(scope_sel), key=_in_carousel_context):
             el = scope.find(attrs={"itemprop": "price"})
             if isinstance(el, Tag):
                 return el

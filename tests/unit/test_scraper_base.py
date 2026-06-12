@@ -171,6 +171,36 @@ def test_find_microdata_price_el_falls_back_to_first():
     assert el.get("content") == "50.00"
 
 
+def test_find_microdata_price_el_skips_carousel_scope():
+    """A complete Product/Offer itemscope inside a carousel container must not win (#37)."""
+    html = (
+        '<div class="related-carousel">'
+        '<div itemscope itemtype="https://schema.org/Product">'
+        '<div itemprop="offers" itemscope itemtype="https://schema.org/Offer">'
+        '<span itemprop="price" content="9.99">9.99</span>'
+        "</div></div></div>"
+        '<div itemscope itemtype="https://schema.org/Product">'
+        '<div itemprop="offers" itemscope itemtype="https://schema.org/Offer">'
+        '<span itemprop="price" content="499.00">499.00</span>'
+        "</div></div>"
+    )
+    el = find_microdata_price_el(BeautifulSoup(html, "lxml"))
+    assert el is not None
+    assert el.get("content") == "499.00"
+
+
+def test_find_microdata_price_el_keeps_first_when_all_scopes_in_carousel():
+    """If every scope sits in a carousel container, keep the first-match behavior (#37)."""
+    html = (
+        '<div class="recommendations-carousel">'
+        '<div itemprop="offers"><span itemprop="price" content="9.99">9.99</span></div>'
+        "</div>"
+    )
+    el = find_microdata_price_el(BeautifulSoup(html, "lxml"))
+    assert el is not None
+    assert el.get("content") == "9.99"
+
+
 def test_parse_price_returns_none_on_garbage():
     assert parse_price("") is None
     assert parse_price("not a price") is None
