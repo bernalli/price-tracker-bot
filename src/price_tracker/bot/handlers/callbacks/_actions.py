@@ -180,7 +180,7 @@ async def handle_reactivate_button(
     if product_id is None:
         await query.edit_message_text("❌ ID non valido.")
         return True
-    product = await db.get_product(product_id)
+    product = await _get_user_product(context, product_id, user_id)
     if not product:
         await query.edit_message_text("❌ Prodotto non trovato.")
         return True
