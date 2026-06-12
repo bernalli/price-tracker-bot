@@ -44,6 +44,25 @@ def _symbol_to_iso(symbol: str) -> str:
     return _SYMBOL_TO_ISO.get(symbol.strip(), "USD")
 
 
+_STRIKETHROUGH_CLASS_RE = re.compile(r"strikethrough|line-through", re.IGNORECASE)
+
+
+def _is_struck_through(el: Tag, container: Tag) -> bool:
+    """True when `el` sits under <s>/<del> or a strikethrough-classed node in container."""
+    node: Tag | None = el
+    while isinstance(node, Tag):
+        if node.name in ("s", "del"):
+            return True
+        classes = node.get("class") or []
+        class_str = " ".join(classes) if isinstance(classes, list) else str(classes)
+        if _STRIKETHROUGH_CLASS_RE.search(class_str):
+            return True
+        if node is container:
+            break
+        node = node.parent
+    return False
+
+
 class StrategyResult(TypedDict, total=False):
     price: Decimal
     currency: str
@@ -151,15 +170,29 @@ class EtsyScraper(AbstractScraper):
         container = soup.select_one("[data-buy-box-listing-price]")
         if not isinstance(container, Tag):
             return None
-        value_el = container.select_one(".currency-value")
-        if not isinstance(value_el, Tag):
+        # On discounted listings the first .currency-value in document order is
+        # the struck-through original price (#40): skip values under <s>/<del>
+        # or strikethrough-classed nodes; if the filter empties (odd markup on
+        # non-discounted listings), keep the first value.
+        candidates = container.select(".currency-value")
+        if not candidates:
             return None
+        value_el = next(
+            (el for el in candidates if not _is_struck_through(el, container)), candidates[0]
+        )
         parsed = parse_price(value_el.get_text(strip=True))
         if parsed is None:
             return None
         result: StrategyResult = {"price": parsed}
 
-        symbol_el = container.select_one(".currency-symbol")
+        # Symbol adjacent to the chosen value (same parent), not the container's
+        # first — that may belong to the struck-through price (#40).
+        symbol_el = None
+        parent = value_el.parent
+        if isinstance(parent, Tag):
+            symbol_el = parent.select_one(".currency-symbol")
+        if symbol_el is None:
+            symbol_el = container.select_one(".currency-symbol")
         if isinstance(symbol_el, Tag):
             symbol = symbol_el.get_text(strip=True)
             if symbol:
