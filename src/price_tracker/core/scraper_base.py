@@ -242,6 +242,50 @@ def select_jsonld_offer(offers: object) -> tuple[Decimal, str | None] | None:
     return best
 
 
+# schema.org availability values are bare names ("InStock") or URLs
+# ("https://schema.org/OutOfStock"); match the suffix case-insensitively.
+_JSONLD_IN_STOCK_SUFFIXES = ("instock",)
+_JSONLD_OUT_OF_STOCK_SUFFIXES = ("outofstock", "soldout")
+
+
+def _offer_availability_to_bool(value: object) -> bool | None:
+    """Map one schema.org ``availability`` value to bool; None when unrecognized."""
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip().rstrip("/").lower()
+    if normalized.endswith(_JSONLD_IN_STOCK_SUFFIXES):
+        return True
+    if normalized.endswith(_JSONLD_OUT_OF_STOCK_SUFFIXES):
+        return False
+    return None
+
+
+def jsonld_offer_availability(offers: object) -> bool | None:
+    """Read stock availability from a JSON-LD ``offers`` value.
+
+    Returns True (in stock), False (out of stock / sold out) or None when no
+    offer declares a recognizable schema.org ``availability``. With multiple
+    offers any in-stock entry wins — the product is purchasable in some
+    variant. Kept separate from ``select_jsonld_offer`` so its
+    ``(price, currency)`` contract and call sites stay untouched (#33).
+    """
+    if isinstance(offers, dict):
+        offer_list: list[dict[str, object]] = [offers]
+    elif isinstance(offers, list):
+        offer_list = [o for o in offers if isinstance(o, dict)]
+    else:
+        return None
+
+    saw_out_of_stock = False
+    for offer in offer_list:
+        availability = _offer_availability_to_bool(offer.get("availability"))
+        if availability is True:
+            return True
+        if availability is False:
+            saw_out_of_stock = True
+    return False if saw_out_of_stock else None
+
+
 def unwrap_jsonld_graph(data: object) -> list[dict[str, object]]:
     """Flatten a JSON-LD payload into its node dicts, unwrapping ``@graph`` containers.
 

@@ -25,6 +25,7 @@ from price_tracker.core.scraper_base import (
     ProductInfo,
     find_microdata_price_el,
     get_headers,
+    jsonld_offer_availability,
     parse_price,
 )
 
@@ -120,7 +121,13 @@ class Nove25Scraper(AbstractScraper):
                 currency = raw_currency.strip().upper()
             raw_name = payload.get("name")
             name = str(raw_name)[:200] if raw_name else None
-            return ProductInfo(name=name, price=price, currency=currency)
+            available = jsonld_offer_availability(offers)
+            return ProductInfo(
+                name=name,
+                price=price,
+                currency=currency,
+                available=available if available is not None else True,
+            )
         return None
 
     @staticmethod

@@ -23,6 +23,7 @@ from price_tracker.core.scraper_base import (
     ProductInfo,
     find_microdata_price_el,
     get_headers,
+    jsonld_offer_availability,
     parse_price,
 )
 
@@ -131,6 +132,9 @@ class EbayScraper(AbstractScraper):
                                 parsed = parse_price(str(price))
                                 if parsed:
                                     info.currency = offers.get("priceCurrency", "EUR")
+                                    availability = jsonld_offer_availability(offers)
+                                    if availability is not None:
+                                        info.available = availability
                                     return parsed
             except (json.JSONDecodeError, TypeError):
                 continue
