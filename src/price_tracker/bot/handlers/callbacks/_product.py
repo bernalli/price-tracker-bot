@@ -290,7 +290,12 @@ async def handle_track_choice(
         if product_id is None:
             await query.edit_message_text("❌ ID non valido.")
             return True
-        name = await _get_product_name(db, product_id)
+        product = await _get_user_product(context, product_id, user_id)
+        if not product:
+            await query.edit_message_text("❌ Prodotto non trovato.")
+            return True
+        await db.set_threshold(product_id, "percentage", "10")
+        name = (product.get("name") or "Sconosciuto")[:60]
         await query.edit_message_text(
             f"👍 <b>Soglia default -10%</b> per #{product_id}\n"
             f"📦 {_escape_html(name)}\n\n"

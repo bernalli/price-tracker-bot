@@ -1,10 +1,14 @@
-"""Per-product callbacks must enforce ownership (IDOR guard).
+"""Per-product callbacks must enforce ownership (IDOR guard) and persist.
 
 ``handle_reactivate_button`` looked the product up via ``db.get_product``
 (no user filter) while every sibling action handler goes through
 ``_get_user_product`` (owner-or-admin). Since ``reactivate_product`` does not
 filter by user_id either, any user could reactivate another user's product
 (and reset its ``consecutive_errors``) by sending ``reactivate_<foreign id>``.
+
+``track_default_`` showed the "-10%" confirmation without ever calling
+``set_threshold``: an ``any_drop`` product silently kept notifying on every
+variation while the user believed the -10% default was active.
 """
 
 from __future__ import annotations
@@ -14,7 +18,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from price_tracker.bot.handlers.callbacks import _actions
+from price_tracker.bot.handlers.callbacks import _actions, _product
 
 OWNER_ID = 1
 INTRUDER_ID = 2
@@ -76,3 +80,36 @@ async def test_reactivate_own_product_succeeds() -> None:
     db.reactivate_product.assert_awaited_once_with(PRODUCT_ID)
     msg = query.edit_message_text.await_args.args[0]
     assert "Riattivato" in msg
+
+
+@pytest.mark.asyncio
+async def test_track_default_persists_percentage_threshold() -> None:
+    """Owner taps "Default -10%" → threshold actually written before confirming."""
+    db = _mock_db(is_admin=False, owned_product={"name": "Widget"})
+    query = _mock_query()
+    context = _mock_context(db)
+
+    handled = await _product.handle_track_choice(
+        query, context, db, OWNER_ID, f"track_default_{PRODUCT_ID}"
+    )
+
+    assert handled is True
+    db.set_threshold.assert_awaited_once_with(PRODUCT_ID, "percentage", "10")
+    msg = query.edit_message_text.await_args.args[0]
+    assert "-10%" in msg
+
+
+@pytest.mark.asyncio
+async def test_track_default_foreign_product_writes_nothing() -> None:
+    """Non-owner sends ``track_default_<foreign id>`` → no write, error reply."""
+    db = _mock_db(is_admin=False, owned_product=None)
+    query = _mock_query()
+    context = _mock_context(db)
+
+    handled = await _product.handle_track_choice(
+        query, context, db, INTRUDER_ID, f"track_default_{PRODUCT_ID}"
+    )
+
+    assert handled is True
+    db.set_threshold.assert_not_awaited()
+    query.edit_message_text.assert_awaited_once_with("❌ Prodotto non trovato.")
