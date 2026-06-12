@@ -311,6 +311,48 @@ async def test_scheduler_currency_mismatch_skips_persist_and_alert(
 
 
 @pytest.mark.asyncio
+async def test_scheduler_currency_mismatch_records_success_for_half_open_domain(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    """Regression of fix #20: a currency-mismatch read is still a SUCCESSFUL
+    scrape (HTTP ok, price parsed) — only the persist/alert is skipped.
+
+    When the mismatching product is the single probe of a HALF_OPEN domain,
+    the guard must still call ``record_success`` so the domain can transition
+    back to CLOSED. Before the fix the guard returned early without
+    ``handle_success_in_pipeline``, so the same product consumed the probe
+    slot on every sweep and the domain stayed HALF_OPEN forever.
+    """
+    repo, pid = repo_with_product  # stored currency = EUR
+    stub = _StubScraper(ProductInfo(name="Widget", price=Decimal("80"), currency="USD"))
+    registry = ScraperRegistry()
+    registry.register(stub)
+    health_mgr: HealthManager = AsyncMock(spec=HealthManager)
+    health_mgr.is_locked = lambda _d: False
+    health_mgr.is_half_open = lambda d: d == "example.com"
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=AsyncMock(),
+                max_consecutive_errors=10,
+                delay_between_products=0.0,
+                health_mgr=health_mgr,
+            )
+        )
+        await scheduler.run_check_for_user(user_id=1)
+    assert stub.calls == 1  # the half-open probe was sent
+    health_mgr.record_success.assert_awaited_once_with("example.com")  # type: ignore[attr-defined]
+    # The #20 guarantees still hold: no persist, no currency rewrite.
+    p = await repo.get_product(pid)
+    assert p is not None
+    assert p.current_price != Decimal("80")
+    assert p.currency == "EUR"
+
+
+@pytest.mark.asyncio
 async def test_scheduler_currency_none_persists_normally(
     repo_with_product: tuple[Repository, int],
 ) -> None:
