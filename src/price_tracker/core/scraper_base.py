@@ -242,6 +242,28 @@ def select_jsonld_offer(offers: object) -> tuple[Decimal, str | None] | None:
     return best
 
 
+def unwrap_jsonld_graph(data: object) -> list[dict[str, object]]:
+    """Flatten a JSON-LD payload into its node dicts, unwrapping ``@graph`` containers.
+
+    Handles a single dict, a list of nodes, and nested ``@graph`` wrappers
+    (Yoast/WordPress-style ``{"@context": ..., "@graph": [...]}``) — a Product
+    nested in ``@graph`` would otherwise be invisible to ``@type`` scans (#56).
+    The container dict itself is kept (callers filter by ``@type`` anyway);
+    non-dict entries are dropped.
+    """
+    if isinstance(data, list):
+        items: list[dict[str, object]] = []
+        for entry in data:
+            items.extend(unwrap_jsonld_graph(entry))
+        return items
+    if isinstance(data, dict):
+        graph = data.get("@graph")
+        if isinstance(graph, list):
+            return [data, *unwrap_jsonld_graph(graph)]
+        return [data]
+    return []
+
+
 # id/class keywords marking related-items modules (carousels, rails, sponsored).
 _CAROUSEL_CONTEXT_RE = re.compile(
     r"carousel|related|recommend|sponsored|aside|rail|recently", re.IGNORECASE
