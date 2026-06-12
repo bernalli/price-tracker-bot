@@ -193,12 +193,23 @@ class Scheduler:
                     "Failed to record failure for product %d after unexpected error", product.id
                 )
 
-    async def _run_tick(self, products: list[ProductRecord]) -> None:
+    async def _run_tick(
+        self,
+        products: list[ProductRecord],
+        *,
+        half_open_seen: set[str] | None = None,
+    ) -> None:
         """One scheduler tick: scrape all eligible products.
 
         Filtering rules per Feature B:
           - skip products on LOCKED domains entirely
           - on HALF_OPEN domains send exactly one probe (first product per domain per tick)
+
+        ``half_open_seen`` lets a caller share the probed-domain set across
+        multiple ticks: ``run_check_all`` passes one set for the whole global
+        sweep so a HALF_OPEN domain receives a single probe per sweep instead
+        of one per user (#17). When ``None`` (single-user callers) a fresh set
+        scoped to this tick is used.
 
         Rate-limiting pacing (`delay_between_products`) is applied between scrapes
         to be friendly to upstream servers.
@@ -206,7 +217,8 @@ class Scheduler:
         metrics = self.deps.metrics
         if metrics is not None:
             metrics.scheduler_jobs_active.set(len(products))
-        half_open_seen: set[str] = set()
+        if half_open_seen is None:
+            half_open_seen = set()
         for product in products:
             domain = extract_etld_plus_one(product.url)
             if not domain:
@@ -234,13 +246,18 @@ class Scheduler:
         await self._run_tick(products)
 
     async def run_check_all(self) -> None:
-        """Check every active product across every active user."""
+        """Check every active product across every active user.
+
+        A single ``half_open_seen`` set is shared across the per-user ticks so
+        a HALF_OPEN domain is probed at most once per global sweep (#17).
+        """
         users = await self.deps.repo.list_active_users()
+        half_open_seen: set[str] = set()
         for u in users:
             products = await self.deps.repo.list_products_for_user(
                 user_id=u.user_id, only_active=True
             )
-            await self._run_tick(products)
+            await self._run_tick(products, half_open_seen=half_open_seen)
 
     async def _record_failure_and_maybe_disable(
         self,
