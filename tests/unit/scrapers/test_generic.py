@@ -179,6 +179,72 @@ def test_js_product_data_bare_price_fallback_still_works() -> None:
     assert result["price"] == Decimal("49.99")
 
 
+# ── CSS / data-attribute scoping (#26) ───────────────────────────
+
+
+def test_css_selector_ignores_carousel_data_price() -> None:
+    """A recently-viewed carousel's data-price must not shadow the main price."""
+    html = """
+    <html><body>
+      <div class="recently-viewed"><a data-price="19.99" href="/o">Visto di recente</a></div>
+      <div class="product-info"><span class="product-price">249,00 €</span></div>
+    </body></html>
+    """
+    result = GenericScraper()._try_css_selectors(BeautifulSoup(html, "lxml"))
+    assert result is not None
+    assert result["price"] == Decimal("249.00")
+
+
+def test_css_selector_prefers_data_price_inside_product_container() -> None:
+    """Broad [data-price] outside a product container is skipped in favour of one inside."""
+    html = """
+    <html><body>
+      <div class="recently-viewed"><a data-price="19.99">x</a></div>
+      <div id="product-main"><span data-price="249.00"></span></div>
+    </body></html>
+    """
+    result = GenericScraper()._try_css_selectors(BeautifulSoup(html, "lxml"))
+    assert result is not None
+    assert result["price"] == Decimal("249.00")
+
+
+def test_css_selector_finds_lone_data_price_in_product_container() -> None:
+    """When ONLY [data-price] inside #product-main has the price, it is still found."""
+    html = """
+    <html><body>
+      <div id="product-main"><span data-price="89.90"></span></div>
+    </body></html>
+    """
+    result = GenericScraper()._try_css_selectors(BeautifulSoup(html, "lxml"))
+    assert result is not None
+    assert result["price"] == Decimal("89.90")
+
+
+def test_data_attributes_skips_elements_outside_product_container() -> None:
+    """data-* hits outside any product/main/schema.org-Product scope are ignored."""
+    html = """
+    <html><body>
+      <div class="sidebar"><span data-amount="9.99"></span></div>
+      <div class="product-detail"><span data-amount="129.00"></span></div>
+    </body></html>
+    """
+    result = GenericScraper()._try_data_attributes(BeautifulSoup(html, "lxml"))
+    assert result is not None
+    assert result["price"] == Decimal("129.00")
+
+
+def test_data_attributes_accepts_schema_org_product_scope() -> None:
+    """itemtype schema.org/Product qualifies as a product container."""
+    html = """
+    <html><body>
+      <div itemtype="https://schema.org/Product"><span data-price="59.90"></span></div>
+    </body></html>
+    """
+    result = GenericScraper()._try_data_attributes(BeautifulSoup(html, "lxml"))
+    assert result is not None
+    assert result["price"] == Decimal("59.90")
+
+
 # ── scrape: error paths ──────────────────────────────────────────
 
 
