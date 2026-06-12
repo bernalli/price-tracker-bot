@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -531,6 +532,51 @@ class TestNotificationPrefsRepository:
         loaded = await repo.get_notification_prefs(user_id=1, product_id=None)
         assert loaded is not None
         assert loaded.digest_mode is True
+        assert loaded.digest_interval_minutes == 15
+
+    @pytest.mark.asyncio
+    async def test_concurrent_global_upserts_leave_single_row(self, repo: Repository):
+        """Two concurrent global upserts must not race into duplicate rows (#58).
+
+        The SELECT-then-INSERT emulation interleaved across awaits: both
+        coroutines saw no row and both inserted, and the (user_id, product_id)
+        PK never fired because SQLite treats NULLs as distinct.
+        """
+        from price_tracker.db.models import NotificationPrefs
+
+        await repo.create_user(user_id=1)
+        first = NotificationPrefs(user_id=1, product_id=None, digest_mode=False)
+        second = NotificationPrefs(user_id=1, product_id=None, digest_mode=True)
+        await asyncio.gather(
+            repo.upsert_notification_prefs(first),
+            repo.upsert_notification_prefs(second),
+        )
+        cursor = await repo._conn.execute(  # noqa: SLF001
+            "SELECT COUNT(*) FROM notification_prefs WHERE user_id = 1 AND product_id IS NULL"
+        )
+        row = await cursor.fetchone()
+        assert row is not None
+        assert row[0] == 1
+
+    @pytest.mark.asyncio
+    async def test_sequential_global_upserts_keep_single_updated_row(self, repo: Repository):
+        from price_tracker.db.models import NotificationPrefs
+
+        await repo.create_user(user_id=1)
+        await repo.upsert_notification_prefs(
+            NotificationPrefs(user_id=1, product_id=None, digest_interval_minutes=60)
+        )
+        await repo.upsert_notification_prefs(
+            NotificationPrefs(user_id=1, product_id=None, digest_interval_minutes=15)
+        )
+        cursor = await repo._conn.execute(  # noqa: SLF001
+            "SELECT COUNT(*) FROM notification_prefs WHERE user_id = 1 AND product_id IS NULL"
+        )
+        row = await cursor.fetchone()
+        assert row is not None
+        assert row[0] == 1
+        loaded = await repo.get_notification_prefs(user_id=1, product_id=None)
+        assert loaded is not None
         assert loaded.digest_interval_minutes == 15
 
 
