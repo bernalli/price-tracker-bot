@@ -77,6 +77,58 @@ async def test_etsy_dom_fallback_when_no_jsonld(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "original_block",
+    [
+        '<p><s><span class="currency-symbol">CA$</span>'
+        '<span class="currency-value">99.00</span></s></p>',
+        '<p class="wt-text-strikethrough"><span class="currency-symbol">CA$</span>'
+        '<span class="currency-value">99.00</span></p>',
+    ],
+)
+async def test_etsy_dom_skips_strikethrough_original_price(original_block: str) -> None:
+    """Repro (#40): discounted buy-box lists the struck-through original price
+    first in document order; the sale price (and its adjacent symbol) must win."""
+    scraper = EtsyScraper()
+    url = "https://www.etsy.com/listing/4040/discounted"
+    html = f"""
+    <html><head><title>Discounted Listing - Etsy</title></head><body>
+    <div data-buy-box-listing-price>
+      {original_block}
+      <p><span class="currency-symbol">$</span><span class="currency-value">49.00</span></p>
+    </div>
+    </body></html>
+    """
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).respond(200, text=html)
+        async with httpx.AsyncClient() as client:
+            info = await scraper.scrape(url, client)
+    assert info.price == Decimal("49.00")
+    assert info.currency == "USD"
+
+
+@pytest.mark.asyncio
+async def test_etsy_dom_keeps_struck_value_when_it_is_the_only_one() -> None:
+    """Odd markup where the only .currency-value sits in <s>: the strikethrough
+    filter empties, so fall back to the first value instead of no price (#40)."""
+    scraper = EtsyScraper()
+    url = "https://www.etsy.com/listing/4041/odd-markup"
+    html = """
+    <html><head><title>Odd Listing - Etsy</title></head><body>
+    <div data-buy-box-listing-price>
+      <p><s><span class="currency-symbol">$</span><span class="currency-value">99.00</span></s></p>
+    </div>
+    </body></html>
+    """
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).respond(200, text=html)
+        async with httpx.AsyncClient() as client:
+            info = await scraper.scrape(url, client)
+    assert info.price == Decimal("99.00")
+    assert info.currency == "USD"
+
+
+@pytest.mark.asyncio
 async def test_etsy_returns_error_on_http_500(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
