@@ -53,6 +53,7 @@ class StrategyResult(TypedDict, total=False):
 async def _fetch_aliexpress_html(url: str, client: httpx.AsyncClient) -> httpx.Response:
     headers = get_headers()
     response = await client.get(url, headers=headers, follow_redirects=True)
+    response.raise_for_status()
     return response
 
 
@@ -75,7 +76,13 @@ class AliexpressScraper(AbstractScraper):
         try:
             response = await _fetch_aliexpress_html(url, client)
             detect_block_event(status_code=response.status_code, body=response.text, url=url)
-            response.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            # raise_for_status() lives inside the retry scope now, so hard
+            # blocks (403/429) surface here — re-check them for BlockEvent
+            # before degrading, so quarantine still engages (#55).
+            detect_block_event(status_code=e.response.status_code, body=e.response.text, url=url)
+            logger.debug("AliExpress fetch failed for %s: %s", url[:80], e)
+            return ProductInfo(error=f"HTTP error: {e}")
         except httpx.HTTPError as e:
             logger.debug("AliExpress fetch failed for %s: %s", url[:80], e)
             return ProductInfo(error=f"HTTP error: {e}")
