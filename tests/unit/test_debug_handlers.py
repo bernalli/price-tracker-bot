@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from price_tracker.bot.handlers.debug import health_command, status_command
+from price_tracker.core.health import HealthManager
 from price_tracker.db.models import ScraperHealth
 
 
@@ -19,13 +20,15 @@ def _make_context(
     """Build a minimal ContextTypes.DEFAULT_TYPE mock for health_command tests.
 
     The real admin_only decorator calls _db(context).is_user_admin(user_id),
-    so we wire a mock DB that returns the desired admin bool.
+    so we wire a mock DB that returns the desired admin bool. The health
+    manager is a real HealthManager (records injected) so the handler sees
+    the genuine effective-state logic (lockout expiry -> HALF_OPEN on read).
     """
     db_mock = MagicMock()
     db_mock.is_user_admin = AsyncMock(return_value=is_admin)
 
-    health_mgr = MagicMock()
-    health_mgr.all_records.return_value = health_records
+    health_mgr = HealthManager(repo=MagicMock())
+    health_mgr._records = {r.domain: r for r in health_records}
 
     context = MagicMock()
     context.bot_data = {
@@ -169,6 +172,44 @@ async def test_health_command_handles_locked_without_locked_until() -> None:
 
     await health_command(update, context)
     update.message.reply_html.assert_awaited()
+
+
+@pytest.mark.asyncio
+async def test_health_command_expired_lockout_listed_as_half_open() -> None:
+    """Bug #60: an expired lockout is effectively half-open on read.
+
+    The persisted row still says LOCKED_T1, but HealthManager.state()
+    resolves it to HALF_OPEN_T1 once locked_until has passed — the report
+    must follow the effective state, never print 'expires in expired'.
+    """
+    update = MagicMock()
+    update.effective_user.id = 1
+    update.message.reply_html = AsyncMock()
+
+    now = datetime.now(UTC)
+    context = _make_context(
+        health_records=[
+            ScraperHealth(
+                domain="expired.com",
+                state="LOCKED_T1",
+                consecutive_blocks=3,
+                locked_until=now - timedelta(minutes=5),  # lockout already expired
+                last_block_at=now - timedelta(hours=2),
+                last_block_reason="HTTP 429",
+            ),
+        ],
+        is_admin=True,
+    )
+
+    await health_command(update, context)
+
+    rendered: str = update.message.reply_html.call_args.args[0]
+    assert "Half-open: 1" in rendered
+    assert "Locked: 0" in rendered
+    assert "<b>Half-open:</b>" in rendered
+    assert "expired.com — probing on next tick" in rendered
+    assert "<b>Locked:</b>" not in rendered
+    assert "expires in expired" not in rendered
 
 
 @pytest.mark.asyncio
