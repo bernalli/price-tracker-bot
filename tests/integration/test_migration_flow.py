@@ -80,7 +80,7 @@ async def test_migrator_treats_pre_existing_v2_schema_as_idempotent():
         await conn.commit()
 
         new_version = await apply_migrations(conn, MIGRATIONS_DIR)
-        assert new_version == 10
+        assert new_version == 11
 
         await conn.execute(
             "INSERT INTO products(url, name, initial_price, currency) VALUES(?, ?, ?, ?)",
