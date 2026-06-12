@@ -16,7 +16,7 @@ from telegram import (
 from telegram.constants import ParseMode
 
 from price_tracker.bot.decorators import _config
-from price_tracker.bot.handlers._helpers import _escape_html
+from price_tracker.bot.handlers._helpers import _escape_html, _parse_id
 from price_tracker.bot.keyboards import menu_back_button
 
 if TYPE_CHECKING:
@@ -122,7 +122,10 @@ async def handle_admin_menu(
     if data.startswith("admin_rm_"):
         if not await db.is_user_admin(user_id):
             return True
-        target_id = int(data.replace("admin_rm_", ""))
+        target_id = _parse_id(data.replace("admin_rm_", ""))
+        if target_id is None:
+            await query.edit_message_text("❌ ID non valido.")
+            return True
         removed = await db.remove_user(target_id)
         if removed:
             await query.edit_message_text(
@@ -155,7 +158,10 @@ async def handle_admin_menu(
     if data.startswith("admin_nick_"):
         if not await db.is_user_admin(user_id):
             return True
-        target_id = int(data.replace("admin_nick_", ""))
+        target_id = _parse_id(data.replace("admin_nick_", ""))
+        if target_id is None:
+            await query.edit_message_text("❌ ID non valido.")
+            return True
         context.user_data["pending_action"] = ("admin_nick", target_id)
         u = await db.get_user(target_id)
         current_name = u.get("display_name", "N/D") if u else "N/D"
