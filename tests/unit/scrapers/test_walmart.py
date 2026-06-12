@@ -78,6 +78,71 @@ async def test_walmart_microdata_fallback_when_no_jsonld(
 
 
 @pytest.mark.asyncio
+async def test_walmart_microdata_skips_carousel_product_scope() -> None:
+    """Scenario B (#37): a carousel that is a complete Product/Offer itemscope
+    appearing before the main product must not win price/currency/name."""
+    scraper = WalmartScraper()
+    url = "https://www.walmart.com/ip/8888"
+    html = """
+    <html><head><title>Main Product - Walmart.com</title></head><body>
+    <div class="related-carousel">
+      <div itemscope itemtype="https://schema.org/Product">
+        <span itemprop="name">Related Gadget</span>
+        <div itemprop="offers" itemscope itemtype="https://schema.org/Offer">
+          <span itemprop="price" content="9.99">$9.99</span>
+          <meta itemprop="priceCurrency" content="MXN" />
+        </div>
+      </div>
+    </div>
+    <div itemscope itemtype="https://schema.org/Product">
+      <h1 itemprop="name">Main Product</h1>
+      <div itemprop="offers" itemscope itemtype="https://schema.org/Offer">
+        <span itemprop="price" content="499.00">$499.00</span>
+        <meta itemprop="priceCurrency" content="USD" />
+      </div>
+    </div>
+    </body></html>
+    """
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).respond(200, text=html)
+        async with httpx.AsyncClient() as client:
+            info = await scraper.scrape(url, client)
+    assert info.price == Decimal("499.00")
+    assert info.currency == "USD"
+    assert info.name == "Main Product"
+
+
+@pytest.mark.asyncio
+async def test_walmart_microdata_currency_and_name_from_price_scope() -> None:
+    """Scenario A (#37): currency/name must come from the price element's own
+    itemscope (Offer/Product), not from a page-wide first match in a carousel."""
+    scraper = WalmartScraper()
+    url = "https://www.walmart.com/ip/9999"
+    html = """
+    <html><head><title>Main Product - Walmart.com</title></head><body>
+    <div class="recommendations">
+      <span itemprop="name">Related Gadget</span>
+      <meta itemprop="priceCurrency" content="MXN" />
+    </div>
+    <div itemscope itemtype="https://schema.org/Product">
+      <h1 itemprop="name">Main Product</h1>
+      <div itemprop="offers" itemscope itemtype="https://schema.org/Offer">
+        <span itemprop="price" content="499.00">$499.00</span>
+        <meta itemprop="priceCurrency" content="USD" />
+      </div>
+    </div>
+    </body></html>
+    """
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).respond(200, text=html)
+        async with httpx.AsyncClient() as client:
+            info = await scraper.scrape(url, client)
+    assert info.price == Decimal("499.00")
+    assert info.currency == "USD"
+    assert info.name == "Main Product"
+
+
+@pytest.mark.asyncio
 async def test_walmart_returns_error_on_http_500(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
