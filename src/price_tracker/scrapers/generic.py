@@ -116,11 +116,6 @@ class GenericScraper(AbstractScraper):
 
     # Extended list of selectors found across many e-commerce platforms
     PRICE_SELECTORS: ClassVar[list[str]] = [
-        # Generic e-commerce
-        "[data-price]",
-        "[data-product-price]",
-        "[data-current-price]",
-        "[data-sale-price]",
         # Common class patterns
         ".product-price",
         ".product-price-value",
@@ -166,11 +161,24 @@ class GenericScraper(AbstractScraper):
         # Shopify
         ".product-single__price",
         ".product__price",
-        "[data-product-price]",
         ".price__current",
         ".price-item--sale",
         ".price-item--regular",
+        # Broad data-* selectors LAST: page-wide attribute hits match unrelated
+        # widgets (carousels, upsells), so product-specific class selectors must
+        # win and matches are only trusted inside a product container (#26).
+        "[data-price]",
+        "[data-product-price]",
+        "[data-current-price]",
+        "[data-sale-price]",
     ]
+
+    # Selectors so broad that a match is accepted only inside a product container (#26)
+    BROAD_DATA_SELECTORS: ClassVar[frozenset[str]] = frozenset(
+        {"[data-price]", "[data-product-price]", "[data-current-price]", "[data-sale-price]"}
+    )
+
+    _PRODUCT_SCOPE_RE: ClassVar[re.Pattern[str]] = re.compile(r"product|main", re.IGNORECASE)
 
     PRICE_PATTERNS: ClassVar[list[str]] = [
         # €29,99 or €29.99 or € 1.299,99
@@ -536,6 +544,28 @@ class GenericScraper(AbstractScraper):
 
     # ── Strategy 6: CSS selectors ──────────────────────────────────
 
+    @classmethod
+    def _in_product_container(cls, el: Tag) -> bool:
+        """True when `el` or an ancestor looks like the main product container (#26).
+
+        Qualifying markers: id/class containing 'product' or 'main', or an
+        itemtype containing 'schema.org/Product'. Page-wide ``[data-*]`` price
+        hits outside such a container belong to unrelated widgets (carousels,
+        upsells) and must not be trusted.
+        """
+        node: Tag | None = el
+        while isinstance(node, Tag):
+            id_attr = node.get("id") or ""
+            classes = node.get("class") or []
+            if isinstance(classes, str):
+                classes = [classes]
+            if cls._PRODUCT_SCOPE_RE.search(" ".join([str(id_attr), *classes])):
+                return True
+            if "schema.org/product" in str(node.get("itemtype") or "").lower():
+                return True
+            node = node.parent
+        return False
+
     def _try_css_selectors(self, soup: BeautifulSoup) -> dict | None:
         for selector in self.PRICE_SELECTORS:
             try:
@@ -543,6 +573,8 @@ class GenericScraper(AbstractScraper):
             except (ValueError, AttributeError):
                 continue
             for el in elements:
+                if selector in self.BROAD_DATA_SELECTORS and not self._in_product_container(el):
+                    continue
                 for attr in (
                     "data-price",
                     "data-product-price",
@@ -582,6 +614,8 @@ class GenericScraper(AbstractScraper):
         for attr in price_data_attrs:
             elements = soup.find_all(attrs={attr: True})
             for el in elements:
+                if not self._in_product_container(el):
+                    continue
                 val = el.get(attr, "")
                 parsed = parse_price(str(val))
                 if parsed:
