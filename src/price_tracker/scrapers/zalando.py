@@ -23,6 +23,7 @@ from price_tracker.core.scraper_base import (
     get_headers,
     parse_price,
     select_jsonld_offer,
+    unwrap_jsonld_graph,
 )
 
 if TYPE_CHECKING:
@@ -140,7 +141,7 @@ class ZalandoScraper(AbstractScraper):
                 data = json.loads(raw)
             except (json.JSONDecodeError, ValueError):
                 continue
-            items = data if isinstance(data, list) else [data]
+            items = unwrap_jsonld_graph(data)
             for item in items:
                 if not isinstance(item, dict):
                     continue
