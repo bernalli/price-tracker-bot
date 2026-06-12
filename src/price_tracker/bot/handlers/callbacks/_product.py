@@ -25,6 +25,7 @@ from price_tracker.bot.handlers._helpers import (
     _escape_html,
     _get_product_name,
     _get_user_product,
+    _parse_id,
     _safe_dec,
 )
 from price_tracker.bot.handlers.history import _generate_chart
@@ -43,7 +44,10 @@ async def handle_delete_flow(
     `delete_all`, `confirmdeleteall`).
     """
     if data.startswith("confirm_delete_"):
-        product_id = int(data.replace("confirm_delete_", ""))
+        product_id = _parse_id(data.replace("confirm_delete_", ""))
+        if product_id is None:
+            await query.edit_message_text("❌ ID non valido.")
+            return True
         product = await _get_user_product(context, product_id, user_id)
         if product:
             name = product.get("name") or "Sconosciuto"
@@ -110,7 +114,10 @@ async def handle_check_button(
     if not data.startswith("check_"):
         return False
 
-    product_id = int(data.replace("check_", ""))
+    product_id = _parse_id(data.replace("check_", ""))
+    if product_id is None:
+        await query.edit_message_text("❌ ID non valido.")
+        return True
     product = await _get_user_product(context, product_id, user_id)
     if not product:
         await query.edit_message_text("❌ Prodotto non trovato.")
@@ -165,7 +172,10 @@ async def handle_chart_button(
     if not data.startswith("chart_"):
         return False
 
-    product_id = int(data.replace("chart_", ""))
+    product_id = _parse_id(data.replace("chart_", ""))
+    if product_id is None:
+        await query.edit_message_text("❌ ID non valido.")
+        return True
     product = await _get_user_product(context, product_id, user_id)
     if not product:
         await query.edit_message_text("❌ Prodotto non trovato.")
@@ -201,7 +211,10 @@ async def handle_amazon_pref(
     """Handle Amazon condition/seller preference buttons (`pref_*`)."""
     for prefix, (condition, seller, label) in _PREF_PROMPTS.items():
         if data.startswith(prefix):
-            product_id = int(data.replace(prefix, ""))
+            product_id = _parse_id(data.replace(prefix, ""))
+            if product_id is None:
+                await query.edit_message_text("❌ ID non valido.")
+                return True
             await db.set_product_preferences(product_id, condition=condition, seller=seller)
             name = await _get_product_name(db, product_id)
             await query.edit_message_text(
@@ -220,7 +233,10 @@ async def handle_track_choice(
 ) -> bool:
     """Handle tracking-mode choice buttons (`track_*`)."""
     if data.startswith("track_any_"):
-        product_id = int(data.replace("track_any_", ""))
+        product_id = _parse_id(data.replace("track_any_", ""))
+        if product_id is None:
+            await query.edit_message_text("❌ ID non valido.")
+            return True
         await db.set_threshold(product_id, "any_drop", "0")
         name = await _get_product_name(db, product_id)
         await query.edit_message_text(
@@ -232,7 +248,10 @@ async def handle_track_choice(
         return True
 
     if data.startswith("track_threshold_"):
-        product_id = int(data.replace("track_threshold_", ""))
+        product_id = _parse_id(data.replace("track_threshold_", ""))
+        if product_id is None:
+            await query.edit_message_text("❌ ID non valido.")
+            return True
         name = await _get_product_name(db, product_id)
         context.user_data["pending_action"] = ("threshold", product_id)
         await query.edit_message_text(
@@ -246,7 +265,10 @@ async def handle_track_choice(
         return True
 
     if data.startswith("track_target_"):
-        product_id = int(data.replace("track_target_", ""))
+        product_id = _parse_id(data.replace("track_target_", ""))
+        if product_id is None:
+            await query.edit_message_text("❌ ID non valido.")
+            return True
         name = await _get_product_name(db, product_id)
         product = await db.get_product(product_id)
         current = _safe_dec(product.get("current_price")) if product else None
@@ -264,7 +286,10 @@ async def handle_track_choice(
         return True
 
     if data.startswith("track_default_"):
-        product_id = int(data.replace("track_default_", ""))
+        product_id = _parse_id(data.replace("track_default_", ""))
+        if product_id is None:
+            await query.edit_message_text("❌ ID non valido.")
+            return True
         name = await _get_product_name(db, product_id)
         await query.edit_message_text(
             f"👍 <b>Soglia default -10%</b> per #{product_id}\n"
