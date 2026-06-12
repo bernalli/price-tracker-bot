@@ -34,6 +34,7 @@ from price_tracker.core.scraper_base import (
     detect_currency,
     get_headers,
     parse_price,
+    select_jsonld_offer,
 )
 
 logger = logging.getLogger(__name__)
@@ -389,42 +390,17 @@ class GenericScraper(AbstractScraper):
         return None
 
     def _extract_price_from_offers(self, offers: object) -> dict | None:
-        if isinstance(offers, list):
-            best: dict | None = None
-            for offer in offers:
-                result = self._extract_price_from_offers(offer)
-                if result and (best is None or result["price"] < best["price"]):
-                    best = result
-            return best
+        """Pick the representative offer via the shared selector (#27).
 
-        if not isinstance(offers, dict):
+        Filters financing/installment entries, never takes the cheapest list
+        entry (add-on/warranty trap) nor an AggregateOffer ``lowPrice``, and
+        normalises the currency to ISO-4217 (no silent EUR default).
+        """
+        selected = select_jsonld_offer(offers)
+        if selected is None:
             return None
-
-        offer_type = str(offers.get("@type", ""))
-        if "AggregateOffer" in offer_type:
-            low_price = offers.get("lowPrice")
-            if low_price is not None:
-                parsed = parse_price(str(low_price))
-                if parsed:
-                    return {
-                        "price": parsed,
-                        "currency": offers.get("priceCurrency", "EUR"),
-                    }
-
-        for price_key in ("price", "lowPrice"):
-            price = offers.get(price_key)
-            if price is not None:
-                parsed = parse_price(str(price))
-                if parsed:
-                    return {
-                        "price": parsed,
-                        "currency": offers.get("priceCurrency", "EUR"),
-                    }
-
-        if "offers" in offers:
-            return self._extract_price_from_offers(offers["offers"])
-
-        return None
+        price, currency = selected
+        return {"price": price, "currency": currency}
 
     # ── Strategy 2: Microdata ──────────────────────────────────────
 
