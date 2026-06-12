@@ -8,9 +8,14 @@ worker thread via asyncio.to_thread.
 from __future__ import annotations
 
 import threading
+from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock
 
 from price_tracker.bot.handlers import history
+
+if TYPE_CHECKING:
+    import io
+    from datetime import datetime
 
 
 async def test_chart_renders_off_the_event_loop(monkeypatch) -> None:
@@ -18,9 +23,9 @@ async def test_chart_renders_off_the_event_loop(monkeypatch) -> None:
     captured: dict[str, int] = {}
     real_render = history._render_chart
 
-    def spy(*args: object, **kwargs: object):  # noqa: ANN202
+    def spy(dates: list[datetime], prices: list[float], target: object, name: str) -> io.BytesIO:
         captured["thread"] = threading.get_ident()
-        return real_render(*args, **kwargs)
+        return real_render(dates, prices, target, name)
 
     monkeypatch.setattr(history, "_render_chart", spy)
 
