@@ -64,13 +64,14 @@ class DigestService:
         self._metrics = metrics
 
     async def enqueue(self, *, user_id: int, product_id: int, payload: dict[str, Any]) -> int:
-        """Enqueue an alert payload for digest delivery."""
-        eid = await self._repo.enqueue_digest(
+        """Enqueue an alert payload for digest delivery.
+
+        The ``digest_pending`` skip metric is emitted by the caller
+        (TelegramNotifier) — not here — so one routed alert counts once.
+        """
+        return await self._repo.enqueue_digest(
             user_id=user_id, product_id=product_id, payload=json.dumps(payload)
         )
-        if self._metrics is not None:
-            self._metrics.notification_skipped_total.labels(reason="digest_pending").inc()
-        return eid
 
     async def flush_user(self, *, user_id: int) -> int:
         """Flush all pending digest entries for a single user. Returns count flushed."""
