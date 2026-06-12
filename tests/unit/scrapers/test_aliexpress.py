@@ -9,6 +9,7 @@ import httpx
 import pytest
 import respx
 
+from price_tracker.core.exceptions import HTTPBlockStatus
 from price_tracker.scrapers.aliexpress import AliexpressScraper
 
 if TYPE_CHECKING:
@@ -82,3 +83,46 @@ async def test_aliexpress_returns_error_on_missing_data() -> None:
             info = await scraper.scrape(url, client)
     assert info.price is None
     assert info.error is not None
+
+
+def _no_wait(self: object, retry_state: object) -> float:  # noqa: ARG001
+    """Zero tenacity backoff so retry tests run instantly."""
+    return 0.0
+
+
+@pytest.mark.asyncio
+async def test_aliexpress_retries_transient_503_then_succeeds(
+    load_fixture: Callable[[str], str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Transient 5xx must be retried inside the @with_retry scope (bug #55)."""
+    monkeypatch.setattr("tenacity.wait.wait_random_exponential.__call__", _no_wait)
+    html = load_fixture("aliexpress/sample_product.html")
+    scraper = AliexpressScraper()
+    url = "https://www.aliexpress.com/item/1005005550000001.html"
+    with respx.mock(assert_all_called=False) as router:
+        route = router.get(url)
+        route.mock(
+            side_effect=[
+                httpx.Response(503, text="temporary upstream error"),
+                httpx.Response(200, text=html),
+            ]
+        )
+        async with httpx.AsyncClient() as client:
+            info = await scraper.scrape(url, client)
+    assert route.call_count == 2
+    assert info.error is None
+    assert info.price == Decimal("12.99")
+
+
+@pytest.mark.asyncio
+async def test_aliexpress_raises_block_event_on_403() -> None:
+    """A hard 403 must raise HTTPBlockStatus (quarantine), not ProductInfo(error=...)."""
+    scraper = AliexpressScraper()
+    url = "https://www.aliexpress.com/item/1005005550000002.html"
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).respond(403, text="<html><body>blocked</body></html>")
+        async with httpx.AsyncClient() as client:
+            with pytest.raises(HTTPBlockStatus) as exc:
+                await scraper.scrape(url, client)
+    assert exc.value.status == 403
