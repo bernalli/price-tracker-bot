@@ -63,7 +63,7 @@ class MetricsRegistry:
         self.quarantine_state = Gauge(
             f"{NAMESPACE}_quarantine_state",
             "Per-domain quarantine state (0=CLOSED 1=T1 2=T2 3=T3 4=HALF_OPEN).",
-            ["domain", "state"],
+            ["domain"],
             registry=reg,
         )
         self.quarantine_transitions_total = Counter(

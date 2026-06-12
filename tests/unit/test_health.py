@@ -4,12 +4,14 @@ from unittest.mock import AsyncMock
 
 import pytest
 from freezegun import freeze_time
+from prometheus_client import CollectorRegistry
 
 from price_tracker.core.health import (
     HealthManager,
     QuarantineState,
 )
 from price_tracker.db.models import ScraperHealth
+from price_tracker.observability.metrics import MetricsRegistry
 
 
 @pytest.fixture
@@ -169,3 +171,29 @@ class TestHealthManagerStateMachine:
         await mgr.load()
         assert mgr.state("x.com") == QuarantineState.LOCKED_T2
         assert mgr.is_locked("x.com")
+
+    @pytest.mark.asyncio
+    async def test_quarantine_state_gauge_single_series_after_recovery(self, repo_mock):
+        """Bug #52: recovery must not leave a stale LOCKED series on the gauge.
+
+        quarantine_state is a per-domain state enum encoded as an int value;
+        a "state" label would leave the old series (e.g. LOCKED_T1=1) alive
+        forever after the domain recovers.
+        """
+        registry = CollectorRegistry()
+        metrics = MetricsRegistry(registry=registry)
+        mgr = HealthManager(repo=repo_mock, metrics=metrics)
+        await mgr.load()
+        for _ in range(3):
+            await mgr.record_block("x.com", reason="HTTP 429")  # → LOCKED_T1
+        await mgr.record_success("x.com")  # → CLOSED
+
+        samples = [
+            sample
+            for metric in registry.collect()
+            for sample in metric.samples
+            if sample.name == "price_tracker_quarantine_state"
+        ]
+        assert len(samples) == 1, f"expected one series for x.com, got {samples}"
+        assert samples[0].labels == {"domain": "x.com"}
+        assert samples[0].value == 0.0
