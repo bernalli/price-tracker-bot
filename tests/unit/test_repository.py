@@ -11,6 +11,7 @@ import aiosqlite
 import pytest
 import pytest_asyncio
 
+from price_tracker.db import apply_runtime_pragmas
 from price_tracker.db.migrator import apply_migrations
 from price_tracker.db.models import ScraperHealth
 from price_tracker.db.repository import Repository
@@ -561,3 +562,45 @@ class TestDigestQueueRepository:
         # No exception raised, no rows touched.
         pending = await repo.list_pending_digest(user_id=1)
         assert pending == []
+
+
+class TestRuntimePragmas:
+    """The runtime connection must enforce FK constraints (#57).
+
+    ``PRAGMA foreign_keys`` is connection-scoped and OFF by default: the one
+    in 001_initial.sql only affected the ephemeral migration connection, so
+    ON DELETE CASCADE never fired at runtime.
+    """
+
+    @pytest.mark.asyncio
+    async def test_apply_runtime_pragmas_turns_foreign_keys_on(self):
+        conn = await aiosqlite.connect(":memory:")
+        try:
+            await apply_runtime_pragmas(conn)
+            cursor = await conn.execute("PRAGMA foreign_keys")
+            row = await cursor.fetchone()
+            assert row is not None
+            assert row[0] == 1
+        finally:
+            await conn.close()
+
+    @pytest.mark.asyncio
+    async def test_delete_product_cascades_price_history(self):
+        conn = await aiosqlite.connect(":memory:")
+        conn.row_factory = aiosqlite.Row
+        try:
+            await apply_migrations(conn, MIGRATIONS_DIR)
+            await apply_runtime_pragmas(conn)
+            repo = Repository(conn)
+            await repo.create_user(user_id=1)
+            await repo.create_product(product_id=10, user_id=1, url="https://x.com/1")
+            await repo.add_price_history(10, Decimal("9.99"))
+            assert await repo.delete_product(10, user_id=1) is True
+            cursor = await conn.execute(
+                "SELECT COUNT(*) FROM price_history WHERE product_id = ?", (10,)
+            )
+            row = await cursor.fetchone()
+            assert row is not None
+            assert row[0] == 0
+        finally:
+            await conn.close()
