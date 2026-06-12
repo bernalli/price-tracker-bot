@@ -384,6 +384,11 @@ class Scheduler:
                 info.currency,
                 p.currency,
             )
+            # A currency mismatch is still a successful scrape (HTTP ok, price
+            # parsed) — record it so a HALF_OPEN probe can close the domain;
+            # only the persist/alert is skipped (#20).
+            if domain != "unknown":
+                await handle_success_in_pipeline(health_mgr=self.deps.health_mgr, domain=domain)
             return (p.user_id, None, False)
 
         history = [h.price for h in await self.deps.repo.get_price_history(p.id, limit=50)]
