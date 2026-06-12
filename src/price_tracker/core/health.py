@@ -160,9 +160,7 @@ class HealthManager:
                         from_state=current_state.value,
                         to_state=new_state.value,
                     ).inc()
-                self._metrics.quarantine_state.labels(domain=domain, state=new_state.value).set(
-                    _state_to_int(new_state)
-                )
+                self._metrics.quarantine_state.labels(domain=domain).set(_state_to_int(new_state))
             return new_state
 
     async def record_success(self, domain: str) -> QuarantineState:
@@ -188,9 +186,9 @@ class HealthManager:
                         from_state=current_state.value,
                         to_state=QuarantineState.CLOSED.value,
                     ).inc()
-                self._metrics.quarantine_state.labels(
-                    domain=domain, state=QuarantineState.CLOSED.value
-                ).set(_state_to_int(QuarantineState.CLOSED))
+                self._metrics.quarantine_state.labels(domain=domain).set(
+                    _state_to_int(QuarantineState.CLOSED)
+                )
             return QuarantineState.CLOSED
 
 
