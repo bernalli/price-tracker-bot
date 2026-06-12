@@ -137,7 +137,20 @@ class EbayScraper(AbstractScraper):
         return None
 
     def _try_microdata(self, soup: BeautifulSoup, info: ProductInfo) -> None:
-        price_el = find_microdata_price_el(soup)
+        # Prefer the main listing container: related/recommended carousels often
+        # expose their own itemprop=price (even a full offers scope) earlier in
+        # document order and would win a page-wide microdata lookup (#31).
+        price_el = None
+        main = soup.select_one(".x-price-primary")
+        if main is not None:
+            price_el = main.find(attrs={"itemprop": "price"})
+            currency_el = main.find(attrs={"itemprop": "priceCurrency"})
+            if currency_el is not None and not info.currency:
+                currency = currency_el.get("content") or currency_el.get_text(strip=True)
+                if currency:
+                    info.currency = str(currency)
+        if price_el is None:
+            price_el = find_microdata_price_el(soup)
         if price_el:
             val = price_el.get("content") or price_el.get_text(strip=True)
             parsed = parse_price(str(val))

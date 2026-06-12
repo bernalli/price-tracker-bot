@@ -60,6 +60,66 @@ async def test_ebay_parses_fixture_html(load_fixture: Callable[[str], str]) -> N
     assert info.error is None
 
 
+# ── scrape: microdata scoping (#31) ──────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_ebay_microdata_ignores_bare_related_price_before_main() -> None:
+    """Related-item bare span (no itemscope) before the main listing must not win.
+
+    Repro V1 (#31): a recommendations module exposes a bare itemprop=price 5.00
+    earlier in document order than the main .x-price-primary 250.00.
+    """
+    scraper = EbayScraper()
+    html = """
+    <!DOCTYPE html><html><body>
+    <div class="related-items"><span itemprop="price" content="5.00">$5.00</span></div>
+    <div class="x-price-primary">
+      <span itemprop="price" content="250.00">US $250.00</span>
+    </div>
+    </body></html>
+    """
+
+    with respx.mock(assert_all_called=False) as router:
+        router.get("https://www.ebay.com/itm/RELATED1").respond(200, text=html)
+        async with httpx.AsyncClient() as client:
+            info = await scraper.scrape("https://www.ebay.com/itm/RELATED1", client)
+
+    assert info.price == Decimal("250.00")
+
+
+@pytest.mark.asyncio
+async def test_ebay_microdata_prefers_main_container_over_carousel_offers() -> None:
+    """A related carousel with its own itemprop=offers scope must not win.
+
+    Repro V4 (#31): the carousel is a complete Product/Offer itemscope appearing
+    before the main listing; price (and currency) must come from .x-price-primary.
+    """
+    scraper = EbayScraper()
+    html = """
+    <!DOCTYPE html><html><body>
+    <div class="carousel" itemscope itemtype="https://schema.org/Product">
+      <div itemprop="offers" itemscope itemtype="https://schema.org/Offer">
+        <span itemprop="price" content="5.00">$5.00</span>
+        <span itemprop="priceCurrency" content="GBP"></span>
+      </div>
+    </div>
+    <div class="x-price-primary">
+      <span itemprop="price" content="250.00">US $250.00</span>
+      <span itemprop="priceCurrency" content="USD"></span>
+    </div>
+    </body></html>
+    """
+
+    with respx.mock(assert_all_called=False) as router:
+        router.get("https://www.ebay.com/itm/CAROUSEL1").respond(200, text=html)
+        async with httpx.AsyncClient() as client:
+            info = await scraper.scrape("https://www.ebay.com/itm/CAROUSEL1", client)
+
+    assert info.price == Decimal("250.00")
+    assert info.currency == "USD"
+
+
 # ── scrape: error paths ──────────────────────────────────────────
 
 
