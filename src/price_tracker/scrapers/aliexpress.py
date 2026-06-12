@@ -22,6 +22,7 @@ from price_tracker.core.scraper_base import (
     detect_block_event,
     detect_currency,
     get_headers,
+    jsonld_offer_availability,
     parse_price,
 )
 
@@ -47,6 +48,7 @@ class StrategyResult(TypedDict, total=False):
     price: Decimal
     currency: str
     name: str
+    available: bool
 
 
 @with_retry(RetryConfig(max_attempts=3, base_wait=2.0, max_wait=10.0))
@@ -119,6 +121,8 @@ class AliexpressScraper(AbstractScraper):
                         info.currency = result["currency"]
                     if result.get("name") and info.name is None:
                         info.name = result["name"]
+                    if result.get("available") is not None:
+                        info.available = result["available"]
                     logger.debug("aliexpress price via %s: %s", strategy_name, info.price)
                 elif result and result.get("name") and info.name is None:
                     info.name = result["name"]
@@ -203,6 +207,9 @@ class AliexpressScraper(AbstractScraper):
                         if parsed is not None:
                             result["price"] = parsed
                             result["currency"] = str(offers.get("priceCurrency", "USD"))
+                            availability = jsonld_offer_availability(offers)
+                            if availability is not None:
+                                result["available"] = availability
                 name = item.get("name")
                 if isinstance(name, str) and name:
                     result["name"] = name[:200]

@@ -221,8 +221,14 @@ class ShopifyScraper(AbstractScraper):
 
             variants = product.get("variants", [])
             logger.debug("Shopify JSON API: %s, %d variants", name, len(variants))
+            declares_availability = any(isinstance(v, dict) and "available" in v for v in variants)
             price: Decimal | None = None
+            available = True
+            # Prefer variants the shop declares purchasable: sold-out products
+            # often keep a placeholder price on the first variant (#33).
             for variant in variants:
+                if declares_availability and not variant.get("available"):
+                    continue
                 variant_price = variant.get("price")
                 if variant_price:
                     parsed = parse_price(str(variant_price))
@@ -231,6 +237,18 @@ class ShopifyScraper(AbstractScraper):
                         price = parsed
                         break
 
+            if price is None and declares_availability:
+                # No purchasable variant: report the first priced one, but
+                # flag the product as unavailable.
+                for variant in variants:
+                    variant_price = variant.get("price")
+                    if variant_price:
+                        parsed = parse_price(str(variant_price))
+                        if parsed:
+                            price = parsed
+                            available = False
+                            break
+
             if price is None:
                 return None
 
@@ -238,6 +256,7 @@ class ShopifyScraper(AbstractScraper):
                 name=name,
                 price=price,
                 currency=None,  # Unknown from JSON API; detected from HTML downstream
+                available=available,
             )
 
         except (json.JSONDecodeError, httpx.HTTPError, ValueError, KeyError, AttributeError) as e:
