@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from decimal import Decimal
 from typing import TYPE_CHECKING
@@ -9,12 +10,22 @@ from typing import TYPE_CHECKING
 import httpx
 import pytest
 import respx
+from bs4 import BeautifulSoup
 
 from price_tracker.scrapers import generic as generic_module
 from price_tracker.scrapers.generic import GenericScraper
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+
+def _jsonld_soup(payload: object) -> BeautifulSoup:
+    html = (
+        '<html><head><script type="application/ld+json">'
+        f"{json.dumps(payload)}"
+        "</script></head><body></body></html>"
+    )
+    return BeautifulSoup(html, "lxml")
 
 
 @pytest.fixture(autouse=True)
@@ -80,6 +91,66 @@ async def test_generic_parses_microdata_fixture(
     assert info.price == Decimal("29.99")
     assert info.currency == "EUR"
     assert info.error is None
+
+
+# ── JSON-LD offers selection (#27) ────────────────────────────────
+
+
+def test_jsonld_offers_picks_main_price_not_cheapest_addon() -> None:
+    """Offer list [main 199.99, addon 14.99] → main price, not the cheapest entry."""
+    payload = {
+        "@type": "Product",
+        "name": "Laptop Pro",
+        "offers": [
+            {"@type": "Offer", "price": "199.99", "priceCurrency": "EUR"},
+            {
+                "@type": "Offer",
+                "name": "Garanzia aggiuntiva",
+                "price": "14.99",
+                "priceCurrency": "EUR",
+            },
+        ],
+    }
+    result = GenericScraper()._try_json_ld(_jsonld_soup(payload))
+    assert result is not None
+    assert result["price"] == Decimal("199.99")
+    assert result["currency"] == "EUR"
+
+
+def test_jsonld_offers_filters_financing_offer() -> None:
+    """A '24 Raten' monthly-installment offer must not be selected as the price."""
+    payload = {
+        "@type": "Product",
+        "name": "TV 55",
+        "offers": [
+            {
+                "@type": "Offer",
+                "name": "Finanzierung: 24 Raten",
+                "price": "24.99",
+                "priceSpecification": {
+                    "@type": "UnitPriceSpecification",
+                    "billingDuration": 24,
+                },
+            },
+            {"@type": "Offer", "price": "199.99", "priceCurrency": "EUR"},
+        ],
+    }
+    result = GenericScraper()._try_json_ld(_jsonld_soup(payload))
+    assert result is not None
+    assert result["price"] == Decimal("199.99")
+
+
+def test_jsonld_offer_without_currency_yields_none_not_eur() -> None:
+    """Missing priceCurrency must not silently default to EUR."""
+    payload = {
+        "@type": "Product",
+        "name": "Widget",
+        "offers": {"@type": "Offer", "price": "49.99"},
+    }
+    result = GenericScraper()._try_json_ld(_jsonld_soup(payload))
+    assert result is not None
+    assert result["price"] == Decimal("49.99")
+    assert result.get("currency") is None
 
 
 # ── scrape: error paths ──────────────────────────────────────────
