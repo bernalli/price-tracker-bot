@@ -153,6 +153,32 @@ def test_jsonld_offer_without_currency_yields_none_not_eur() -> None:
     assert result.get("currency") is None
 
 
+# ── JS product data (#53) ────────────────────────────────────────
+
+
+def _script_soup(js: str) -> BeautifulSoup:
+    return BeautifulSoup(f"<html><head><script>{js}</script></head><body></body></html>", "lxml")
+
+
+def test_js_product_data_skips_unidentified_object_before_product() -> None:
+    """An analytics/related object's price must not win over the product object."""
+    js = (
+        'dataLayer.push({"listName": "related-products", "price": 9.99});'
+        'var product = {"name": "Laptop Pro", "sku": "LP-100", "price": 199.99};'
+    )
+    result = GenericScraper()._try_js_product_data(_script_soup(js))
+    assert result is not None
+    assert result["price"] == Decimal("199.99")
+
+
+def test_js_product_data_bare_price_fallback_still_works() -> None:
+    """With no product-identified object anywhere, the bare regex fallback applies."""
+    js = 'window.__app = {"currency": "EUR", "price": 49.99};'
+    result = GenericScraper()._try_js_product_data(_script_soup(js))
+    assert result is not None
+    assert result["price"] == Decimal("49.99")
+
+
 # ── scrape: error paths ──────────────────────────────────────────
 
 
