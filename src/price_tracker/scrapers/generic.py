@@ -53,6 +53,24 @@ PRODUCT_TYPES: frozenset[str] = frozenset(
     }
 )
 
+# Inline-JS extraction (#53): price-bearing keys, and identity keys marking a
+# JSON object as the product itself rather than analytics/related-item data.
+_JS_PRICE_KEYS: tuple[str, ...] = (
+    "price",
+    "salePrice",
+    "sale_price",
+    "current_price",
+    "finalPrice",
+    "selling_price",
+)
+_JS_IDENTITY_KEYS: tuple[str, ...] = ("name", "title", "sku", "productId", "product_id")
+_JS_PRICE_OBJECT_RE = re.compile(
+    r'\{[^{}]*"(?:' + "|".join(_JS_PRICE_KEYS) + r')"\s*:\s*"?\d[^{}]*\}'
+)
+_JS_BARE_PRICE_PATTERNS: list[str] = [
+    rf'"{key}"\s*:\s*"?(\d{{1,6}}(?:\.\d{{1,2}})?)"?' for key in _JS_PRICE_KEYS
+]
+
 
 @with_retry(RetryConfig(max_attempts=3, base_wait=2.0, max_wait=10.0))
 async def _fetch_generic_html(url: str, client: httpx.AsyncClient) -> str:
@@ -574,29 +592,22 @@ class GenericScraper(AbstractScraper):
     # ── Strategy 8: JS embedded product data ───────────────────────
 
     def _try_js_product_data(self, soup: BeautifulSoup) -> dict | None:
-        scripts = soup.find_all("script")
-        for script in scripts:
-            if not script.string:
-                continue
-            text = script.string
+        texts: list[str] = []
+        for script in soup.find_all("script"):
+            raw = script.string
+            if raw and len(raw) <= 200000:
+                texts.append(raw)
 
-            if len(text) > 200000:
-                continue
+        # Pass 1 — context-aware: accept a price only when co-located with
+        # product identity keys, so analytics/related-item objects appearing
+        # earlier in the page cannot leak their price (#53).
+        for text in texts:
+            result = self._js_identified_object_price(text)
+            if result:
+                return result
 
-            for pattern in [
-                r'"price"\s*:\s*"?(\d{1,6}(?:\.\d{1,2})?)"?',
-                r'"salePrice"\s*:\s*"?(\d{1,6}(?:\.\d{1,2})?)"?',
-                r'"sale_price"\s*:\s*"?(\d{1,6}(?:\.\d{1,2})?)"?',
-                r'"current_price"\s*:\s*"?(\d{1,6}(?:\.\d{1,2})?)"?',
-                r'"finalPrice"\s*:\s*"?(\d{1,6}(?:\.\d{1,2})?)"?',
-                r'"selling_price"\s*:\s*"?(\d{1,6}(?:\.\d{1,2})?)"?',
-            ]:
-                matches = re.findall(pattern, text)
-                for match in matches:
-                    parsed = parse_price(match)
-                    if parsed and Decimal("0.50") < parsed < Decimal("100000"):
-                        return {"price": parsed}
-
+        # Pass 2 — Shopify-style variants objects (legacy heuristic).
+        for text in texts:
             if "variants" in text and "price" in text:
                 for json_match in re.finditer(r'\{[^{}]*"price"\s*:\s*"?\d+\.?\d*"?[^{}]*\}', text):
                     try:
@@ -612,6 +623,34 @@ class GenericScraper(AbstractScraper):
                     except (json.JSONDecodeError, AttributeError):
                         pass
 
+        # Pass 3 — bare key:value regex, last resort when no identified object.
+        for text in texts:
+            for pattern in _JS_BARE_PRICE_PATTERNS:
+                for match in re.findall(pattern, text):
+                    parsed = parse_price(match)
+                    if parsed and Decimal("0.50") < parsed < Decimal("100000"):
+                        return {"price": parsed}
+
+        return None
+
+    def _js_identified_object_price(self, text: str) -> dict | None:
+        """Price from a flat JSON object carrying product identity keys (#53)."""
+        for json_match in _JS_PRICE_OBJECT_RE.finditer(text):
+            try:
+                obj = json.loads(json_match.group())
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(obj, dict):
+                continue
+            if not any(obj.get(key) for key in _JS_IDENTITY_KEYS):
+                continue
+            for key in _JS_PRICE_KEYS:
+                value = obj.get(key)
+                if value is None:
+                    continue
+                parsed = parse_price(str(value))
+                if parsed and Decimal("0.50") < parsed < Decimal("100000"):
+                    return {"price": parsed, "name": obj.get("name") or obj.get("title")}
         return None
 
     # ── Strategy 9: Regex fallback ─────────────────────────────────
