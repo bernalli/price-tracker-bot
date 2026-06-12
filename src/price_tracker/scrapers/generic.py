@@ -25,6 +25,7 @@ from typing import ClassVar
 import httpx
 from bs4 import BeautifulSoup, Tag
 
+from price_tracker.core.exceptions import BlockEvent
 from price_tracker.core.retry_policy import RetryConfig, with_retry
 from price_tracker.core.scraper_base import (
     AbstractScraper,
@@ -57,6 +58,10 @@ async def _fetch_generic_html(url: str, client: httpx.AsyncClient) -> str:
     """Single GET attempt with browser headers. Tenacity handles retries."""
     headers = get_headers()
     response = await client.get(url, headers=headers, follow_redirects=True)
+    # Surface 403/429 (and WAF/CAPTCHA bodies) as a BlockEvent BEFORE
+    # raise_for_status, so the scheduler quarantines the domain instead of
+    # recording a generic failure (#16). with_retry never retries BlockEvents.
+    detect_block_event(status_code=response.status_code, body=response.text, url=url)
     response.raise_for_status()
     return response.text
 
@@ -71,6 +76,10 @@ async def _fetch_with_curl_cffi(url: str) -> str | None:
     try:
         async with AsyncSession(impersonate="chrome") as session:
             resp = await session.get(url, allow_redirects=True, timeout=30)
+            if resp.status_code in (403, 429):
+                # Hard block on the primary path: raise instead of discarding the
+                # status, so scrape() can quarantine after fallbacks fail (#16).
+                detect_block_event(status_code=resp.status_code, body=resp.text or "", url=url)
             if 200 <= resp.status_code < 300 and resp.text:
                 return resp.text
             logger.debug("curl_cffi got %s for %s", resp.status_code, url[:60])
@@ -161,7 +170,13 @@ class GenericScraper(AbstractScraper):
     async def scrape(self, url: str, client: httpx.AsyncClient) -> ProductInfo:
         # Anti-bot primary: try curl_cffi (Chrome JA3) first — covers many
         # Shopify / boutique e-commerce fronts that drop plain httpx requests.
-        html = await _fetch_with_curl_cffi(url)
+        html: str | None = None
+        curl_block: BlockEvent | None = None
+        try:
+            html = await _fetch_with_curl_cffi(url)
+        except BlockEvent as e:
+            # Defer: give httpx a chance before signalling quarantine (#16).
+            curl_block = e
         if not html or len(html) < 5000:
             try:
                 fetched = await _fetch_generic_html(url, client)
@@ -171,6 +186,10 @@ class GenericScraper(AbstractScraper):
                 logger.debug("Generic httpx fetch failed for %s: %s", url[:60], e)
                 # Keep curl_cffi result (if any)
         if not html:
+            if curl_block is not None:
+                # Both paths failed and curl_cffi saw a hard block (403/429):
+                # surface it so the scheduler quarantines the domain (#16).
+                raise curl_block
             return ProductInfo(error="Impossibile caricare la pagina")
 
         # Surface WAF/CAPTCHA challenge bodies (often served with HTTP 200) as a

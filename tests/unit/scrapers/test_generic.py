@@ -107,8 +107,8 @@ async def test_generic_handles_404(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_generic_handles_429_after_retries(monkeypatch: pytest.MonkeyPatch) -> None:
-    """429 with retries exhausted → ProductInfo with error."""
+async def test_generic_handles_500_after_retries(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Non-block 500 with retries exhausted → ProductInfo with error (no BlockEvent)."""
     scraper = GenericScraper()
 
     async def _fast_fail(url: str, client: httpx.AsyncClient) -> str:
@@ -119,7 +119,7 @@ async def test_generic_handles_429_after_retries(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(generic_module, "_fetch_generic_html", _fast_fail)
 
     with respx.mock(assert_all_called=False) as router:
-        router.get("https://example.com/rate").respond(429)
+        router.get("https://example.com/rate").respond(500)
         async with httpx.AsyncClient() as client:
             info = await scraper.scrape("https://example.com/rate", client)
 
