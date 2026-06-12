@@ -376,6 +376,16 @@ class Scheduler:
             )
             return (p.user_id, None, disabled)
 
+        if info.currency is not None and p.currency is not None and info.currency != p.currency:
+            logger.warning(
+                "Product %d: currency mismatch (scraped=%s, stored=%s) — read skipped, "
+                "no persist/alert",
+                p.id,
+                info.currency,
+                p.currency,
+            )
+            return (p.user_id, None, False)
+
         history = [h.price for h in await self.deps.repo.get_price_history(p.id, limit=50)]
         outlier = is_outlier(
             info.price,
