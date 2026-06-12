@@ -7,6 +7,7 @@ scrapling) when 403/CAPTCHA are returned.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import random
@@ -83,17 +84,22 @@ async def _fetch_via_curl_cffi(url: str) -> str | None:
 async def _fetch_via_scrapling(url: str) -> str | None:
     """Final fallback via Scrapling (stealth headers). Returns None on any failure."""
     try:
+        from curl_cffi import CurlError
         from scrapling import Fetcher
     except ImportError:
         logger.debug("Scrapling not available for Amazon fallback")
         return None
     try:
-        page = Fetcher.get(url, stealthy_headers=True, follow_redirects=True, timeout=30)
+        # Fetcher.get is synchronous (time.sleep between retries, up to 3x30s):
+        # run it in a worker thread so it cannot block the event loop (#21/#59).
+        page = await asyncio.to_thread(
+            Fetcher.get, url, stealthy_headers=True, follow_redirects=True, timeout=30
+        )
         if page.status == 200 and page.text:
             logger.info("Scrapling fallback succeeded for %s", url[:60])
             return page.text
         logger.warning("Scrapling fallback got status %s for %s", page.status, url[:60])
-    except (ValueError, OSError, AttributeError) as e:
+    except (CurlError, ValueError, OSError, AttributeError) as e:
         logger.warning("Scrapling fallback failed for %s: %s", url[:60], e)
     return None
 
