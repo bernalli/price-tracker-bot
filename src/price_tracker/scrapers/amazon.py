@@ -27,6 +27,7 @@ from price_tracker.core.scraper_base import (
     detect_currency,
     get_headers,
     parse_price,
+    select_jsonld_offer,
 )
 
 logger = logging.getLogger(__name__)
@@ -570,16 +571,12 @@ class AmazonScraper(AbstractScraper):
             try:
                 data = json.loads(script.string)
                 if isinstance(data, dict) and data.get("@type") == "Product":
-                    offers = data.get("offers", {})
-                    if isinstance(offers, list):
-                        offers = offers[0] if offers else {}
-                    offer_type = offers.get("@type", "")
-                    if offer_type == "AggregateOffer":
-                        logger.debug("Skipping AggregateOffer.lowPrice (unreliable on Amazon)")
-                        continue
-                    price = offers.get("price")
-                    if price:
-                        return parse_price(str(price))
+                    # Shared offer selection: skips financing entries and
+                    # AggregateOffer.lowPrice, returns the representative
+                    # concrete price — never offers[0] blindly (#54).
+                    selected = select_jsonld_offer(data.get("offers", {}))
+                    if selected is not None:
+                        return selected[0]
             except (json.JSONDecodeError, TypeError, AttributeError):
                 continue
         return None
