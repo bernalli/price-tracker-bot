@@ -88,7 +88,7 @@ class TargetScraper(AbstractScraper):
                 result = strategy_fn(soup)
                 if not result:
                     continue
-                if result.get("price") is not None and info.price is None:
+                if result.get("price") is not None and result["price"] > 0 and info.price is None:
                     info.price = result["price"]
                     logger.debug("target price via %s: %s", strategy_name, info.price)
                 if result.get("currency") and info.currency is None:
