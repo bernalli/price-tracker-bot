@@ -180,6 +180,10 @@ async def handle_text_input(  # noqa: PLR0915 — verbatim port; cyclomatic spli
             await update.message.reply_text(_("❌ Minimo 5 minuti."))
             context.user_data["pending_action"] = pending_action
             return
+        if minutes > 1440 * 7:
+            await update.message.reply_text(_("❌ L'intervallo massimo è 7 giorni."))
+            context.user_data["pending_action"] = pending_action
+            return
         await db.set_config("check_interval_minutes", str(minutes))
         _reschedule_periodic_check(context, minutes)
         if minutes >= 60:
