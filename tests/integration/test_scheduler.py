@@ -951,6 +951,106 @@ async def test_scheduler_renotifies_after_cooldown_elapsed(
     assert notifier.await_count == 2
 
 
+class _CountingConnectErrorScraper(AbstractScraper):
+    """Raises a non-block httpx error on every scrape and counts the attempts.
+
+    Used to count HALF_OPEN probes: a non-block failure (timeout/connect error)
+    leaves the domain HALF_OPEN, unlike a block (lock) or a success (close).
+    """
+
+    name = "counting-raising"
+    priority = 100
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def can_handle(self, url: str) -> bool:
+        return True
+
+    async def scrape(self, url: str, client: httpx.AsyncClient) -> ProductInfo:
+        self.calls += 1
+        raise httpx.ConnectError("simulated timeout (non-block failure)")
+
+
+@pytest.mark.asyncio
+async def test_run_check_all_sends_single_half_open_probe_across_users() -> None:
+    """Bug #17: a HALF_OPEN domain must receive exactly ONE probe per global
+    sweep, even when multiple users track products on that domain.
+
+    Three users each track one product on the same half-open domain; the probe
+    fails with a non-block error (httpx.ConnectError) so the domain stays
+    HALF_OPEN throughout the sweep (a block or a success would transition the
+    state). Before the fix every per-user ``_run_tick`` created its own
+    ``half_open_seen`` set, so ``run_check_all`` sent one probe per user.
+    """
+    from price_tracker.db.models import ProductRecord, UserRecord  # noqa: PLC0415
+
+    def _make_product(pid: int, uid: int) -> ProductRecord:
+        return ProductRecord(
+            id=pid,
+            user_id=uid,
+            url=f"https://example.com/item/{pid}",
+            name=f"Product {pid}",
+            domain="example.com",
+            initial_price=Decimal("100"),
+            current_price=None,
+            lowest_price=None,
+            highest_price=None,
+            target_price=None,
+            threshold_type="drop_pct",
+            threshold_value=Decimal("10"),
+            is_active=True,
+            is_available=True,
+            consecutive_errors=0,
+            currency="EUR",
+            check_interval_minutes=None,
+            last_checked_at=None,
+            last_notified_at=None,
+        )
+
+    users = [UserRecord(user_id=u, is_admin=False, is_active=True) for u in (1, 2, 3)]
+    products_by_user = {u.user_id: [_make_product(100 + u.user_id, u.user_id)] for u in users}
+
+    repo = AsyncMock()
+    repo.list_active_users.return_value = users
+
+    async def _list_products(*, user_id: int, only_active: bool = True) -> list[ProductRecord]:  # noqa: ARG001
+        return products_by_user[user_id]
+
+    repo.list_products_for_user.side_effect = _list_products
+
+    async def _get_product(pid: int) -> ProductRecord:
+        return _make_product(pid, 1)  # consecutive_errors=0 → never auto-disabled
+
+    repo.get_product.side_effect = _get_product
+
+    health_mgr: HealthManager = AsyncMock(spec=HealthManager)
+    health_mgr.is_locked = lambda _d: False
+    health_mgr.is_half_open = lambda d: d == "example.com"
+
+    scraper = _CountingConnectErrorScraper()
+    registry = ScraperRegistry()
+    registry.register(scraper)
+
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=AsyncMock(),
+                max_consecutive_errors=10,
+                delay_between_products=0.0,
+                health_mgr=health_mgr,
+            )
+        )
+        await scheduler.run_check_all()
+
+    assert scraper.calls == 1, (
+        f"HALF_OPEN domain probed {scraper.calls} times in one global sweep (expected 1)"
+    )
+
+
 class _SelectiveScraper(AbstractScraper):
     """Raises an *unexpected* exception for one URL, returns a good price otherwise."""
 
