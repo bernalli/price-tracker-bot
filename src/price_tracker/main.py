@@ -22,6 +22,7 @@ from price_tracker.core.registry import (
     discover_dropin_scrapers,
 )
 from price_tracker.core.scheduler import Scheduler, SchedulerDeps
+from price_tracker.db import apply_runtime_pragmas
 from price_tracker.db.migrator import apply_migrations
 from price_tracker.db.repository import Repository
 from price_tracker.notifier.digest import DigestService
@@ -137,6 +138,7 @@ async def amain() -> None:
     Path(config.database_path).parent.mkdir(parents=True, exist_ok=True)
     db_conn = await aiosqlite.connect(config.database_path)
     db_conn.row_factory = aiosqlite.Row
+    await apply_runtime_pragmas(db_conn)
 
     application = (
         Application.builder()
