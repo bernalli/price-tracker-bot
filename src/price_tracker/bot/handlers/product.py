@@ -6,6 +6,7 @@ Ported from monolithic bot.py. CSV export/import lives in
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from decimal import Decimal, InvalidOperation
@@ -292,7 +293,22 @@ async def _add_product(
     user_id = update.effective_user.id
 
     from price_tracker.core.scraper_base import detect_currency  # noqa: PLC0415
-    from price_tracker.core.url_utils import extract_etld_plus_one  # noqa: PLC0415
+    from price_tracker.core.url_utils import (  # noqa: PLC0415
+        UnsafeURLError,
+        extract_etld_plus_one,
+        validate_public_url,
+    )
+
+    # SSRF guard: reject URLs pointing to private/internal/loopback addresses
+    # before the URL is stored or fetched. Runs in a thread (getaddrinfo blocks).
+    try:
+        await asyncio.to_thread(validate_public_url, url)
+    except UnsafeURLError as e:
+        logger.warning("Rejected unsafe product URL from user %d: %s", user_id, e)
+        await update.message.reply_text(
+            "❌ URL non consentito: punta a un indirizzo privato o interno."
+        )
+        return
 
     # Check for duplicates PER USER
     existing = await db.get_product_by_url_for_user(url, user_id)
@@ -318,7 +334,17 @@ async def _add_product(
             "💡 Verifica che il link sia corretto o segnala il sito non supportato."
         )
         return
-    result = await scraper_for_url.scrape(url, client)
+    from price_tracker.core.exceptions import BlockEvent  # noqa: PLC0415
+
+    try:
+        result = await scraper_for_url.scrape(url, client)
+    except BlockEvent:
+        logger.info("Add blocked by site protection for %s", url[:60])
+        await msg.edit_text(
+            "🛡 Il sito sta bloccando le richieste automatiche in questo momento.\n"
+            "Riprova tra qualche minuto."
+        )
+        return
 
     if result.price is None:
         error_msg = result.error or "Prezzo non trovato"

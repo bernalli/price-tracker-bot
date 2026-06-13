@@ -27,6 +27,12 @@ MIN_HISTORY = 5
 # Default tolerance: a price more than `max_ratio` × median is flagged
 DEFAULT_MAX_RATIO = Decimal("2.5")
 
+# Dedicated low-side threshold: a price below median / LOW_OUTLIER_RATIO is
+# flagged (parse-error guard, e.g. 100x/1000x scale mistakes). Deliberately
+# independent from `max_ratio` so steep-but-legitimate discounts (clearance,
+# Black Friday) are never rejected by the high-side tolerance.
+LOW_OUTLIER_RATIO = Decimal("50")
+
 
 def is_outlier(
     price: Decimal,
@@ -43,8 +49,9 @@ def is_outlier(
     - Zero or negative prices are always outliers.
     - Histories shorter than MIN_HISTORY skip detection (return False).
     - A price > max_ratio × median(history) is an outlier.
-    - A price < median / max_ratio is also an outlier (sudden drop, likely
-      installment scrape or wrong-variant). Symmetric ratio check.
+    - A price < median / LOW_OUTLIER_RATIO is also an outlier (parse-error
+      guard: 100x/1000x scale mistakes). The low side ignores `max_ratio` so
+      legitimate steep discounts are not rejected.
 
     When `metrics` is provided and the result is an outlier, emits
     `outlier_rejected_total{scraper, domain}` once.
@@ -75,7 +82,7 @@ def _compute(
     inv_ratio = med / price
 
     is_high_outlier = ratio > max_ratio
-    is_low_outlier = inv_ratio > max_ratio
+    is_low_outlier = inv_ratio > LOW_OUTLIER_RATIO
 
     return OutlierResult(
         is_outlier=is_high_outlier or is_low_outlier,

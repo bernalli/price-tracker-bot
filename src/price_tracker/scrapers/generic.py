@@ -25,13 +25,16 @@ from typing import ClassVar
 import httpx
 from bs4 import BeautifulSoup, Tag
 
+from price_tracker.core.exceptions import BlockEvent
 from price_tracker.core.retry_policy import RetryConfig, with_retry
 from price_tracker.core.scraper_base import (
     AbstractScraper,
     ProductInfo,
+    detect_block_event,
     detect_currency,
     get_headers,
     parse_price,
+    select_jsonld_offer,
 )
 
 logger = logging.getLogger(__name__)
@@ -50,12 +53,34 @@ PRODUCT_TYPES: frozenset[str] = frozenset(
     }
 )
 
+# Inline-JS extraction (#53): price-bearing keys, and identity keys marking a
+# JSON object as the product itself rather than analytics/related-item data.
+_JS_PRICE_KEYS: tuple[str, ...] = (
+    "price",
+    "salePrice",
+    "sale_price",
+    "current_price",
+    "finalPrice",
+    "selling_price",
+)
+_JS_IDENTITY_KEYS: tuple[str, ...] = ("name", "title", "sku", "productId", "product_id")
+_JS_PRICE_OBJECT_RE = re.compile(
+    r'\{[^{}]*"(?:' + "|".join(_JS_PRICE_KEYS) + r')"\s*:\s*"?\d[^{}]*\}'
+)
+_JS_BARE_PRICE_PATTERNS: list[str] = [
+    rf'"{key}"\s*:\s*"?(\d{{1,6}}(?:\.\d{{1,2}})?)"?' for key in _JS_PRICE_KEYS
+]
+
 
 @with_retry(RetryConfig(max_attempts=3, base_wait=2.0, max_wait=10.0))
 async def _fetch_generic_html(url: str, client: httpx.AsyncClient) -> str:
     """Single GET attempt with browser headers. Tenacity handles retries."""
     headers = get_headers()
     response = await client.get(url, headers=headers, follow_redirects=True)
+    # Surface 403/429 (and WAF/CAPTCHA bodies) as a BlockEvent BEFORE
+    # raise_for_status, so the scheduler quarantines the domain instead of
+    # recording a generic failure (#16). with_retry never retries BlockEvents.
+    detect_block_event(status_code=response.status_code, body=response.text, url=url)
     response.raise_for_status()
     return response.text
 
@@ -63,16 +88,21 @@ async def _fetch_generic_html(url: str, client: httpx.AsyncClient) -> str:
 async def _fetch_with_curl_cffi(url: str) -> str | None:
     """Fetch via curl_cffi with Chrome JA3/TLS impersonation. Returns None on failure."""
     try:
+        from curl_cffi import CurlError
         from curl_cffi.requests import AsyncSession
     except ImportError:
         return None
     try:
         async with AsyncSession(impersonate="chrome") as session:
             resp = await session.get(url, allow_redirects=True, timeout=30)
+            if resp.status_code in (403, 429):
+                # Hard block on the primary path: raise instead of discarding the
+                # status, so scrape() can quarantine after fallbacks fail (#16).
+                detect_block_event(status_code=resp.status_code, body=resp.text or "", url=url)
             if 200 <= resp.status_code < 300 and resp.text:
                 return resp.text
             logger.debug("curl_cffi got %s for %s", resp.status_code, url[:60])
-    except (ValueError, OSError, AttributeError) as e:
+    except (CurlError, ValueError, OSError, AttributeError) as e:
         logger.debug("curl_cffi fetch failed for %s: %s", url[:60], e)
     return None
 
@@ -86,11 +116,6 @@ class GenericScraper(AbstractScraper):
 
     # Extended list of selectors found across many e-commerce platforms
     PRICE_SELECTORS: ClassVar[list[str]] = [
-        # Generic e-commerce
-        "[data-price]",
-        "[data-product-price]",
-        "[data-current-price]",
-        "[data-sale-price]",
         # Common class patterns
         ".product-price",
         ".product-price-value",
@@ -136,11 +161,24 @@ class GenericScraper(AbstractScraper):
         # Shopify
         ".product-single__price",
         ".product__price",
-        "[data-product-price]",
         ".price__current",
         ".price-item--sale",
         ".price-item--regular",
+        # Broad data-* selectors LAST: page-wide attribute hits match unrelated
+        # widgets (carousels, upsells), so product-specific class selectors must
+        # win and matches are only trusted inside a product container (#26).
+        "[data-price]",
+        "[data-product-price]",
+        "[data-current-price]",
+        "[data-sale-price]",
     ]
+
+    # Selectors so broad that a match is accepted only inside a product container (#26)
+    BROAD_DATA_SELECTORS: ClassVar[frozenset[str]] = frozenset(
+        {"[data-price]", "[data-product-price]", "[data-current-price]", "[data-sale-price]"}
+    )
+
+    _PRODUCT_SCOPE_RE: ClassVar[re.Pattern[str]] = re.compile(r"product|main", re.IGNORECASE)
 
     PRICE_PATTERNS: ClassVar[list[str]] = [
         # €29,99 or €29.99 or € 1.299,99
@@ -159,7 +197,13 @@ class GenericScraper(AbstractScraper):
     async def scrape(self, url: str, client: httpx.AsyncClient) -> ProductInfo:
         # Anti-bot primary: try curl_cffi (Chrome JA3) first — covers many
         # Shopify / boutique e-commerce fronts that drop plain httpx requests.
-        html = await _fetch_with_curl_cffi(url)
+        html: str | None = None
+        curl_block: BlockEvent | None = None
+        try:
+            html = await _fetch_with_curl_cffi(url)
+        except BlockEvent as e:
+            # Defer: give httpx a chance before signalling quarantine (#16).
+            curl_block = e
         if not html or len(html) < 5000:
             try:
                 fetched = await _fetch_generic_html(url, client)
@@ -169,7 +213,15 @@ class GenericScraper(AbstractScraper):
                 logger.debug("Generic httpx fetch failed for %s: %s", url[:60], e)
                 # Keep curl_cffi result (if any)
         if not html:
+            if curl_block is not None:
+                # Both paths failed and curl_cffi saw a hard block (403/429):
+                # surface it so the scheduler quarantines the domain (#16).
+                raise curl_block
             return ProductInfo(error="Impossibile caricare la pagina")
+
+        # Surface WAF/CAPTCHA challenge bodies (often served with HTTP 200) as a
+        # BlockEvent so the scheduler quarantines the domain (#7).
+        detect_block_event(status_code=200, body=html, url=url)
 
         soup = BeautifulSoup(html, "lxml")
         info = ProductInfo()
@@ -364,42 +416,17 @@ class GenericScraper(AbstractScraper):
         return None
 
     def _extract_price_from_offers(self, offers: object) -> dict | None:
-        if isinstance(offers, list):
-            best: dict | None = None
-            for offer in offers:
-                result = self._extract_price_from_offers(offer)
-                if result and (best is None or result["price"] < best["price"]):
-                    best = result
-            return best
+        """Pick the representative offer via the shared selector (#27).
 
-        if not isinstance(offers, dict):
+        Filters financing/installment entries, never takes the cheapest list
+        entry (add-on/warranty trap) nor an AggregateOffer ``lowPrice``, and
+        normalises the currency to ISO-4217 (no silent EUR default).
+        """
+        selected = select_jsonld_offer(offers)
+        if selected is None:
             return None
-
-        offer_type = str(offers.get("@type", ""))
-        if "AggregateOffer" in offer_type:
-            low_price = offers.get("lowPrice")
-            if low_price is not None:
-                parsed = parse_price(str(low_price))
-                if parsed:
-                    return {
-                        "price": parsed,
-                        "currency": offers.get("priceCurrency", "EUR"),
-                    }
-
-        for price_key in ("price", "lowPrice"):
-            price = offers.get(price_key)
-            if price is not None:
-                parsed = parse_price(str(price))
-                if parsed:
-                    return {
-                        "price": parsed,
-                        "currency": offers.get("priceCurrency", "EUR"),
-                    }
-
-        if "offers" in offers:
-            return self._extract_price_from_offers(offers["offers"])
-
-        return None
+        price, currency = selected
+        return {"price": price, "currency": currency}
 
     # ── Strategy 2: Microdata ──────────────────────────────────────
 
@@ -517,6 +544,28 @@ class GenericScraper(AbstractScraper):
 
     # ── Strategy 6: CSS selectors ──────────────────────────────────
 
+    @classmethod
+    def _in_product_container(cls, el: Tag) -> bool:
+        """True when `el` or an ancestor looks like the main product container (#26).
+
+        Qualifying markers: id/class containing 'product' or 'main', or an
+        itemtype containing 'schema.org/Product'. Page-wide ``[data-*]`` price
+        hits outside such a container belong to unrelated widgets (carousels,
+        upsells) and must not be trusted.
+        """
+        node: Tag | None = el
+        while isinstance(node, Tag):
+            id_attr = node.get("id") or ""
+            classes = node.get("class") or []
+            if isinstance(classes, str):
+                classes = [classes]
+            if cls._PRODUCT_SCOPE_RE.search(" ".join([str(id_attr), *classes])):
+                return True
+            if "schema.org/product" in str(node.get("itemtype") or "").lower():
+                return True
+            node = node.parent
+        return False
+
     def _try_css_selectors(self, soup: BeautifulSoup) -> dict | None:
         for selector in self.PRICE_SELECTORS:
             try:
@@ -524,6 +573,8 @@ class GenericScraper(AbstractScraper):
             except (ValueError, AttributeError):
                 continue
             for el in elements:
+                if selector in self.BROAD_DATA_SELECTORS and not self._in_product_container(el):
+                    continue
                 for attr in (
                     "data-price",
                     "data-product-price",
@@ -563,6 +614,8 @@ class GenericScraper(AbstractScraper):
         for attr in price_data_attrs:
             elements = soup.find_all(attrs={attr: True})
             for el in elements:
+                if not self._in_product_container(el):
+                    continue
                 val = el.get(attr, "")
                 parsed = parse_price(str(val))
                 if parsed:
@@ -573,29 +626,22 @@ class GenericScraper(AbstractScraper):
     # ── Strategy 8: JS embedded product data ───────────────────────
 
     def _try_js_product_data(self, soup: BeautifulSoup) -> dict | None:
-        scripts = soup.find_all("script")
-        for script in scripts:
-            if not script.string:
-                continue
-            text = script.string
+        texts: list[str] = []
+        for script in soup.find_all("script"):
+            raw = script.string
+            if raw and len(raw) <= 200000:
+                texts.append(raw)
 
-            if len(text) > 200000:
-                continue
+        # Pass 1 — context-aware: accept a price only when co-located with
+        # product identity keys, so analytics/related-item objects appearing
+        # earlier in the page cannot leak their price (#53).
+        for text in texts:
+            result = self._js_identified_object_price(text)
+            if result:
+                return result
 
-            for pattern in [
-                r'"price"\s*:\s*"?(\d{1,6}(?:\.\d{1,2})?)"?',
-                r'"salePrice"\s*:\s*"?(\d{1,6}(?:\.\d{1,2})?)"?',
-                r'"sale_price"\s*:\s*"?(\d{1,6}(?:\.\d{1,2})?)"?',
-                r'"current_price"\s*:\s*"?(\d{1,6}(?:\.\d{1,2})?)"?',
-                r'"finalPrice"\s*:\s*"?(\d{1,6}(?:\.\d{1,2})?)"?',
-                r'"selling_price"\s*:\s*"?(\d{1,6}(?:\.\d{1,2})?)"?',
-            ]:
-                matches = re.findall(pattern, text)
-                for match in matches:
-                    parsed = parse_price(match)
-                    if parsed and Decimal("0.50") < parsed < Decimal("100000"):
-                        return {"price": parsed}
-
+        # Pass 2 — Shopify-style variants objects (legacy heuristic).
+        for text in texts:
             if "variants" in text and "price" in text:
                 for json_match in re.finditer(r'\{[^{}]*"price"\s*:\s*"?\d+\.?\d*"?[^{}]*\}', text):
                     try:
@@ -611,6 +657,34 @@ class GenericScraper(AbstractScraper):
                     except (json.JSONDecodeError, AttributeError):
                         pass
 
+        # Pass 3 — bare key:value regex, last resort when no identified object.
+        for text in texts:
+            for pattern in _JS_BARE_PRICE_PATTERNS:
+                for match in re.findall(pattern, text):
+                    parsed = parse_price(match)
+                    if parsed and Decimal("0.50") < parsed < Decimal("100000"):
+                        return {"price": parsed}
+
+        return None
+
+    def _js_identified_object_price(self, text: str) -> dict | None:
+        """Price from a flat JSON object carrying product identity keys (#53)."""
+        for json_match in _JS_PRICE_OBJECT_RE.finditer(text):
+            try:
+                obj = json.loads(json_match.group())
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(obj, dict):
+                continue
+            if not any(obj.get(key) for key in _JS_IDENTITY_KEYS):
+                continue
+            for key in _JS_PRICE_KEYS:
+                value = obj.get(key)
+                if value is None:
+                    continue
+                parsed = parse_price(str(value))
+                if parsed and Decimal("0.50") < parsed < Decimal("100000"):
+                    return {"price": parsed, "name": obj.get("name") or obj.get("title")}
         return None
 
     # ── Strategy 9: Regex fallback ─────────────────────────────────

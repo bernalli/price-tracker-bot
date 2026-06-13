@@ -27,6 +27,7 @@ from price_tracker.bot.handlers._helpers import (
     _parse_threshold_input,
     _safe_dec,
 )
+from price_tracker.bot.handlers.settings import _reschedule_periodic_check
 from price_tracker.bot.messages import _
 
 if TYPE_CHECKING:
@@ -179,9 +180,12 @@ async def handle_text_input(  # noqa: PLR0915 — verbatim port; cyclomatic spli
             await update.message.reply_text(_("❌ Minimo 5 minuti."))
             context.user_data["pending_action"] = pending_action
             return
-        config = _config(context)
-        config.check_interval_minutes = minutes
+        if minutes > 1440 * 7:
+            await update.message.reply_text(_("❌ L'intervallo massimo è 7 giorni."))
+            context.user_data["pending_action"] = pending_action
+            return
         await db.set_config("check_interval_minutes", str(minutes))
+        _reschedule_periodic_check(context, minutes)
         if minutes >= 60:
             h = minutes / 60
             display = f"{h:.0f} ore" if h == int(h) else f"{h:.1f} ore"

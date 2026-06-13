@@ -396,9 +396,22 @@ async def health_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     health_mgr = context.bot_data["health_manager"]
     records = health_mgr.all_records()
 
-    healthy = [r for r in records if r.state == QuarantineState.CLOSED.value]
-    locked = [r for r in records if r.state.startswith("LOCKED_")]
-    half_open = [r for r in records if r.state.startswith("HALF_OPEN_")]
+    # Classify by EFFECTIVE state: an expired lockout is HALF_OPEN on read
+    # even though the persisted row still says LOCKED_* (bug #60).
+    effective = {r.domain: health_mgr.state(r.domain) for r in records}
+    locked_states = (
+        QuarantineState.LOCKED_T1,
+        QuarantineState.LOCKED_T2,
+        QuarantineState.LOCKED_T3,
+    )
+    half_open_states = (
+        QuarantineState.HALF_OPEN_T1,
+        QuarantineState.HALF_OPEN_T2,
+        QuarantineState.HALF_OPEN_T3,
+    )
+    healthy = [r for r in records if effective[r.domain] == QuarantineState.CLOSED]
+    locked = [r for r in records if effective[r.domain] in locked_states]
+    half_open = [r for r in records if effective[r.domain] in half_open_states]
 
     lines: list[str] = ["🏥 <b>Scraper Health Report</b>", ""]
     lines.append(f"✅ Healthy domains: {len(healthy)}")
@@ -410,7 +423,7 @@ async def health_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         lines.append("<b>Locked:</b>")
         for r in sorted(locked, key=lambda x: x.locked_until or datetime.max.replace(tzinfo=UTC)):
             lines.append(
-                f"  • {r.domain} — {_tier_label(r.state)}, "
+                f"  • {r.domain} — {_tier_label(effective[r.domain].value)}, "
                 f"expires in {_format_remaining(r.locked_until)}"
             )
         lines.append("")
