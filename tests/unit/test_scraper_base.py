@@ -6,6 +6,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 
 import pytest
+from bs4 import BeautifulSoup
 
 from price_tracker.core.exceptions import (
     CaptchaDetected,
@@ -17,7 +18,9 @@ from price_tracker.core.scraper_base import (
     ProductInfo,
     detect_block_event,
     detect_currency,
+    find_microdata_price_el,
     parse_price,
+    select_jsonld_offer,
 )
 
 if TYPE_CHECKING:
@@ -54,6 +57,148 @@ def test_product_info_with_values():
 )
 def test_parse_price_returns_decimal(raw, expected):
     assert parse_price(raw) == expected
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        # EU dot-thousands with NO decimal part (was parsed 1000x too low) — bug #3
+        ("1.299", Decimal("1299")),
+        ("2.499", Decimal("2499")),
+        ("12.999", Decimal("12999")),
+        ("1.234", Decimal("1234")),
+        ("1.299 €", Decimal("1299")),
+        # EU multi-dot integer thousands (was returning None) — bug #22
+        ("1.234.567", Decimal("1234567")),
+        ("12.345.678", Decimal("12345678")),
+        # US multi-comma integer thousands (was mis-parsed to 1234.567) — bug #23
+        ("1,234,567", Decimal("1234567")),
+        ("$12,345,678", Decimal("12345678")),
+        # German "no cents" notation 349,- / 1.299,- — bug #44
+        ("349,-", Decimal("349")),
+        ("799,-", Decimal("799")),
+        ("1.299,-", Decimal("1299")),
+        # Non-ASCII currency labels not stripped before → no price — bug #50
+        ("1 299,00 zł", Decimal("1299.00")),
+        ("129,00 zł", Decimal("129.00")),
+        ("1 299 Kč", Decimal("1299")),
+        ("1 299,00 kr", Decimal("1299.00")),
+        # Leading-zero decimals must stay decimals, NOT become thousands
+        ("0.999", Decimal("0.999")),
+        ("0,99", Decimal("0.99")),
+        # Space/thin-space thousands (French/Polish) with decimal
+        ("1 234,56", Decimal("1234.56")),
+    ],
+)
+def test_parse_price_international_formats(raw, expected):
+    assert parse_price(raw) == expected
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        # Split-span React concatenation "$1,299" + "99" → "$1,29999": a single
+        # separator with >3 trailing digits is neither a 2-decimal nor a 3-digit
+        # thousands group → reject so the scraper falls back to JSON-LD (bug #12).
+        "$1,29999",
+        "1,29999",
+        "1.29999",
+        "1234,5678",
+    ],
+)
+def test_parse_price_rejects_split_span_concatenation(raw):
+    assert parse_price(raw) is None
+
+
+def test_select_jsonld_offer_skips_financing_and_takes_highest():
+    offers = [
+        {"price": "1299.00", "priceCurrency": "USD"},
+        {"price": "54.08", "priceCurrency": "USD", "name": "$54.08/mo. financing"},
+        {"price": "1199.00", "priceCurrency": "USD"},
+    ]
+    result = select_jsonld_offer(offers)
+    assert result == (Decimal("1299.00"), "USD")
+
+
+def test_select_jsonld_offer_filters_unit_price_specification():
+    offers = [
+        {
+            "price": "50.00",
+            "priceCurrency": "EUR",
+            "priceSpecification": {"@type": "UnitPriceSpecification", "billingDuration": 24},
+        }
+    ]
+    assert select_jsonld_offer(offers) is None
+
+
+def test_select_jsonld_offer_ignores_aggregate_low_price():
+    # AggregateOffer with no concrete `price` → must NOT leak the 'from' lowPrice.
+    offers = {"@type": "AggregateOffer", "lowPrice": "999", "highPrice": "1299"}
+    assert select_jsonld_offer(offers) is None
+
+
+def test_select_jsonld_offer_uses_aggregate_price_when_present():
+    offers = {"@type": "AggregateOffer", "price": "1099", "lowPrice": "999"}
+    assert select_jsonld_offer(offers) == (Decimal("1099"), None)
+
+
+def test_select_jsonld_offer_normalizes_symbol_currency():
+    offers = {"price": "29,99", "priceCurrency": "€"}
+    assert select_jsonld_offer(offers) == (Decimal("29.99"), "EUR")
+
+
+def test_select_jsonld_offer_handles_empty_and_invalid():
+    assert select_jsonld_offer([]) is None
+    assert select_jsonld_offer(None) is None
+    assert select_jsonld_offer("nope") is None
+
+
+def test_find_microdata_price_el_prefers_offer_scope():
+    html = (
+        '<div class="recs"><span itemprop="price" content="9.99">9.99</span></div>'
+        '<div itemprop="offers"><span itemprop="price" content="199.99">199.99</span></div>'
+    )
+    el = find_microdata_price_el(BeautifulSoup(html, "lxml"))
+    assert el is not None
+    assert el.get("content") == "199.99"
+
+
+def test_find_microdata_price_el_falls_back_to_first():
+    el = find_microdata_price_el(
+        BeautifulSoup('<span itemprop="price" content="50.00">50.00</span>', "lxml")
+    )
+    assert el is not None
+    assert el.get("content") == "50.00"
+
+
+def test_find_microdata_price_el_skips_carousel_scope():
+    """A complete Product/Offer itemscope inside a carousel container must not win (#37)."""
+    html = (
+        '<div class="related-carousel">'
+        '<div itemscope itemtype="https://schema.org/Product">'
+        '<div itemprop="offers" itemscope itemtype="https://schema.org/Offer">'
+        '<span itemprop="price" content="9.99">9.99</span>'
+        "</div></div></div>"
+        '<div itemscope itemtype="https://schema.org/Product">'
+        '<div itemprop="offers" itemscope itemtype="https://schema.org/Offer">'
+        '<span itemprop="price" content="499.00">499.00</span>'
+        "</div></div>"
+    )
+    el = find_microdata_price_el(BeautifulSoup(html, "lxml"))
+    assert el is not None
+    assert el.get("content") == "499.00"
+
+
+def test_find_microdata_price_el_keeps_first_when_all_scopes_in_carousel():
+    """If every scope sits in a carousel container, keep the first-match behavior (#37)."""
+    html = (
+        '<div class="recommendations-carousel">'
+        '<div itemprop="offers"><span itemprop="price" content="9.99">9.99</span></div>'
+        "</div>"
+    )
+    el = find_microdata_price_el(BeautifulSoup(html, "lxml"))
+    assert el is not None
+    assert el.get("content") == "9.99"
 
 
 def test_parse_price_returns_none_on_garbage():

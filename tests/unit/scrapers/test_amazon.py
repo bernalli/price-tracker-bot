@@ -122,7 +122,9 @@ async def test_amazon_handles_404(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.mark.asyncio
 async def test_amazon_handles_429_after_retries(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Retryable 429 → after retries exhausted, return ProductInfo with error."""
+    """Retryable 429 → after retries+fallbacks exhausted, raise HTTPBlockStatus (quarantine)."""
+    from price_tracker.core.exceptions import HTTPBlockStatus
+
     scraper = AmazonScraper()
 
     # Bypass the retry decorator by replacing the module-level fetcher.
@@ -148,10 +150,69 @@ async def test_amazon_handles_429_after_retries(monkeypatch: pytest.MonkeyPatch)
     with respx.mock(assert_all_called=False) as router:
         router.get("https://www.amazon.it/dp/RATE").respond(429)
         async with httpx.AsyncClient() as client:
-            info = await scraper.scrape("https://www.amazon.it/dp/RATE", client)
+            with pytest.raises(HTTPBlockStatus):
+                await scraper.scrape("https://www.amazon.it/dp/RATE", client)
 
-    assert info.price is None
-    assert info.error is not None
+
+# ── JSON-LD offer selection for the cross-check (#54) ────────────
+
+
+_MULTI_OFFER_HTML = """
+<!DOCTYPE html><html><head>
+<script type="application/ld+json">
+{"@type": "Product", "name": "Sample Product", "offers": [
+  {"@type": "Offer", "price": "45.00", "priceCurrency": "EUR",
+   "itemCondition": "https://schema.org/UsedCondition"},
+  {"@type": "Offer", "price": "199.00", "priceCurrency": "EUR",
+   "itemCondition": "https://schema.org/NewCondition"}
+]}
+</script>
+</head><body>
+<h1 id="productTitle">Sample Product</h1>
+<div id="corePrice_desktop">
+  <span class="priceToPay"><span class="a-offscreen">199,00&euro;</span></span>
+</div>
+</body></html>
+"""
+
+
+@pytest.mark.asyncio
+async def test_amazon_multi_offer_jsonld_does_not_override_correct_css_price(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """offers[0]=used 45.00 must NOT become the cross-check authority (#54).
+
+    CSS buybox says 199.00 (correct); JSON-LD offers list a used entry first.
+    Taking offers[0] blindly made ratio=199/45 > 2 and overrode the correct
+    CSS price with the used one.
+    """
+    scraper = AmazonScraper()
+
+    async def _no_fresh(url: str) -> str | None:
+        return None
+
+    monkeypatch.setattr(amazon_module, "_fetch_with_fresh_client", _no_fresh)
+
+    with respx.mock(assert_all_called=False) as router:
+        router.get("https://www.amazon.it/dp/MULTIOFFER").respond(200, text=_MULTI_OFFER_HTML)
+        async with httpx.AsyncClient() as client:
+            info = await scraper.scrape("https://www.amazon.it/dp/MULTIOFFER", client)
+
+    assert info.price == Decimal("199.00")
+    assert info.error is None
+
+
+def test_amazon_jsonld_single_offer_contract_unchanged() -> None:
+    """Single-offer JSON-LD keeps returning its concrete price (contract guard)."""
+    from bs4 import BeautifulSoup
+
+    html = (
+        '<html><head><script type="application/ld+json">'
+        '{"@type": "Product", "name": "X", "offers":'
+        ' {"@type": "Offer", "price": "199.00", "priceCurrency": "EUR"}}'
+        "</script></head><body></body></html>"
+    )
+    assert AmazonScraper()._try_json_ld_price(BeautifulSoup(html, "lxml")) == Decimal("199.00")
 
 
 @pytest.mark.asyncio

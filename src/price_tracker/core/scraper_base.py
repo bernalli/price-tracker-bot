@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 
 if TYPE_CHECKING:
     import httpx
+    from bs4 import BeautifulSoup, Tag
 
     from price_tracker.core.health import HealthManager
 
@@ -59,64 +60,94 @@ def get_headers(extra: dict[str, str] | None = None) -> dict[str, str]:
 
 # ── Price parsing (returns Decimal, never float) ──────────────────
 
-_CURRENCY_LABEL_RE = re.compile(r"(EUR|USD|GBP|CHF|JPY|SEK|NOK|DKK|PLN|CZK)", re.IGNORECASE)
-_NUMERIC_NOISE_RE = re.compile(r"[€$£¥₹\s ​]")
+# Trailing German "no cents" marker: "349,-" / "1.299,-" → keep the separator, drop the dash.
+_NO_CENTS_RE = re.compile(r"([.,])\s*-\s*$")
+# Anything that is NOT a digit or a thousands/decimal separator. Strips currency symbols
+# and labels (€, $, zł, Kč, kr, EUR, ...), spaces, thin/zero-width spaces and stray chars.
+_NON_NUMERIC_RE = re.compile(r"[^\d.,']")
+
+
+def _to_decimal(s: str) -> Decimal | None:
+    try:
+        return Decimal(s)
+    except (InvalidOperation, ValueError):
+        return None
+
+
+def _is_thousands_grouping(groups: list[str]) -> bool:
+    """True if `groups` form a valid thousands grouping: first 1–3 digits, the rest exactly 3."""
+    if len(groups) < 2 or not groups[0] or len(groups[0]) > 3 or not groups[0].isdigit():
+        return False
+    return all(len(g) == 3 and g.isdigit() for g in groups[1:])
 
 
 def parse_price(price_str: str | None) -> Decimal | None:
     """Parse a price string in arbitrary international format into Decimal.
 
-    Handles european comma decimal, US comma thousands, swiss apostrophe,
-    multi-comma european thousands, and currency labels mixed in.
+    Handles EU comma-decimal, US comma-thousands, Swiss apostrophe, EU/US thousands
+    with NO decimal part, German "349,-" notation, and currency labels/symbols mixed
+    in (€, $, zł, Kč, kr, ISO codes).
+
+    Disambiguation: a lone separator followed by exactly three digits (e.g. "1.299"
+    or "1,234") is read as thousands grouping, NOT a three-decimal fraction — retail
+    prices never carry three decimals, while EU dot-thousands integers ("1.299 €" =
+    1299) are extremely common. (Trade-off: 3-decimal niche prices like fuel/crypto
+    are out of scope for this e-commerce tracker.)
     """
     if not price_str:
         return None
 
-    cleaned = _NUMERIC_NOISE_RE.sub("", price_str)
-    cleaned = _CURRENCY_LABEL_RE.sub("", cleaned).strip()
+    # "349,-" → "349," so the integer survives the rest of the pipeline.
+    s = _NO_CENTS_RE.sub(r"\1", price_str)
+    cleaned = _NON_NUMERIC_RE.sub("", s)
+    cleaned = cleaned.replace("'", "")  # Swiss apostrophe is always a thousands sep.
     if not cleaned:
         return None
 
-    # Swiss apostrophe = thousands sep
-    if "'" in cleaned:
-        cleaned = cleaned.replace("'", "")
+    has_dot = "." in cleaned
+    has_comma = "," in cleaned
 
-    last_dot = cleaned.rfind(".")
-    last_comma = cleaned.rfind(",")
+    # No separators → plain integer.
+    if not has_dot and not has_comma:
+        return _to_decimal(cleaned)
 
-    if last_dot == -1 and last_comma == -1:
-        # Integer
-        try:
-            return Decimal(cleaned)
-        except (InvalidOperation, ValueError):
+    # Both separators present → whichever appears LAST is the decimal point.
+    if has_dot and has_comma:
+        if cleaned.rfind(".") > cleaned.rfind(","):
+            # US: dot decimal, comma thousands.
+            return _to_decimal(cleaned.replace(",", ""))
+        # EU: comma decimal, dot thousands.
+        last = cleaned.rfind(",")
+        whole = cleaned[:last].replace(".", "").replace(",", "")
+        return _to_decimal(whole + "." + cleaned[last + 1 :])
+
+    # Exactly one kind of separator present.
+    sep = "." if has_dot else ","
+    if cleaned.count(sep) == 1:
+        before, after = cleaned.split(sep)
+        # >3 trailing digits is neither a 2-decimal fraction nor a 3-digit thousands
+        # group — typically a split-span concatenation ("$1,299"+"99" → "1,29999").
+        # Reject so the scraper can fall back to a reliable source (bug #12).
+        if len(after) > 3:
             return None
+        # Lone separator + exactly 3 trailing digits + non-zero leading group → thousands.
+        if len(after) == 3 and after.isdigit() and before[:1] not in ("", "0"):
+            return _to_decimal(before + after)
+        return _to_decimal(before + "." + after)
 
-    if last_dot > last_comma:
-        # US-style: dot is decimal, comma is thousands
-        cleaned = cleaned.replace(",", "")
-    elif last_comma > last_dot:
-        # Comma after dot (or no dot): could be euro decimal or US thousands
-        if last_dot == -1 and cleaned.count(",") == 1:
-            # Single comma, no dot — disambiguate by digits after the comma:
-            #   3 digits after → US thousands (e.g. "$1,234")
-            #   1–2 digits after → euro decimal (e.g. "29,99")
-            #   else → treat as decimal
-            after = cleaned[last_comma + 1 :]
-            if len(after) == 3 and after.isdigit():
-                cleaned = cleaned.replace(",", "")
-            else:
-                cleaned = cleaned.replace(",", ".")
-        else:
-            # Euro-style with thousands: comma is decimal, dot is thousands
-            cleaned = cleaned.replace(".", "")
-            # Replace ONLY the rightmost comma with a decimal point; drop earlier ones
-            last = cleaned.rfind(",")
-            cleaned = cleaned[:last].replace(",", "") + "." + cleaned[last + 1 :]
-
-    try:
-        return Decimal(cleaned)
-    except (InvalidOperation, ValueError):
-        return None
+    # Multiple separators of the same kind.
+    groups = cleaned.split(sep)
+    if sep == ",":
+        # US thousands only if every group lines up ("1,234,567"); otherwise the last
+        # comma is an EU decimal ("5,250,00" → 5250.00).
+        if _is_thousands_grouping(groups):
+            return _to_decimal(cleaned.replace(",", ""))
+        last = cleaned.rfind(",")
+        return _to_decimal(cleaned[:last].replace(",", "") + "." + cleaned[last + 1 :])
+    # Multiple dots: only valid as EU thousands grouping, else malformed ("1.2.3.4").
+    if _is_thousands_grouping(groups):
+        return _to_decimal(cleaned.replace(".", ""))
+    return None
 
 
 # ── Currency detection ───────────────────────────────────────────
@@ -151,6 +182,170 @@ def detect_currency(text: str | None) -> str | None:
         if sign.upper() in upper:
             return code
     return None
+
+
+# ── JSON-LD offer selection (shared across scrapers) ─────────────
+
+_FINANCING_RE = re.compile(
+    r"/mo\b|/month|per month|a month|al mese|/mese|monthly|installment|financ|rate ", re.IGNORECASE
+)
+
+
+def _is_financing_offer(offer: dict[str, object]) -> bool:
+    """True when an Offer represents a recurring/monthly financing entry, not the price."""
+    spec = offer.get("priceSpecification")
+    specs = spec if isinstance(spec, list) else [spec]
+    for s in specs:
+        if isinstance(s, dict) and (
+            "UnitPrice" in str(s.get("@type", ""))
+            or s.get("billingDuration")
+            or s.get("billingIncrement")
+            or s.get("referenceQuantity")
+        ):
+            return True
+    blob = " ".join(str(offer.get(k, "")) for k in ("name", "description", "category"))
+    return bool(_FINANCING_RE.search(blob))
+
+
+def select_jsonld_offer(offers: object) -> tuple[Decimal, str | None] | None:
+    """Pick the representative (price, ISO-currency) from a JSON-LD ``offers`` value.
+
+    Robust against the common precision traps: takes neither ``offers[0]`` blindly
+    (cheapest variant / used / marketplace entry) nor an ``AggregateOffer``'s
+    ``lowPrice`` ("from" price). Filters recurring/financing offers, then returns
+    the HIGHEST remaining single ``price`` — the main buy price. The currency is
+    normalised to ISO-4217 (a bare symbol like ``€`` becomes ``EUR``; an unknown
+    value becomes ``None`` rather than leaking verbatim).
+    """
+    if isinstance(offers, dict):
+        offer_list: list[dict[str, object]] = [offers]
+    elif isinstance(offers, list):
+        offer_list = [o for o in offers if isinstance(o, dict)]
+    else:
+        return None
+
+    best: tuple[Decimal, str | None] | None = None
+    for offer in offer_list:
+        if _is_financing_offer(offer):
+            continue
+        # Only a concrete single `price`; never AggregateOffer low/highPrice.
+        price_raw = offer.get("price")
+        if price_raw is None:
+            continue
+        parsed = parse_price(str(price_raw))
+        if parsed is None:
+            continue
+        raw_currency = offer.get("priceCurrency")
+        currency = detect_currency(str(raw_currency)) if raw_currency else None
+        if best is None or parsed > best[0]:
+            best = (parsed, currency)
+    return best
+
+
+# schema.org availability values are bare names ("InStock") or URLs
+# ("https://schema.org/OutOfStock"); match the suffix case-insensitively.
+_JSONLD_IN_STOCK_SUFFIXES = ("instock",)
+_JSONLD_OUT_OF_STOCK_SUFFIXES = ("outofstock", "soldout")
+
+
+def _offer_availability_to_bool(value: object) -> bool | None:
+    """Map one schema.org ``availability`` value to bool; None when unrecognized."""
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip().rstrip("/").lower()
+    if normalized.endswith(_JSONLD_IN_STOCK_SUFFIXES):
+        return True
+    if normalized.endswith(_JSONLD_OUT_OF_STOCK_SUFFIXES):
+        return False
+    return None
+
+
+def jsonld_offer_availability(offers: object) -> bool | None:
+    """Read stock availability from a JSON-LD ``offers`` value.
+
+    Returns True (in stock), False (out of stock / sold out) or None when no
+    offer declares a recognizable schema.org ``availability``. With multiple
+    offers any in-stock entry wins — the product is purchasable in some
+    variant. Kept separate from ``select_jsonld_offer`` so its
+    ``(price, currency)`` contract and call sites stay untouched (#33).
+    """
+    if isinstance(offers, dict):
+        offer_list: list[dict[str, object]] = [offers]
+    elif isinstance(offers, list):
+        offer_list = [o for o in offers if isinstance(o, dict)]
+    else:
+        return None
+
+    saw_out_of_stock = False
+    for offer in offer_list:
+        availability = _offer_availability_to_bool(offer.get("availability"))
+        if availability is True:
+            return True
+        if availability is False:
+            saw_out_of_stock = True
+    return False if saw_out_of_stock else None
+
+
+def unwrap_jsonld_graph(data: object) -> list[dict[str, object]]:
+    """Flatten a JSON-LD payload into its node dicts, unwrapping ``@graph`` containers.
+
+    Handles a single dict, a list of nodes, and nested ``@graph`` wrappers
+    (Yoast/WordPress-style ``{"@context": ..., "@graph": [...]}``) — a Product
+    nested in ``@graph`` would otherwise be invisible to ``@type`` scans (#56).
+    The container dict itself is kept (callers filter by ``@type`` anyway);
+    non-dict entries are dropped.
+    """
+    if isinstance(data, list):
+        items: list[dict[str, object]] = []
+        for entry in data:
+            items.extend(unwrap_jsonld_graph(entry))
+        return items
+    if isinstance(data, dict):
+        graph = data.get("@graph")
+        if isinstance(graph, list):
+            return [data, *unwrap_jsonld_graph(graph)]
+        return [data]
+    return []
+
+
+# id/class keywords marking related-items modules (carousels, rails, sponsored).
+_CAROUSEL_CONTEXT_RE = re.compile(
+    r"carousel|related|recommend|sponsored|aside|rail|recently", re.IGNORECASE
+)
+
+
+def _in_carousel_context(el: Tag) -> bool:
+    """True when `el` or an ancestor is id/class-marked as a related-items module."""
+    node: Tag | None = el
+    while node is not None:
+        classes = node.get("class") or []
+        class_str = " ".join(classes) if isinstance(classes, list) else str(classes)
+        if _CAROUSEL_CONTEXT_RE.search(f"{node.get('id') or ''} {class_str}"):
+            return True
+        node = node.parent
+    return False
+
+
+def find_microdata_price_el(soup: BeautifulSoup) -> Tag | None:
+    """Return the listing's microdata price element, preferring an Offer/Product scope.
+
+    A bare ``soup.find(itemprop="price")`` often returns a related/recommended item's
+    price (carousels appearing before the main listing). Prefer a price nested under
+    ``itemprop="offers"`` or an Offer/Product ``itemscope`` before falling back to the
+    first occurrence (#34/#49). With multiple scopes, prefer one NOT nested in a
+    carousel/related-items container; if every scope sits in one, keep the previous
+    first-match behavior (#37).
+    """
+    from bs4 import Tag  # noqa: PLC0415 — keep bs4 off the module import path
+
+    for scope_sel in ('[itemprop="offers"]', '[itemtype*="Offer"]', '[itemtype*="Product"]'):
+        # Stable sort: non-carousel scopes first, document order preserved within groups.
+        for scope in sorted(soup.select(scope_sel), key=_in_carousel_context):
+            el = scope.find(attrs={"itemprop": "price"})
+            if isinstance(el, Tag):
+                return el
+    el = soup.find(attrs={"itemprop": "price"})
+    return el if isinstance(el, Tag) else None
 
 
 # ── ProductInfo & AbstractScraper ────────────────────────────────

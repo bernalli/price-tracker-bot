@@ -19,10 +19,10 @@ MIGRATIONS_DIR = Path("src/price_tracker/db/migrations")
 
 
 @pytest.mark.asyncio
-async def test_list_migrations_finds_001_to_010():
+async def test_list_migrations_finds_001_to_011():
     files = list_migrations(MIGRATIONS_DIR)
     versions = [v for v, _ in files]
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
 
 
 @pytest.mark.asyncio
@@ -37,7 +37,7 @@ async def test_apply_migrations_brings_fresh_db_to_latest():
     async with aiosqlite.connect(":memory:") as conn:
         await apply_migrations(conn, MIGRATIONS_DIR)
         version = await get_current_version(conn)
-        assert version == 10
+        assert version == 11
         cursor = await conn.execute("PRAGMA table_info(products)")
         cols = [row[1] async for row in cursor]
         assert "id" in cols
@@ -56,7 +56,7 @@ async def test_apply_migrations_is_idempotent():
         await apply_migrations(conn, MIGRATIONS_DIR)
         await apply_migrations(conn, MIGRATIONS_DIR)
         version = await get_current_version(conn)
-        assert version == 10
+        assert version == 11
 
 
 @pytest.mark.asyncio
@@ -91,7 +91,7 @@ async def test_apply_migrations_partial_then_complete():
 
         await apply_migrations(conn, MIGRATIONS_DIR)
         version = await get_current_version(conn)
-        assert version == 10
+        assert version == 11
 
 
 class TestMigration008:
@@ -208,3 +208,46 @@ class TestMigration010:
             row = await cursor.fetchone()
             assert row is not None
             assert row[0] >= 10
+
+
+class TestMigration011:
+    @pytest.mark.asyncio
+    async def test_dedupes_preexisting_global_pref_duplicates(self, tmp_db_path):
+        """011 must keep only the most recent global row per user (#58)."""
+        await Migrator(db_path=tmp_db_path, max_version=10).migrate()
+        async with aiosqlite.connect(tmp_db_path) as conn:
+            await conn.execute("INSERT INTO users (user_id) VALUES (1)")
+            await conn.execute(
+                "INSERT INTO notification_prefs "
+                "(user_id, product_id, digest_interval_minutes, updated_at) "
+                "VALUES (1, NULL, 60, '2026-01-01 00:00:00')"
+            )
+            await conn.execute(
+                "INSERT INTO notification_prefs "
+                "(user_id, product_id, digest_interval_minutes, updated_at) "
+                "VALUES (1, NULL, 15, '2026-02-01 00:00:00')"
+            )
+            await conn.commit()
+
+        await Migrator(db_path=tmp_db_path).migrate()
+
+        async with aiosqlite.connect(tmp_db_path) as conn:
+            cursor = await conn.execute(
+                "SELECT digest_interval_minutes FROM notification_prefs "
+                "WHERE user_id = 1 AND product_id IS NULL"
+            )
+            rows = list(await cursor.fetchall())
+            assert len(rows) == 1
+            assert rows[0][0] == 15
+
+    @pytest.mark.asyncio
+    async def test_unique_index_rejects_duplicate_global_rows(self, tmp_db_path):
+        await Migrator(db_path=tmp_db_path).migrate()
+        async with aiosqlite.connect(tmp_db_path) as conn:
+            await conn.execute(
+                "INSERT INTO notification_prefs (user_id, product_id) VALUES (1, NULL)"
+            )
+            with pytest.raises(aiosqlite.IntegrityError):
+                await conn.execute(
+                    "INSERT INTO notification_prefs (user_id, product_id) VALUES (1, NULL)"
+                )
