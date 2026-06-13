@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from decimal import Decimal
 from typing import TYPE_CHECKING
@@ -9,12 +10,22 @@ from typing import TYPE_CHECKING
 import httpx
 import pytest
 import respx
+from bs4 import BeautifulSoup
 
 from price_tracker.scrapers import generic as generic_module
 from price_tracker.scrapers.generic import GenericScraper
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+
+def _jsonld_soup(payload: object) -> BeautifulSoup:
+    html = (
+        '<html><head><script type="application/ld+json">'
+        f"{json.dumps(payload)}"
+        "</script></head><body></body></html>"
+    )
+    return BeautifulSoup(html, "lxml")
 
 
 @pytest.fixture(autouse=True)
@@ -82,6 +93,158 @@ async def test_generic_parses_microdata_fixture(
     assert info.error is None
 
 
+# ── JSON-LD offers selection (#27) ────────────────────────────────
+
+
+def test_jsonld_offers_picks_main_price_not_cheapest_addon() -> None:
+    """Offer list [main 199.99, addon 14.99] → main price, not the cheapest entry."""
+    payload = {
+        "@type": "Product",
+        "name": "Laptop Pro",
+        "offers": [
+            {"@type": "Offer", "price": "199.99", "priceCurrency": "EUR"},
+            {
+                "@type": "Offer",
+                "name": "Garanzia aggiuntiva",
+                "price": "14.99",
+                "priceCurrency": "EUR",
+            },
+        ],
+    }
+    result = GenericScraper()._try_json_ld(_jsonld_soup(payload))
+    assert result is not None
+    assert result["price"] == Decimal("199.99")
+    assert result["currency"] == "EUR"
+
+
+def test_jsonld_offers_filters_financing_offer() -> None:
+    """A '24 Raten' monthly-installment offer must not be selected as the price."""
+    payload = {
+        "@type": "Product",
+        "name": "TV 55",
+        "offers": [
+            {
+                "@type": "Offer",
+                "name": "Finanzierung: 24 Raten",
+                "price": "24.99",
+                "priceSpecification": {
+                    "@type": "UnitPriceSpecification",
+                    "billingDuration": 24,
+                },
+            },
+            {"@type": "Offer", "price": "199.99", "priceCurrency": "EUR"},
+        ],
+    }
+    result = GenericScraper()._try_json_ld(_jsonld_soup(payload))
+    assert result is not None
+    assert result["price"] == Decimal("199.99")
+
+
+def test_jsonld_offer_without_currency_yields_none_not_eur() -> None:
+    """Missing priceCurrency must not silently default to EUR."""
+    payload = {
+        "@type": "Product",
+        "name": "Widget",
+        "offers": {"@type": "Offer", "price": "49.99"},
+    }
+    result = GenericScraper()._try_json_ld(_jsonld_soup(payload))
+    assert result is not None
+    assert result["price"] == Decimal("49.99")
+    assert result.get("currency") is None
+
+
+# ── JS product data (#53) ────────────────────────────────────────
+
+
+def _script_soup(js: str) -> BeautifulSoup:
+    return BeautifulSoup(f"<html><head><script>{js}</script></head><body></body></html>", "lxml")
+
+
+def test_js_product_data_skips_unidentified_object_before_product() -> None:
+    """An analytics/related object's price must not win over the product object."""
+    js = (
+        'dataLayer.push({"listName": "related-products", "price": 9.99});'
+        'var product = {"name": "Laptop Pro", "sku": "LP-100", "price": 199.99};'
+    )
+    result = GenericScraper()._try_js_product_data(_script_soup(js))
+    assert result is not None
+    assert result["price"] == Decimal("199.99")
+
+
+def test_js_product_data_bare_price_fallback_still_works() -> None:
+    """With no product-identified object anywhere, the bare regex fallback applies."""
+    js = 'window.__app = {"currency": "EUR", "price": 49.99};'
+    result = GenericScraper()._try_js_product_data(_script_soup(js))
+    assert result is not None
+    assert result["price"] == Decimal("49.99")
+
+
+# ── CSS / data-attribute scoping (#26) ───────────────────────────
+
+
+def test_css_selector_ignores_carousel_data_price() -> None:
+    """A recently-viewed carousel's data-price must not shadow the main price."""
+    html = """
+    <html><body>
+      <div class="recently-viewed"><a data-price="19.99" href="/o">Visto di recente</a></div>
+      <div class="product-info"><span class="product-price">249,00 €</span></div>
+    </body></html>
+    """
+    result = GenericScraper()._try_css_selectors(BeautifulSoup(html, "lxml"))
+    assert result is not None
+    assert result["price"] == Decimal("249.00")
+
+
+def test_css_selector_prefers_data_price_inside_product_container() -> None:
+    """Broad [data-price] outside a product container is skipped in favour of one inside."""
+    html = """
+    <html><body>
+      <div class="recently-viewed"><a data-price="19.99">x</a></div>
+      <div id="product-main"><span data-price="249.00"></span></div>
+    </body></html>
+    """
+    result = GenericScraper()._try_css_selectors(BeautifulSoup(html, "lxml"))
+    assert result is not None
+    assert result["price"] == Decimal("249.00")
+
+
+def test_css_selector_finds_lone_data_price_in_product_container() -> None:
+    """When ONLY [data-price] inside #product-main has the price, it is still found."""
+    html = """
+    <html><body>
+      <div id="product-main"><span data-price="89.90"></span></div>
+    </body></html>
+    """
+    result = GenericScraper()._try_css_selectors(BeautifulSoup(html, "lxml"))
+    assert result is not None
+    assert result["price"] == Decimal("89.90")
+
+
+def test_data_attributes_skips_elements_outside_product_container() -> None:
+    """data-* hits outside any product/main/schema.org-Product scope are ignored."""
+    html = """
+    <html><body>
+      <div class="sidebar"><span data-amount="9.99"></span></div>
+      <div class="product-detail"><span data-amount="129.00"></span></div>
+    </body></html>
+    """
+    result = GenericScraper()._try_data_attributes(BeautifulSoup(html, "lxml"))
+    assert result is not None
+    assert result["price"] == Decimal("129.00")
+
+
+def test_data_attributes_accepts_schema_org_product_scope() -> None:
+    """itemtype schema.org/Product qualifies as a product container."""
+    html = """
+    <html><body>
+      <div itemtype="https://schema.org/Product"><span data-price="59.90"></span></div>
+    </body></html>
+    """
+    result = GenericScraper()._try_data_attributes(BeautifulSoup(html, "lxml"))
+    assert result is not None
+    assert result["price"] == Decimal("59.90")
+
+
 # ── scrape: error paths ──────────────────────────────────────────
 
 
@@ -107,8 +270,8 @@ async def test_generic_handles_404(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_generic_handles_429_after_retries(monkeypatch: pytest.MonkeyPatch) -> None:
-    """429 with retries exhausted → ProductInfo with error."""
+async def test_generic_handles_500_after_retries(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Non-block 500 with retries exhausted → ProductInfo with error (no BlockEvent)."""
     scraper = GenericScraper()
 
     async def _fast_fail(url: str, client: httpx.AsyncClient) -> str:
@@ -119,7 +282,7 @@ async def test_generic_handles_429_after_retries(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(generic_module, "_fetch_generic_html", _fast_fail)
 
     with respx.mock(assert_all_called=False) as router:
-        router.get("https://example.com/rate").respond(429)
+        router.get("https://example.com/rate").respond(500)
         async with httpx.AsyncClient() as client:
             info = await scraper.scrape("https://example.com/rate", client)
 

@@ -22,6 +22,7 @@ from price_tracker.core.registry import (
     discover_dropin_scrapers,
 )
 from price_tracker.core.scheduler import Scheduler, SchedulerDeps
+from price_tracker.db import apply_runtime_pragmas
 from price_tracker.db.migrator import apply_migrations
 from price_tracker.db.repository import Repository
 from price_tracker.notifier.digest import DigestService
@@ -108,6 +109,27 @@ async def scheduled_check_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     await scheduler.run_check_all()
 
 
+# How often the digest-flush job runs, and the fallback cadence for users with no
+# stored digest_interval_minutes preference.
+DIGEST_FLUSH_INTERVAL_SECONDS = 60
+DIGEST_FLUSH_DEFAULT_MINUTES = 60
+
+
+async def digest_flush_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Flush due per-user notification digests (Feature D).
+
+    Without this scheduled job, enqueued digest entries were never delivered
+    except via manual /digest_now — they piled up indefinitely (#25).
+    """
+    digest_service = context.bot_data.get("digest_service")
+    if digest_service is None:
+        return
+    try:
+        await digest_service.flush_due(interval_minutes=DIGEST_FLUSH_DEFAULT_MINUTES)
+    except Exception:  # noqa: BLE001 — a flush failure must not kill the job
+        log.exception("digest_flush_job failed")
+
+
 async def amain() -> None:
     config = Config.from_env()
     configure_logging(level=config.log_level)
@@ -116,6 +138,7 @@ async def amain() -> None:
     Path(config.database_path).parent.mkdir(parents=True, exist_ok=True)
     db_conn = await aiosqlite.connect(config.database_path)
     db_conn.row_factory = aiosqlite.Row
+    await apply_runtime_pragmas(db_conn)
 
     application = (
         Application.builder()
@@ -148,10 +171,26 @@ async def amain() -> None:
     register_handlers(application)
 
     if application.job_queue:
+        # Prefer a persisted interval (/intervallo writes bot_config) over the
+        # env default, so a runtime change survives a restart.
+        interval_minutes = config.check_interval_minutes
+        cursor = await db_conn.execute(
+            "SELECT value FROM bot_config WHERE key = ?", ("check_interval_minutes",)
+        )
+        row = await cursor.fetchone()
+        if row and row[0] and str(row[0]).isdigit():
+            interval_minutes = max(5, int(row[0]))
         application.job_queue.run_repeating(
             scheduled_check_job,
-            interval=config.check_interval_minutes * 60,
+            interval=interval_minutes * 60,
             first=60,
+            name="periodic_check",
+        )
+        application.job_queue.run_repeating(
+            digest_flush_job,
+            interval=DIGEST_FLUSH_INTERVAL_SECONDS,
+            first=DIGEST_FLUSH_INTERVAL_SECONDS,
+            name="digest_flush",
         )
 
     await application.initialize()

@@ -17,6 +17,7 @@ from price_tracker.bot.handlers._helpers import (
     _escape_html,
     _format_threshold,
     _get_user_product,
+    _parse_id,
     _safe_dec,
 )
 
@@ -33,7 +34,10 @@ async def handle_edit_button(
     if not data.startswith("edit_"):
         return False
 
-    product_id = int(data.replace("edit_", ""))
+    product_id = _parse_id(data.replace("edit_", ""))
+    if product_id is None:
+        await query.edit_message_text("❌ ID non valido.")
+        return True
     product = await _get_user_product(context, product_id, user_id)
     if not product:
         await query.edit_message_text("❌ Prodotto non trovato.")
@@ -79,7 +83,10 @@ async def handle_pause_button(
     if not data.startswith("pause_"):
         return False
 
-    product_id = int(data.replace("pause_", ""))
+    product_id = _parse_id(data.replace("pause_", ""))
+    if product_id is None:
+        await query.edit_message_text("❌ ID non valido.")
+        return True
     product = await _get_user_product(context, product_id, user_id)
     if not product:
         await query.edit_message_text("❌ Prodotto non trovato.")
@@ -101,7 +108,10 @@ async def handle_remove_button(
     if not data.startswith("remove_"):
         return False
 
-    product_id = int(data.replace("remove_", ""))
+    product_id = _parse_id(data.replace("remove_", ""))
+    if product_id is None:
+        await query.edit_message_text("❌ ID non valido.")
+        return True
     product = await _get_user_product(context, product_id, user_id)
     if not product:
         await query.edit_message_text("❌ Prodotto non trovato.")
@@ -135,7 +145,10 @@ async def handle_reset_button(
     if not data.startswith("reset_"):
         return False
 
-    product_id = int(data.replace("reset_", ""))
+    product_id = _parse_id(data.replace("reset_", ""))
+    if product_id is None:
+        await query.edit_message_text("❌ ID non valido.")
+        return True
     product = await _get_user_product(context, product_id, user_id)
     if not product:
         await query.edit_message_text("❌ Prodotto non trovato.")
@@ -163,8 +176,11 @@ async def handle_reactivate_button(
     if not data.startswith("reactivate_"):
         return False
 
-    product_id = int(data.replace("reactivate_", ""))
-    product = await db.get_product(product_id)
+    product_id = _parse_id(data.replace("reactivate_", ""))
+    if product_id is None:
+        await query.edit_message_text("❌ ID non valido.")
+        return True
+    product = await _get_user_product(context, product_id, user_id)
     if not product:
         await query.edit_message_text("❌ Prodotto non trovato.")
         return True
@@ -182,7 +198,10 @@ async def handle_picker(
 ) -> bool:
     """Handle inline pickers that need a follow-up text reply (`set*_<id>`)."""
     if data.startswith("settarget_"):
-        product_id = int(data.replace("settarget_", ""))
+        product_id = _parse_id(data.replace("settarget_", ""))
+        if product_id is None:
+            await query.edit_message_text("❌ ID non valido.")
+            return True
         product = await _get_user_product(context, product_id, user_id)
         if not product:
             await query.edit_message_text("❌ Prodotto non trovato.")
@@ -199,7 +218,10 @@ async def handle_picker(
         return True
 
     if data.startswith("setsoglia_"):
-        product_id = int(data.replace("setsoglia_", ""))
+        product_id = _parse_id(data.replace("setsoglia_", ""))
+        if product_id is None:
+            await query.edit_message_text("❌ ID non valido.")
+            return True
         product = await _get_user_product(context, product_id, user_id)
         if not product:
             await query.edit_message_text("❌ Prodotto non trovato.")
@@ -214,7 +236,10 @@ async def handle_picker(
         return True
 
     if data.startswith("setrefresh_"):
-        product_id = int(data.replace("setrefresh_", ""))
+        product_id = _parse_id(data.replace("setrefresh_", ""))
+        if product_id is None:
+            await query.edit_message_text("❌ ID non valido.")
+            return True
         product = await _get_user_product(context, product_id, user_id)
         if not product:
             await query.edit_message_text("❌ Prodotto non trovato.")

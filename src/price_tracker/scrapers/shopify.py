@@ -19,6 +19,7 @@ from price_tracker.core.retry_policy import RetryConfig, with_retry
 from price_tracker.core.scraper_base import (
     AbstractScraper,
     ProductInfo,
+    detect_block_event,
     detect_currency,
     get_headers,
     parse_price,
@@ -139,6 +140,8 @@ class ShopifyScraper(AbstractScraper):
         except (httpx.HTTPError, ValueError) as e:
             logger.debug("Shopify HTML fetch failed for %s: %s", url[:60], e)
             return None
+        # Surface WAF/CAPTCHA challenge bodies as a BlockEvent → domain quarantine (#7).
+        detect_block_event(status_code=response.status_code, body=response.text, url=url)
         if not _is_product_path(response.url):
             logger.info(
                 "Shopify rejecting non-product redirect: %s -> %s",
@@ -169,6 +172,12 @@ class ShopifyScraper(AbstractScraper):
             return f"{parsed.scheme}://{parsed.netloc}{product_path}.json"
         return None
 
+    @staticmethod
+    def _extract_requested_handle(json_url: str) -> str | None:
+        """Return the product handle from a /products/<handle>.json URL, if present."""
+        match = re.search(r"/products/([a-z0-9\-_]+)\.json", json_url, re.IGNORECASE)
+        return match.group(1) if match else None
+
     async def _try_json_api(self, json_url: str, client: httpx.AsyncClient) -> ProductInfo | None:
         """Fetch product data from Shopify JSON API."""
         try:
@@ -191,12 +200,36 @@ class ShopifyScraper(AbstractScraper):
                 logger.warning("Shopify JSON API: no 'product' key in response")
                 return None
 
+            # Guard against a dead-slug redirect landing on a DIFFERENT product:
+            # the JSON path follows redirects, so verify the returned handle still
+            # matches the one we requested (the HTML path guards via _is_product_path).
+            requested_handle = self._extract_requested_handle(json_url)
+            returned_handle = product.get("handle")
+            if (
+                requested_handle
+                and returned_handle
+                and requested_handle.lower() != str(returned_handle).lower()
+            ):
+                logger.info(
+                    "Shopify JSON redirected to a different product (%s != %s) — rejecting",
+                    requested_handle,
+                    returned_handle,
+                )
+                return None
+
             name = product.get("title")
 
             variants = product.get("variants", [])
             logger.debug("Shopify JSON API: %s, %d variants", name, len(variants))
+            declares_availability = any(isinstance(v, dict) and "available" in v for v in variants)
             price: Decimal | None = None
+            available = True
+            # Prefer variants the shop declares purchasable: sold-out products
+            # often keep a placeholder price on the first variant (#33).
             for variant in variants:
+                # Absent key = purchasable: only an explicit False marks sold-out.
+                if declares_availability and not variant.get("available", True):
+                    continue
                 variant_price = variant.get("price")
                 if variant_price:
                     parsed = parse_price(str(variant_price))
@@ -205,6 +238,18 @@ class ShopifyScraper(AbstractScraper):
                         price = parsed
                         break
 
+            if price is None and declares_availability:
+                # No purchasable variant: report the first priced one, but
+                # flag the product as unavailable.
+                for variant in variants:
+                    variant_price = variant.get("price")
+                    if variant_price:
+                        parsed = parse_price(str(variant_price))
+                        if parsed:
+                            price = parsed
+                            available = False
+                            break
+
             if price is None:
                 return None
 
@@ -212,6 +257,7 @@ class ShopifyScraper(AbstractScraper):
                 name=name,
                 price=price,
                 currency=None,  # Unknown from JSON API; detected from HTML downstream
+                available=available,
             )
 
         except (json.JSONDecodeError, httpx.HTTPError, ValueError, KeyError, AttributeError) as e:
@@ -222,6 +268,7 @@ class ShopifyScraper(AbstractScraper):
     async def _fetch_json_via_curl_cffi(json_url: str) -> dict | None:
         """Fallback for 403 from Shopify JSON endpoint."""
         try:
+            from curl_cffi import CurlError
             from curl_cffi.requests import AsyncSession
         except ImportError:
             return None
@@ -230,7 +277,7 @@ class ShopifyScraper(AbstractScraper):
                 resp = await session.get(json_url, allow_redirects=True, timeout=30)
                 if resp.status_code == 200:
                     return resp.json()
-        except (ValueError, OSError, AttributeError) as e:
+        except (CurlError, ValueError, OSError, AttributeError) as e:
             logger.debug("Shopify curl_cffi fallback failed: %s", e)
         return None
 

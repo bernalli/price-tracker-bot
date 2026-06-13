@@ -175,13 +175,41 @@ class Scheduler:
             await self._record_failure_and_maybe_disable(
                 product, scraper_name=scraper_name, domain=domain, reason="http_error"
             )
+        except Exception as e:  # noqa: BLE001 — one product must never abort the sweep
+            # Unexpected: a scraper leaking a non-contract exception, or a DB error
+            # (e.g. sqlite 'database is locked' under tick/`/checkall` contention).
+            # Isolate it to this product so the remaining sweep still runs.
+            logger.exception("Unexpected error checking product %d: %s", product.id, e)
+            if metrics is not None:
+                metrics.price_check_total.labels(
+                    scraper=scraper_name, domain=domain, status="error"
+                ).inc()
+            try:
+                await self._record_failure_and_maybe_disable(
+                    product, scraper_name=scraper_name, domain=domain, reason="unexpected"
+                )
+            except Exception:  # noqa: BLE001 — bookkeeping must also not abort the sweep
+                logger.exception(
+                    "Failed to record failure for product %d after unexpected error", product.id
+                )
 
-    async def _run_tick(self, products: list[ProductRecord]) -> None:
+    async def _run_tick(
+        self,
+        products: list[ProductRecord],
+        *,
+        half_open_seen: set[str] | None = None,
+    ) -> None:
         """One scheduler tick: scrape all eligible products.
 
         Filtering rules per Feature B:
           - skip products on LOCKED domains entirely
           - on HALF_OPEN domains send exactly one probe (first product per domain per tick)
+
+        ``half_open_seen`` lets a caller share the probed-domain set across
+        multiple ticks: ``run_check_all`` passes one set for the whole global
+        sweep so a HALF_OPEN domain receives a single probe per sweep instead
+        of one per user (#17). When ``None`` (single-user callers) a fresh set
+        scoped to this tick is used.
 
         Rate-limiting pacing (`delay_between_products`) is applied between scrapes
         to be friendly to upstream servers.
@@ -189,7 +217,8 @@ class Scheduler:
         metrics = self.deps.metrics
         if metrics is not None:
             metrics.scheduler_jobs_active.set(len(products))
-        half_open_seen: set[str] = set()
+        if half_open_seen is None:
+            half_open_seen = set()
         for product in products:
             domain = extract_etld_plus_one(product.url)
             if not domain:
@@ -217,13 +246,18 @@ class Scheduler:
         await self._run_tick(products)
 
     async def run_check_all(self) -> None:
-        """Check every active product across every active user."""
+        """Check every active product across every active user.
+
+        A single ``half_open_seen`` set is shared across the per-user ticks so
+        a HALF_OPEN domain is probed at most once per global sweep (#17).
+        """
         users = await self.deps.repo.list_active_users()
+        half_open_seen: set[str] = set()
         for u in users:
             products = await self.deps.repo.list_products_for_user(
                 user_id=u.user_id, only_active=True
             )
-            await self._run_tick(products)
+            await self._run_tick(products, half_open_seen=half_open_seen)
 
     async def _record_failure_and_maybe_disable(
         self,
@@ -341,6 +375,21 @@ class Scheduler:
                 p, scraper_name=scraper_name, domain=domain, reason="price_none"
             )
             return (p.user_id, None, disabled)
+
+        if info.currency is not None and p.currency is not None and info.currency != p.currency:
+            logger.warning(
+                "Product %d: currency mismatch (scraped=%s, stored=%s) — read skipped, "
+                "no persist/alert",
+                p.id,
+                info.currency,
+                p.currency,
+            )
+            # A currency mismatch is still a successful scrape (HTTP ok, price
+            # parsed) — record it so a HALF_OPEN probe can close the domain;
+            # only the persist/alert is skipped (#20).
+            if domain != "unknown":
+                await handle_success_in_pipeline(health_mgr=self.deps.health_mgr, domain=domain)
+            return (p.user_id, None, False)
 
         history = [h.price for h in await self.deps.repo.get_price_history(p.id, limit=50)]
         outlier = is_outlier(
@@ -562,6 +611,30 @@ class Scheduler:
                 disabled = await self._record_failure_and_maybe_disable(
                     product, scraper_name=scraper_name, domain=domain, reason="http_error"
                 )
+                results.append(
+                    CheckResult(
+                        product_id=product.id,
+                        user_id=user_id,
+                        alert=None,
+                        disabled=disabled,
+                    )
+                )
+            except Exception as e:  # noqa: BLE001 — one product must never abort /checkall
+                logger.exception("Unexpected error checking product %d: %s", product.id, e)
+                if metrics is not None:
+                    metrics.price_check_total.labels(
+                        scraper=scraper_name, domain=domain, status="error"
+                    ).inc()
+                try:
+                    disabled = await self._record_failure_and_maybe_disable(
+                        product, scraper_name=scraper_name, domain=domain, reason="unexpected"
+                    )
+                except Exception:  # noqa: BLE001 — bookkeeping must also not abort the sweep
+                    logger.exception(
+                        "Failed to record failure for product %d after unexpected error",
+                        product.id,
+                    )
+                    disabled = False
                 results.append(
                     CheckResult(
                         product_id=product.id,

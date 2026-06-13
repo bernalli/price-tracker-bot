@@ -7,6 +7,7 @@ Phase 3 (F4).
 
 from __future__ import annotations
 
+import asyncio
 import io
 import logging
 from datetime import datetime
@@ -28,44 +29,28 @@ from price_tracker.bot.messages import _
 logger = logging.getLogger(__name__)
 
 
-async def _generate_chart(db: Any, product_id: int, product: dict[str, Any]) -> io.BytesIO | None:
-    """Generate a price-history chart as PNG image. Returns None if data is too sparse.
+def _render_chart(
+    dates: list[datetime], prices: list[float], target: object, name: str
+) -> io.BytesIO:
+    """Render the price-history chart to a PNG buffer (pure CPU — run via to_thread).
 
-    Note: matplotlib imports are deferred to avoid the heavy import at module
-    load — the bot starts faster, and headless test imports stay cheap.
+    Uses the matplotlib OO API (Figure, not pyplot) so concurrent renders in the
+    threadpool don't race on pyplot's global figure registry, and no plt.close()
+    bookkeeping is needed. matplotlib imports stay deferred for fast startup.
     """
-    history = await db.get_price_history(product_id, limit=100)
-    if not history or len(history) < 2:
-        return None
-
-    dates: list[datetime] = []
-    prices: list[float] = []
-    for record in history:
-        try:
-            dt = datetime.fromisoformat(record["checked_at"].replace("Z", "+00:00"))
-            price = float(record["price"])
-            dates.append(dt)
-            prices.append(price)
-        except (ValueError, TypeError):
-            continue
-
-    if len(dates) < 2:
-        return None
-
     import matplotlib  # noqa: PLC0415 — heavy import deferred
 
     matplotlib.use("Agg")
     import matplotlib.dates as mdates  # noqa: PLC0415
-    import matplotlib.pyplot as plt  # noqa: PLC0415
+    from matplotlib.figure import Figure  # noqa: PLC0415
 
-    fig, ax = plt.subplots(figsize=(8, 3.5), dpi=100)
+    fig = Figure(figsize=(8, 3.5), dpi=100)
+    ax = fig.subplots()
     fig.patch.set_facecolor("#000000")
     ax.set_facecolor("#000000")
 
     ax.plot(dates, prices, color="#ff9f1c", linewidth=2.2, antialiased=True)
 
-    # Target line
-    target = product.get("target_price")
     if target:
         try:
             target_f = float(target)
@@ -92,19 +77,45 @@ async def _generate_chart(db: Any, product_id: int, product: dict[str, Any]) -> 
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%d/%m"))
     fig.autofmt_xdate(rotation=30)
 
-    name = (product.get("name") or "Prodotto")[:50]
     ax.set_title(name, color="white", fontsize=10, pad=10)
 
     min_p, max_p = min(prices), max(prices)
     margin = (max_p - min_p) * 0.15 if max_p != min_p else max_p * 0.05
     ax.set_ylim(min_p - margin, max_p + margin)
 
-    plt.tight_layout()
+    fig.tight_layout()
     buf = io.BytesIO()
     fig.savefig(buf, format="png", bbox_inches="tight", facecolor=fig.get_facecolor())
-    plt.close(fig)
     buf.seek(0)
     return buf
+
+
+async def _generate_chart(db: Any, product_id: int, product: dict[str, Any]) -> io.BytesIO | None:
+    """Generate a price-history chart as PNG. Returns None if data is too sparse.
+
+    The matplotlib render is offloaded to a worker thread so it never blocks the
+    event loop (and therefore every other user/handler) while drawing.
+    """
+    history = await db.get_price_history(product_id, limit=100)
+    if not history or len(history) < 2:
+        return None
+
+    dates: list[datetime] = []
+    prices: list[float] = []
+    for record in history:
+        try:
+            dt = datetime.fromisoformat(record["checked_at"].replace("Z", "+00:00"))
+            price = float(record["price"])
+            dates.append(dt)
+            prices.append(price)
+        except (ValueError, TypeError):
+            continue
+
+    if len(dates) < 2:
+        return None
+
+    name = (product.get("name") or "Prodotto")[:50]
+    return await asyncio.to_thread(_render_chart, dates, prices, product.get("target_price"), name)
 
 
 @with_locale

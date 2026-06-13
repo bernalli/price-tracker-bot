@@ -7,6 +7,7 @@ scrapling) when 403/CAPTCHA are returned.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import random
@@ -17,6 +18,7 @@ from typing import ClassVar
 import httpx
 from bs4 import BeautifulSoup
 
+from price_tracker.core.exceptions import CaptchaDetected, HTTPBlockStatus
 from price_tracker.core.retry_policy import RetryConfig, with_retry
 from price_tracker.core.scraper_base import (
     USER_AGENTS,
@@ -25,6 +27,7 @@ from price_tracker.core.scraper_base import (
     detect_currency,
     get_headers,
     parse_price,
+    select_jsonld_offer,
 )
 
 logger = logging.getLogger(__name__)
@@ -62,6 +65,7 @@ async def _fetch_with_fresh_client(url: str) -> str | None:
 async def _fetch_via_curl_cffi(url: str) -> str | None:
     """Last-resort fetch with Chrome JA3/TLS impersonation. Returns None on any failure."""
     try:
+        from curl_cffi import CurlError
         from curl_cffi.requests import AsyncSession
     except ImportError:
         logger.debug("curl_cffi not available for Amazon fallback")
@@ -73,7 +77,7 @@ async def _fetch_via_curl_cffi(url: str) -> str | None:
                 logger.info("curl_cffi fallback succeeded for %s", url[:60])
                 return resp.text
             logger.warning("curl_cffi fallback got %s for %s", resp.status_code, url[:60])
-    except (httpx.HTTPError, ValueError, OSError) as e:
+    except (CurlError, httpx.HTTPError, ValueError, OSError) as e:
         logger.warning("curl_cffi fallback failed for %s: %s", url[:60], e)
     return None
 
@@ -81,17 +85,22 @@ async def _fetch_via_curl_cffi(url: str) -> str | None:
 async def _fetch_via_scrapling(url: str) -> str | None:
     """Final fallback via Scrapling (stealth headers). Returns None on any failure."""
     try:
+        from curl_cffi import CurlError
         from scrapling import Fetcher
     except ImportError:
         logger.debug("Scrapling not available for Amazon fallback")
         return None
     try:
-        page = Fetcher.get(url, stealthy_headers=True, follow_redirects=True, timeout=30)
+        # Fetcher.get is synchronous (time.sleep between retries, up to 3x30s):
+        # run it in a worker thread so it cannot block the event loop (#21/#59).
+        page = await asyncio.to_thread(
+            Fetcher.get, url, stealthy_headers=True, follow_redirects=True, timeout=30
+        )
         if page.status == 200 and page.text:
             logger.info("Scrapling fallback succeeded for %s", url[:60])
             return page.text
         logger.warning("Scrapling fallback got status %s for %s", page.status, url[:60])
-    except (ValueError, OSError, AttributeError) as e:
+    except (CurlError, ValueError, OSError, AttributeError) as e:
         logger.warning("Scrapling fallback failed for %s: %s", url[:60], e)
     return None
 
@@ -99,14 +108,19 @@ async def _fetch_via_scrapling(url: str) -> str | None:
 async def _fetch_amazon_page(
     url: str, client: httpx.AsyncClient, extra_headers: dict[str, str] | None = None
 ) -> str | None:
-    """Fetch Amazon page with retry + fallback chain. Always returns str | None."""
+    """Fetch Amazon page with retry + fallback chain.
+
+    Returns the page HTML, or None on a non-block failure. On a hard block
+    (HTTP 403/429) that survives every fallback, raises :class:`HTTPBlockStatus`
+    so the scheduler quarantines the domain instead of recording a generic error.
+    """
     html: str | None = None
-    got_403 = False
+    block_status: int | None = None
     try:
         html = await _fetch_amazon_html(url, client, extra_headers)
     except httpx.HTTPStatusError as e:
-        if e.response.status_code == 403:
-            got_403 = True
+        if e.response.status_code in (403, 429):
+            block_status = e.response.status_code
         logger.warning("HTTP %s for %s after retries", e.response.status_code, url[:60])
     except (httpx.HTTPError, ValueError) as e:
         logger.warning("Fetch error for %s: %s", url[:60], e)
@@ -122,13 +136,15 @@ async def _fetch_amazon_page(
     if html:
         return html
 
-    if got_403:
+    if block_status is not None:
         html = await _fetch_via_curl_cffi(url)
         if html:
             return html
         html = await _fetch_via_scrapling(url)
         if html:
             return html
+        # Hard block survived every fallback → signal quarantine to the scheduler.
+        raise HTTPBlockStatus(status=block_status, url=url)
 
     return None
 
@@ -199,9 +215,10 @@ class AmazonScraper(AbstractScraper):
         soup = BeautifulSoup(html, "lxml")
         info = ProductInfo()
 
-        # Check for captcha page
+        # Check for captcha page — raise so the scheduler quarantines the domain
+        # instead of recording a generic "price not found" error.
         if soup.find("form", action=re.compile(r"validateCaptcha")):
-            return ProductInfo(error="Amazon ha richiesto un CAPTCHA — riprovo più tardi")
+            raise CaptchaDetected(marker="amazon-validateCaptcha", url=url)
 
         # Check for "currently unavailable"
         unavail = soup.find(id="availability")
@@ -554,16 +571,12 @@ class AmazonScraper(AbstractScraper):
             try:
                 data = json.loads(script.string)
                 if isinstance(data, dict) and data.get("@type") == "Product":
-                    offers = data.get("offers", {})
-                    if isinstance(offers, list):
-                        offers = offers[0] if offers else {}
-                    offer_type = offers.get("@type", "")
-                    if offer_type == "AggregateOffer":
-                        logger.debug("Skipping AggregateOffer.lowPrice (unreliable on Amazon)")
-                        continue
-                    price = offers.get("price")
-                    if price:
-                        return parse_price(str(price))
+                    # Shared offer selection: skips financing entries and
+                    # AggregateOffer.lowPrice, returns the representative
+                    # concrete price — never offers[0] blindly (#54).
+                    selected = select_jsonld_offer(data.get("offers", {}))
+                    if selected is not None:
+                        return selected[0]
             except (json.JSONDecodeError, TypeError, AttributeError):
                 continue
         return None

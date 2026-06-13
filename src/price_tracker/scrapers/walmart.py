@@ -22,8 +22,10 @@ from price_tracker.core.scraper_base import (
     ProductInfo,
     detect_block_event,
     detect_currency,
+    find_microdata_price_el,
     get_headers,
     parse_price,
+    select_jsonld_offer,
 )
 
 logger = logging.getLogger(__name__)
@@ -74,15 +76,17 @@ class WalmartScraper(AbstractScraper):
         ):
             try:
                 result = strategy_fn(soup)
-                if result and result.get("price") is not None and info.price is None:
+                if not result:
+                    continue
+                if result.get("price") is not None and result["price"] > 0 and info.price is None:
                     info.price = result["price"]
-                    if result.get("currency") and info.currency is None:
-                        info.currency = result["currency"]
-                    if result.get("name") and info.name is None:
-                        info.name = result["name"]
                     logger.debug("walmart price via %s: %s", strategy_name, info.price)
-                    if info.price is not None and info.name is not None:
-                        break
+                if result.get("currency") and info.currency is None:
+                    info.currency = result["currency"]
+                if result.get("name") and info.name is None:
+                    info.name = result["name"]
+                if info.price is not None and info.name is not None:
+                    break
             except (ValueError, KeyError, AttributeError) as e:
                 logger.debug("walmart strategy %s error: %s", strategy_name, e)
                 continue
@@ -120,20 +124,13 @@ class WalmartScraper(AbstractScraper):
                 type_str = " ".join(type_val) if isinstance(type_val, list) else str(type_val)
                 if "Product" not in type_str:
                     continue
-                offers = item.get("offers")
-                if isinstance(offers, list):
-                    offers = offers[0] if offers else None
-                if not isinstance(offers, dict):
+                selected = select_jsonld_offer(item.get("offers"))
+                if selected is None:
                     continue
-                price_raw = offers.get("price") or offers.get("lowPrice")
-                if price_raw is None:
-                    continue
-                parsed = parse_price(str(price_raw))
-                if parsed is None:
-                    continue
+                parsed, currency = selected
                 result: StrategyResult = {
                     "price": parsed,
-                    "currency": offers.get("priceCurrency", "USD"),
+                    "currency": currency or "USD",
                 }
                 name = item.get("name")
                 if isinstance(name, str) and name:
@@ -142,7 +139,7 @@ class WalmartScraper(AbstractScraper):
         return None
 
     def _try_microdata(self, soup: BeautifulSoup) -> StrategyResult | None:
-        price_el = soup.find(attrs={"itemprop": "price"})
+        price_el = find_microdata_price_el(soup)
         if not isinstance(price_el, Tag):
             return None
         raw = price_el.get("content") or price_el.get_text(strip=True)
@@ -150,12 +147,22 @@ class WalmartScraper(AbstractScraper):
         if parsed is None:
             return None
         result: StrategyResult = {"price": parsed}
-        currency_el = soup.find(attrs={"itemprop": "priceCurrency"})
+        # Scope currency/name to the price element's own itemscope (Offer for the
+        # currency, enclosing Product for the name): a page-wide find would pick
+        # up a related-items carousel's values (#37). Flat markup without any
+        # itemscope keeps the page-wide lookup.
+        offer_scope = price_el.find_parent(attrs={"itemscope": True})
+        currency_root: Tag | BeautifulSoup = offer_scope if isinstance(offer_scope, Tag) else soup
+        name_root: Tag | BeautifulSoup = soup
+        if isinstance(offer_scope, Tag):
+            product_scope = offer_scope.find_parent(attrs={"itemscope": True})
+            name_root = product_scope if isinstance(product_scope, Tag) else offer_scope
+        currency_el = currency_root.find(attrs={"itemprop": "priceCurrency"})
         if isinstance(currency_el, Tag):
             currency_val = currency_el.get("content") or currency_el.get_text(strip=True)
             if currency_val:
                 result["currency"] = str(currency_val)
-        name_el = soup.find(attrs={"itemprop": "name"})
+        name_el = name_root.find(attrs={"itemprop": "name"})
         if isinstance(name_el, Tag):
             name_val = name_el.get("content") or name_el.get_text(strip=True)
             if name_val:

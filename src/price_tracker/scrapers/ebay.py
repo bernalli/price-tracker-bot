@@ -21,7 +21,9 @@ from price_tracker.core.retry_policy import RetryConfig, with_retry
 from price_tracker.core.scraper_base import (
     AbstractScraper,
     ProductInfo,
+    find_microdata_price_el,
     get_headers,
+    jsonld_offer_availability,
     parse_price,
 )
 
@@ -130,13 +132,29 @@ class EbayScraper(AbstractScraper):
                                 parsed = parse_price(str(price))
                                 if parsed:
                                     info.currency = offers.get("priceCurrency", "EUR")
+                                    availability = jsonld_offer_availability(offers)
+                                    if availability is not None:
+                                        info.available = availability
                                     return parsed
             except (json.JSONDecodeError, TypeError):
                 continue
         return None
 
     def _try_microdata(self, soup: BeautifulSoup, info: ProductInfo) -> None:
-        price_el = soup.find(attrs={"itemprop": "price"})
+        # Prefer the main listing container: related/recommended carousels often
+        # expose their own itemprop=price (even a full offers scope) earlier in
+        # document order and would win a page-wide microdata lookup (#31).
+        price_el = None
+        main = soup.select_one(".x-price-primary")
+        if main is not None:
+            price_el = main.find(attrs={"itemprop": "price"})
+            currency_el = main.find(attrs={"itemprop": "priceCurrency"})
+            if currency_el is not None and not info.currency:
+                currency = currency_el.get("content") or currency_el.get_text(strip=True)
+                if currency:
+                    info.currency = str(currency)
+        if price_el is None:
+            price_el = find_microdata_price_el(soup)
         if price_el:
             val = price_el.get("content") or price_el.get_text(strip=True)
             parsed = parse_price(str(val))

@@ -125,6 +125,36 @@ async def test_quiet_hours_without_digest_drops(repo_mock: AsyncMock) -> None:
 
 
 @pytest.mark.asyncio
+async def test_digest_routed_alert_counts_skip_reason_once(repo_mock: AsyncMock) -> None:
+    """Bug #64: one digest-routed alert must increment digest_pending exactly once.
+
+    DigestService.enqueue used to bump notification_skipped_total{digest_pending}
+    on top of TelegramNotifier._emit_skipped, double-counting every routed alert.
+    """
+    repo_mock.get_notification_prefs = AsyncMock(
+        side_effect=[
+            None,
+            NotificationPrefs(user_id=42, product_id=None, digest_mode=True),
+        ]
+    )
+    bot = AsyncMock()
+    registry = CollectorRegistry()
+    metrics = MetricsRegistry(registry=registry)
+    notifier = TelegramNotifier(
+        bot=bot,
+        metrics=metrics,
+        prefs=PreferencesManager(repo=repo_mock),
+        digest=DigestService(repo=repo_mock, bot=bot, metrics=metrics),
+    )
+    await notifier.notify_alert(user_id=42, product_id=10, alert={"product_name": "X"})
+    repo_mock.enqueue_digest.assert_awaited_once()
+    val = registry.get_sample_value(
+        "price_tracker_notification_skipped_total", {"reason": "digest_pending"}
+    )
+    assert val == 1.0
+
+
+@pytest.mark.asyncio
 async def test_no_duplicate_notification_for_same_event(repo_mock: AsyncMock) -> None:
     """KPI v0.1.0: same alert event must not trigger two messages."""
     bot = AsyncMock()

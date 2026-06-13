@@ -274,6 +274,112 @@ async def test_scheduler_outlier_price_rejected(
 
 
 @pytest.mark.asyncio
+async def test_scheduler_currency_mismatch_skips_persist_and_alert(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    """Bug #20: scraped currency != stored currency → warn + skip, no persist.
+
+    A USD read against a EUR product (wrong variant / marketplace redirect)
+    must not be persisted as price/history, must not alert, must not count
+    as a scrape error, and must NOT silently rewrite the stored currency.
+    """
+    repo, pid = repo_with_product  # stored currency = EUR
+    stub = _StubScraper(ProductInfo(name="Widget", price=Decimal("80"), currency="USD"))
+    registry = ScraperRegistry()
+    registry.register(stub)
+    notifier = AsyncMock()
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=notifier,
+                max_consecutive_errors=10,
+                delay_between_products=0.0,
+            )
+        )
+        await scheduler.run_check_for_user(user_id=1)
+    p = await repo.get_product(pid)
+    assert p is not None
+    assert p.current_price != Decimal("80")  # not persisted
+    assert p.currency == "EUR"  # NO update_currency
+    assert p.consecutive_errors == 0  # not a scrape failure
+    history = await repo.get_price_history(pid, limit=50)
+    assert all(h.price != Decimal("80") for h in history)  # no history row
+    notifier.assert_not_awaited()  # no alert
+
+
+@pytest.mark.asyncio
+async def test_scheduler_currency_mismatch_records_success_for_half_open_domain(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    """Regression of fix #20: a currency-mismatch read is still a SUCCESSFUL
+    scrape (HTTP ok, price parsed) — only the persist/alert is skipped.
+
+    When the mismatching product is the single probe of a HALF_OPEN domain,
+    the guard must still call ``record_success`` so the domain can transition
+    back to CLOSED. Before the fix the guard returned early without
+    ``handle_success_in_pipeline``, so the same product consumed the probe
+    slot on every sweep and the domain stayed HALF_OPEN forever.
+    """
+    repo, pid = repo_with_product  # stored currency = EUR
+    stub = _StubScraper(ProductInfo(name="Widget", price=Decimal("80"), currency="USD"))
+    registry = ScraperRegistry()
+    registry.register(stub)
+    health_mgr: HealthManager = AsyncMock(spec=HealthManager)
+    health_mgr.is_locked = lambda _d: False
+    health_mgr.is_half_open = lambda d: d == "example.com"
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=AsyncMock(),
+                max_consecutive_errors=10,
+                delay_between_products=0.0,
+                health_mgr=health_mgr,
+            )
+        )
+        await scheduler.run_check_for_user(user_id=1)
+    assert stub.calls == 1  # the half-open probe was sent
+    health_mgr.record_success.assert_awaited_once_with("example.com")  # type: ignore[attr-defined]
+    # The #20 guarantees still hold: no persist, no currency rewrite.
+    p = await repo.get_product(pid)
+    assert p is not None
+    assert p.current_price != Decimal("80")
+    assert p.currency == "EUR"
+
+
+@pytest.mark.asyncio
+async def test_scheduler_currency_none_persists_normally(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    """Guard #20 must not fire when the scraper reports no currency."""
+    repo, pid = repo_with_product
+    stub = _StubScraper(ProductInfo(name="Widget", price=Decimal("80"), currency=None))
+    registry = ScraperRegistry()
+    registry.register(stub)
+    notifier = AsyncMock()
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=notifier,
+                max_consecutive_errors=10,
+                delay_between_products=0.0,
+            )
+        )
+        await scheduler.run_check_for_user(user_id=1)
+    p = await repo.get_product(pid)
+    assert p is not None
+    assert p.current_price == Decimal("80")
+
+
+@pytest.mark.asyncio
 async def test_scheduler_first_check_no_old_price_no_alert() -> None:
     """Line 101: when old_price is None, return without crossing threshold check.
 
@@ -949,3 +1055,210 @@ async def test_scheduler_renotifies_after_cooldown_elapsed(
         await scheduler.run_check_for_user(user_id=1)  # tick 2: 100 → recover, no cross
         await scheduler.run_check_for_user(user_id=1)  # tick 3: 80 → re-cross, cooldown elapsed
     assert notifier.await_count == 2
+
+
+class _CountingConnectErrorScraper(AbstractScraper):
+    """Raises a non-block httpx error on every scrape and counts the attempts.
+
+    Used to count HALF_OPEN probes: a non-block failure (timeout/connect error)
+    leaves the domain HALF_OPEN, unlike a block (lock) or a success (close).
+    """
+
+    name = "counting-raising"
+    priority = 100
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def can_handle(self, url: str) -> bool:
+        return True
+
+    async def scrape(self, url: str, client: httpx.AsyncClient) -> ProductInfo:
+        self.calls += 1
+        raise httpx.ConnectError("simulated timeout (non-block failure)")
+
+
+@pytest.mark.asyncio
+async def test_run_check_all_sends_single_half_open_probe_across_users() -> None:
+    """Bug #17: a HALF_OPEN domain must receive exactly ONE probe per global
+    sweep, even when multiple users track products on that domain.
+
+    Three users each track one product on the same half-open domain; the probe
+    fails with a non-block error (httpx.ConnectError) so the domain stays
+    HALF_OPEN throughout the sweep (a block or a success would transition the
+    state). Before the fix every per-user ``_run_tick`` created its own
+    ``half_open_seen`` set, so ``run_check_all`` sent one probe per user.
+    """
+    from price_tracker.db.models import ProductRecord, UserRecord  # noqa: PLC0415
+
+    def _make_product(pid: int, uid: int) -> ProductRecord:
+        return ProductRecord(
+            id=pid,
+            user_id=uid,
+            url=f"https://example.com/item/{pid}",
+            name=f"Product {pid}",
+            domain="example.com",
+            initial_price=Decimal("100"),
+            current_price=None,
+            lowest_price=None,
+            highest_price=None,
+            target_price=None,
+            threshold_type="drop_pct",
+            threshold_value=Decimal("10"),
+            is_active=True,
+            is_available=True,
+            consecutive_errors=0,
+            currency="EUR",
+            check_interval_minutes=None,
+            last_checked_at=None,
+            last_notified_at=None,
+        )
+
+    users = [UserRecord(user_id=u, is_admin=False, is_active=True) for u in (1, 2, 3)]
+    products_by_user = {u.user_id: [_make_product(100 + u.user_id, u.user_id)] for u in users}
+
+    repo = AsyncMock()
+    repo.list_active_users.return_value = users
+
+    async def _list_products(*, user_id: int, only_active: bool = True) -> list[ProductRecord]:  # noqa: ARG001
+        return products_by_user[user_id]
+
+    repo.list_products_for_user.side_effect = _list_products
+
+    async def _get_product(pid: int) -> ProductRecord:
+        return _make_product(pid, 1)  # consecutive_errors=0 → never auto-disabled
+
+    repo.get_product.side_effect = _get_product
+
+    health_mgr: HealthManager = AsyncMock(spec=HealthManager)
+    health_mgr.is_locked = lambda _d: False
+    health_mgr.is_half_open = lambda d: d == "example.com"
+
+    scraper = _CountingConnectErrorScraper()
+    registry = ScraperRegistry()
+    registry.register(scraper)
+
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=AsyncMock(),
+                max_consecutive_errors=10,
+                delay_between_products=0.0,
+                health_mgr=health_mgr,
+            )
+        )
+        await scheduler.run_check_all()
+
+    assert scraper.calls == 1, (
+        f"HALF_OPEN domain probed {scraper.calls} times in one global sweep (expected 1)"
+    )
+
+
+class _SelectiveScraper(AbstractScraper):
+    """Raises an *unexpected* exception for one URL, returns a good price otherwise."""
+
+    name = "selective"
+    priority = 100
+
+    def __init__(self, raise_on_url: str, good: ProductInfo) -> None:
+        self._raise_on_url = raise_on_url
+        self._good = good
+        self.calls = 0
+
+    def can_handle(self, url: str) -> bool:
+        return True
+
+    async def scrape(self, url: str, client: httpx.AsyncClient) -> ProductInfo:
+        self.calls += 1
+        if url == self._raise_on_url:
+            # Not in the scheduler's caught set (Block/Parse/httpx/ValueError/KeyError).
+            raise RuntimeError("unexpected scraper explosion")
+        return self._good
+
+
+@pytest.mark.asyncio
+async def test_run_tick_survives_unexpected_scraper_exception(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    """One product raising an unexpected exception must not abort the whole sweep.
+
+    Regression for bug #2: a non-(Block/Parse/httpx/ValueError/KeyError) error
+    (e.g. sqlite 'database is locked', RuntimeError) escaped ``_scrape_one`` and
+    the un-guarded ``_run_tick`` loop, silently skipping every later product.
+    """
+    repo, pid1 = repo_with_product
+    pid2 = await repo.add_product(
+        user_id=1,
+        url="https://example.com/p/2",
+        name="Widget2",
+        domain="example.com",
+        initial_price=Decimal("100"),
+        currency="EUR",
+    )
+    scraper = _SelectiveScraper(
+        raise_on_url="https://example.com/p/1",
+        good=ProductInfo(name="Widget2", price=Decimal("80"), currency="EUR"),
+    )
+    registry = ScraperRegistry()
+    registry.register(scraper)
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=AsyncMock(),
+                max_consecutive_errors=10,
+                delay_between_products=0.0,
+            )
+        )
+        await scheduler.run_check_for_user(user_id=1)  # must NOT raise
+    p2 = await repo.get_product(pid2)
+    assert p2 is not None
+    assert p2.current_price == Decimal("80")  # later product still processed
+    p1 = await repo.get_product(pid1)
+    assert p1 is not None
+    assert p1.consecutive_errors == 1  # crashing product's failure recorded
+
+
+@pytest.mark.asyncio
+async def test_checkall_survives_unexpected_exception(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    """Pull-mode /checkall must not abort mid-list on an unexpected exception (#2)."""
+    repo, _pid1 = repo_with_product
+    pid2 = await repo.add_product(
+        user_id=1,
+        url="https://example.com/p/2",
+        name="Widget2",
+        domain="example.com",
+        initial_price=Decimal("100"),
+        currency="EUR",
+    )
+    scraper = _SelectiveScraper(
+        raise_on_url="https://example.com/p/1",
+        good=ProductInfo(name="Widget2", price=Decimal("80"), currency="EUR"),
+    )
+    registry = ScraperRegistry()
+    registry.register(scraper)
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=AsyncMock(),
+                max_consecutive_errors=10,
+                delay_between_products=0.0,
+            )
+        )
+        results = await scheduler.check_user_products_for_user(
+            user_id=1, delay_between_products=0.0
+        )
+    assert len(results) == 2  # both products produced a result; sweep did not abort
+    p2 = await repo.get_product(pid2)
+    assert p2 is not None
+    assert p2.current_price == Decimal("80")

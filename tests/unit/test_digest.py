@@ -95,6 +95,7 @@ async def test_flush_at_quiet_hours_end_via_scheduler(
     repo_mock.list_users_with_pending_digest = AsyncMock(
         return_value=[(42, datetime(2026, 5, 9, 12, 0, tzinfo=UTC))]
     )
+    repo_mock.get_notification_prefs = AsyncMock(return_value=None)  # fall back to interval_minutes
     svc = DigestService(repo=repo_mock, bot=telegram_mock)
     with freeze_time("2026-05-09 13:01:00"):
         await svc.flush_due(interval_minutes=60)

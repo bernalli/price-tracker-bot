@@ -31,11 +31,12 @@ class TestMetricsRegistry:
         assert count == 2
 
     def test_quarantine_state_gauge(self, fresh_registry):
+        """Single series per domain — state is the gauge value, not a label (#52)."""
         m = MetricsRegistry(registry=fresh_registry)
-        m.quarantine_state.labels(domain="xteink.com", state="LOCKED_T3").set(3)
+        m.quarantine_state.labels(domain="xteink.com").set(3)
         val = fresh_registry.get_sample_value(
             "price_tracker_quarantine_state",
-            {"domain": "xteink.com", "state": "LOCKED_T3"},
+            {"domain": "xteink.com"},
         )
         assert val == 3
 

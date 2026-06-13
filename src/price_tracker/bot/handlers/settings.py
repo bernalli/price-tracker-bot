@@ -16,7 +16,7 @@ from zoneinfo import available_timezones
 from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler
 
-from price_tracker.bot.decorators import _config, _db, admin_only, with_locale
+from price_tracker.bot.decorators import _config, _db, admin_only, restricted, with_locale
 from price_tracker.bot.messages import _
 from price_tracker.db.models import NotificationPrefs
 
@@ -56,9 +56,8 @@ async def cmd_set_interval(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await update.message.reply_text(_("❌ L'intervallo massimo è 7 giorni."))
         return
 
-    config = _config(context)
-    config.check_interval_minutes = minutes
     await _db(context).set_config("check_interval_minutes", str(minutes))
+    _reschedule_periodic_check(context, minutes)
 
     if minutes >= 60:
         hours = minutes / 60
@@ -74,6 +73,24 @@ async def cmd_set_interval(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 # ── Phase 2 F3.D: notification preference commands ────────────────────
 
 
+def _reschedule_periodic_check(context: ContextTypes.DEFAULT_TYPE, minutes: int) -> None:
+    """Reschedule the periodic price-check job so a new interval takes effect live.
+
+    Config is frozen and the job interval is fixed at startup, so a runtime change
+    must remove the existing job and re-add it at the new cadence.
+    """
+    job_queue = getattr(context, "job_queue", None)
+    if job_queue is None:
+        return
+    from price_tracker.main import scheduled_check_job  # noqa: PLC0415 — avoid import cycle
+
+    for job in job_queue.get_jobs_by_name("periodic_check"):
+        job.schedule_removal()
+    job_queue.run_repeating(
+        scheduled_check_job, interval=minutes * 60, first=minutes * 60, name="periodic_check"
+    )
+
+
 def _valid_hhmm(value: str) -> bool:
     """Return True if ``value`` is a 24h ``HH:MM`` time string."""
     if len(value) != 5 or value[2] != ":":
@@ -86,6 +103,7 @@ def _valid_hhmm(value: str) -> bool:
 
 
 @with_locale
+@restricted
 async def mute_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Usage: ``/mute [product_id|all] [hours|forever]`` (default: all 24h)."""
     repo = context.bot_data["repository"]
@@ -139,6 +157,7 @@ async def mute_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 
 @with_locale
+@restricted
 async def unmute_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Usage: ``/unmute [product_id|all]``."""
     repo = context.bot_data["repository"]
@@ -169,6 +188,7 @@ async def unmute_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 
 @with_locale
+@restricted
 async def digest_mode_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Usage: ``/digest_mode on|off [interval_min]``."""
     repo = context.bot_data["repository"]
@@ -205,6 +225,7 @@ async def digest_mode_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 @with_locale
+@restricted
 async def quiet_hours_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Usage: ``/quiet_hours HH:MM-HH:MM`` or ``/quiet_hours off``."""
     repo = context.bot_data["repository"]
@@ -254,6 +275,7 @@ async def quiet_hours_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 @with_locale
+@restricted
 async def timezone_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Usage: ``/timezone <TZ>`` (e.g. ``Europe/Berlin``)."""
     repo = context.bot_data["repository"]
@@ -276,6 +298,7 @@ async def timezone_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 
 @with_locale
+@restricted
 async def throttle_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Usage: ``/throttle <N>`` or ``/throttle off``."""
     repo = context.bot_data["repository"]
@@ -308,6 +331,7 @@ async def throttle_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 
 @with_locale
+@restricted
 async def prefs_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Usage: ``/prefs [product_id]`` — render resolved (effective) preferences."""
     from price_tracker.notifier.preferences import PreferencesManager
@@ -341,6 +365,7 @@ async def prefs_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 
 @with_locale
+@restricted
 async def digest_now_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Usage: ``/digest_now`` — flush pending digest entries immediately."""
     digest_svc = context.bot_data["digest_service"]
