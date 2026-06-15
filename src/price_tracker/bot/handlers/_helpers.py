@@ -5,11 +5,36 @@ Ported verbatim from monolithic bot.py [item 17].
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from telegram.ext import ContextTypes
+
+
+def _format_relative_time(iso_ts: str | None, *, now: datetime | None = None) -> str | None:
+    """Render an ISO timestamp as a compact "Nmin/h/g fa" string, or None.
+
+    Normalises naive timestamps (the DB stores ``YYYY-MM-DD HH:MM:SS`` without
+    tzinfo) to UTC before subtracting, so the comparison never raises the
+    naive-vs-aware ``TypeError`` that previously hid the "Ultimo check" line.
+    """
+    if not iso_ts:
+        return None
+    try:
+        checked = datetime.fromisoformat(iso_ts.replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return None
+    if checked.tzinfo is None:
+        checked = checked.replace(tzinfo=UTC)
+    reference = now or datetime.now(UTC)
+    seconds = (reference - checked).total_seconds()
+    if seconds < 3600:
+        return f"{int(seconds / 60)}min fa"
+    if seconds < 86400:
+        return f"{int(seconds / 3600)}h fa"
+    return f"{int(seconds / 86400)}g fa"
 
 
 def _escape_html(text: str) -> str:

@@ -396,10 +396,21 @@ _WAF_FINGERPRINTS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("imperva", re.compile(r"Incapsula incident ID", re.IGNORECASE)),
 )
 
+# A real CAPTCHA lives in a challenge element (form/div/iframe), NOT in a
+# <script>. Anchoring to those tags avoids matching the benign
+# `<script id="captcha-bootstrap">` that Shopify injects on every storefront
+# (PayPal/bot-management bootstrap) — the over-broad `id="captcha*"` pattern
+# falsely quarantined fillingpieces/clae/xteink for days (2026-06-13). The
+# `[^>]{0,200}` cannot cross a `>`, so the match stays within a single tag.
+_CAPTCHA_CHALLENGE_RE = re.compile(
+    r'<(?:form|div|iframe)\b[^>]{0,200}\bid\s*=\s*["\']captcha[\w-]*',
+    re.IGNORECASE,
+)
+
 _CAPTCHA_FINGERPRINTS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("g-recaptcha", re.compile(r'class\s*=\s*["\']g-recaptcha', re.IGNORECASE)),
     ("hcaptcha", re.compile(r'class\s*=\s*["\']h-captcha', re.IGNORECASE)),
-    ("captcha-form", re.compile(r'id\s*=\s*["\']captcha[\w-]*', re.IGNORECASE)),
+    ("captcha-form", _CAPTCHA_CHALLENGE_RE),
 )
 
 

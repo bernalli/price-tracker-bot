@@ -15,6 +15,7 @@ from urllib.parse import urlparse
 import httpx
 from bs4 import BeautifulSoup
 
+from price_tracker.core.exceptions import BlockEvent
 from price_tracker.core.retry_policy import RetryConfig, with_retry
 from price_tracker.core.scraper_base import (
     AbstractScraper,
@@ -108,8 +109,15 @@ class ShopifyScraper(AbstractScraper):
         if json_url:
             result = await self._try_json_api(json_url, client)
             if result and result.price is not None:
-                # Detect currency from HTML page (JSON-LD, OG tags)
-                html = await self._fetch_html(url, client)
+                # Detect currency from HTML page (JSON-LD, OG tags). This fetch is
+                # enrichment ONLY: the price is already in hand. A challenge/block
+                # marker in the HTML must NOT discard a valid scrape (it falsely
+                # quarantined fillingpieces/clae/xteink), so swallow BlockEvent and
+                # fall back to the default currency.
+                try:
+                    html = await self._fetch_html(url, client)
+                except BlockEvent:
+                    html = None
                 if html:
                     detected = self._detect_currency_from_html(html)
                     if detected:

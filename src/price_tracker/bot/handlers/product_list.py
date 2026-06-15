@@ -7,7 +7,6 @@ budget [item 17].
 from __future__ import annotations
 
 import logging
-from datetime import UTC
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
@@ -16,6 +15,7 @@ from telegram.ext import Application, CommandHandler, ContextTypes
 from price_tracker.bot.decorators import _convert_display, _db, restricted, with_locale
 from price_tracker.bot.handlers._helpers import (
     _escape_html,
+    _format_relative_time,
     _format_threshold,
     _safe_dec,
 )
@@ -93,27 +93,13 @@ async def cmd_list(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             parts.append(f"🔄 Check: ogni {int_str}")
 
         # Last check time
-        last_checked = p.get("last_checked_at")
-        if last_checked:
-            try:
-                from datetime import datetime  # noqa: PLC0415
-
-                checked_dt = datetime.fromisoformat(last_checked.replace("Z", "+00:00"))
-                now = datetime.now(UTC)
-                delta = now - checked_dt
-                if delta.total_seconds() < 3600:
-                    ago = f"{int(delta.total_seconds() / 60)}min fa"
-                elif delta.total_seconds() < 86400:
-                    ago = f"{int(delta.total_seconds() / 3600)}h fa"
-                else:
-                    ago = f"{int(delta.total_seconds() / 86400)}g fa"
-                parts.append(f"🕐 Ultimo check: {ago}")
-            except (ValueError, TypeError):
-                pass
+        ago = _format_relative_time(p.get("last_checked_at"))
+        if ago:
+            parts.append(f"🕐 Ultimo check: {ago}")
 
         errors = p.get("consecutive_errors", 0)
         if errors and errors > 0:
-            parts.append(f"⚠️ Errori: {errors}")
+            parts.append(f"⚠️ {errors} letture fallite di recente — dettagli con /errori")
 
         text = "\n".join(parts)
 
