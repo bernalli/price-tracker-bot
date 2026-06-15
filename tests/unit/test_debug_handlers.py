@@ -9,7 +9,7 @@ import pytest
 
 from price_tracker.bot.handlers.debug import health_command, status_command
 from price_tracker.core.health import HealthManager
-from price_tracker.db.models import ScraperHealth
+from price_tracker.db.models import ProductErrorRow, ScraperHealth
 
 
 def _make_context(
@@ -229,3 +229,84 @@ async def test_status_shows_uptime_and_products_tracked() -> None:
     rendered: str = update.message.reply_html.call_args.args[0]
     assert "1h" in rendered or "uptime" in rendered.lower()
     assert "42" in rendered
+
+
+def _make_errori_context(
+    *, errored: list[ProductErrorRow], health_records: list[ScraperHealth]
+) -> MagicMock:
+    """Build a context mock for cmd_errori (@restricted + @with_locale)."""
+    db_mock = MagicMock()
+    db_mock.is_user_allowed = AsyncMock(return_value=True)
+    db_mock.update_user_info = AsyncMock()
+    db_mock.list_products_with_errors = AsyncMock(return_value=errored)
+
+    health_mgr = HealthManager(repo=MagicMock())
+    health_mgr._records = {r.domain: r for r in health_records}
+
+    context = MagicMock()
+    context.bot_data = {"db": db_mock, "health_manager": health_mgr}
+    return context
+
+
+@pytest.mark.asyncio
+async def test_errori_command_lists_products_and_quarantine_state() -> None:
+    from price_tracker.bot.handlers.debug import cmd_errori
+    from price_tracker.db.models import ProductErrorRow
+
+    update = MagicMock()
+    update.effective_user.id = 42
+    update.effective_user.language_code = "it"
+    update.message.reply_html = AsyncMock()
+    update.message.reply_text = AsyncMock()
+
+    now = datetime.now(UTC)
+    errored = [
+        ProductErrorRow(
+            id=39,
+            name="Riviera Weave",
+            url="https://www.fillingpieces.com/products/riviera-weave",
+            domain="fillingpieces.com",
+            consecutive_errors=4,
+            last_error="block: CAPTCHA detected (captcha-form)",
+            last_error_at=(now - timedelta(minutes=10)).strftime("%Y-%m-%d %H:%M:%S"),
+        ),
+    ]
+    records = [
+        ScraperHealth(
+            domain="fillingpieces.com",
+            state="LOCKED_T3",
+            consecutive_blocks=14,
+            locked_until=now + timedelta(hours=20),
+            last_block_at=now,
+            last_block_reason="CAPTCHA/captcha-form",
+        ),
+    ]
+    context = _make_errori_context(errored=errored, health_records=records)
+
+    await cmd_errori(update, context)
+
+    update.message.reply_html.assert_awaited_once()
+    rendered: str = update.message.reply_html.call_args.args[0]
+    assert "Riviera Weave" in rendered
+    assert "fillingpieces.com" in rendered
+    assert "CAPTCHA" in rendered
+    assert "4 letture fallite" in rendered
+    assert "🔒" in rendered  # quarantine indicator for the locked domain
+
+
+@pytest.mark.asyncio
+async def test_errori_command_no_errors() -> None:
+    from price_tracker.bot.handlers.debug import cmd_errori
+
+    update = MagicMock()
+    update.effective_user.id = 42
+    update.effective_user.language_code = "it"
+    update.message.reply_text = AsyncMock()
+    update.message.reply_html = AsyncMock()
+    context = _make_errori_context(errored=[], health_records=[])
+
+    await cmd_errori(update, context)
+
+    update.message.reply_text.assert_awaited_once()
+    assert "Nessun errore" in update.message.reply_text.call_args.args[0]
+    update.message.reply_html.assert_not_awaited()

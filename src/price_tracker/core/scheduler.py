@@ -29,9 +29,10 @@ from price_tracker.core.alert import (
     crosses_threshold,
     format_alert,
     format_error_notification,
+    format_quarantine_notification,
 )
 from price_tracker.core.exceptions import BlockEvent, ParseError
-from price_tracker.core.health import HealthManager
+from price_tracker.core.health import HealthManager, QuarantineState
 from price_tracker.core.outlier import is_outlier
 from price_tracker.core.scraper_base import (
     handle_block_in_pipeline,
@@ -77,6 +78,9 @@ def _no_op_health_mgr() -> HealthManager:
     class _NoOpHealthManager(HealthManager):
         def __init__(self) -> None:
             pass  # skip Repository dependency
+
+        def state(self, domain: str) -> QuarantineState:  # noqa: ARG002
+            return QuarantineState.CLOSED
 
         def is_locked(self, domain: str) -> bool:  # noqa: ARG002
             return False
@@ -153,9 +157,14 @@ class Scheduler:
                     scraper=scraper_name, domain=domain, status="block"
                 ).inc()
             if domain != "unknown":
+                # Capture the pre-block state so we notify exactly once, on the
+                # CLOSED → LOCKED transition (no spam while a domain stays locked).
+                prev_state = self.deps.health_mgr.state(domain)
                 await handle_block_in_pipeline(e, health_mgr=self.deps.health_mgr, domain=domain)
+                if prev_state == QuarantineState.CLOSED and self.deps.health_mgr.is_locked(domain):
+                    await self._notify_quarantine_entry(product, domain, reason=str(e))
             await self._record_failure_and_maybe_disable(
-                product, scraper_name=scraper_name, domain=domain, reason="block"
+                product, scraper_name=scraper_name, domain=domain, reason="block", detail=str(e)
             )
         except ParseError as e:
             logger.warning("Parse error for product %d: %s", product.id, e)
@@ -164,7 +173,11 @@ class Scheduler:
                     scraper=scraper_name, domain=domain, status="error"
                 ).inc()
             await self._record_failure_and_maybe_disable(
-                product, scraper_name=scraper_name, domain=domain, reason="parse_error"
+                product,
+                scraper_name=scraper_name,
+                domain=domain,
+                reason="parse_error",
+                detail=str(e),
             )
         except (httpx.HTTPError, ValueError, KeyError) as e:
             logger.warning("Check failed for product %d: %s", product.id, e)
@@ -173,7 +186,11 @@ class Scheduler:
                     scraper=scraper_name, domain=domain, status="error"
                 ).inc()
             await self._record_failure_and_maybe_disable(
-                product, scraper_name=scraper_name, domain=domain, reason="http_error"
+                product,
+                scraper_name=scraper_name,
+                domain=domain,
+                reason="http_error",
+                detail=str(e),
             )
         except Exception as e:  # noqa: BLE001 — one product must never abort the sweep
             # Unexpected: a scraper leaking a non-contract exception, or a DB error
@@ -186,7 +203,11 @@ class Scheduler:
                 ).inc()
             try:
                 await self._record_failure_and_maybe_disable(
-                    product, scraper_name=scraper_name, domain=domain, reason="unexpected"
+                    product,
+                    scraper_name=scraper_name,
+                    domain=domain,
+                    reason="unexpected",
+                    detail=str(e),
                 )
             except Exception:  # noqa: BLE001 — bookkeeping must also not abort the sweep
                 logger.exception(
@@ -259,6 +280,28 @@ class Scheduler:
             )
             await self._run_tick(products, half_open_seen=half_open_seen)
 
+    async def _notify_quarantine_entry(
+        self, product: ProductRecord, domain: str, *, reason: str
+    ) -> None:
+        """Push a one-shot alert when ``domain`` first enters quarantine.
+
+        Called only on the CLOSED → LOCKED transition. The notifier runs under a
+        broad try/except so a flaky transport never aborts the scheduler tick.
+        """
+        message = format_quarantine_notification(
+            domain=domain,
+            reason=reason,
+            locked_until=self.deps.health_mgr.locked_until(domain),
+        )
+        try:
+            await self.deps.notifier(product.user_id, message)
+        except Exception:  # noqa: BLE001 — notifier failure must not kill the tick
+            logger.exception(
+                "Notifier failed to deliver quarantine alert for domain %s (user %d)",
+                domain,
+                product.user_id,
+            )
+
     async def _record_failure_and_maybe_disable(
         self,
         product: ProductRecord,
@@ -266,6 +309,7 @@ class Scheduler:
         scraper_name: str,
         domain: str,
         reason: str,
+        detail: str | None = None,
     ) -> bool:
         """Increment ``consecutive_errors`` and auto-disable on threshold.
 
@@ -283,10 +327,12 @@ class Scheduler:
         the product was disabled *by this call* so pull-mode callers can flag
         the disabled status on their :class:`CheckResult`.
 
-        ``scraper_name``, ``domain`` and ``reason`` are passed through for
-        structured logging only — they are not persisted.
+        ``scraper_name`` and ``domain`` are passed through for structured
+        logging only. ``reason`` (plus optional ``detail``) is persisted as the
+        product's ``last_error`` so the /errori command can surface it.
         """
         await self.deps.repo.increment_errors(product.id)
+        await self.deps.repo.set_last_error(product.id, f"{reason}: {detail}" if detail else reason)
         updated = await self.deps.repo.get_product(product.id)
         if updated is None:
             return False

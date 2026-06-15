@@ -650,3 +650,49 @@ class TestRuntimePragmas:
             assert row[0] == 0
         finally:
             await conn.close()
+
+
+async def test_set_last_error_and_list_products_with_errors(repo: Repository):
+    pid = await repo.add_product(
+        user_id=1,
+        url="https://x.com/products/a",
+        name="Sneaker A",
+        domain="x.com",
+        initial_price=Decimal("199"),
+        currency="EUR",
+    )
+    # No errors → nothing listed.
+    assert await repo.list_products_with_errors(user_id=1) == []
+
+    await repo.increment_errors(pid)
+    await repo.set_last_error(pid, "block: CAPTCHA detected (captcha-form)")
+
+    rows = await repo.list_products_with_errors(user_id=1)
+    assert len(rows) == 1
+    assert rows[0].id == pid
+    assert rows[0].consecutive_errors == 1
+    assert "CAPTCHA" in (rows[0].last_error or "")
+    assert rows[0].last_error_at is not None
+
+    # Scoped per user.
+    assert await repo.list_products_with_errors(user_id=2) == []
+
+    # Clearing the counter drops it from the list.
+    await repo.reset_errors(pid)
+    assert await repo.list_products_with_errors(user_id=1) == []
+
+
+async def test_set_last_error_truncates_to_300_chars(repo: Repository):
+    pid = await repo.add_product(
+        user_id=1,
+        url="https://x.com/products/b",
+        name="B",
+        domain="x.com",
+        initial_price=Decimal("10"),
+        currency="EUR",
+    )
+    await repo.increment_errors(pid)
+    await repo.set_last_error(pid, "x" * 500)
+    rows = await repo.list_products_with_errors(user_id=1)
+    assert rows[0].last_error is not None
+    assert len(rows[0].last_error) == 300
