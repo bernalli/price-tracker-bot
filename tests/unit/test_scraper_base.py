@@ -324,6 +324,36 @@ class TestDetectBlockEvent:
         with pytest.raises(CaptchaDetected):
             detect_block_event(status_code=200, body=body, url="x")
 
+    def test_shopify_captcha_bootstrap_script_is_not_a_block(self):
+        """Regression (2026-06-13): Shopify injects ``<script id="captcha-bootstrap">``
+        (PayPal/bot-management bootstrap) on EVERY storefront — it is not a challenge.
+
+        The over-broad ``id="captcha*"`` fingerprint falsely quarantined
+        fillingpieces/clae/xteink for 2+ days (LOCKED_T3). A benign bootstrap
+        ``<script>`` on a full HTTP-200 product page must NOT be a block.
+        """
+        body = (
+            "<html><head><title>Riviera Weave — Filling Pieces</title>"
+            '<script type="application/ld+json">'
+            '{"@type":"Product","offers":{"price":"220.00","priceCurrency":"EUR"}}'
+            "</script></head><body>"
+            "<script>window.ShopifyPaypalV4VisibilityTracking=true;</script>"
+            '<script id="captcha-bootstrap">!function(){"use strict";}();</script>'
+            "</body></html>"
+        )
+        # A no-raise is the pass condition (detect_block_event returns None).
+        detect_block_event(
+            status_code=200,
+            body=body,
+            url="https://www.fillingpieces.com/products/riviera-weave",
+        )
+
+    def test_real_captcha_div_container_still_blocks(self):
+        """A genuine challenge container (``<div id="captcha…">``) stays a block."""
+        body = '<div id="captcha-challenge" class="challenge"></div>'
+        with pytest.raises(CaptchaDetected):
+            detect_block_event(status_code=200, body=body, url="x")
+
 
 # ── Pipeline helper tests ─────────────────────────────────────────
 

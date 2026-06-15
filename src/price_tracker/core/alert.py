@@ -5,7 +5,10 @@ from __future__ import annotations
 import html
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 ThresholdType = Literal["percentage", "absolute", "target", "any_drop"]
 
@@ -105,4 +108,28 @@ def format_error_notification(
         f"<b>{name}</b>\n"
         f"Failed {error_count}/{max_errors} consecutive checks. "
         f"Use /reactivate to retry."
+    )
+
+
+def format_quarantine_notification(
+    *,
+    domain: str,
+    reason: str,
+    locked_until: datetime | None,
+) -> str:
+    """Notify the user that a domain entered anti-bot quarantine (one-shot).
+
+    Sent on the CLOSED → LOCKED transition only, so the user learns a site has
+    started failing without being spammed on every individual check.
+    """
+    until = ""
+    if locked_until is not None:
+        until = f"\n🔁 Riprovo da solo dopo: {locked_until:%Y-%m-%d %H:%M} UTC"
+    return (
+        f"🔒 <b>Sito in pausa automatica</b>\n\n"
+        f"<b>{_escape_html(domain)}</b> ha fallito troppi controlli "
+        f"({_escape_html(reason)}).\n"
+        f"Sospendo temporaneamente i check su questo sito per non insistere "
+        f"contro un blocco.{until}\n\n"
+        f"Dettagli con /errori."
     )
