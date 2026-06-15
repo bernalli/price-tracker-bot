@@ -27,7 +27,7 @@ from price_tracker.bot.decorators import (
     restricted,
     with_locale,
 )
-from price_tracker.bot.handlers._helpers import _escape_html
+from price_tracker.bot.handlers._helpers import _escape_html, _format_relative_time
 from price_tracker.bot.messages import _
 
 if TYPE_CHECKING:
@@ -448,9 +448,56 @@ async def health_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await update.message.reply_html("\n".join(lines))
 
 
+@with_locale
+@restricted
+async def cmd_errori(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """User-facing: products with recent scrape errors + domain quarantine state.
+
+    Complements the admin-only English /health (domain-level) with a per-product,
+    Italian view that surfaces the persisted ``last_error`` for debugging.
+    """
+    from price_tracker.core.health import QuarantineState  # noqa: PLC0415
+
+    db = _db(context)
+    user_id = update.effective_user.id
+    health_mgr = context.bot_data.get("health_manager")
+
+    errored = await db.list_products_with_errors(user_id=user_id)
+    if not errored:
+        await update.message.reply_text("✅ Nessun errore recente sui tuoi prodotti.")
+        return
+
+    lines: list[str] = [f"⚠️ <b>Errori recenti ({len(errored)})</b>", ""]
+    for row in errored:
+        name = _escape_html((row.name or "Sconosciuto")[:50])
+        lines.append(f"<b>#{row.id}</b> {name}")
+
+        state_label = ""
+        if health_mgr is not None and row.domain:
+            state = health_mgr.state(row.domain)
+            if state != QuarantineState.CLOSED:
+                until = _format_remaining(health_mgr.locked_until(row.domain))
+                state_label = f" — 🔒 {_tier_label(state.value)} (riprende tra {until})"
+        lines.append(f"  🌐 {_escape_html(row.domain or '?')}{state_label}")
+        lines.append(f"  ❌ {row.consecutive_errors} letture fallite")
+        if row.last_error:
+            when = _format_relative_time(row.last_error_at)
+            when_str = f" — {when}" if when else ""
+            lines.append(f"  🐞 {_escape_html(row.last_error[:140])}{when_str}")
+        lines.append("")
+
+    lines.append(
+        "ℹ️ I siti in 🔒 quarantena riprendono da soli; "
+        "usa /reactivate per riattivare un prodotto sospeso."
+    )
+    await update.message.reply_html("\n".join(lines))
+
+
 def register(app: Application) -> None:
     """Register debug/status command handlers on `app`."""
     app.add_handler(CommandHandler("debug", cmd_debug))
     app.add_handler(CommandHandler("stato", cmd_status))
     app.add_handler(CommandHandler("status", cmd_status))
     app.add_handler(CommandHandler("health", health_command))
+    app.add_handler(CommandHandler("errori", cmd_errori))
+    app.add_handler(CommandHandler("errors", cmd_errori))

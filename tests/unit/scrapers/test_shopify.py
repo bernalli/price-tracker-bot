@@ -103,6 +103,37 @@ async def test_shopify_parses_via_json_api() -> None:
     assert info.currency == "EUR"
 
 
+@pytest.mark.asyncio
+async def test_shopify_block_on_currency_html_does_not_discard_json_price() -> None:
+    """When the JSON API already yielded a price, a BlockEvent raised by the
+    currency-only HTML fetch must NOT discard the scrape.
+
+    Root cause of the fillingpieces/clae/xteink quarantine: scrape() got the
+    price from JSON, then fetched the HTML purely to detect currency; a block on
+    that body propagated out of scrape() and poisoned an already-successful
+    result, feeding the domain quarantine.
+    """
+    scraper = ShopifyScraper()
+    url = "https://shop.example.com/products/sample"
+    json_url = "https://shop.example.com/products/sample.json"
+    json_payload = {"product": {"title": "Sample", "variants": [{"id": 1, "price": "199.00"}]}}
+    # HTML page carries a genuine challenge marker → detect_block_event raises.
+    blocked_html = '<html><body><form id="captcha-form">verify</form></body></html>'
+
+    with respx.mock(assert_all_called=False) as router:
+        router.get(json_url).respond(200, json=json_payload)
+        router.get(url).respond(200, text=blocked_html)
+        async with httpx.AsyncClient() as client:
+            info = await scraper.scrape(url, client)
+
+    assert info.price == Decimal("199.00")  # price survived the block
+    assert info.name == "Sample"
+    assert info.error is None
+    # Currency may stay None (pre-existing HTML-detection limitation); the point
+    # is the scrape did not crash and the price was preserved.
+    assert info.currency in (None, "EUR")
+
+
 # ── scrape: error paths ──────────────────────────────────────────
 
 

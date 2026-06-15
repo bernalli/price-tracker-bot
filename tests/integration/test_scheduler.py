@@ -1262,3 +1262,65 @@ async def test_checkall_survives_unexpected_exception(
     p2 = await repo.get_product(pid2)
     assert p2 is not None
     assert p2.current_price == Decimal("80")
+
+
+class _CaptchaScraper(AbstractScraper):
+    """Always raises a CAPTCHA BlockEvent, to drive a domain into quarantine."""
+
+    name = "captcha"
+    priority = 100
+
+    def can_handle(self, url: str) -> bool:
+        return True
+
+    async def scrape(self, url: str, client: httpx.AsyncClient) -> ProductInfo:
+        from price_tracker.core.exceptions import CaptchaDetected
+
+        raise CaptchaDetected(marker="captcha-form", url=url)
+
+
+@pytest.mark.asyncio
+async def test_scheduler_notifies_once_on_quarantine_entry(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    """A domain crossing into LOCKED (T1 threshold = 3 blocks) pushes exactly one
+    quarantine alert — on the CLOSED→LOCKED transition, not on every block."""
+    repo, pid = repo_with_product
+    registry = ScraperRegistry()
+    registry.register(_CaptchaScraper())
+    notifier = AsyncMock()
+    health_mgr = HealthManager(repo=repo)
+    await health_mgr.load()
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=notifier,
+                max_consecutive_errors=10,
+                delay_between_products=0.0,
+                health_mgr=health_mgr,
+            )
+        )
+        product = await repo.get_product(pid)
+        assert product is not None
+        await scheduler._scrape_one(product)
+        assert notifier.await_count == 0  # block 1: still CLOSED
+        await scheduler._scrape_one(product)
+        assert notifier.await_count == 0  # block 2: still CLOSED
+        await scheduler._scrape_one(product)
+        assert notifier.await_count == 1  # block 3: CLOSED→LOCKED_T1 → notify once
+        await scheduler._scrape_one(product)
+        assert notifier.await_count == 1  # still locked → no re-notify
+
+    assert notifier.await_args is not None
+    message = notifier.await_args.args[1]
+    assert "example.com" in message
+    assert "pausa automatica" in message.lower() or "quarantena" in message.lower()
+
+    # last_error was persisted for /errori visibility (via the public projection).
+    errored = await repo.list_products_with_errors(user_id=1)
+    assert len(errored) == 1
+    assert errored[0].last_error is not None
+    assert "captcha-form" in errored[0].last_error.lower()

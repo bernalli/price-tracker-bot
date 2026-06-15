@@ -80,6 +80,19 @@ class PriceHistoryRecord(_DictCompatMixin):
 
 
 @dataclass(frozen=True, slots=True)
+class ProductErrorRow:
+    """Lightweight projection for the /errori command (no full ProductRecord)."""
+
+    id: int
+    name: str | None
+    url: str
+    domain: str | None
+    consecutive_errors: int
+    last_error: str | None
+    last_error_at: str | None
+
+
+@dataclass(frozen=True, slots=True)
 class ScraperHealth:
     """Persistent health state for a single eTLD+1 domain."""
 
