@@ -19,10 +19,10 @@ MIGRATIONS_DIR = Path("src/price_tracker/db/migrations")
 
 
 @pytest.mark.asyncio
-async def test_list_migrations_finds_001_to_011():
+async def test_list_migrations_finds_001_to_012():
     files = list_migrations(MIGRATIONS_DIR)
     versions = [v for v, _ in files]
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 
 
 @pytest.mark.asyncio
@@ -37,7 +37,7 @@ async def test_apply_migrations_brings_fresh_db_to_latest():
     async with aiosqlite.connect(":memory:") as conn:
         await apply_migrations(conn, MIGRATIONS_DIR)
         version = await get_current_version(conn)
-        assert version == 11
+        assert version == 12
         cursor = await conn.execute("PRAGMA table_info(products)")
         cols = [row[1] async for row in cursor]
         assert "id" in cols
@@ -48,6 +48,8 @@ async def test_apply_migrations_brings_fresh_db_to_latest():
         assert "pending_alert_price" in cols
         assert "preferred_condition" in cols
         assert "check_interval_minutes" in cols
+        assert "last_error" in cols
+        assert "last_error_at" in cols
 
 
 @pytest.mark.asyncio
@@ -56,7 +58,7 @@ async def test_apply_migrations_is_idempotent():
         await apply_migrations(conn, MIGRATIONS_DIR)
         await apply_migrations(conn, MIGRATIONS_DIR)
         version = await get_current_version(conn)
-        assert version == 11
+        assert version == 12
 
 
 @pytest.mark.asyncio
@@ -91,7 +93,7 @@ async def test_apply_migrations_partial_then_complete():
 
         await apply_migrations(conn, MIGRATIONS_DIR)
         version = await get_current_version(conn)
-        assert version == 11
+        assert version == 12
 
 
 class TestMigration008:

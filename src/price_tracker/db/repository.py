@@ -11,6 +11,7 @@ from price_tracker.db.models import (
     DigestEntry,
     NotificationPrefs,
     PriceHistoryRecord,
+    ProductErrorRow,
     ProductRecord,
     ScraperHealth,
     UserRecord,
@@ -343,6 +344,36 @@ class Repository:
             (product_id,),
         )
         await self._conn.commit()
+
+    async def set_last_error(self, product_id: int, error_text: str) -> None:
+        """Persist the most recent scrape failure reason for /errori visibility."""
+        await self._conn.execute(
+            "UPDATE products SET last_error = ?, last_error_at = datetime('now') WHERE id = ?",
+            (error_text[:300], product_id),
+        )
+        await self._conn.commit()
+
+    async def list_products_with_errors(self, *, user_id: int) -> list[ProductErrorRow]:
+        """Active or paused products of a user that currently carry scrape errors."""
+        cursor = await self._conn.execute(
+            "SELECT id, name, url, domain, consecutive_errors, last_error, last_error_at "
+            "FROM products WHERE user_id = ? AND consecutive_errors > 0 "
+            "ORDER BY consecutive_errors DESC, id ASC",
+            (user_id,),
+        )
+        rows = await cursor.fetchall()
+        return [
+            ProductErrorRow(
+                id=r[0],
+                name=r[1],
+                url=r[2],
+                domain=r[3],
+                consecutive_errors=int(r[4]),
+                last_error=r[5],
+                last_error_at=r[6],
+            )
+            for r in rows
+        ]
 
     async def mark_pending_alert(self, product_id: int, price: Decimal) -> None:
         await self._conn.execute(
