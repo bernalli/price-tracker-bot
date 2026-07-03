@@ -75,7 +75,7 @@ ignore = []
 
 [tool.mypy]
 strict = true
-python_version = "3.11"
+python_version = "3.12"
 files = ["src/price_tracker", "tests"]
 plugins = []
 
