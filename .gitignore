@@ -54,5 +54,5 @@ messages.pot
 .DS_Store
 Thumbs.db
 
-# (internal cleanup note (details not published))
+# internal docs — not published
 docs/notes/

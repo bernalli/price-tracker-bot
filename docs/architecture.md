@@ -1,6 +1,6 @@
 # Architecture
 
-> Reference: layered architecture, data flow, database schema, and plugin extension point. For the full design rationale and roll-out roadmap, see [docs/notes/specs/2026-05-09-price-tracker-public-design.md](docs/notes/specs/2026-05-09-price-tracker-public-design.md).
+> Reference: layered architecture, data flow, database schema, and plugin extension point.
 
 ## Overview
 
@@ -95,9 +95,6 @@ Both forms must subclass `AbstractScraper` (`core/scraper_base.py:172`) and impl
 
 ## Cross-references
 
-- [public-design.md (Phase 1+2+3+4)](docs/notes/specs/2026-05-09-price-tracker-public-design.md) — full architecture rationale, public/private boundary, security, i18n strategy, roll-out roadmap.
-- [phase2-enhancements-design.md (Phase 2)](docs/notes/specs/2026-05-09-price-tracker-phase2-enhancements-design.md) — HealthManager, NotificationPrefs, Prometheus exporter, scraper additions.
-- [phase3-publish-ready-design.md (Phase 3)](docs/notes/specs/2026-05-10-price-tracker-phase3-publish-ready-design.md) — this docs site, i18n runtime, CI/CD pipelines, container hardening.
 - [scrapers.md](scrapers.md) — built-in scraper inventory.
 - [observability.md](observability.md) — metrics catalog + dashboard panels.
 - [operations.md](operations.md) — deploy, env vars, backup, troubleshooting.
