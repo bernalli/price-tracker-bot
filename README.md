@@ -7,6 +7,12 @@
 
 Self-hosted Telegram bot for multi-site price tracking with auto-quarantine, structured observability, fine-grained notification preferences, and a plugin architecture for adding new sites.
 
+<p align="center">
+  <img src="docs/img/price-chart.png" alt="Price-history chart with target line, as sent by the /chart command" width="790">
+  <br>
+  <em>The <code>/chart</code> command: price history with your target line, rendered by the bot.</em>
+</p>
+
 ## Why this bot
 
 | Feature                          | price-tracker-bot | Camelcamelcamel | Keepa | Pricepulse |
