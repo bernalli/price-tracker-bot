@@ -130,15 +130,28 @@ async def digest_flush_job(context: ContextTypes.DEFAULT_TYPE) -> None:
         log.exception("digest_flush_job failed")
 
 
+async def bootstrap_database(database_path: str) -> aiosqlite.Connection:
+    """Open the SQLite connection with the schema fully applied.
+
+    Migrations must run here, before anything reads the database: `amain`
+    reads `bot_config` (persisted check interval) while wiring the job queue,
+    which happens BEFORE PTB's post_init — on a brand-new deployment that
+    read used to crash with `no such table: bot_config`.
+    """
+    Path(database_path).parent.mkdir(parents=True, exist_ok=True)
+    db_conn = await aiosqlite.connect(database_path)
+    db_conn.row_factory = aiosqlite.Row
+    await apply_runtime_pragmas(db_conn)
+    await apply_migrations(db_conn, MIGRATIONS_DIR)
+    return db_conn
+
+
 async def amain() -> None:
     config = Config.from_env()
     configure_logging(level=config.log_level)
     log.info("bot.starting", log_level=config.log_level)
 
-    Path(config.database_path).parent.mkdir(parents=True, exist_ok=True)
-    db_conn = await aiosqlite.connect(config.database_path)
-    db_conn.row_factory = aiosqlite.Row
-    await apply_runtime_pragmas(db_conn)
+    db_conn = await bootstrap_database(config.database_path)
 
     application = (
         Application.builder()
