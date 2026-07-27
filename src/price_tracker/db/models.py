@@ -71,6 +71,7 @@ class ProductRecord(_DictCompatMixin):
     preferred_seller: str | None = None
     pending_read_price: Decimal | None = None
     pending_read_count: int = 0
+    pending_read_streak: int = 0
 
 
 @dataclass(frozen=True)

@@ -240,6 +240,34 @@ async def test_sustained_price_rise_is_eventually_accepted(
 
 
 @pytest.mark.asyncio
+async def test_volatile_new_price_cannot_wedge_forever(
+    repo_with_history: tuple[Repository, int],
+) -> None:
+    """A genuinely repriced but jittery product must not be frozen forever.
+
+    Confirmation requires consecutive reads to *agree*. A product whose new
+    price wobbles by more than the agreement tolerance on every check would
+    never confirm, and — since held reads never enter history — the median that
+    keeps rejecting it could never move. That is the same trap that wedged
+    product 16, so the gate has a bounded escape: after enough consecutive held
+    reads it rebaselines on the latest one.
+    """
+    repo, pid = repo_with_history
+    jittery = [
+        _reading(Decimal(p))
+        for p in ("150.00", "158.00", "146.00", "155.00", "148.00", "157.00", "149.00", "156.00")
+    ]
+    scraper = _ScriptedScraper(jittery)
+    notifier = AsyncMock()
+
+    await _run(repo, scraper, notifier, times=len(jittery))
+
+    product = await repo.get_product(pid)
+    assert product is not None
+    assert product.current_price != STEADY, "product stayed frozen on the stale price"
+
+
+@pytest.mark.asyncio
 async def test_used_offer_is_not_tracked_when_user_wants_new(
     repo_with_history: tuple[Repository, int],
 ) -> None:

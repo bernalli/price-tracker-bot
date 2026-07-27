@@ -57,6 +57,15 @@ REQUIRED_CONFIRMATIONS = 3
 # Two held reads count as agreeing when they are within this relative distance.
 CONFIRMATION_TOLERANCE = Decimal("0.02")
 
+# Escape hatch: after this many consecutive held reads the gate rebaselines on
+# the latest one, even if they never agreed with each other. Without it a real
+# but jittery repricing could be held forever — held reads never enter history,
+# so the median rejecting them would never move. That is exactly the deadlock
+# this release fixes on the rejection path, and it must not reappear here.
+# Set well above the worst case seen in production history (5 consecutive held
+# reads across ~50k readings), so it only fires on genuinely pathological series.
+MAX_HELD_READS = 8
+
 
 class ReadVerdict(StrEnum):
     """What the pipeline should do with a freshly scraped price."""

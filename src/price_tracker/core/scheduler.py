@@ -35,6 +35,7 @@ from price_tracker.core.alert import (
 from price_tracker.core.exceptions import BlockEvent, ParseError
 from price_tracker.core.health import HealthManager, QuarantineState
 from price_tracker.core.outlier import (
+    MAX_HELD_READS,
     REQUIRED_CONFIRMATIONS,
     ReadVerdict,
     classify_read,
@@ -639,27 +640,40 @@ class Scheduler:
         sustained new price confirms itself and is let through.
         """
         previous = product.pending_read_price
-        if previous is not None and reads_agree(previous, price):
-            confirmations = product.pending_read_count + 1
-            if confirmations >= self.deps.read_confirmations:
-                logger.info(
-                    "Product %d: implausible read %s confirmed by %d agreeing checks — accepting",
-                    product.id,
-                    price,
-                    confirmations,
-                )
-                await self.deps.repo.clear_pending_read(product.id)
-                return True
-            await self.deps.repo.set_pending_read(product.id, price, confirmations)
-            return False
+        streak = product.pending_read_streak + 1
+        agreed = previous is not None and reads_agree(previous, price)
+        confirmations = product.pending_read_count + 1 if agreed else 1
+
+        if agreed and confirmations >= self.deps.read_confirmations:
+            logger.info(
+                "Product %d: implausible read %s confirmed by %d agreeing checks — accepting",
+                product.id,
+                price,
+                confirmations,
+            )
+            await self.deps.repo.clear_pending_read(product.id)
+            return True
+
+        if streak >= MAX_HELD_READS:
+            logger.warning(
+                "Product %d: %d consecutive implausible reads without agreement — "
+                "rebaselining on %s rather than tracking a stale price forever",
+                product.id,
+                streak,
+                price,
+            )
+            await self.deps.repo.clear_pending_read(product.id)
+            return True
 
         logger.info(
-            "Product %d: implausible read %s held for confirmation (previous held read: %s)",
+            "Product %d: implausible read %s held (agreeing run %d, held streak %d, previous %s)",
             product.id,
             price,
+            confirmations,
+            streak,
             previous,
         )
-        await self.deps.repo.set_pending_read(product.id, price, 1)
+        await self.deps.repo.set_pending_read(product.id, price, confirmations, streak)
         return False
 
     async def _check_product(

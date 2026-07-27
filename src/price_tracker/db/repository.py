@@ -58,7 +58,7 @@ _PRODUCT_COLS = (
     "threshold_value, is_active, is_available, consecutive_errors, "
     "currency, check_interval_minutes, last_checked_at, last_notified_at, "
     "pending_alert_price, pending_alert_at, preferred_condition, preferred_seller, "
-    "pending_read_price, pending_read_count"
+    "pending_read_price, pending_read_count, pending_read_streak"
 )
 
 
@@ -94,6 +94,7 @@ def _row_to_product(row: tuple[Any, ...]) -> ProductRecord:
         preferred_seller=row[22],
         pending_read_price=_dec(row[23]),
         pending_read_count=int(row[24] or 0),
+        pending_read_streak=int(row[25] or 0),
     )
 
 
@@ -418,22 +419,26 @@ class Repository:
 
     # ── Held reads (two-read confirmation gate) ────────────────
 
-    async def set_pending_read(self, product_id: int, price: Decimal, count: int) -> None:
+    async def set_pending_read(
+        self, product_id: int, price: Decimal, count: int, streak: int
+    ) -> None:
         """Park an implausible read until the next check either confirms or drops it.
 
         Unrelated to ``mark_pending_alert``: this is a read the pipeline has
         refused to trust yet, not an alert already sent.
         """
         await self._conn.execute(
-            "UPDATE products SET pending_read_price = ?, pending_read_count = ? WHERE id = ?",
-            (_dec_str(price), count, product_id),
+            "UPDATE products SET pending_read_price = ?, pending_read_count = ?, "
+            "pending_read_streak = ? WHERE id = ?",
+            (_dec_str(price), count, streak, product_id),
         )
         await self._conn.commit()
 
     async def clear_pending_read(self, product_id: int) -> None:
         """Forget any held read — the latest scrape was plausible on its own."""
         await self._conn.execute(
-            "UPDATE products SET pending_read_price = NULL, pending_read_count = 0 WHERE id = ?",
+            "UPDATE products SET pending_read_price = NULL, pending_read_count = 0, "
+            "pending_read_streak = 0 WHERE id = ?",
             (product_id,),
         )
         await self._conn.commit()
