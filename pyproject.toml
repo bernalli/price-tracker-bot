@@ -36,7 +36,11 @@ dev = [
     "pytest-asyncio>=0.23",
     "pytest-cov>=4.1",
     "respx>=0.21",
-    "ruff>=0.5",
+    # Pinned exactly: CI runs `ruff format --check`, so an unpinned formatter
+    # turns any upstream release into a red build on files nobody touched —
+    # which is how main broke on docs/plugins.md. Bump deliberately, with the
+    # reformat it implies in the same commit.
+    "ruff==0.15.12",
     "mypy>=1.10",
     "types-beautifulsoup4",
     "types-python-dateutil",
