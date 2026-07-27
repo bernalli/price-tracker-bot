@@ -531,7 +531,7 @@ class Scheduler:
                 await handle_success_in_pipeline(health_mgr=self.deps.health_mgr, domain=domain)
             return (p.user_id, None, False)
 
-        if p.pending_read_count:
+        if p.pending_read_count or p.pending_read_streak:
             await self.deps.repo.clear_pending_read(p.id)
 
         old_price = p.current_price or p.initial_price
@@ -549,6 +549,10 @@ class Scheduler:
         if info.available != p.is_available:
             await self.deps.repo.set_availability(p.id, available=info.available)
         if came_back_in_stock:
+            # Routed with the product id so a restock obeys the same mute, quiet
+            # hours and digest settings as a price drop — it is the same kind of
+            # message to the user, and a mute that leaked restocks would be a
+            # mute in name only.
             await self._notify(
                 p.user_id,
                 format_back_in_stock(
@@ -557,6 +561,16 @@ class Scheduler:
                     price=info.price,
                     currency=p.currency,
                 ),
+                product_id=p.id,
+                payload={
+                    "product_id": p.id,
+                    "product_name": p.name or p.url,
+                    "url": p.url,
+                    "old_price": str(p.current_price) if p.current_price is not None else "",
+                    "new_price": str(info.price),
+                    "currency": p.currency,
+                    "domain": domain,
+                },
             )
 
         if old_price is None:
