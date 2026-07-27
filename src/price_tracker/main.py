@@ -26,6 +26,7 @@ from price_tracker.db import apply_runtime_pragmas
 from price_tracker.db.migrator import apply_migrations
 from price_tracker.db.repository import Repository
 from price_tracker.notifier.digest import DigestService
+from price_tracker.notifier.preferences import PreferencesManager
 from price_tracker.notifier.telegram import TelegramNotifier
 from price_tracker.observability.logging import configure_logging
 from price_tracker.observability.metrics import MetricsRegistry, MetricsServer
@@ -83,7 +84,15 @@ async def _setup_scheduler(application: Application[Any, Any, Any, Any, Any, Any
     await health_mgr.load()
     application.bot_data["health_manager"] = health_mgr
 
-    notifier = TelegramNotifier(application.bot, metrics=metrics)
+    # Prefs and digest must be wired here, not just on the bot_data service:
+    # the periodic job is precisely the sender that mute, quiet hours and digest
+    # mode exist to govern, and without them it bypassed all three.
+    notifier = TelegramNotifier(
+        application.bot,
+        metrics=metrics,
+        prefs=PreferencesManager(repo),
+        digest=application.bot_data["digest_service"],
+    )
     application.bot_data["scheduler"] = Scheduler(
         SchedulerDeps(
             repo=repo,
@@ -93,6 +102,7 @@ async def _setup_scheduler(application: Application[Any, Any, Any, Any, Any, Any
             max_consecutive_errors=config.max_consecutive_errors,
             delay_between_products=config.check_delay_seconds,
             notification_cooldown_hours=config.notification_cooldown_hours,
+            read_confirmations=config.read_confirmations,
             health_mgr=health_mgr,
             metrics=metrics,
         )

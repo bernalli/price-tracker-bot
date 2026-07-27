@@ -3,8 +3,9 @@
 Two dispatch modes:
 
 * **Push (default)** — used by the periodic ``run_check_all`` job. After scraping
-  a product the scheduler invokes ``deps.notifier(user_id, formatted_text)`` so
-  the configured Telegram notifier ships the message immediately.
+  a product the scheduler hands the alert to ``deps.notifier`` together with the
+  product id and its structured payload, so a preference-aware notifier can
+  mute, defer or digest it instead of sending immediately.
 * **Pull (interactive handlers)** — ``check_one_product_for_user`` and
   ``check_user_products_for_user`` accumulate :class:`CheckResult` objects and
   return them to the caller, which renders its own summary message
@@ -16,10 +17,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 import httpx
 
@@ -28,12 +28,19 @@ from price_tracker.core.alert import (
     ThresholdType,
     crosses_threshold,
     format_alert,
+    format_back_in_stock,
     format_error_notification,
     format_quarantine_notification,
 )
 from price_tracker.core.exceptions import BlockEvent, ParseError
 from price_tracker.core.health import HealthManager, QuarantineState
-from price_tracker.core.outlier import is_outlier
+from price_tracker.core.outlier import (
+    MAX_HELD_READS,
+    REQUIRED_CONFIRMATIONS,
+    ReadVerdict,
+    classify_read,
+    reads_agree,
+)
 from price_tracker.core.scraper_base import (
     handle_block_in_pipeline,
     handle_success_in_pipeline,
@@ -50,8 +57,45 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Notifier coroutine: receives a user_id and a formatted alert message.
-NotifierFn = Callable[[int, str], Awaitable[None]]
+
+class NotifierFn(Protocol):
+    """Delivers one formatted message to one user.
+
+    ``product_id`` and ``payload`` are optional so operational notices
+    (auto-disable, quarantine) can be sent without them; a notifier that honours
+    per-product notification preferences uses them to route price alerts.
+
+    Returning ``False`` means the message was NOT delivered and nothing took
+    responsibility for it, so the scheduler must not record it as sent.
+    ``None`` is the legacy "fire and forget" answer and counts as delivered, so
+    older notifiers keep working unchanged.
+    """
+
+    async def __call__(
+        self,
+        user_id: int,
+        text: str,
+        *,
+        product_id: int | None = ...,
+        payload: dict[str, Any] | None = ...,
+    ) -> bool | None: ...
+
+
+def _alert_payload(alert: PriceAlert, *, domain: str) -> dict[str, Any]:
+    """Structured view of an alert, for notifiers that do more than send text.
+
+    The digest renders its lines from these fields, so they must survive the
+    trip even when the immediate message body is pre-rendered.
+    """
+    return {
+        "product_id": alert.product_id,
+        "product_name": alert.product_name,
+        "url": alert.url,
+        "old_price": str(alert.old_price),
+        "new_price": str(alert.new_price),
+        "currency": alert.currency,
+        "domain": domain,
+    }
 
 
 def _parse_db_timestamp(value: str) -> datetime:
@@ -110,6 +154,13 @@ class SchedulerDeps:
     notification_cooldown_hours: int = 24
     health_mgr: HealthManager = field(default_factory=_no_op_health_mgr)
     metrics: MetricsRegistry | None = None
+    read_confirmations: int = REQUIRED_CONFIRMATIONS
+    """Agreeing reads needed before an implausible price is trusted.
+
+    Costs ``(read_confirmations - 1) × check_interval`` of latency on a genuine
+    steep discount, so deployments checking every few hours may prefer a lower
+    value than the default.
+    """
 
 
 @dataclass(frozen=True)
@@ -333,6 +384,11 @@ class Scheduler:
         """
         await self.deps.repo.increment_errors(product.id)
         await self.deps.repo.set_last_error(product.id, f"{reason}: {detail}" if detail else reason)
+        # A check that failed produced no evidence about the price, so it breaks
+        # any confirmation run in progress: two sightings either side of an
+        # outage are not consecutive readings of the same claim.
+        if product.pending_read_count or product.pending_read_streak:
+            await self.deps.repo.clear_pending_read(product.id)
         updated = await self.deps.repo.get_product(product.id)
         if updated is None:
             return False
@@ -435,34 +491,83 @@ class Scheduler:
             # only the persist/alert is skipped (#20).
             if domain != "unknown":
                 await handle_success_in_pipeline(health_mgr=self.deps.health_mgr, domain=domain)
+            if p.pending_read_count or p.pending_read_streak:
+                await self.deps.repo.clear_pending_read(p.id)
             return (p.user_id, None, False)
 
-        history = [h.price for h in await self.deps.repo.get_price_history(p.id, limit=50)]
-        outlier = is_outlier(
-            info.price,
-            history,
-            metrics=metrics,
-            scraper=scraper_name,
-            domain=domain,
-        )
-        if outlier.is_outlier:
-            logger.warning(
-                "Product %d: OUTLIER read %s rejected (median=%s, ratio=%s, history_n=%d)",
+        if not self._condition_matches(p, info.condition):
+            logger.info(
+                "Product %d: buy-box offer is %r but the user tracks %r — read skipped, "
+                "no persist/alert",
                 p.id,
-                info.price,
-                outlier.median,
-                outlier.ratio,
-                outlier.history_n,
+                info.condition,
+                p.preferred_condition,
             )
             if metrics is not None:
                 metrics.price_check_total.labels(
+                    scraper=scraper_name, domain=domain, status="condition_mismatch"
+                ).inc()
+            # Still a successful fetch: let a HALF_OPEN domain close on it (#20).
+            if domain != "unknown":
+                await handle_success_in_pipeline(health_mgr=self.deps.health_mgr, domain=domain)
+            # Counted as a failure on purpose. Skipping the read is right — a
+            # different offer is a different price — but doing it silently would
+            # leave the product frozen on a stale price while still looking
+            # healthy. Recording it surfaces the product in /errori and, if no
+            # matching offer turns up for long enough, pauses it with a message
+            # instead of pretending everything is fine.
+            disabled = await self._record_failure_and_maybe_disable(
+                p,
+                scraper_name=scraper_name,
+                domain=domain,
+                reason="condition_mismatch",
+                detail=f"offer is {info.condition!r}, tracking {p.preferred_condition!r}",
+            )
+            return (p.user_id, None, disabled)
+
+        history = [h.price for h in await self.deps.repo.get_price_history(p.id, limit=50)]
+        verdict = classify_read(info.price, history)
+
+        if verdict is ReadVerdict.REJECT:
+            logger.warning(
+                "Product %d: read %s rejected as implausible (history_n=%d)",
+                p.id,
+                info.price,
+                len(history),
+            )
+            if metrics is not None:
+                metrics.outlier_rejected_total.labels(scraper=scraper_name, domain=domain).inc()
+                metrics.price_check_total.labels(
                     scraper=scraper_name, domain=domain, status="outlier_rejected"
                 ).inc()
+            # No confirmation count can make a scale-error magnitude believable,
+            # so this reading is never accepted. Discarding it in silence would
+            # leave the product reporting a stale price forever while looking
+            # healthy — the same trap as the old outlier deadlock — so it is
+            # recorded, surfaces in /errori, and eventually pauses the product.
+            disabled = await self._record_failure_and_maybe_disable(
+                p,
+                scraper_name=scraper_name,
+                domain=domain,
+                reason="implausible_read",
+                detail=f"{info.price} against a median of recent readings",
+            )
+            return (p.user_id, None, disabled)
+
+        if verdict is ReadVerdict.CONFIRM and not await self._confirm_read(p, info.price):
+            if metrics is not None:
+                metrics.price_check_total.labels(
+                    scraper=scraper_name, domain=domain, status="awaiting_confirmation"
+                ).inc()
+            if domain != "unknown":
+                await handle_success_in_pipeline(health_mgr=self.deps.health_mgr, domain=domain)
             return (p.user_id, None, False)
 
         old_price = p.current_price or p.initial_price
         await self.deps.repo.update_price(p.id, info.price)
         await self.deps.repo.add_price_history(p.id, info.price)
+        if p.pending_read_count or p.pending_read_streak:
+            await self.deps.repo.clear_pending_read(p.id)
         await self.deps.repo.reset_errors(p.id)
         if domain != "unknown":
             await handle_success_in_pipeline(health_mgr=self.deps.health_mgr, domain=domain)
@@ -471,15 +576,48 @@ class Scheduler:
                 scraper=scraper_name, domain=domain, status="success"
             ).inc()
 
+        came_back_in_stock = info.available and not p.is_available
+        if info.available != p.is_available:
+            await self.deps.repo.set_availability(p.id, available=info.available)
+        if came_back_in_stock:
+            # Routed with the product id so a restock obeys the same mute, quiet
+            # hours and digest settings as a price drop — it is the same kind of
+            # message to the user, and a mute that leaked restocks would be a
+            # mute in name only.
+            await self._notify(
+                p.user_id,
+                format_back_in_stock(
+                    product_name=p.name or p.url,
+                    url=p.url,
+                    price=info.price,
+                    currency=p.currency,
+                ),
+                product_id=p.id,
+                payload={
+                    "product_id": p.id,
+                    "product_name": p.name or p.url,
+                    "url": p.url,
+                    "old_price": str(p.current_price) if p.current_price is not None else "",
+                    "new_price": str(info.price),
+                    "currency": p.currency,
+                    "domain": domain,
+                },
+            )
+
         if old_price is None:
             return (p.user_id, None, False)
         threshold_type = cast("ThresholdType", p.threshold_type)
-        if not crosses_threshold(
+        threshold_hit = crosses_threshold(
             old=old_price,
             new=info.price,
             threshold_type=threshold_type,
             threshold_value=p.threshold_value,
-        ):
+        )
+        # A target is a crossing, not a state: alert when the price moves from
+        # above it to at-or-below it, so a product parked under its target does
+        # not re-announce itself every cooldown window.
+        target_hit = p.target_price is not None and info.price <= p.target_price < old_price
+        if not (threshold_hit or target_hit):
             return (p.user_id, None, False)
         alert = PriceAlert(
             product_id=p.id,
@@ -492,6 +630,94 @@ class Scheduler:
             threshold_value=p.threshold_value,
         )
         return (p.user_id, alert, False)
+
+    async def _notify(
+        self,
+        user_id: int,
+        message: str,
+        *,
+        product_id: int | None = None,
+        payload: dict[str, Any] | None = None,
+    ) -> bool:
+        """Push one message, reporting whether it actually reached the user.
+
+        A notifier that raises, or that answers ``False``, did not deliver —
+        callers must not record bookkeeping (cooldowns, alert timestamps) off a
+        message nobody received. Exceptions never escape: one undeliverable
+        message must not abort the rest of the tick.
+        """
+        try:
+            delivered = await self.deps.notifier(
+                user_id, message, product_id=product_id, payload=payload
+            )
+        except Exception:  # noqa: BLE001 — notifier failure must not kill the tick
+            logger.exception("Notifier failed to deliver a message to user %d", user_id)
+            return False
+        return delivered is not False
+
+    @staticmethod
+    def _condition_matches(product: ProductRecord, scraped_condition: str | None) -> bool:
+        """Return ``True`` when the scraped offer is the one the user tracks.
+
+        Scrapers report the buy-box condition (``new`` / ``used`` / ``renewed``)
+        when they can tell. If the user pinned a condition for this product, an
+        offer in a different condition is a *different* product for pricing
+        purposes: a warehouse deal appearing in the buy-box must not be recorded
+        as the tracked item's price, let alone alerted on as a price drop.
+
+        Silent when either side is unknown — most scrapers never populate the
+        field, and the historical default is to track whatever the buy-box shows.
+        """
+        if product.preferred_condition is None or scraped_condition is None:
+            return True
+        return scraped_condition == product.preferred_condition
+
+    async def _confirm_read(self, product: ProductRecord, price: Decimal) -> bool:
+        """Hold an implausible read until a second, agreeing read backs it up.
+
+        Returns ``True`` when ``price`` completes the required run of agreeing
+        reads and may now be trusted; ``False`` when it has been parked and the
+        caller must drop this check without persisting or alerting.
+
+        This is what separates a transient bad scrape from a real repricing: a
+        glitch does not repeat, a real price does. It also unwedges the opposite
+        failure — a genuine level shift that history keeps rejecting — because a
+        sustained new price confirms itself and is let through.
+        """
+        previous = product.pending_read_price
+        streak = product.pending_read_streak + 1
+        agreed = previous is not None and reads_agree(previous, price)
+        confirmations = product.pending_read_count + 1 if agreed else 1
+
+        if agreed and confirmations >= self.deps.read_confirmations:
+            logger.info(
+                "Product %d: implausible read %s confirmed by %d agreeing checks — accepting",
+                product.id,
+                price,
+                confirmations,
+            )
+            return True
+
+        if streak >= MAX_HELD_READS:
+            logger.warning(
+                "Product %d: %d consecutive implausible reads without agreement — "
+                "rebaselining on %s rather than tracking a stale price forever",
+                product.id,
+                streak,
+                price,
+            )
+            return True
+
+        logger.info(
+            "Product %d: implausible read %s held (agreeing run %d, held streak %d, previous %s)",
+            product.id,
+            price,
+            confirmations,
+            streak,
+            previous,
+        )
+        await self.deps.repo.set_pending_read(product.id, price, confirmations, streak)
+        return False
 
     async def _check_product(
         self,
@@ -522,8 +748,13 @@ class Scheduler:
             if self.deps.metrics is not None:
                 self.deps.metrics.notification_skipped_total.labels(reason="cooldown").inc()
             return
-        await self.deps.notifier(user_id, format_alert(alert))
-        await self.deps.repo.record_alert_sent(alert.product_id, alert.new_price)
+        if await self._notify(
+            user_id,
+            format_alert(alert),
+            product_id=alert.product_id,
+            payload=_alert_payload(alert, domain=domain),
+        ):
+            await self.deps.repo.record_alert_sent(alert.product_id, alert.new_price)
 
     def _is_duplicate_alert(
         self, product: ProductRecord, *, new_price: Decimal, now: datetime | None = None
