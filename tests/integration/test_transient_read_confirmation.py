@@ -12,7 +12,8 @@ forever, because a rejected read never enters price history and therefore can
 never move the median that rejects it.
 
 Both are the same missing concept: an implausible reading must be confirmed by
-a second, agreeing read before the bot either trusts it or alerts on it.
+a run of consecutive agreeing reads before the bot either trusts it or alerts
+on it.
 """
 
 from __future__ import annotations
@@ -27,6 +28,7 @@ import httpx
 import pytest
 import pytest_asyncio
 
+from price_tracker.core.outlier import REQUIRED_CONFIRMATIONS
 from price_tracker.core.registry import ScraperRegistry
 from price_tracker.core.scheduler import Scheduler, SchedulerDeps
 from price_tracker.core.scraper_base import AbstractScraper, ProductInfo
@@ -161,14 +163,14 @@ async def test_confirmed_real_drop_still_alerts(
 ) -> None:
     """A genuine deep discount persists across checks, so it must still alert.
 
-    Confirmation delays a real deep discount by one check interval; it must
-    never suppress it.
+    Confirmation delays a real deep discount by a couple of check intervals; it
+    must never suppress it.
     """
     repo, pid = repo_with_history
-    scraper = _ScriptedScraper([_reading(GLITCH), _reading(GLITCH)])
+    scraper = _ScriptedScraper([_reading(GLITCH)])
     notifier = AsyncMock()
 
-    await _run(repo, scraper, notifier, times=2)
+    await _run(repo, scraper, notifier, times=REQUIRED_CONFIRMATIONS)
 
     notifier.assert_awaited_once()
     message = notifier.await_args.args[1]
@@ -203,9 +205,10 @@ async def test_sustained_price_rise_is_eventually_accepted(
     """Product 16's deadlock: a real level shift must not be rejected forever.
 
     History is flat at 9.99 and the price genuinely moves to 34.99 (3.5x the
-    median). The first read is implausible and held back, but a second agreeing
-    read must be accepted so history can adapt — otherwise every future check
-    rejects the same value against a median that can never move.
+    median). The first read is implausible and held back, but once enough
+    agreeing reads arrive it must be accepted so history can adapt — otherwise
+    every future check rejects the same value against a median that can never
+    move.
     """
     conn = await aiosqlite.connect(":memory:")
     conn.row_factory = aiosqlite.Row

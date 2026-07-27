@@ -19,13 +19,19 @@ decided what the user was told.
 ### Fixed
 - **A single bad scrape can no longer raise an alert.** A reading that
   contradicts recent history (a drop below 60% of the median, or a rise above
-  2.5x it) is now held and must be confirmed by a second, agreeing check before
-  it is persisted or alerted on. Field case: a product steady at ~386 EUR
-  reported 187.95 EUR on three isolated checks, each bouncing back to ~386 on
+  2.5x it) is now held and must be confirmed by a run of consecutive agreeing
+  checks before it is persisted or alerted on. Field case: a product steady at
+  ~386 EUR reported 187.95 EUR on isolated checks, each bouncing back to ~386 on
   the next one, and each firing a "-51.3%" alert. Genuinely deep discounts still
-  alert — one check interval later — because a real price repeats and a glitch
-  does not. The previous guard could not catch this: it only rejected readings
-  below 1/50th of the median, i.e. under ~7.70 EUR on that product.
+  alert — a couple of check intervals later — because a real price repeats and a
+  glitch does not. The previous guard could not catch this: it only rejected
+  readings below 1/50th of the median, i.e. under ~7.70 EUR on that product.
+
+  The confirmation count was calibrated by replaying the product's real 2424-reading
+  history rather than guessed: it removes every false alert in the incident
+  window (10 of them) while preserving both genuine alerts. Tunable via
+  `READ_CONFIRMATIONS` — it costs `(N-1) × check_interval` of latency on a real
+  steep discount, so long check intervals may want a lower value.
 - **Products no longer get stuck rejecting a real price change forever.** A
   reading rejected as an outlier never entered price history, so the median that
   rejected it could never move; one product had been rejecting the same

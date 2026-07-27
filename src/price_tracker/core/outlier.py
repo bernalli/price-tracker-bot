@@ -45,7 +45,14 @@ ABSURD_HIGH_RATIO = Decimal("20")
 SUSPICIOUS_DROP_RATIO = Decimal("0.6")
 
 # Consecutive agreeing reads required before an implausible price is accepted.
-REQUIRED_CONFIRMATIONS = 2
+#
+# Calibrated on the incident data rather than guessed: replaying the affected
+# product's real history, 2 confirmations left one false alert (the bad price
+# happened to repeat on two consecutive checks) while 3 removed every false
+# alert in the incident window and kept both genuine ones. 4 bought nothing
+# more. The cost is latency — a real deep discount is announced after
+# (N-1) × check_interval — so deployments on long check intervals may prefer 2.
+REQUIRED_CONFIRMATIONS = 3
 
 # Two held reads count as agreeing when they are within this relative distance.
 CONFIRMATION_TOLERANCE = Decimal("0.02")

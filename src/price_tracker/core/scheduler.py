@@ -153,6 +153,13 @@ class SchedulerDeps:
     notification_cooldown_hours: int = 24
     health_mgr: HealthManager = field(default_factory=_no_op_health_mgr)
     metrics: MetricsRegistry | None = None
+    read_confirmations: int = REQUIRED_CONFIRMATIONS
+    """Agreeing reads needed before an implausible price is trusted.
+
+    Costs ``(read_confirmations - 1) × check_interval`` of latency on a genuine
+    steep discount, so deployments checking every few hours may prefer a lower
+    value than the default.
+    """
 
 
 @dataclass(frozen=True)
@@ -634,7 +641,7 @@ class Scheduler:
         previous = product.pending_read_price
         if previous is not None and reads_agree(previous, price):
             confirmations = product.pending_read_count + 1
-            if confirmations >= REQUIRED_CONFIRMATIONS:
+            if confirmations >= self.deps.read_confirmations:
                 logger.info(
                     "Product %d: implausible read %s confirmed by %d agreeing checks — accepting",
                     product.id,
