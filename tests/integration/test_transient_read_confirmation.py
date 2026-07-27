@@ -240,6 +240,61 @@ async def test_sustained_price_rise_is_eventually_accepted(
 
 
 @pytest.mark.asyncio
+async def test_confirmations_must_be_consecutive(
+    repo_with_history: tuple[Repository, int],
+) -> None:
+    """Garbage between two suspicious reads breaks the run; it must not be ignored.
+
+    Readings absurd enough to be discarded outright used to leave the held-read
+    state untouched, so a suspicious price interleaved with garbage still
+    accumulated "consecutive" confirmations it never actually had.
+    """
+    repo, pid = repo_with_history
+    absurd = Decimal("15000.00")  # ~39x the median: discarded, not held
+    scraper = _ScriptedScraper(
+        [
+            _reading(GLITCH),
+            _reading(absurd),
+            _reading(GLITCH),
+            _reading(absurd),
+            _reading(GLITCH),
+        ]
+    )
+    notifier = AsyncMock()
+
+    await _run(repo, scraper, notifier, times=5)
+
+    notifier.assert_not_awaited()
+    product = await repo.get_product(pid)
+    assert product is not None
+    assert product.current_price == STEADY
+
+
+@pytest.mark.asyncio
+async def test_absurd_readings_do_not_silently_freeze_the_product(
+    repo_with_history: tuple[Repository, int],
+) -> None:
+    """Unusable readings must surface, not leave the product quietly stale.
+
+    A price off by a scale-error magnitude is never trusted — no confirmation
+    count should make the bot believe it. But discarding it in silence forever
+    is the same trap as the outlier deadlock: the product keeps reporting a
+    stale price and looks healthy. It has to end up in /errori instead.
+    """
+    repo, pid = repo_with_history
+    scraper = _ScriptedScraper([_reading(Decimal("15000.00"))])
+    notifier = AsyncMock()
+
+    await _run(repo, scraper, notifier, times=3)
+
+    product = await repo.get_product(pid)
+    assert product is not None
+    assert product.current_price == STEADY, "garbage must never be accepted as the price"
+    errors = await repo.list_products_with_errors(user_id=1)
+    assert [e.id for e in errors] == [pid]
+
+
+@pytest.mark.asyncio
 async def test_volatile_new_price_cannot_wedge_forever(
     repo_with_history: tuple[Repository, int],
 ) -> None:

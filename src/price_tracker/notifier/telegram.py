@@ -69,15 +69,14 @@ class TelegramNotifier:
         them it is sent directly: operational notices (auto-disable, quarantine)
         are not the kind of message a mute is meant to hide.
 
-        ``False`` means the message was not delivered *and* nothing took
-        responsibility for it, so the caller must not record it as sent. A
-        message deliberately suppressed or queued by a preference returns
-        ``True``: the system did what the user asked.
+        ``True`` means the message reached the user or was queued for a digest
+        that will. ``False`` means it did not and nothing else will deliver it —
+        a send failure, or a preference that dropped it outright — so the caller
+        must not record it as sent.
         """
         if product_id is not None and self._prefs is not None:
             alert: dict[str, Any] = {**(payload or {}), "text": text}
-            await self.notify_alert(user_id=user_id, product_id=product_id, alert=alert)
-            return True
+            return await self.notify_alert(user_id=user_id, product_id=product_id, alert=alert)
         return await self._send_direct(user_id, text)
 
     async def _send_direct(self, user_id: int, text: str) -> bool:
@@ -101,7 +100,7 @@ class TelegramNotifier:
         if self._metrics is not None:
             self._metrics.notification_sent_total.labels(type="immediate", channel="telegram").inc()
 
-    async def notify_alert(self, *, user_id: int, product_id: int, alert: dict[str, Any]) -> None:
+    async def notify_alert(self, *, user_id: int, product_id: int, alert: dict[str, Any]) -> bool:
         """Dispatch an alert respecting the user's effective preferences.
 
         Flow:
@@ -112,11 +111,17 @@ class TelegramNotifier:
           5. Throttle exceeded → enqueue if digest_mode else drop.
           6. Digest mode (no quiet/throttle gate) → enqueue.
           7. Otherwise immediate send.
+
+        Returns ``True`` when the alert was sent or queued for a digest, and
+        ``False`` when it was dropped. The distinction matters to the caller:
+        a dropped alert must not advance cooldown bookkeeping, or the drop the
+        user was waiting for is suppressed a second time once the preference
+        that hid it no longer applies.
         """
         event_id = alert.get("event_id")
         if event_id is not None:
             if event_id in self._dedupe_seen:
-                return
+                return True  # already handled once; not a delivery failure
             self._dedupe_seen.add(event_id)
 
         now = datetime.now(UTC)
@@ -128,15 +133,15 @@ class TelegramNotifier:
 
         if eff is not None and is_muted_now(eff, now_utc=now):
             self._emit_skipped("mute")
-            return
+            return False
 
         if eff is not None and is_quiet_now(eff, now_utc=now):
             if eff.digest_mode and self._digest is not None:
                 await self._digest.enqueue(user_id=user_id, product_id=product_id, payload=alert)
                 self._emit_skipped("digest_pending")
-            else:
-                self._emit_skipped("quiet_hours")
-            return
+                return True
+            self._emit_skipped("quiet_hours")
+            return False
 
         if eff is not None and eff.throttle_per_hour is not None and self._prefs is not None:
             # Load throttle window from prefs row (fetch fresh)
@@ -150,9 +155,9 @@ class TelegramNotifier:
                         user_id=user_id, product_id=product_id, payload=alert
                     )
                     self._emit_skipped("digest_pending")
-                else:
-                    self._emit_skipped("throttle")
-                return
+                    return True
+                self._emit_skipped("throttle")
+                return False
             window.record(now)
             if row is not None:
                 updated = dataclasses.replace(row, throttle_state_json=window.to_json())
@@ -167,13 +172,14 @@ class TelegramNotifier:
         if eff is not None and eff.digest_mode and self._digest is not None:
             await self._digest.enqueue(user_id=user_id, product_id=product_id, payload=alert)
             self._emit_skipped("digest_pending")
-            return
+            return True
 
         # A caller that already rendered the message (the scheduler's rich
         # price-drop body) keeps its text; the dict-only fallback is for callers
         # that hand over structured data alone.
         text = alert.get("text") or _format_alert_message(alert)
         await self.send_alert(chat_id=user_id, text=text)
+        return True
 
     def _emit_skipped(self, reason: str) -> None:
         if self._metrics is not None:

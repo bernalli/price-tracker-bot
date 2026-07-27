@@ -486,6 +486,8 @@ class Scheduler:
             # only the persist/alert is skipped (#20).
             if domain != "unknown":
                 await handle_success_in_pipeline(health_mgr=self.deps.health_mgr, domain=domain)
+            if p.pending_read_count or p.pending_read_streak:
+                await self.deps.repo.clear_pending_read(p.id)
             return (p.user_id, None, False)
 
         if not self._condition_matches(p, info.condition):
@@ -509,6 +511,8 @@ class Scheduler:
             # healthy. Recording it surfaces the product in /errori and, if no
             # matching offer turns up for long enough, pauses it with a message
             # instead of pretending everything is fine.
+            if p.pending_read_count or p.pending_read_streak:
+                await self.deps.repo.clear_pending_read(p.id)
             disabled = await self._record_failure_and_maybe_disable(
                 p,
                 scraper_name=scraper_name,
@@ -533,7 +537,24 @@ class Scheduler:
                 metrics.price_check_total.labels(
                     scraper=scraper_name, domain=domain, status="outlier_rejected"
                 ).inc()
-            return (p.user_id, None, False)
+            # Garbage breaks a confirmation run: without this, a suspicious price
+            # interleaved with unusable readings would accumulate "consecutive"
+            # confirmations it never had.
+            if p.pending_read_count or p.pending_read_streak:
+                await self.deps.repo.clear_pending_read(p.id)
+            # No confirmation count can make a scale-error magnitude believable,
+            # so this reading is never accepted. Discarding it in silence would
+            # leave the product reporting a stale price forever while looking
+            # healthy — the same trap as the old outlier deadlock — so it is
+            # recorded, surfaces in /errori, and eventually pauses the product.
+            disabled = await self._record_failure_and_maybe_disable(
+                p,
+                scraper_name=scraper_name,
+                domain=domain,
+                reason="implausible_read",
+                detail=f"{info.price} against a median of recent readings",
+            )
+            return (p.user_id, None, disabled)
 
         if verdict is ReadVerdict.CONFIRM and not await self._confirm_read(p, info.price):
             if metrics is not None:
@@ -544,12 +565,11 @@ class Scheduler:
                 await handle_success_in_pipeline(health_mgr=self.deps.health_mgr, domain=domain)
             return (p.user_id, None, False)
 
-        if p.pending_read_count or p.pending_read_streak:
-            await self.deps.repo.clear_pending_read(p.id)
-
         old_price = p.current_price or p.initial_price
         await self.deps.repo.update_price(p.id, info.price)
         await self.deps.repo.add_price_history(p.id, info.price)
+        if p.pending_read_count or p.pending_read_streak:
+            await self.deps.repo.clear_pending_read(p.id)
         await self.deps.repo.reset_errors(p.id)
         if domain != "unknown":
             await handle_success_in_pipeline(health_mgr=self.deps.health_mgr, domain=domain)
@@ -678,7 +698,6 @@ class Scheduler:
                 price,
                 confirmations,
             )
-            await self.deps.repo.clear_pending_read(product.id)
             return True
 
         if streak >= MAX_HELD_READS:
@@ -689,7 +708,6 @@ class Scheduler:
                 streak,
                 price,
             )
-            await self.deps.repo.clear_pending_read(product.id)
             return True
 
         logger.info(

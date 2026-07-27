@@ -59,11 +59,11 @@ decided what the user was told.
   exactly the alerts it was meant to govern.
 
 ### Note on enabling quiet hours
-Now that preferences are actually applied, quiet hours behave as the preference
-engine always specified: an alert landing inside the quiet window is **dropped**,
-not deferred — unless digest mode is on, in which case it is queued and delivered
-with the next digest. Turn digest mode on with quiet hours if you want those
-drops to reach you later.
+Now that preferences are actually applied, an alert landing inside a quiet
+window is not delivered at that moment — it is queued for the next digest if
+digest mode is on, and otherwise dropped. A dropped alert does **not** start the
+anti-flap cooldown, so if the price is still down at the next check once the
+window has passed, you are told then.
 
 ### Known issues
 Found during the same audit, not addressed here:

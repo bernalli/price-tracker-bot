@@ -122,6 +122,50 @@ async def test_digest_user_gets_alert_queued_not_pushed(
 
 
 @pytest.mark.asyncio
+async def test_suppressed_alert_does_not_start_the_cooldown(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    """A muted alert was never delivered, so it must not silence the next 24h.
+
+    Recording it as sent starts the anti-flap cooldown, which then suppresses a
+    later re-crossing at an equal-or-higher price — including after the user
+    unmutes. The drop the user was waiting for disappears twice over.
+    """
+    repo, pid = repo_with_product
+    await repo.upsert_notification_prefs(NotificationPrefs(user_id=1, product_id=None, mute=True))
+    bot = AsyncMock()
+    notifier = TelegramNotifier(bot, prefs=PreferencesManager(repo))
+
+    await _tick(repo, notifier)
+
+    bot.send_message.assert_not_awaited()
+    product = await repo.get_product(pid)
+    assert product is not None
+    assert product.last_notified_at is None
+
+
+@pytest.mark.asyncio
+async def test_digest_queued_alert_does_start_the_cooldown(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    """Queued for digest *is* taking responsibility, so bookkeeping proceeds."""
+    repo, pid = repo_with_product
+    await repo.upsert_notification_prefs(
+        NotificationPrefs(user_id=1, product_id=None, digest_mode=True)
+    )
+    bot = AsyncMock()
+    notifier = TelegramNotifier(
+        bot, prefs=PreferencesManager(repo), digest=DigestService(repo=repo, bot=bot)
+    )
+
+    await _tick(repo, notifier)
+
+    product = await repo.get_product(pid)
+    assert product is not None
+    assert product.last_notified_at is not None
+
+
+@pytest.mark.asyncio
 async def test_unmuted_user_still_gets_the_rich_alert_text(
     repo_with_product: tuple[Repository, int],
 ) -> None:
