@@ -69,6 +69,9 @@ class ProductRecord(_DictCompatMixin):
     pending_alert_at: str | None = None
     preferred_condition: str | None = None
     preferred_seller: str | None = None
+    pending_read_price: Decimal | None = None
+    pending_read_count: int = 0
+    pending_read_streak: int = 0
 
 
 @dataclass(frozen=True)

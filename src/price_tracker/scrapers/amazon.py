@@ -516,6 +516,21 @@ class AmazonScraper(AbstractScraper):
             "#corePrice_feature_div",
             "#apex_desktop",
         ]
+
+        # Amazon shows used and Warehouse offers in the *same* core container as
+        # new ones, so "there is a price here" proves nothing about condition.
+        # Read the container's own words before falling back to that heuristic,
+        # otherwise a second-hand buy box is reported as a new-product price.
+        for container_sel in main_buybox_selectors:
+            container = soup.select_one(container_sel)
+            if container is None:
+                continue
+            box_text = container.get_text(" ", strip=True).lower()
+            if "ricondizionat" in box_text or "renewed" in box_text:
+                return "renewed"
+            if "usato" in box_text or "seconda mano" in box_text or "used" in box_text:
+                return "used"
+
         price_sub_selectors = [
             ".priceToPay .a-offscreen",
             ".apexPriceToPay .a-offscreen",

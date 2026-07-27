@@ -95,6 +95,16 @@ def format_alert(alert: PriceAlert) -> str:
     )
 
 
+def format_back_in_stock(*, product_name: str, url: str, price: Decimal, currency: str) -> str:
+    """Announce that a previously sold-out listing is purchasable again."""
+    return (
+        f"📦 <b>Back in stock!</b>\n\n"
+        f"<b>{_escape_html(product_name)}</b>\n"
+        f'<a href="{_escape_html(url)}">View product</a>\n\n'
+        f"Price: <b>{price} {_currency_symbol(currency)}</b>"
+    )
+
+
 def format_error_notification(
     *,
     product: dict[str, str],
