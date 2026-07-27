@@ -288,3 +288,10 @@ async def test_used_offer_is_not_tracked_when_user_wants_new(
     product = await repo.get_product(pid)
     assert product is not None
     assert product.current_price == STEADY
+
+    # Skipping the read must not be silent: a product whose pinned condition no
+    # longer matches any offer would otherwise sit frozen on a stale price,
+    # looking perfectly healthy while never updating again.
+    errors = await repo.list_products_with_errors(user_id=1)
+    assert [e.id for e in errors] == [pid]
+    assert "used" in (errors[0].last_error or "")

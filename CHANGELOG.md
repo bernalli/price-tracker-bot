@@ -58,6 +58,13 @@ decided what the user was told.
   no production caller on the periodic path — every setting was inert for
   exactly the alerts it was meant to govern.
 
+### Note on enabling quiet hours
+Now that preferences are actually applied, quiet hours behave as the preference
+engine always specified: an alert landing inside the quiet window is **dropped**,
+not deferred — unless digest mode is on, in which case it is queued and delivered
+with the next digest. Turn digest mode on with quiet hours if you want those
+drops to reach you later.
+
 ### Known issues
 Found during the same audit, not addressed here:
 - Percentage/absolute thresholds compare against the last reading, so a gradual

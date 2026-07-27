@@ -503,7 +503,20 @@ class Scheduler:
             # Still a successful fetch: let a HALF_OPEN domain close on it (#20).
             if domain != "unknown":
                 await handle_success_in_pipeline(health_mgr=self.deps.health_mgr, domain=domain)
-            return (p.user_id, None, False)
+            # Counted as a failure on purpose. Skipping the read is right — a
+            # different offer is a different price — but doing it silently would
+            # leave the product frozen on a stale price while still looking
+            # healthy. Recording it surfaces the product in /errori and, if no
+            # matching offer turns up for long enough, pauses it with a message
+            # instead of pretending everything is fine.
+            disabled = await self._record_failure_and_maybe_disable(
+                p,
+                scraper_name=scraper_name,
+                domain=domain,
+                reason="condition_mismatch",
+                detail=f"offer is {info.condition!r}, tracking {p.preferred_condition!r}",
+            )
+            return (p.user_id, None, disabled)
 
         history = [h.price for h in await self.deps.repo.get_price_history(p.id, limit=50)]
         verdict = classify_read(info.price, history)
