@@ -271,6 +271,35 @@ async def test_confirmations_must_be_consecutive(
 
 
 @pytest.mark.asyncio
+async def test_failed_scrape_breaks_the_confirmation_run(
+    repo_with_history: tuple[Repository, int],
+) -> None:
+    """A check that produced no price is not evidence for the previous one.
+
+    The confirmation run has to be consecutive readings of the *same* claim. A
+    scrape that failed to find a price tells us nothing, so it must reset the
+    run rather than let two sightings an outage apart count as three.
+    """
+    repo, pid = repo_with_history
+    scraper = _ScriptedScraper(
+        [
+            _reading(GLITCH),
+            ProductInfo(name="Widget", price=None, error="price not found"),
+            _reading(GLITCH),
+            _reading(GLITCH),
+        ]
+    )
+    notifier = AsyncMock()
+
+    await _run(repo, scraper, notifier, times=4)
+
+    notifier.assert_not_awaited()
+    product = await repo.get_product(pid)
+    assert product is not None
+    assert product.current_price == STEADY
+
+
+@pytest.mark.asyncio
 async def test_absurd_readings_do_not_silently_freeze_the_product(
     repo_with_history: tuple[Repository, int],
 ) -> None:

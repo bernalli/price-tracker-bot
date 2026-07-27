@@ -384,6 +384,11 @@ class Scheduler:
         """
         await self.deps.repo.increment_errors(product.id)
         await self.deps.repo.set_last_error(product.id, f"{reason}: {detail}" if detail else reason)
+        # A check that failed produced no evidence about the price, so it breaks
+        # any confirmation run in progress: two sightings either side of an
+        # outage are not consecutive readings of the same claim.
+        if product.pending_read_count or product.pending_read_streak:
+            await self.deps.repo.clear_pending_read(product.id)
         updated = await self.deps.repo.get_product(product.id)
         if updated is None:
             return False
@@ -511,8 +516,6 @@ class Scheduler:
             # healthy. Recording it surfaces the product in /errori and, if no
             # matching offer turns up for long enough, pauses it with a message
             # instead of pretending everything is fine.
-            if p.pending_read_count or p.pending_read_streak:
-                await self.deps.repo.clear_pending_read(p.id)
             disabled = await self._record_failure_and_maybe_disable(
                 p,
                 scraper_name=scraper_name,
@@ -537,11 +540,6 @@ class Scheduler:
                 metrics.price_check_total.labels(
                     scraper=scraper_name, domain=domain, status="outlier_rejected"
                 ).inc()
-            # Garbage breaks a confirmation run: without this, a suspicious price
-            # interleaved with unusable readings would accumulate "consecutive"
-            # confirmations it never had.
-            if p.pending_read_count or p.pending_read_streak:
-                await self.deps.repo.clear_pending_read(p.id)
             # No confirmation count can make a scale-error magnitude believable,
             # so this reading is never accepted. Discarding it in silence would
             # leave the product reporting a stale price forever while looking

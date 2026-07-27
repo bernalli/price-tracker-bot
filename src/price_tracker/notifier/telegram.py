@@ -118,11 +118,9 @@ class TelegramNotifier:
         user was waiting for is suppressed a second time once the preference
         that hid it no longer applies.
         """
-        event_id = alert.get("event_id")
-        if event_id is not None:
-            if event_id in self._dedupe_seen:
-                return True  # already handled once; not a delivery failure
-            self._dedupe_seen.add(event_id)
+        event_id: str | None = alert.get("event_id")
+        if event_id is not None and event_id in self._dedupe_seen:
+            return True  # already delivered once; not a delivery failure
 
         now = datetime.now(UTC)
         eff = (
@@ -139,6 +137,7 @@ class TelegramNotifier:
             if eff.digest_mode and self._digest is not None:
                 await self._digest.enqueue(user_id=user_id, product_id=product_id, payload=alert)
                 self._emit_skipped("digest_pending")
+                self._mark_delivered(event_id)
                 return True
             self._emit_skipped("quiet_hours")
             return False
@@ -155,6 +154,7 @@ class TelegramNotifier:
                         user_id=user_id, product_id=product_id, payload=alert
                     )
                     self._emit_skipped("digest_pending")
+                    self._mark_delivered(event_id)
                     return True
                 self._emit_skipped("throttle")
                 return False
@@ -172,6 +172,7 @@ class TelegramNotifier:
         if eff is not None and eff.digest_mode and self._digest is not None:
             await self._digest.enqueue(user_id=user_id, product_id=product_id, payload=alert)
             self._emit_skipped("digest_pending")
+            self._mark_delivered(event_id)
             return True
 
         # A caller that already rendered the message (the scheduler's rich
@@ -179,7 +180,18 @@ class TelegramNotifier:
         # that hand over structured data alone.
         text = alert.get("text") or _format_alert_message(alert)
         await self.send_alert(chat_id=user_id, text=text)
+        self._mark_delivered(event_id)
         return True
+
+    def _mark_delivered(self, event_id: str | None) -> None:
+        """Remember an event only once it was sent or queued.
+
+        Recording it on arrival instead poisoned every retry of an alert that a
+        preference had dropped: the retry hit the dedupe set and reported
+        success for a message nobody ever delivered.
+        """
+        if event_id is not None:
+            self._dedupe_seen.add(event_id)
 
     def _emit_skipped(self, reason: str) -> None:
         if self._metrics is not None:

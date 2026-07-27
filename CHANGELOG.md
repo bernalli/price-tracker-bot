@@ -76,6 +76,11 @@ Found during the same audit, not addressed here:
 - Price-history retention is implemented but never scheduled, so the database
   grows without bound.
 - Shopify tracks the first available variant rather than the one in the URL.
+- The price update, the history row and the held-read bookkeeping are three
+  separate commits rather than one transaction. A crash between them can leave
+  the new price durable while the alert decision is skipped, losing that
+  crossing. Pre-existing; the confirmation gate inherits it rather than adding
+  it, and closing it properly needs a transactional repository method.
 
 ## [0.1.12] - 2026-05-22
 
