@@ -180,6 +180,7 @@ async def test_back_in_stock_notifies(
     await _run(repo, scraper, notifier, times=2)
 
     notifier.assert_awaited_once()
+    assert notifier.await_args is not None
     assert "stock" in notifier.await_args.args[1].lower()
     product = await repo.get_product(pid)
     assert product is not None

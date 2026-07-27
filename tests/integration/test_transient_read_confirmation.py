@@ -173,6 +173,7 @@ async def test_confirmed_real_drop_still_alerts(
     await _run(repo, scraper, notifier, times=REQUIRED_CONFIRMATIONS)
 
     notifier.assert_awaited_once()
+    assert notifier.await_args is not None
     message = notifier.await_args.args[1]
     assert "Price drop!" in message
     product = await repo.get_product(pid)
