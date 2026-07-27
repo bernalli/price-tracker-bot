@@ -9,6 +9,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 (empty)
 
+## [0.2.0] - 2026-07-27
+
+Alert-correctness release. A tracked Amazon product reported three "price drop"
+alerts for a price that never existed; investigating it surfaced a family of
+related defects where a single unverified reading, or a setting nobody read,
+decided what the user was told.
+
+### Fixed
+- **A single bad scrape can no longer raise an alert.** A reading that
+  contradicts recent history (a drop below 60% of the median, or a rise above
+  2.5x it) is now held and must be confirmed by a second, agreeing check before
+  it is persisted or alerted on. Field case: a product steady at ~386 EUR
+  reported 187.95 EUR on three isolated checks, each bouncing back to ~386 on
+  the next one, and each firing a "-51.3%" alert. Genuinely deep discounts still
+  alert — one check interval later — because a real price repeats and a glitch
+  does not. The previous guard could not catch this: it only rejected readings
+  below 1/50th of the median, i.e. under ~7.70 EUR on that product.
+- **Products no longer get stuck rejecting a real price change forever.** A
+  reading rejected as an outlier never entered price history, so the median that
+  rejected it could never move; one product had been rejecting the same
+  legitimate 9.99 → 34.99 repricing on every check for days. Sustained new
+  prices now confirm themselves and are accepted.
+- **Used and refurbished offers are no longer tracked as the new-product
+  price.** Scrapers already reported buy-box condition and the bot already let
+  you pin one, but the scheduler read neither. Amazon condition detection also
+  treated "there is a price in the buy-box" as proof the item was new, which
+  made its used/Warehouse branch unreachable.
+- **Alerts that Telegram refused are no longer recorded as sent.** A failed
+  delivery started the 24-hour cooldown, suppressing later drops in favour of a
+  message the user never received.
+- `/target` now actually alerts. The target price was stored and never
+  evaluated: only the percentage/absolute threshold was, so a target reached by
+  a series of small moves passed in silence.
+
+### Added
+- Availability tracking: a sold-out listing is recorded as unavailable, and a
+  **back-in-stock** notification is sent when it returns. The scrapers had been
+  reporting availability all along and the scheduler discarded it.
+- Scheduled price alerts now honour notification preferences (mute, quiet hours,
+  throttle, digest). The preference engine existed and was fully tested, but had
+  no production caller on the periodic path — every setting was inert for
+  exactly the alerts it was meant to govern.
+
+### Known issues
+Found during the same audit, not addressed here:
+- Percentage/absolute thresholds compare against the last reading, so a gradual
+  slide (5% + 5% + 5%) never crosses a 10% threshold.
+- The alert cooldown does not model separate drop episodes: a recovery followed
+  by a fresh drop can be suppressed within the cooldown window.
+- Per-product check intervals are stored but the scheduler checks everything on
+  the global tick.
+- Price-history retention is implemented but never scheduled, so the database
+  grows without bound.
+- Shopify tracks the first available variant rather than the one in the URL.
+
 ## [0.1.12] - 2026-05-22
 
 ### Fixed

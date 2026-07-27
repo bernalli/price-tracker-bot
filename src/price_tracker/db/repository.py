@@ -57,7 +57,8 @@ _PRODUCT_COLS = (
     "lowest_price, highest_price, target_price, threshold_type, "
     "threshold_value, is_active, is_available, consecutive_errors, "
     "currency, check_interval_minutes, last_checked_at, last_notified_at, "
-    "pending_alert_price, pending_alert_at, preferred_condition, preferred_seller"
+    "pending_alert_price, pending_alert_at, preferred_condition, preferred_seller, "
+    "pending_read_price, pending_read_count"
 )
 
 
@@ -91,6 +92,8 @@ def _row_to_product(row: tuple[Any, ...]) -> ProductRecord:
         pending_alert_at=row[20],
         preferred_condition=row[21],
         preferred_seller=row[22],
+        pending_read_price=_dec(row[23]),
+        pending_read_count=int(row[24] or 0),
     )
 
 
@@ -402,6 +405,36 @@ class Repository:
             "UPDATE products SET last_notified_at = datetime('now'), "
             "pending_alert_price = ?, pending_alert_at = datetime('now') WHERE id = ?",
             (_dec_str(price), product_id),
+        )
+        await self._conn.commit()
+
+    async def set_availability(self, product_id: int, *, available: bool) -> None:
+        """Record whether the listing is currently purchasable."""
+        await self._conn.execute(
+            "UPDATE products SET is_available = ?, updated_at = datetime('now') WHERE id = ?",
+            (1 if available else 0, product_id),
+        )
+        await self._conn.commit()
+
+    # ── Held reads (two-read confirmation gate) ────────────────
+
+    async def set_pending_read(self, product_id: int, price: Decimal, count: int) -> None:
+        """Park an implausible read until the next check either confirms or drops it.
+
+        Unrelated to ``mark_pending_alert``: this is a read the pipeline has
+        refused to trust yet, not an alert already sent.
+        """
+        await self._conn.execute(
+            "UPDATE products SET pending_read_price = ?, pending_read_count = ? WHERE id = ?",
+            (_dec_str(price), count, product_id),
+        )
+        await self._conn.commit()
+
+    async def clear_pending_read(self, product_id: int) -> None:
+        """Forget any held read — the latest scrape was plausible on its own."""
+        await self._conn.execute(
+            "UPDATE products SET pending_read_price = NULL, pending_read_count = 0 WHERE id = ?",
+            (product_id,),
         )
         await self._conn.commit()
 

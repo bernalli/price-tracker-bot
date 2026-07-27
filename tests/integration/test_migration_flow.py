@@ -7,9 +7,11 @@ from pathlib import Path
 import aiosqlite
 import pytest
 
-from price_tracker.db.migrator import apply_migrations
+from price_tracker.db.migrator import apply_migrations, list_migrations
 
 MIGRATIONS_DIR = Path("src/price_tracker/db/migrations")
+
+LATEST_VERSION = max(v for v, _ in list_migrations(MIGRATIONS_DIR))
 
 
 # This SQL recreates the schema as it exists in v2 after all 22 inline ALTERs ran
@@ -80,7 +82,7 @@ async def test_migrator_treats_pre_existing_v2_schema_as_idempotent():
         await conn.commit()
 
         new_version = await apply_migrations(conn, MIGRATIONS_DIR)
-        assert new_version == 12
+        assert new_version == LATEST_VERSION
 
         await conn.execute(
             "INSERT INTO products(url, name, initial_price, currency) VALUES(?, ?, ?, ?)",

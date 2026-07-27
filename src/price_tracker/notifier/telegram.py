@@ -53,8 +53,34 @@ class TelegramNotifier:
         self._digest = digest
         self._dedupe_seen: set[str] = set()  # event_id deduplication (in-process)
 
-    async def __call__(self, user_id: int, text: str) -> None:
-        """Legacy callable path used by the scheduler — direct send, no prefs."""
+    async def __call__(
+        self,
+        user_id: int,
+        text: str,
+        *,
+        product_id: int | None = None,
+        payload: dict[str, Any] | None = None,
+    ) -> bool:
+        """Deliver one message, returning whether the caller may consider it handled.
+
+        With a ``product_id`` and a configured :class:`PreferencesManager` the
+        message is routed through the user's preferences (mute, quiet hours,
+        throttle, digest) — the same gates ``notify_alert`` applies. Without
+        them it is sent directly: operational notices (auto-disable, quarantine)
+        are not the kind of message a mute is meant to hide.
+
+        ``False`` means the message was not delivered *and* nothing took
+        responsibility for it, so the caller must not record it as sent. A
+        message deliberately suppressed or queued by a preference returns
+        ``True``: the system did what the user asked.
+        """
+        if product_id is not None and self._prefs is not None:
+            alert: dict[str, Any] = {**(payload or {}), "text": text}
+            await self.notify_alert(user_id=user_id, product_id=product_id, alert=alert)
+            return True
+        return await self._send_direct(user_id, text)
+
+    async def _send_direct(self, user_id: int, text: str) -> bool:
         try:
             await self._bot.send_message(
                 chat_id=user_id,
@@ -64,9 +90,10 @@ class TelegramNotifier:
             )
         except Exception as e:  # noqa: BLE001 — Telegram errors are non-deterministic
             logger.warning("Telegram send failed for user %d: %s", user_id, e)
-            return
+            return False
         if self._metrics is not None:
             self._metrics.notification_sent_total.labels(type="immediate", channel="telegram").inc()
+        return True
 
     async def send_alert(self, *, chat_id: int, text: str) -> None:
         """Send an HTML alert message and emit the immediate-sent metric."""
@@ -142,7 +169,10 @@ class TelegramNotifier:
             self._emit_skipped("digest_pending")
             return
 
-        text = _format_alert_message(alert)
+        # A caller that already rendered the message (the scheduler's rich
+        # price-drop body) keeps its text; the dict-only fallback is for callers
+        # that hand over structured data alone.
+        text = alert.get("text") or _format_alert_message(alert)
         await self.send_alert(chat_id=user_id, text=text)
 
     def _emit_skipped(self, reason: str) -> None:
