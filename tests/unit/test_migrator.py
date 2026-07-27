@@ -17,12 +17,16 @@ from price_tracker.db.migrator import (
 
 MIGRATIONS_DIR = Path("src/price_tracker/db/migrations")
 
+# Derived, not hardcoded: adding a migration should not mean editing four
+# assertions that only ever encoded "the newest one".
+LATEST_VERSION = max(v for v, _ in list_migrations(MIGRATIONS_DIR))
+
 
 @pytest.mark.asyncio
-async def test_list_migrations_finds_001_to_012():
+async def test_list_migrations_is_a_contiguous_run_from_one():
     files = list_migrations(MIGRATIONS_DIR)
     versions = [v for v, _ in files]
-    assert versions == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    assert versions == list(range(1, LATEST_VERSION + 1))
 
 
 @pytest.mark.asyncio
@@ -37,7 +41,7 @@ async def test_apply_migrations_brings_fresh_db_to_latest():
     async with aiosqlite.connect(":memory:") as conn:
         await apply_migrations(conn, MIGRATIONS_DIR)
         version = await get_current_version(conn)
-        assert version == 12
+        assert version == LATEST_VERSION
         cursor = await conn.execute("PRAGMA table_info(products)")
         cols = [row[1] async for row in cursor]
         assert "id" in cols
@@ -58,7 +62,7 @@ async def test_apply_migrations_is_idempotent():
         await apply_migrations(conn, MIGRATIONS_DIR)
         await apply_migrations(conn, MIGRATIONS_DIR)
         version = await get_current_version(conn)
-        assert version == 12
+        assert version == LATEST_VERSION
 
 
 @pytest.mark.asyncio
@@ -93,7 +97,7 @@ async def test_apply_migrations_partial_then_complete():
 
         await apply_migrations(conn, MIGRATIONS_DIR)
         version = await get_current_version(conn)
-        assert version == 12
+        assert version == LATEST_VERSION
 
 
 class TestMigration008:

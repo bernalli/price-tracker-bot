@@ -8,6 +8,8 @@ from dataclasses import dataclass
 
 from dotenv import load_dotenv
 
+from price_tracker.core.outlier import REQUIRED_CONFIRMATIONS
+
 load_dotenv()
 logger = logging.getLogger(__name__)
 
@@ -38,6 +40,7 @@ class Config:
     lang: str
     prometheus_bind: str = "127.0.0.1:9090"
     metrics_enabled: bool = True
+    read_confirmations: int = REQUIRED_CONFIRMATIONS
 
     @classmethod
     def from_env(cls) -> Config:
@@ -67,6 +70,7 @@ class Config:
             log_level=os.getenv("LOG_LEVEL", "INFO"),
             lang=os.getenv("LOCALE", "en"),
             prometheus_bind=os.getenv("PROMETHEUS_BIND", "127.0.0.1:9090"),
+            read_confirmations=int(os.getenv("READ_CONFIRMATIONS", str(REQUIRED_CONFIRMATIONS))),
             metrics_enabled=metrics_enabled,
         )
 
