@@ -1899,7 +1899,7 @@ requires-dist = [
     { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "python-telegram-bot", extras = ["job-queue"], specifier = ">=21.0" },
     { name = "respx", marker = "extra == 'dev'", specifier = ">=0.21" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.5" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = "==0.15.12" },
     { name = "scrapling", specifier = ">=0.2.0" },
     { name = "structlog", specifier = ">=24.1.0" },
     { name = "tenacity", specifier = ">=8.5.0" },

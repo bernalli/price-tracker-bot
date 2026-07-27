@@ -57,8 +57,8 @@ class MyShopScraper(AbstractScraper):
         # Always wrap price string with parse_price() to get Decimal.
         # Return early with ProductInfo(error=...) on parse failure.
 
-        name = "..."          # extract title/name from HTML
-        price_str = "..."     # raw price text
+        name = "..."  # extract title/name from HTML
+        price_str = "..."  # raw price text
         price = parse_price(price_str)
         currency = "EUR"
 
@@ -138,9 +138,7 @@ async def test_myshop_parses_sample():
     fixture = Path("tests/fixtures/myshop/sample_product.html").read_text()
 
     with respx.mock(assert_all_called=False) as router:
-        router.get("https://myshop.com/p/1").mock(
-            return_value=httpx.Response(200, text=fixture)
-        )
+        router.get("https://myshop.com/p/1").mock(return_value=httpx.Response(200, text=fixture))
 
         async with httpx.AsyncClient() as client:
             scraper = MyShopScraper()
