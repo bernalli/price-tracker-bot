@@ -11,14 +11,12 @@ on:
       - ".github/workflows/docker-build.yml"
     tags:
       - "v*.*.*"
+  # No paths filter on pull_request: `build` is a required status check on main,
+  # and a check that never starts is reported as pending forever — a docs-only PR
+  # would be unmergeable without an admin override. Running it on every PR keeps
+  # the gate honest at the cost of one image build.
   pull_request:
     branches: [main]
-    paths:
-      - "Dockerfile"
-      - ".dockerignore"
-      - "pyproject.toml"
-      - "src/**"
-      - ".github/workflows/docker-build.yml"
 
 permissions:
   contents: read
