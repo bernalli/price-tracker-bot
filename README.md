@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/img/cover.png" alt="price-tracker-bot — self-hosted Telegram bot for multi-site price tracking" width="100%">
+</p>
+
 # price-tracker-bot
 
 [![CI](https://github.com/bernalli/price-tracker-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/bernalli/price-tracker-bot/actions/workflows/ci.yml)
