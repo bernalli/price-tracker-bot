@@ -26,7 +26,9 @@ dependencies = [
     "tldextract>=5.1.0",
     "structlog>=24.1.0",
     "prometheus_client>=0.20.0",
-    "aiohttp>=3.10.0",
+    # Floor raised for PYSEC-2026-3545/-3546/-3547 (fixed in 3.14.2/3.14.3):
+    # keeps a future re-resolve from ever landing back on a vulnerable build.
+    "aiohttp>=3.14.3",
     "babel>=2.13.0",
 ]
 
