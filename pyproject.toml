@@ -13,7 +13,7 @@ requires-python = ">=3.11"
 dependencies = [
     "python-telegram-bot[job-queue]>=21.0",
     "httpx>=0.27.0",
-    "brotli>=1.1.0",  # httpx needs this to decompress br-encoded responses (sites like nove25.net serve brotli by default)
+    "brotli>=1.2.0",  # httpx needs this to decompress br-encoded responses (sites like nove25.net serve brotli by default)
     "beautifulsoup4>=4.12.0",
     "lxml>=5.0.0",
     "aiosqlite>=0.20.0",
