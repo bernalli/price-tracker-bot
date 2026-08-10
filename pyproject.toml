@@ -29,7 +29,7 @@ dependencies = [
     # Floor raised for PYSEC-2026-3545/-3546/-3547 (fixed in 3.14.2/3.14.3):
     # keeps a future re-resolve from ever landing back on a vulnerable build.
     "aiohttp>=3.14.3",
-    "babel>=2.13.0",
+    "babel>=2.18.0",
 ]
 
 [project.optional-dependencies]
