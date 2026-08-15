@@ -14,9 +14,10 @@ import random
 import re
 from decimal import Decimal
 from typing import ClassVar
+from urllib.parse import urlparse
 
 import httpx
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
 from price_tracker.core.exceptions import CaptchaDetected, HTTPBlockStatus
 from price_tracker.core.retry_policy import RetryConfig, with_retry
@@ -31,6 +32,18 @@ from price_tracker.core.scraper_base import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+_ASIN_PATH_RE = re.compile(
+    r"/(?:dp|gp/product|gp/aw/d)/([A-Z0-9]{10})(?:[/?]|$)",
+    re.IGNORECASE,
+)
+
+
+def _extract_asin(url: str) -> str | None:
+    """Return the product ASIN encoded in a canonical Amazon URL path."""
+    match = _ASIN_PATH_RE.search(urlparse(url).path)
+    return match.group(1).upper() if match else None
 
 
 @with_retry(RetryConfig(max_attempts=3, base_wait=2.0, max_wait=10.0))
@@ -225,8 +238,12 @@ class AmazonScraper(AbstractScraper):
         if unavail and "non disponibile" in unavail.get_text().lower():
             info.available = False
 
-        # Extract price — CSS selectors first (buybox = real price for Amazon)
-        css_price = self._extract_price(soup)
+        # Extract price — CSS selectors first (buybox = real price for Amazon).
+        # Keep the ASIN as an ownership boundary: Amazon product pages contain
+        # recommendation carousels whose prices use the same generic classes as
+        # the main buy box. A foreign card must never become this product's price.
+        target_asin = _extract_asin(url)
+        css_price = self._extract_price(soup, target_asin=target_asin)
         ld_price = self._try_json_ld_price(soup)
 
         # Prefer CSS, but cross-check with JSON-LD: when CSS differs >2x from
@@ -282,7 +299,9 @@ class AmazonScraper(AbstractScraper):
 
         return info
 
-    def _extract_price(self, soup: BeautifulSoup) -> Decimal | None:
+    def _extract_price(
+        self, soup: BeautifulSoup, *, target_asin: str | None = None
+    ) -> Decimal | None:
         # Strategy 1: Target the main buy box directly (most reliable)
         buybox_containers = [
             "#corePrice_desktop",
@@ -302,6 +321,8 @@ class AmazonScraper(AbstractScraper):
                 ".a-price:not(.a-text-price) .a-offscreen",
             ]:
                 for el in container.select(sel):
+                    if not self._belongs_to_target_asin(el, target_asin, allow_unowned=True):
+                        continue
                     # Skip if this price is in an installment/pay-later sub-widget
                     skip = False
                     for parent in el.parents:
@@ -393,6 +414,13 @@ class AmazonScraper(AbstractScraper):
         for selector in self.PRICE_SELECTORS:
             elements = soup.select(selector)
             for el in elements:
+                # An ID selector identifies a known main-page price node and may
+                # legitimately have no data-asin. Generic class selectors are
+                # safe only when a matching data-asin explicitly owns them.
+                if not self._belongs_to_target_asin(
+                    el, target_asin, allow_unowned=selector.startswith("#")
+                ):
+                    continue
                 skip = False
                 for parent in el.parents:
                     pid = (parent.get("id") or "").lower()
@@ -437,6 +465,31 @@ class AmazonScraper(AbstractScraper):
                     return parsed
 
         return None
+
+    @staticmethod
+    def _belongs_to_target_asin(
+        element: Tag, target_asin: str | None, *, allow_unowned: bool
+    ) -> bool:
+        """Require target ownership unless the caller supplies a trusted scope.
+
+        Recommendation, sponsored-product, and carousel cards carry their own
+        ``data-asin``. Their price markup is otherwise indistinguishable from a
+        main product price (often ``span.a-price .a-offscreen``), so selector
+        priority alone cannot make the fallback safe.
+
+        Trusted main-buy-box containers and stable ID selectors may opt into
+        unowned legacy markup. A generic class-based fallback may not: if it
+        cannot prove ownership, failing closed is safer than recording another
+        product's price.
+        """
+        if target_asin is None:
+            return True
+
+        for node in (element, *element.parents):
+            owner = node.get("data-asin")
+            if owner:
+                return str(owner).strip().upper() == target_asin
+        return allow_unowned
 
     def _extract_name(self, soup: BeautifulSoup) -> str | None:
         for selector in self.NAME_SELECTORS:

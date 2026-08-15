@@ -10,7 +10,7 @@ import pytest
 import respx
 
 from price_tracker.scrapers import amazon as amazon_module
-from price_tracker.scrapers.amazon import AmazonScraper
+from price_tracker.scrapers.amazon import AmazonScraper, _extract_asin
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -46,6 +46,19 @@ def test_amazon_priority_high():
     assert AmazonScraper.priority == 100
 
 
+@pytest.mark.parametrize(
+    ("url", "expected"),
+    [
+        ("https://www.amazon.it/widget/dp/B0G34ZTW51/ref=sr_1_7", "B0G34ZTW51"),
+        ("https://www.amazon.com/gp/product/b0g34ztw51", "B0G34ZTW51"),
+        ("https://www.amazon.de/gp/aw/d/B0G34ZTW51?th=1", "B0G34ZTW51"),
+        ("https://www.amazon.it/s?k=B0G34ZTW51", None),
+    ],
+)
+def test_extract_asin_from_product_url(url: str, expected: str | None) -> None:
+    assert _extract_asin(url) == expected
+
+
 # ── scrape: happy path ────────────────────────────────────────────
 
 
@@ -75,6 +88,104 @@ async def test_amazon_parses_fixture_html(
     assert info.currency in (None, "EUR")
     assert info.name == "Sample Product"
     assert info.error is None
+
+
+@pytest.mark.asyncio
+async def test_amazon_rejects_price_owned_by_recommendation_asin(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression: a foreign carousel price must not become the target price.
+
+    Production fetched the ZBT-2 page without a target buy-box price. The first
+    generic ``a-price`` belonged to Home Assistant Green (a different ASIN), so
+    218.75 EUR was persisted and announced as if it belonged to the ZBT-2.
+    """
+    html = """
+    <!DOCTYPE html><html><body>
+      <h1 id="productTitle">Home Assistant Connect ZBT-2</h1>
+      <ol class="a-carousel">
+        <li class="a-carousel-card">
+          <div data-asin="B0CXVKSG19">
+            <span>Nabu Casa Home Assistant Green</span>
+            <span class="a-price"><span class="a-offscreen">218,75€</span></span>
+          </div>
+        </li>
+      </ol>
+    </body></html>
+    """
+
+    async def _no_fresh(url: str) -> str | None:
+        return None
+
+    monkeypatch.setattr(amazon_module, "_fetch_with_fresh_client", _no_fresh)
+
+    url = "https://www.amazon.it/Assistant/dp/B0G34ZTW51/ref=sr_1_7"
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).respond(200, text=html)
+        async with httpx.AsyncClient() as client:
+            info = await AmazonScraper().scrape(url, client)
+
+    assert info.price is None
+    assert info.error == "Prezzo non trovato (prodotto non disponibile?)"
+
+
+@pytest.mark.asyncio
+async def test_amazon_accepts_generic_price_owned_by_target_asin(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The ownership guard keeps valid generic markup for the requested ASIN."""
+    html = """
+    <!DOCTYPE html><html><body>
+      <h1 id="productTitle">Home Assistant Connect ZBT-2</h1>
+      <div data-asin="B0G34ZTW51">
+        <span class="a-price"><span class="a-offscreen">69,99€</span></span>
+      </div>
+    </body></html>
+    """
+
+    async def _no_fresh(url: str) -> str | None:
+        return None
+
+    monkeypatch.setattr(amazon_module, "_fetch_with_fresh_client", _no_fresh)
+
+    url = "https://www.amazon.it/Assistant/dp/B0G34ZTW51"
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).respond(200, text=html)
+        async with httpx.AsyncClient() as client:
+            info = await AmazonScraper().scrape(url, client)
+
+    assert info.price == Decimal("69.99")
+    assert info.error is None
+
+
+def test_amazon_rejects_foreign_asin_even_inside_primary_price_container() -> None:
+    """ASIN ownership wins even if malformed HTML nests a card in a trusted container."""
+    from bs4 import BeautifulSoup
+
+    html = """
+    <div id="corePrice_desktop">
+      <div data-asin="B0CXVKSG19">
+        <span class="priceToPay"><span class="a-offscreen">218,75€</span></span>
+      </div>
+    </div>
+    """
+    soup = BeautifulSoup(html, "lxml")
+
+    assert AmazonScraper()._extract_price(soup, target_asin="B0G34ZTW51") is None
+
+
+def test_amazon_rejects_unowned_generic_price_outside_primary_container() -> None:
+    """An unscoped generic price cannot prove that it belongs to the target product."""
+    from bs4 import BeautifulSoup
+
+    html = """
+    <div class="recommendation-without-asin">
+      <span class="a-price"><span class="a-offscreen">218,75€</span></span>
+    </div>
+    """
+    soup = BeautifulSoup(html, "lxml")
+
+    assert AmazonScraper()._extract_price(soup, target_asin="B0G34ZTW51") is None
 
 
 # ── scrape: error paths ──────────────────────────────────────────
