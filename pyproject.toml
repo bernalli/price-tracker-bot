@@ -42,7 +42,7 @@ dev = [
     # turns any upstream release into a red build on files nobody touched —
     # which is how main broke on docs/plugins.md. Bump deliberately, with the
     # reformat it implies in the same commit.
-    "ruff==0.16.0",
+    "ruff==0.16.5",
     "mypy>=1.10",
     "types-beautifulsoup4",
     "types-python-dateutil",
