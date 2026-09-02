@@ -37,6 +37,10 @@ async def _fetch_shopify_response(url: str, client: httpx.AsyncClient) -> httpx.
     """Single GET attempt with browser headers. Tenacity handles retries."""
     headers = get_headers()
     response = await client.get(url, headers=headers, follow_redirects=True)
+    # Surface 403/429 (and WAF/CAPTCHA bodies) as a BlockEvent BEFORE
+    # raise_for_status, so the scheduler quarantines the domain instead of
+    # recording a generic failure (#16). with_retry never retries BlockEvents.
+    detect_block_event(status_code=response.status_code, body=response.text, url=url)
     response.raise_for_status()
     return response
 
