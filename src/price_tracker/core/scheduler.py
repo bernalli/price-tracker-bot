@@ -532,6 +532,7 @@ class Scheduler:
                 await handle_success_in_pipeline(health_mgr=self.deps.health_mgr, domain=domain)
             if p.pending_read_count or p.pending_read_streak:
                 await self.deps.repo.clear_pending_read(p.id)
+            await self.deps.repo.reset_errors(p.id)
             return (p.user_id, None, False)
 
         if not self._condition_matches(p, info.condition):
@@ -600,6 +601,7 @@ class Scheduler:
                 ).inc()
             if domain != "unknown":
                 await handle_success_in_pipeline(health_mgr=self.deps.health_mgr, domain=domain)
+            await self.deps.repo.reset_errors(p.id)
             return (p.user_id, None, False)
 
         old_price = p.current_price or p.initial_price

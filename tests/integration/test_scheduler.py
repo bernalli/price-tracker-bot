@@ -362,6 +362,35 @@ async def test_scheduler_currency_mismatch_skips_persist_and_alert(
 
 
 @pytest.mark.asyncio
+async def test_scheduler_currency_mismatch_resets_error_counters(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    """A parsed price in another currency proves the listing is still live."""
+    repo, pid = repo_with_product
+    await repo.record_failure(pid, reason="listing_gone", detail="HTTP 404")
+    stub = _StubScraper(ProductInfo(name="Widget", price=Decimal("80"), currency="USD"))
+    registry = ScraperRegistry()
+    registry.register(stub)
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=AsyncMock(),
+                max_consecutive_errors=10,
+                delay_between_products=0.0,
+            )
+        )
+        await scheduler.run_check_for_user(user_id=1)
+
+    product = await repo.get_product(pid)
+    assert product is not None
+    assert product.consecutive_errors == 0
+    assert product.gone_streak == 0
+
+
+@pytest.mark.asyncio
 async def test_scheduler_currency_mismatch_records_success_for_half_open_domain(
     repo_with_product: tuple[Repository, int],
 ) -> None:
@@ -401,6 +430,38 @@ async def test_scheduler_currency_mismatch_records_success_for_half_open_domain(
     assert p is not None
     assert p.current_price != Decimal("80")
     assert p.currency == "EUR"
+
+
+@pytest.mark.asyncio
+async def test_scheduler_awaiting_confirmation_resets_error_counters(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    """A held, parsed price is a successful scrape even before persistence."""
+    repo, pid = repo_with_product
+    for price in (100, 102, 98, 105, 100):
+        await repo.add_price_history(pid, Decimal(str(price)))
+    await repo.record_failure(pid, reason="listing_gone", detail="HTTP 404")
+    stub = _StubScraper(ProductInfo(name="Widget", price=Decimal("50"), currency="EUR"))
+    registry = ScraperRegistry()
+    registry.register(stub)
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=AsyncMock(),
+                max_consecutive_errors=10,
+                delay_between_products=0.0,
+            )
+        )
+        await scheduler.run_check_for_user(user_id=1)
+
+    product = await repo.get_product(pid)
+    assert product is not None
+    assert product.consecutive_errors == 0
+    assert product.gone_streak == 0
+    assert product.pending_read_price == Decimal("50")
 
 
 @pytest.mark.asyncio
