@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, TypeVar
 from zoneinfo import ZoneInfo
 
 if TYPE_CHECKING:
+    from price_tracker.db.models import NotificationPrefs
     from price_tracker.db.repository import Repository
 
 T = TypeVar("T")
@@ -71,62 +72,74 @@ class PreferencesManager:
             user_id=user_id, product_id=product_id
         )
         per_user = await self._repo.get_notification_prefs(user_id=user_id, product_id=None)
+        return _coalesce_rows(per_product, per_user)
 
-        def _pick_bool(name: str, default: bool) -> bool:
-            pp = getattr(per_product, name, None) if per_product is not None else None
-            pu = getattr(per_user, name, None) if per_user is not None else None
-            v = _coalesce(pp, pu)
-            return bool(v) if v is not None else default
+    async def resolve_global(self, *, user_id: int) -> EffectivePrefs:
+        """Return global preferences only, without a per-product override."""
+        per_user = await self._repo.get_notification_prefs(user_id=user_id, product_id=None)
+        return _coalesce_rows(None, per_user)
 
-        def _pick_int(name: str, default: int) -> int:
-            pp = getattr(per_product, name, None) if per_product is not None else None
-            pu = getattr(per_user, name, None) if per_user is not None else None
-            v = _coalesce(pp, pu)
-            if v is None:
-                return default
-            return int(v)
 
-        def _pick_str(name: str, default: str) -> str:
-            pp = getattr(per_product, name, None) if per_product is not None else None
-            pu = getattr(per_user, name, None) if per_user is not None else None
-            v = _coalesce(pp, pu)
-            return str(v) if v is not None else default
+def _coalesce_rows(
+    per_product: NotificationPrefs | None, per_user: NotificationPrefs | None
+) -> EffectivePrefs:
+    """Coalesce preference rows field-by-field, then fall back to defaults."""
 
-        def _pick_optional_str(name: str) -> str | None:
-            pp = getattr(per_product, name, None) if per_product is not None else None
-            pu = getattr(per_user, name, None) if per_user is not None else None
-            v = _coalesce(pp, pu)
-            return str(v) if v is not None else None
+    def _pick_bool(name: str, default: bool) -> bool:
+        pp = getattr(per_product, name, None) if per_product is not None else None
+        pu = getattr(per_user, name, None) if per_user is not None else None
+        v = _coalesce(pp, pu)
+        return bool(v) if v is not None else default
 
-        def _pick_optional_int(name: str) -> int | None:
-            pp = getattr(per_product, name, None) if per_product is not None else None
-            pu = getattr(per_user, name, None) if per_user is not None else None
-            v = _coalesce(pp, pu)
-            if v is None:
-                return None
-            return int(v)
+    def _pick_int(name: str, default: int) -> int:
+        pp = getattr(per_product, name, None) if per_product is not None else None
+        pu = getattr(per_user, name, None) if per_user is not None else None
+        v = _coalesce(pp, pu)
+        if v is None:
+            return default
+        return int(v)
 
-        def _pick_optional_dt(name: str) -> datetime | None:
-            pp = getattr(per_product, name, None) if per_product is not None else None
-            pu = getattr(per_user, name, None) if per_user is not None else None
-            v = _coalesce(pp, pu)
-            if v is None:
-                return None
-            assert isinstance(v, datetime)
-            return v
+    def _pick_str(name: str, default: str) -> str:
+        pp = getattr(per_product, name, None) if per_product is not None else None
+        pu = getattr(per_user, name, None) if per_user is not None else None
+        v = _coalesce(pp, pu)
+        return str(v) if v is not None else default
 
-        return EffectivePrefs(
-            mute=_pick_bool("mute", _DEFAULTS.mute),
-            mute_until=_pick_optional_dt("mute_until"),
-            digest_mode=_pick_bool("digest_mode", _DEFAULTS.digest_mode),
-            digest_interval_minutes=_pick_int(
-                "digest_interval_minutes", _DEFAULTS.digest_interval_minutes
-            ),
-            quiet_hours_start=_pick_optional_str("quiet_hours_start"),
-            quiet_hours_end=_pick_optional_str("quiet_hours_end"),
-            throttle_per_hour=_pick_optional_int("throttle_per_hour"),
-            timezone=_pick_str("timezone", _DEFAULTS.timezone),
-        )
+    def _pick_optional_str(name: str) -> str | None:
+        pp = getattr(per_product, name, None) if per_product is not None else None
+        pu = getattr(per_user, name, None) if per_user is not None else None
+        v = _coalesce(pp, pu)
+        return str(v) if v is not None else None
+
+    def _pick_optional_int(name: str) -> int | None:
+        pp = getattr(per_product, name, None) if per_product is not None else None
+        pu = getattr(per_user, name, None) if per_user is not None else None
+        v = _coalesce(pp, pu)
+        if v is None:
+            return None
+        return int(v)
+
+    def _pick_optional_dt(name: str) -> datetime | None:
+        pp = getattr(per_product, name, None) if per_product is not None else None
+        pu = getattr(per_user, name, None) if per_user is not None else None
+        v = _coalesce(pp, pu)
+        if v is None:
+            return None
+        assert isinstance(v, datetime)
+        return v
+
+    return EffectivePrefs(
+        mute=_pick_bool("mute", _DEFAULTS.mute),
+        mute_until=_pick_optional_dt("mute_until"),
+        digest_mode=_pick_bool("digest_mode", _DEFAULTS.digest_mode),
+        digest_interval_minutes=_pick_int(
+            "digest_interval_minutes", _DEFAULTS.digest_interval_minutes
+        ),
+        quiet_hours_start=_pick_optional_str("quiet_hours_start"),
+        quiet_hours_end=_pick_optional_str("quiet_hours_end"),
+        throttle_per_hour=_pick_optional_int("throttle_per_hour"),
+        timezone=_pick_str("timezone", _DEFAULTS.timezone),
+    )
 
 
 def _parse_hhmm(hhmm: str) -> time:

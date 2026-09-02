@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import gettext
 import os
-from contextvars import ContextVar
+from contextvars import ContextVar, Token
 from functools import lru_cache
 from pathlib import Path
 
@@ -96,9 +96,14 @@ def get_translation(lang_code: str | None) -> gettext.NullTranslations:
     return gettext.NullTranslations()
 
 
-def set_locale(lang_code: str | None) -> None:
-    """Set the GNUTranslations instance for the current asyncio context."""
-    _translation_var.set(get_translation(lang_code))
+def set_locale(lang_code: str | None) -> Token[gettext.NullTranslations]:
+    """Set the current locale and return its ContextVar reset token."""
+    return _translation_var.set(get_translation(lang_code))
+
+
+def reset_locale(token: Token[gettext.NullTranslations]) -> None:
+    """Restore the current asyncio context's locale from ``set_locale``."""
+    _translation_var.reset(token)
 
 
 def _(text: str) -> str:

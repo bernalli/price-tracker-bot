@@ -21,6 +21,7 @@ from price_tracker.core.scraper_base import (
     ProductInfo,
     detect_block_event,
     detect_currency,
+    detect_listing_gone,
     get_headers,
     jsonld_offer_availability,
     parse_price,
@@ -55,6 +56,7 @@ class StrategyResult(TypedDict, total=False):
 async def _fetch_aliexpress_html(url: str, client: httpx.AsyncClient) -> httpx.Response:
     headers = get_headers()
     response = await client.get(url, headers=headers, follow_redirects=True)
+    detect_listing_gone(status_code=response.status_code, url=url)
     response.raise_for_status()
     return response
 

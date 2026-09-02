@@ -16,6 +16,22 @@ class ParseError(ScrapeError):
     """Raised when scraper cannot extract product info from a valid response."""
 
 
+LISTING_GONE_STATUSES: frozenset[int] = frozenset({404, 410})
+
+
+class ListingGone(ScrapeError):
+    """The product page answered 404/410: the listing no longer exists.
+
+    Not a BlockEvent (the site is not refusing us) and not an httpx error
+    (scrapers that swallow ``httpx.HTTPError`` must let this one through).
+    """
+
+    def __init__(self, *, status: int, url: str = "") -> None:
+        self.status = status
+        self.url = url
+        super().__init__(f"HTTP {status} listing gone on {url}")
+
+
 class BlockEvent(ScrapeError):
     """Raised when a site explicitly blocks the request.
 

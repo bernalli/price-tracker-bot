@@ -696,3 +696,255 @@ async def test_set_last_error_truncates_to_300_chars(repo: Repository):
     rows = await repo.list_products_with_errors(user_id=1)
     assert rows[0].last_error is not None
     assert len(rows[0].last_error) == 300
+
+
+async def test_get_product_exposes_last_error_gone_streak_and_provenance(repo: Repository):
+    pid = await repo.add_product(
+        user_id=1,
+        url="https://x.com/products/new",
+        name="New",
+        domain="x.com",
+        initial_price=Decimal("10"),
+        currency="EUR",
+    )
+
+    product = await repo.get_product(pid)
+
+    assert product is not None
+    assert product.last_error is None
+    assert product.last_error_at is None
+    assert product.gone_streak == 0
+    assert product.suspension_kind is None
+    assert product.suspension_reason is None
+
+
+async def test_record_failure_increments_and_sets_last_error(repo: Repository):
+    pid = await repo.add_product(
+        user_id=1,
+        url="https://x.com/products/failure",
+        name="Failure",
+        domain="x.com",
+        initial_price=Decimal("10"),
+        currency="EUR",
+    )
+
+    product = await repo.record_failure(pid, reason="parse_error", detail="x")
+
+    assert product is not None
+    assert product.consecutive_errors == 1
+    assert product.last_error == "parse_error: x"
+    assert product.last_error_at is not None
+    assert product.gone_streak == 0
+
+
+async def test_record_failure_gone_streak_grows_only_on_listing_gone(repo: Repository):
+    pid = await repo.add_product(
+        user_id=1,
+        url="https://x.com/products/gone",
+        name="Gone",
+        domain="x.com",
+        initial_price=Decimal("10"),
+        currency="EUR",
+    )
+
+    first = await repo.record_failure(pid, reason="listing_gone")
+    second = await repo.record_failure(pid, reason="listing_gone", detail="HTTP 410")
+    reset = await repo.record_failure(pid, reason="http_error", detail="HTTP 500")
+    restarted = await repo.record_failure(pid, reason="listing_gone", detail="HTTP 404")
+
+    assert first is not None
+    assert first.gone_streak == 1
+    assert second is not None
+    assert second.gone_streak == 2
+    assert reset is not None
+    assert reset.gone_streak == 0
+    assert restarted is not None
+    assert restarted.gone_streak == 1
+    assert restarted.consecutive_errors == 4
+
+
+async def test_record_failure_truncates_detail_to_300(repo: Repository):
+    pid = await repo.add_product(
+        user_id=1,
+        url="https://x.com/products/long-error",
+        name="Long error",
+        domain="x.com",
+        initial_price=Decimal("10"),
+        currency="EUR",
+    )
+    full_text = f"parse_error: {'x' * 500}"
+
+    product = await repo.record_failure(pid, reason="parse_error", detail="x" * 500)
+
+    assert product is not None
+    assert product.last_error == full_text[:300]
+    assert len(product.last_error) == 300
+
+
+async def test_record_failure_unknown_product_returns_none(repo: Repository):
+    assert await repo.record_failure(999_999, reason="unexpected", detail="boom") is None
+
+
+async def test_suspend_product_marks_automatic_with_reason(repo: Repository):
+    pid = await repo.add_product(
+        user_id=1,
+        url="https://x.com/products/suspend",
+        name="Suspend",
+        domain="x.com",
+        initial_price=Decimal("10"),
+        currency="EUR",
+    )
+    failed = await repo.record_failure(pid, reason="listing_gone", detail="HTTP 404")
+    assert failed is not None
+
+    assert await repo.suspend_product(pid, reason="listing_gone") is True
+    product = await repo.get_product(pid)
+
+    assert product is not None
+    assert product.is_active is False
+    assert product.suspension_kind == "automatic"
+    assert product.suspension_reason == "listing_gone"
+    assert product.consecutive_errors == failed.consecutive_errors
+    assert product.gone_streak == failed.gone_streak
+
+
+async def test_pause_product_marks_manual(repo: Repository):
+    pid = await repo.add_product(
+        user_id=1,
+        url="https://x.com/products/manual",
+        name="Manual",
+        domain="x.com",
+        initial_price=Decimal("10"),
+        currency="EUR",
+    )
+    for _ in range(7):
+        await repo.record_failure(pid, reason="http_error", detail="HTTP 500")
+
+    await repo.pause_product(pid)
+    product = await repo.get_product(pid)
+
+    assert product is not None
+    assert product.is_active is False
+    assert product.suspension_kind == "manual"
+    assert product.suspension_reason is None
+    assert product.consecutive_errors == 7
+
+
+async def test_reactivate_clears_counters_and_provenance(repo: Repository):
+    pid = await repo.add_product(
+        user_id=1,
+        url="https://x.com/products/reactivate",
+        name="Reactivate",
+        domain="x.com",
+        initial_price=Decimal("10"),
+        currency="EUR",
+    )
+    await repo.record_failure(pid, reason="listing_gone", detail="HTTP 404")
+    await repo.record_failure(pid, reason="listing_gone", detail="HTTP 410")
+    await repo.suspend_product(pid, reason="listing_gone")
+
+    await repo.reactivate_product(pid)
+    product = await repo.get_product(pid)
+
+    assert product is not None
+    assert product.is_active is True
+    assert product.consecutive_errors == 0
+    assert product.gone_streak == 0
+    assert product.suspension_kind is None
+    assert product.suspension_reason is None
+
+    await repo.record_failure(pid, reason="listing_gone", detail="HTTP 404")
+    await repo.reset_errors(pid)
+    reset = await repo.get_product(pid)
+    assert reset is not None
+    assert reset.consecutive_errors == 0
+    assert reset.gone_streak == 0
+
+
+async def test_list_auto_suspended_products_uses_provenance_only(repo: Repository):
+    product_ids = []
+    for index, user_id in enumerate((1, 1, 1, 1, 2, 1), start=1):
+        product_ids.append(
+            await repo.add_product(
+                user_id=user_id,
+                url=f"https://x.com/products/{index}",
+                name=f"Product {index}",
+                domain="x.com",
+                initial_price=Decimal("10"),
+                currency="EUR",
+            )
+        )
+    automatic, manual, legacy, active, other_user, automatic_later = product_ids
+
+    for _ in range(3):
+        await repo.record_failure(automatic, reason="http_error")
+    await repo.suspend_product(automatic, reason="http_error")
+
+    for _ in range(7):
+        await repo.record_failure(manual, reason="http_error")
+    await repo.pause_product(manual)
+
+    await repo._conn.execute(  # noqa: SLF001
+        "UPDATE products SET is_active = 0, consecutive_errors = 10 WHERE id = ?",
+        (legacy,),
+    )
+    await repo._conn.commit()  # noqa: SLF001
+
+    for _ in range(10):
+        await repo.record_failure(active, reason="http_error")
+
+    await repo.suspend_product(other_user, reason="listing_gone")
+    await repo.suspend_product(automatic_later, reason="parse_error")
+
+    products = await repo.list_auto_suspended_products(user_id=1)
+
+    assert [product.id for product in products] == [automatic, automatic_later]
+
+
+async def test_suspend_product_is_a_compare_and_swap(repo: Repository):
+    pid = await repo.add_product(
+        user_id=1,
+        url="https://x.com/products/cas",
+        name="CAS",
+        domain="x.com",
+        initial_price=Decimal("10"),
+        currency="EUR",
+    )
+
+    assert await repo.suspend_product(pid, reason="listing_gone") is True
+    automatically_suspended = await repo.get_product(pid)
+    assert automatically_suspended is not None
+    assert automatically_suspended.suspension_kind == "automatic"
+    assert automatically_suspended.suspension_reason == "listing_gone"
+
+    await repo.reactivate_product(pid)
+    await repo.record_failure(pid, reason="listing_gone", detail="HTTP 404")
+    await repo.pause_product(pid)
+    manually_paused = await repo.get_product(pid)
+    assert manually_paused is not None
+
+    assert await repo.suspend_product(pid, reason="listing_gone") is False
+    after_lost_race = await repo.get_product(pid)
+    assert after_lost_race == manually_paused
+    assert after_lost_race.suspension_kind == "manual"
+    assert after_lost_race.suspension_reason is None
+    assert await repo.list_auto_suspended_products(user_id=1) == []
+
+
+async def test_enqueue_digest_accepts_null_product_id(repo: Repository):
+    await repo.create_user(user_id=1)
+
+    entry_id = await repo.enqueue_digest(user_id=1, product_id=None, payload="{}")
+
+    assert entry_id > 0
+
+
+async def test_list_pending_digest_maps_null_product(repo: Repository):
+    await repo.create_user(user_id=1)
+    entry_id = await repo.enqueue_digest(user_id=1, product_id=None, payload="{}")
+
+    pending = await repo.list_pending_digest(user_id=1)
+
+    assert len(pending) == 1
+    assert pending[0].id == entry_id
+    assert pending[0].product_id is None
