@@ -6,7 +6,15 @@ from decimal import Decimal
 
 import pytest
 
-from price_tracker.core.notices import NoticeCollector, OperationalEvent, group_key_for
+from price_tracker.core.notices import (
+    OPS_DELETE_CONFIRM_PREFIX,
+    OPS_DELETE_PREFIX,
+    OPS_REACTIVATE_PREFIX,
+    NoticeCollector,
+    NoticeGroup,
+    OperationalEvent,
+    group_key_for,
+)
 
 
 def _event(
@@ -15,7 +23,7 @@ def _event(
     user_id: int = 1,
     product_id: int = 1,
     url: str = "https://shop.example.com/products/1",
-    reason: str = "parse_error",
+    reason: str | None = "parse_error",
 ) -> OperationalEvent:
     return OperationalEvent(
         event=event,  # type: ignore[arg-type]
@@ -46,10 +54,23 @@ def _event(
         ("https://a.example.co.uk/p", "example.co.uk"),
         ("http://127.0.0.1/x", "127.0.0.1"),
         ("//fallback.example/path", "fallback.example"),
+        ("http://[::1", "unknown"),
+        (b"https://example.com", "unknown"),
+        (None, "unknown"),
     ],
 )
-def test_group_key_for_never_raises(url: str, expected: str) -> None:
+def test_group_key_for_never_raises(url: object, expected: str) -> None:
     assert group_key_for(url) == expected
+
+
+def test_notice_constants_and_empty_anchor_contract() -> None:
+    assert OPS_REACTIVATE_PREFIX == "ops_react_"
+    assert OPS_DELETE_PREFIX == "ops_del_"
+    assert OPS_DELETE_CONFIRM_PREFIX == "ops_delok_"
+
+    empty = NoticeGroup("suspended", 1, "example.com", ())
+    with pytest.raises(ValueError, match="at least one"):
+        _ = empty.anchor_product_id
 
 
 def test_collector_deduplicates_by_event_and_product_with_last_value_winning() -> None:
@@ -96,3 +117,21 @@ def test_primary_reason_uses_frequency_then_alphabetical_order() -> None:
     unknown.add(_event(reason="zzz"))
     assert unknown.groups()[0].primary_reason == "zzz"
     assert NoticeCollector().groups() == []
+
+
+@pytest.mark.parametrize(
+    ("reasons", "expected"),
+    [
+        ([None], "unknown"),
+        ([None, "zzz"], "unknown"),
+        ([None, "listing_gone"], "listing_gone"),
+    ],
+)
+def test_primary_reason_normalizes_none_before_tie_breaking(
+    reasons: list[str | None], expected: str
+) -> None:
+    collector = NoticeCollector()
+    for product_id, reason in enumerate(reasons, 1):
+        collector.add(_event(product_id=product_id, reason=reason))
+
+    assert collector.groups()[0].primary_reason == expected

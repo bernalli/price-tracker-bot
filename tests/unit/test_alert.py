@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import gettext
+import html
 from decimal import Decimal
+from xml.etree import ElementTree
 
 import pytest
 
@@ -17,7 +19,14 @@ from price_tracker.core.alert import (
     operational_buttons,
 )
 from price_tracker.core.notices import NoticeGroup, OperationalEvent
-from price_tracker.core.textlimits import visible_length
+from price_tracker.core.textlimits import (
+    DOMAIN_BUDGET,
+    ERROR_BUDGET,
+    NAME_BUDGET,
+    split_message,
+    truncate_visible,
+    visible_length,
+)
 
 
 def _operational_event(
@@ -273,6 +282,45 @@ def test_operational_notice_escapes_html_and_handles_missing_last_error() -> Non
     assert "<code>unknown</code>" in text
 
 
+def test_operational_notice_keeps_user_values_inside_one_html_row() -> None:
+    text = format_operational_notice(
+        _group(
+            _operational_event(
+                name="Widget\nInjected",
+                domain="shop\n.example",
+                last_error="failure\nline",
+            )
+        )
+    )
+
+    assert "Widget Injected" in text
+    assert "shop .example" in text
+    assert "failure line" in text
+    for line in text.splitlines():
+        assert line.count("<b>") == line.count("</b>")
+        assert line.count("<code>") == line.count("</code>")
+
+
+def test_long_alert_with_newline_never_splits_inside_html_tag() -> None:
+    alert = PriceAlert(
+        product_id=1,
+        product_name="a" * 3984 + "\n" + "z",
+        url="https://example.com",
+        old_price=Decimal("2"),
+        new_price=Decimal("1"),
+        currency="EUR",
+        threshold_type="any_drop",
+        threshold_value=Decimal("0"),
+    )
+
+    chunks = split_message(format_alert(alert))
+
+    assert len(chunks) > 1
+    assert all(visible_length(chunk) <= 4000 for chunk in chunks)
+    for chunk in chunks:
+        ElementTree.fromstring(f"<root>{chunk}</root>")
+
+
 def test_operational_notice_budgets_cap_and_balanced_html() -> None:
     domain = "d" * 150
     group = _group(
@@ -314,6 +362,91 @@ def test_warning_notice_format_and_has_no_buttons() -> None:
     assert "10/10" in text
     assert "/errori" in text
     assert operational_buttons(group) == []
+
+
+@pytest.mark.parametrize(
+    ("reason", "title", "callbacks"),
+    [
+        ("listing_gone", "Listings removed on", ["ops_del_1", "ops_react_1"]),
+        ("parse_error", "Price unreadable on", ["ops_react_1", "ops_del_1"]),
+        ("price_none", "Price unreadable on", ["ops_react_1", "ops_del_1"]),
+        ("no_scraper", "Price unreadable on", ["ops_react_1", "ops_del_1"]),
+        ("condition_mismatch", "Price unreadable on", ["ops_react_1", "ops_del_1"]),
+        ("implausible_read", "Price unreadable on", ["ops_react_1", "ops_del_1"]),
+        ("http_error", "Site unreachable:", ["ops_react_1", "ops_del_1"]),
+        ("unexpected", "Site unreachable:", ["ops_react_1", "ops_del_1"]),
+        ("block", "Blocked by", ["ops_react_1", "ops_del_1"]),
+        ("unknown_reason", "Tracking suspended on", ["ops_react_1", "ops_del_1"]),
+    ],
+)
+def test_closed_reason_copy_and_exact_callback_contract(
+    reason: str, title: str, callbacks: list[str]
+) -> None:
+    group = _group(_operational_event(reason=reason))
+
+    assert title in format_operational_notice(group)
+    assert [row[0]["callback_data"] for row in operational_buttons(group)] == callbacks
+
+
+def test_renderer_rejects_empty_and_wrong_event_groups() -> None:
+    suspended_empty = NoticeGroup("suspended", 9, "example.com", ())
+    warning_empty = NoticeGroup("warning", 9, "example.com", ())
+
+    with pytest.raises(ValueError, match="at least one"):
+        format_operational_notice(suspended_empty)
+    with pytest.raises(ValueError, match="at least one"):
+        format_warning_notice(warning_empty)
+    with pytest.raises(ValueError, match="suspended"):
+        format_operational_notice(_group(_operational_event(event="warning")))
+    with pytest.raises(ValueError, match="warning"):
+        format_warning_notice(_group(_operational_event()))
+
+
+def test_every_external_field_is_truncated_then_escaped() -> None:
+    external = "&<>" * 100
+    text = format_operational_notice(
+        _group(
+            _operational_event(
+                name=external,
+                domain=external,
+                last_error=external,
+            )
+        )
+    )
+
+    assert html.escape(truncate_visible(external, NAME_BUDGET), quote=True) in text
+    assert html.escape(truncate_visible(external, DOMAIN_BUDGET), quote=True) in text
+    assert html.escape(truncate_visible(external, ERROR_BUDGET), quote=True) in text
+    assert html.escape(external, quote=True) not in text
+    ElementTree.fromstring(f"<root>{text}</root>")
+
+
+def test_price_and_translated_why_have_exact_visible_budgets(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import price_tracker.core.alert as alert_module
+
+    monkeypatch.setattr(
+        alert_module,
+        "_",
+        lambda text: "w" * 100 if text == "blocked" else text,
+    )
+    text = format_operational_notice(
+        _group(
+            _operational_event(
+                reason="block",
+                last_price=Decimal("9" * 100),
+                last_checked_at="2026-09-02 12:34:56",
+            )
+        )
+    )
+
+    product_line = next(line for line in text.splitlines() if line.startswith("• "))
+    assert product_line.endswith("w" * 39 + "…")
+    price_line = next(line for line in text.splitlines() if line.startswith("Last good read:"))
+    rendered_price = price_line.removeprefix("Last good read: ").rsplit(" on ", 1)[0].rstrip()
+    assert visible_length(rendered_price) == 24
+    assert rendered_price.endswith("…")
 
 
 def test_operational_notice_it_locale(fake_catalog: None) -> None:

@@ -45,7 +45,7 @@ class OperationalEvent:
     product_name: str
     url: str
     group_key: str
-    reason: str
+    reason: str | None
     detail: str | None
     last_error: str | None
     error_count: int
@@ -76,7 +76,9 @@ class NoticeGroup:
         """Return the most common reason, breaking ties alphabetically."""
         if not self.events:
             return "unknown"
-        counts = Counter(event.reason for event in self.events)
+        counts = Counter(
+            event.reason if isinstance(event.reason, str) else "unknown" for event in self.events
+        )
         return min(counts, key=lambda reason: (-counts[reason], reason))
 
 

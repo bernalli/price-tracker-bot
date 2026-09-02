@@ -47,7 +47,10 @@ def _currency_symbol(currency: str) -> str:
 
 
 def _escape_html(text: str) -> str:
-    return html.escape(str(text), quote=True)
+    # User- and site-controlled values must remain inside one renderer row:
+    # split_message uses newline boundaries and must never split an open tag.
+    single_line = str(text).replace("\r", " ").replace("\n", " ")
+    return html.escape(single_line, quote=True)
 
 
 _UNREADABLE_COPY = (
