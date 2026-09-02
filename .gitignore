@@ -53,6 +53,3 @@ messages.pot
 # OS
 .DS_Store
 Thumbs.db
-
-# internal docs — not published
-docs/notes/
