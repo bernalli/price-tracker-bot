@@ -16,8 +16,10 @@ import httpx
 import pytest
 import pytest_asyncio
 
+from price_tracker.core.alert import format_operational_notice
 from price_tracker.core.exceptions import ListingGone, ParseError
 from price_tracker.core.health import HealthManager
+from price_tracker.core.notices import NoticeCollector, NoticeGroup
 from price_tracker.core.registry import ScraperRegistry
 from price_tracker.core.scheduler import Scheduler, SchedulerDeps, _failure_reason
 from price_tracker.core.scraper_base import AbstractScraper, ProductInfo
@@ -561,7 +563,7 @@ async def test_scheduler_skips_inactive_product(
         )
         # Call _check_product directly: list_products_for_user(only_active=True)
         # would skip the inactive product upstream; we want to hit line 69.
-        await scheduler._check_product(pid)
+        await scheduler._check_product(pid, collector=NoticeCollector())
     assert stub.calls == 0
 
 
@@ -639,9 +641,11 @@ async def test_scheduler_skips_locked_domain(
     scheduler: Scheduler = scheduler_factory(health_mgr=health_mgr)
     products = [p for p in sample_products if "shop-a.com" in p.url]
     scrape_calls: list[str] = []
-    scheduler._scrape_one = AsyncMock(side_effect=lambda p: scrape_calls.append(p.url))
+    scheduler._scrape_one = AsyncMock(
+        side_effect=lambda p, *, collector: scrape_calls.append(p.url)
+    )
 
-    await scheduler._run_tick(products)
+    await scheduler._run_tick(products, collector=NoticeCollector())
 
     assert scrape_calls == []  # all shop-a products skipped
 
@@ -661,8 +665,8 @@ async def test_scheduler_half_open_sends_only_one_probe(
     assert len(shop_a_products) >= 2  # ensure multiple products on same domain
 
     calls: list[str] = []
-    scheduler._scrape_one = AsyncMock(side_effect=lambda p: calls.append(p.url))
-    await scheduler._run_tick(shop_a_products)
+    scheduler._scrape_one = AsyncMock(side_effect=lambda p, *, collector: calls.append(p.url))
+    await scheduler._run_tick(shop_a_products, collector=NoticeCollector())
 
     assert len(calls) == 1  # only one probe per half-open domain per tick
 
@@ -691,7 +695,7 @@ async def test_scheduler_sets_jobs_active_gauge(
     scheduler: Scheduler = scheduler_factory(metrics=metrics)
     scheduler._scrape_one = AsyncMock(return_value=None)
 
-    await scheduler._run_tick(sample_products[:1])
+    await scheduler._run_tick(sample_products[:1], collector=NoticeCollector())
 
     jobs_active = sum(
         sample.value
@@ -717,7 +721,7 @@ async def test_scheduler_emits_quarantine_skip_total(
     health_mgr.is_locked = lambda _d: True
     health_mgr.is_half_open = lambda _d: False
     scheduler: Scheduler = scheduler_factory(metrics=metrics, health_mgr=health_mgr)
-    await scheduler._run_tick(sample_products[:3])
+    await scheduler._run_tick(sample_products[:3], collector=NoticeCollector())
     total = sum(
         sample.value
         for metric in reg.collect()
@@ -917,9 +921,10 @@ async def test_product_auto_disabled_after_max_consecutive_errors(
     repo_with_product: tuple[Repository, int],
 ) -> None:
     """Push mode: once a product accumulates ``max_consecutive_errors`` failures,
-    the scheduler must (1) deactivate the product, (2) push a single
-    ``Tracking suspended`` notification, and (3) stop retrying it on subsequent
-    ticks (because ``list_products_for_user(only_active=True)`` filters it out).
+    the scheduler must keep it active with a non-suspension pre-warning before
+    the threshold, then (1) deactivate it, (2) push one suspension notice, and
+    (3) stop retrying it on subsequent ticks (because
+    ``list_products_for_user(only_active=True)`` filters it out).
     """
     repo, pid = repo_with_product
     registry = ScraperRegistry()
@@ -936,33 +941,49 @@ async def test_product_auto_disabled_after_max_consecutive_errors(
                 delay_between_products=0.0,
             )
         )
-        # Tick 1: increment 1 → still active, no notification yet
+        # Tick 1: increment 1 → still active. With max=2 this is the
+        # half-threshold pre-warning, never a suspension.
         await scheduler.run_check_for_user(user_id=1)
         p_after_1 = await repo.get_product(pid)
         assert p_after_1 is not None
         assert p_after_1.consecutive_errors == 1
         assert p_after_1.is_active is True
-        notifier.assert_not_awaited()
+        assert notifier.await_count == 1
+        first_payloads = [call.kwargs["payload"] for call in notifier.await_args_list]
+        assert all(
+            payload is not None and payload["event"] != "suspended" for payload in first_payloads
+        )
+        assert first_payloads[0]["event"] == "warning"
         # Tick 2: increment 2 → hits threshold → deactivate + notify
         await scheduler.run_check_for_user(user_id=1)
         p_after_2 = await repo.get_product(pid)
         assert p_after_2 is not None
         assert p_after_2.consecutive_errors == 2
         assert p_after_2.is_active is False
-        notifier.assert_awaited_once()
-        # Verify notifier received the user_id and a "Tracking suspended" message
+        assert notifier.await_count == 2
+        # The notice is operational, has no product owner, and carries only the
+        # closed group payload that the notifier/digest consumers share.
         call_args = notifier.await_args
         assert call_args is not None
         sent_user_id, sent_message = call_args.args
         assert sent_user_id == 1
-        assert "Tracking suspended" in sent_message
-        assert "2/2" in sent_message
+        assert "Site unreachable" in sent_message
+        assert "Error: <code>http_error: simulated network failure</code>" in sent_message
+        assert call_args.kwargs["product_id"] is None
+        payload = call_args.kwargs["payload"]
+        assert payload is not None
+        assert payload["kind"] == "operational"
+        assert payload["event"] == "suspended"
+        assert payload["product_ids"] == [pid]
+        assert payload["products"][0]["id"] == pid
+        assert len(payload["buttons"]) == 2
+        assert "product_id" not in payload
         # Tick 3: only_active filter hides the product → no new scrape, no new notify
         await scheduler.run_check_for_user(user_id=1)
         p_after_3 = await repo.get_product(pid)
         assert p_after_3 is not None
         assert p_after_3.consecutive_errors == 2  # unchanged
-        notifier.assert_awaited_once()  # still exactly one
+        assert notifier.await_count == 2  # warning + suspension, still exactly once each
 
 
 @pytest.mark.asyncio
@@ -971,8 +992,8 @@ async def test_check_user_products_for_user_marks_disabled_on_threshold(
 ) -> None:
     """Pull mode: when a product is auto-disabled mid-batch, the returned
     :class:`CheckResult` must carry ``disabled=True`` so the interactive
-    handler can render a visual cue in the summary. The notifier is also
-    invoked once so the user gets a persistent push record of the suspension.
+    handler can render a visual cue in the summary. The pre-warning and the
+    later suspension are both delivered as distinct operational events.
     """
     repo, pid = repo_with_product
     registry = ScraperRegistry()
@@ -993,18 +1014,332 @@ async def test_check_user_products_for_user_marks_disabled_on_threshold(
         assert len(results_1) == 1
         assert results_1[0].alert is None
         assert results_1[0].disabled is False  # not yet at threshold
-        notifier.assert_not_awaited()
+        assert notifier.await_count == 1
+        first_payloads = [call.kwargs["payload"] for call in notifier.await_args_list]
+        assert all(
+            payload is not None and payload["event"] != "suspended" for payload in first_payloads
+        )
+        assert first_payloads[0]["event"] == "warning"
 
         results_2 = await scheduler.check_user_products_for_user(user_id=1)
         assert len(results_2) == 1
         assert results_2[0].alert is None
         assert results_2[0].disabled is True  # hit threshold this tick
-        notifier.assert_awaited_once()
+        assert notifier.await_count == 2
+        suspension_payloads = [
+            call.kwargs["payload"]
+            for call in notifier.await_args_list
+            if call.kwargs["payload"] is not None and call.kwargs["payload"]["event"] == "suspended"
+        ]
+        assert len(suspension_payloads) == 1
 
     p = await repo.get_product(pid)
     assert p is not None
     assert p.is_active is False
     assert p.consecutive_errors == 2
+
+
+@pytest.mark.asyncio
+async def test_default_error_threshold_warns_at_half_and_suspends_at_end(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    """The production threshold warns after five failures and suspends after ten."""
+    repo, pid = repo_with_product
+    registry = ScraperRegistry()
+    registry.register(_RaisingScraper())
+    notifier = AsyncMock()
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=notifier,
+                delay_between_products=0.0,
+            )
+        )
+
+        for _ in range(4):
+            await scheduler.run_check_for_user(user_id=1)
+        assert notifier.await_count == 0
+
+        await scheduler.run_check_for_user(user_id=1)
+        p_after_5 = await repo.get_product(pid)
+        assert p_after_5 is not None
+        assert p_after_5.is_active is True
+        assert p_after_5.consecutive_errors == 5
+        assert notifier.await_count == 1
+        warning_call = notifier.await_args
+        assert warning_call is not None
+        warning_payload = warning_call.kwargs["payload"]
+        assert warning_payload is not None
+        assert warning_payload["kind"] == "operational"
+        assert warning_payload["event"] == "warning"
+        assert warning_payload["error_count"] == 5
+        assert warning_payload["max_errors"] == 10
+
+        for _ in range(4):
+            await scheduler.run_check_for_user(user_id=1)
+        p_after_9 = await repo.get_product(pid)
+        assert p_after_9 is not None
+        assert p_after_9.is_active is True
+        assert p_after_9.consecutive_errors == 9
+        assert notifier.await_count == 1
+
+        await scheduler.run_check_for_user(user_id=1)
+        p_after_10 = await repo.get_product(pid)
+        assert p_after_10 is not None
+        assert p_after_10.is_active is False
+        assert p_after_10.consecutive_errors == 10
+        suspension_call = notifier.await_args
+        assert suspension_call is not None
+        suspension_payload = suspension_call.kwargs["payload"]
+        assert suspension_payload is not None
+        assert suspension_payload["kind"] == "operational"
+        assert suspension_payload["event"] == "suspended"
+        assert suspension_payload["error_count"] == 10
+        assert suspension_payload["max_errors"] == 10
+
+
+@pytest.mark.asyncio
+async def test_failure_event_in_empty_collector_is_flushed(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    """An explicit, initially empty collector retains the failure event for flush."""
+    repo, pid = repo_with_product
+    registry = ScraperRegistry()
+    notifier = AsyncMock()
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=notifier,
+                max_consecutive_errors=1,
+            )
+        )
+        product = await repo.get_product(pid)
+        assert product is not None
+        collector = NoticeCollector()
+
+        disabled = await scheduler._record_failure_and_maybe_disable(
+            product,
+            scraper_name="stub",
+            domain="example.com",
+            reason="parse_error",
+            detail="broken listing",
+            collector=collector,
+        )
+
+        assert disabled is True
+        assert len(collector) == 1
+        await scheduler._flush_notices(collector)
+
+    notifier.assert_awaited_once()
+    call_args = notifier.await_args
+    assert call_args is not None
+    payload = call_args.kwargs["payload"]
+    assert payload is not None
+    assert payload["product_ids"] == [pid]
+
+
+@pytest.mark.asyncio
+async def test_five_products_same_domain_emit_one_operational_notice(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    repo, first_id = repo_with_product
+    for number in range(2, 6):
+        await repo.add_product(
+            user_id=1,
+            url=f"https://shop.example.com/p/{number}",
+            name=f"Widget {number}",
+            domain="example.com",
+            initial_price=Decimal("100"),
+            currency="EUR",
+        )
+    registry = ScraperRegistry()
+    registry.register(_RaisingScraper())
+    notifier = AsyncMock()
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=notifier,
+                max_consecutive_errors=1,
+                delay_between_products=0.0,
+            )
+        )
+        await scheduler.run_check_for_user(user_id=1)
+    assert notifier.await_count == 1
+    call_args = notifier.await_args
+    assert call_args is not None
+    payload = call_args.kwargs["payload"]
+    assert payload is not None
+    assert payload["product_ids"] == list(range(first_id, first_id + 5))
+
+
+@pytest.mark.asyncio
+async def test_warning_is_operational_and_exactly_once_per_episode(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    repo, pid = repo_with_product
+    registry = ScraperRegistry()
+    registry.register(_RaisingScraper())
+    notifier = AsyncMock()
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=notifier,
+                max_consecutive_errors=4,
+                delay_between_products=0.0,
+            )
+        )
+        await scheduler.run_check_for_user(user_id=1)
+        notifier.assert_not_awaited()
+        await scheduler.run_check_for_user(user_id=1)
+        await scheduler.run_check_for_user(user_id=1)
+    assert notifier.await_count == 1
+    call_args = notifier.await_args
+    assert call_args is not None
+    payload = call_args.kwargs["payload"]
+    assert payload is not None
+    assert payload["kind"] == "operational"
+    assert payload["event"] == "warning"
+    assert payload["product_ids"] == [pid]
+    assert payload["buttons"] == []
+
+
+@pytest.mark.asyncio
+async def test_check_one_product_for_user_flushes_listing_gone_notice(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    repo, pid = repo_with_product
+    registry = ScraperRegistry()
+    registry.register(_ScriptedScraper([ListingGone(status=404, url="https://example.com/p/1")]))
+    notifier = AsyncMock()
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=notifier,
+                max_consecutive_errors=10,
+                listing_gone_confirmations=1,
+                delay_between_products=0.0,
+            )
+        )
+        result = await scheduler.check_one_product_for_user(product_id=pid, user_id=1)
+    assert result.disabled is True
+    assert result.reason == "listing_gone"
+    assert notifier.await_count == 1
+    call_args = notifier.await_args
+    assert call_args is not None
+    payload = call_args.kwargs["payload"]
+    assert payload is not None
+    assert payload["event"] == "suspended"
+    assert payload["reason"] == "listing_gone"
+
+
+@pytest.mark.asyncio
+async def test_check_products_for_user_skips_foreign_and_missing_ids(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    repo, own_id = repo_with_product
+    await repo.ensure_user(user_id=2)
+    foreign_id = await repo.add_product(
+        user_id=2,
+        url="https://example.net/p/1",
+        name="Foreign",
+        domain="example.net",
+        initial_price=Decimal("100"),
+        currency="EUR",
+    )
+    registry = ScraperRegistry()
+    registry.register(_StubScraper(ProductInfo(name="Widget", price=Decimal("80"), currency="EUR")))
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(repo=repo, registry=registry, client=client, notifier=AsyncMock())
+        )
+        results = await scheduler.check_products_for_user(
+            product_ids=[999_999, foreign_id, own_id], user_id=1, delay_between_products=0.0
+        )
+    assert [result.product_id for result in results] == [own_id]
+
+
+@pytest.mark.asyncio
+async def test_notifier_failure_and_render_failure_do_not_abort_other_groups(
+    repo_with_product: tuple[Repository, int], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo, _pid = repo_with_product
+    await repo.add_product(
+        user_id=1,
+        url="https://other.example.net/p/2",
+        name="Other",
+        domain="example.net",
+        initial_price=Decimal("100"),
+        currency="EUR",
+    )
+    registry = ScraperRegistry()
+    registry.register(_RaisingScraper())
+    notifier = AsyncMock(return_value=False)
+    original_render = format_operational_notice
+
+    def fail_first_group(group: NoticeGroup) -> str:
+        if group.group_key == "example.com":
+            raise RuntimeError("render failed")
+        return original_render(group)
+
+    monkeypatch.setattr("price_tracker.core.scheduler.format_operational_notice", fail_first_group)
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=notifier,
+                max_consecutive_errors=1,
+                delay_between_products=0.0,
+            )
+        )
+        await scheduler.run_check_for_user(user_id=1)
+    assert notifier.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_flush_restores_locale_after_render_failure(
+    repo_with_product: tuple[Repository, int], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from price_tracker.bot.messages import _, set_locale
+
+    repo, _pid = repo_with_product
+    registry = ScraperRegistry()
+    registry.register(_RaisingScraper())
+    monkeypatch.setattr(
+        "price_tracker.core.scheduler.format_operational_notice",
+        lambda _group: (_ for _ in ()).throw(RuntimeError("render failed")),
+    )
+    set_locale("en")
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=AsyncMock(),
+                max_consecutive_errors=1,
+                delay_between_products=0.0,
+                lang="it",
+            )
+        )
+        await scheduler.run_check_for_user(user_id=1)
+    assert _("❌ Invalid ID.") == "❌ Invalid ID."
 
 
 @pytest.mark.asyncio
@@ -1628,13 +1963,13 @@ async def test_scheduler_notifies_once_on_quarantine_entry(
         )
         product = await repo.get_product(pid)
         assert product is not None
-        await scheduler._scrape_one(product)
+        await scheduler._scrape_one(product, collector=NoticeCollector())
         assert notifier.await_count == 0  # block 1: still CLOSED
-        await scheduler._scrape_one(product)
+        await scheduler._scrape_one(product, collector=NoticeCollector())
         assert notifier.await_count == 0  # block 2: still CLOSED
-        await scheduler._scrape_one(product)
+        await scheduler._scrape_one(product, collector=NoticeCollector())
         assert notifier.await_count == 1  # block 3: CLOSED→LOCKED_T1 → notify once
-        await scheduler._scrape_one(product)
+        await scheduler._scrape_one(product, collector=NoticeCollector())
         assert notifier.await_count == 1  # still locked → no re-notify
 
     assert notifier.await_args is not None
