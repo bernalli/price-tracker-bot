@@ -329,7 +329,7 @@ class TestDetectBlockEvent:
         (PayPal/bot-management bootstrap) on EVERY storefront — it is not a challenge.
 
         The over-broad ``id="captcha*"`` fingerprint falsely quarantined
-        fillingpieces/clae/xteink for 2+ days (LOCKED_T3). A benign bootstrap
+        shop-b/clae/shop-a for 2+ days (LOCKED_T3). A benign bootstrap
         ``<script>`` on a full HTTP-200 product page must NOT be a block.
         """
         body = (
@@ -345,7 +345,7 @@ class TestDetectBlockEvent:
         detect_block_event(
             status_code=200,
             body=body,
-            url="https://www.fillingpieces.com/products/riviera-weave",
+            url="https://www.shop-b.com/products/riviera-weave",
         )
 
     def test_real_captcha_div_container_still_blocks(self):
@@ -367,9 +367,9 @@ async def test_scraper_base_invokes_health_on_block_event():
     from price_tracker.core.scraper_base import handle_block_in_pipeline
 
     health_mgr = AsyncMock()
-    exc = HTTPBlockStatus(status=429, url="https://xteink.com/p/1")
-    await handle_block_in_pipeline(exc, health_mgr=health_mgr, domain="xteink.com")
-    health_mgr.record_block.assert_awaited_once_with("xteink.com", reason="HTTP 429")
+    exc = HTTPBlockStatus(status=429, url="https://shop-a.com/p/1")
+    await handle_block_in_pipeline(exc, health_mgr=health_mgr, domain="shop-a.com")
+    health_mgr.record_block.assert_awaited_once_with("shop-a.com", reason="HTTP 429")
 
 
 @pytest.mark.asyncio

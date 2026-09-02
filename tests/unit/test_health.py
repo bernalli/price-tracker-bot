@@ -35,9 +35,9 @@ class TestHealthManagerStateMachine:
         mgr = HealthManager(repo=repo_mock)
         await mgr.load()
         for _ in range(3):
-            await mgr.record_block("xteink.com", reason="HTTP 429")
-        assert mgr.state("xteink.com") == QuarantineState.LOCKED_T1
-        assert mgr.is_locked("xteink.com")
+            await mgr.record_block("shop-a.com", reason="HTTP 429")
+        assert mgr.state("shop-a.com") == QuarantineState.LOCKED_T1
+        assert mgr.is_locked("shop-a.com")
 
     @pytest.mark.asyncio
     async def test_two_blocks_stays_closed(self, repo_mock):
