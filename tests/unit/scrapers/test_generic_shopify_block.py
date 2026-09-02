@@ -132,3 +132,35 @@ async def test_generic_curl_403_falls_back_to_httpx_success(
             info = await GenericScraper().scrape(url, client)
     assert info.error is None
     assert info.price is not None
+
+
+# ── #16 follow-up: Shopify was left behind when Generic got the fix ──
+
+
+@pytest.mark.parametrize("status", [403, 429])
+async def test_shopify_fetch_html_surfaces_block_status(status: int) -> None:
+    """A Shopify HTTP block must reach the scheduler as a BlockEvent.
+
+    Generic already raises before ``raise_for_status``; Shopify did not, so the
+    status became an ``HTTPStatusError`` that ``_fetch_html`` swallowed into
+    ``None``. The domain was never quarantined and every product on it burned
+    its own per-product error budget instead.
+    """
+    url = f"https://shop.example/products/status-{status}"
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).respond(status, text="blocked")
+        async with httpx.AsyncClient() as client:
+            with pytest.raises(HTTPBlockStatus) as exc_info:
+                await ShopifyScraper._fetch_html(url, client)
+    assert exc_info.value.status == status
+
+
+async def test_shopify_scrape_propagates_block_to_caller() -> None:
+    """Both Shopify paths blocked → BlockEvent out of scrape(), not ProductInfo."""
+    url = "https://shop.example/products/blocked"
+    with respx.mock(assert_all_called=False) as router:
+        router.get(f"{url}.json").respond(429, text="blocked")
+        router.get(url).respond(429, text="blocked")
+        async with httpx.AsyncClient() as client:
+            with pytest.raises(BlockEvent):
+                await ShopifyScraper().scrape(url, client)

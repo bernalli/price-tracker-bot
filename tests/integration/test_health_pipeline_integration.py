@@ -4,7 +4,7 @@ Bug observed in prod (2026-05-22): the ``scraper_health`` table stays empty
 forever because :class:`Scheduler` only *consumes* HealthManager state
 (``is_locked``/``is_half_open``) but never *produces* it via ``record_success``
 or ``record_block``. Auto-quarantine therefore never engages — even a domain
-returning HTTP 429 in a loop (Bug #1) was not quarantined.
+returning HTTP 429 in a loop (Bug #1) would not be quarantined.
 
 These tests exercise the full pipeline against a real Repository so that any
 future regression that removes the pipeline hooks fails CI.
