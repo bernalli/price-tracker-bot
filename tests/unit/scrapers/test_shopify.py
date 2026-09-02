@@ -108,7 +108,7 @@ async def test_shopify_block_on_currency_html_does_not_discard_json_price() -> N
     """When the JSON API already yielded a price, a BlockEvent raised by the
     currency-only HTML fetch must NOT discard the scrape.
 
-    Root cause of the fillingpieces/clae/xteink quarantine: scrape() got the
+    Root cause of the three Shopify stores quarantine: scrape() got the
     price from JSON, then fetched the HTML purely to detect currency; a block on
     that body propagated out of scrape() and poisoned an already-successful
     result, feeding the domain quarantine.
@@ -163,8 +163,16 @@ async def test_shopify_handles_404_on_html(monkeypatch: pytest.MonkeyPatch) -> N
 
 
 @pytest.mark.asyncio
-async def test_shopify_handles_429_after_retries(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Both JSON API and HTML return 429 → after retries, error."""
+async def test_shopify_handles_server_error_after_retries(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Both paths return 5xx → a generic error, and no block is claimed.
+
+    Deliberately a 500 and not a 429: a 403/429 is a *block* and must leave the
+    scraper as a BlockEvent so the domain gets quarantined — that contract is
+    covered in ``test_generic_shopify_block.py``. A 5xx is the site being
+    broken, which is the per-product failure this test pins down.
+    """
     scraper = ShopifyScraper()
     url = "https://shop.example.com/products/rate"
     json_url = "https://shop.example.com/products/rate.json"
@@ -181,8 +189,8 @@ async def test_shopify_handles_429_after_retries(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(shopify_module, "_fetch_shopify_json", _fast_json)
 
     with respx.mock(assert_all_called=False) as router:
-        router.get(json_url).respond(429)
-        router.get(url).respond(429)
+        router.get(json_url).respond(500)
+        router.get(url).respond(500)
         async with httpx.AsyncClient() as client:
             info = await scraper.scrape(url, client)
 

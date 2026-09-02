@@ -37,6 +37,10 @@ async def _fetch_shopify_response(url: str, client: httpx.AsyncClient) -> httpx.
     """Single GET attempt with browser headers. Tenacity handles retries."""
     headers = get_headers()
     response = await client.get(url, headers=headers, follow_redirects=True)
+    # Surface 403/429 (and WAF/CAPTCHA bodies) as a BlockEvent BEFORE
+    # raise_for_status, so the scheduler quarantines the domain instead of
+    # recording a generic failure (#16). with_retry never retries BlockEvents.
+    detect_block_event(status_code=response.status_code, body=response.text, url=url)
     response.raise_for_status()
     return response
 
@@ -77,8 +81,10 @@ class ShopifyScraper(AbstractScraper):
     domain_patterns: ClassVar[list[re.Pattern[str]]] = []
 
     # Known Shopify domains (extend as discovered)
+    # Seeded with well-known Shopify storefronts. It is a shortcut, not the
+    # contract: any URL carrying a /products/<handle> path is handled anyway,
+    # so a store missing from here still resolves to this scraper.
     KNOWN_SHOPIFY_DOMAINS: ClassVar[set[str]] = {
-        "fillingpieces.com",
         "allbirds.com",
         "gymshark.com",
         "colourpop.com",
@@ -86,7 +92,6 @@ class ShopifyScraper(AbstractScraper):
         "kith.com",
         "bombas.com",
         "brooklinen.com",
-        "decodedgear.com",
     }
 
     def can_handle(self, url: str) -> bool:
@@ -112,7 +117,7 @@ class ShopifyScraper(AbstractScraper):
                 # Detect currency from HTML page (JSON-LD, OG tags). This fetch is
                 # enrichment ONLY: the price is already in hand. A challenge/block
                 # marker in the HTML must NOT discard a valid scrape (it falsely
-                # quarantined fillingpieces/clae/xteink), so swallow BlockEvent and
+                # quarantined three Shopify stores), so swallow BlockEvent and
                 # fall back to the default currency.
                 try:
                     html = await self._fetch_html(url, client)

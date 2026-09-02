@@ -4,8 +4,8 @@
 
 # price-tracker-bot
 
-[![CI](https://github.com/SVM-98/price-tracker-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/SVM-98/price-tracker-bot/actions/workflows/ci.yml)
-[![Security](https://github.com/SVM-98/price-tracker-bot/actions/workflows/security.yml/badge.svg)](https://github.com/SVM-98/price-tracker-bot/actions/workflows/security.yml)
+[![CI](https://github.com/bernalli/price-tracker-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/bernalli/price-tracker-bot/actions/workflows/ci.yml)
+[![Security](https://github.com/bernalli/price-tracker-bot/actions/workflows/security.yml/badge.svg)](https://github.com/bernalli/price-tracker-bot/actions/workflows/security.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 
@@ -44,7 +44,7 @@ Self-hosted Telegram bot for multi-site price tracking with auto-quarantine, str
 ## Quick start
 
 ```bash
-git clone https://github.com/SVM-98/price-tracker-bot.git
+git clone https://github.com/bernalli/price-tracker-bot.git
 cd price-tracker-bot
 cp .env.example .env
 # edit .env: set TELEGRAM_BOT_TOKEN and ALLOWED_USERS
@@ -63,7 +63,10 @@ All configuration is via environment variables. Copy `.env.example` to `.env` an
 | `TELEGRAM_BOT_TOKEN`    | (required)               | Telegram bot API token                                                           |
 | `ALLOWED_USERS`         | (required)               | Comma-separated Telegram user IDs authorized to use the bot (first listed becomes admin) |
 | `DATABASE_PATH`         | `/data/pricetracker.db`  | SQLite database path                                                             |
-| `LANG`                  | `en`                     | Default locale fallback when Telegram language_code missing                      |
+| `LOCALE`                | `en`                     | Default locale fallback when the Telegram `language_code` is missing             |
+| `CHECK_INTERVAL_MINUTES`| `360`                    | Global sweep interval                                                            |
+| `MAX_CONSECUTIVE_ERRORS`| `10`                     | Failed checks before a product is auto-suspended                                 |
+| `READ_CONFIRMATIONS`    | `3`                      | Agreeing checks required before an implausible price raises an alert             |
 | `PROMETHEUS_BIND`       | `127.0.0.1:9090`         | Prometheus exporter bind address (host:port)                                     |
 | `LOG_LEVEL`             | `INFO`                   | structlog log level                                                              |
 
@@ -71,36 +74,50 @@ See [docs/operations.md](docs/operations.md) for full operational reference.
 
 ## Commands
 
-### Monitoring
-- `/start` — register and view main menu
-- `/list` — list tracked products with current prices
-- `/add <url>` — start tracking a product
-- `/remove <product_id>` — stop tracking
-- `/details <product_id>` — full info + price history
-- `/chart <product_id> [days]` — matplotlib price chart
-- `/pause <product_id>` / `/reactivate <product_id>` — temporarily stop checks
-- `/set_interval <product_id> <minutes>` — custom check interval (5 min – 7 days)
+Every command has an English name and, where it existed first, an Italian alias — both
+are registered, so `/list` and `/lista` are the same command.
 
-### Settings
-- `/threshold <product_id> <pct|fixed|target_price>` — alert threshold
-- `/notification_mode <immediate|digest>` — global notification mode
-- `/health` — view scraper health + quarantine status
+### Tracking
+- `/start` — register and view the main menu
+- `/menu` — open the inline menu
+- `/help` — command reference
+- `/add <url>` (`/aggiungi`) — start tracking a product
+- `/list` (`/lista`) — tracked products with current price, drop since tracking start, and per-product buttons
+- `/delete <id>` (`/elimina`) — stop tracking
+- `/check <id>` (`/controlla`) — check one product now
+- `/checkall` — check every product now
+- `/pause <id>` (`/pausa`) / `/reactivate <id>` (`/riattiva`) — suspend and resume checks
+- `/history <id>` (`/storia`) — price history chart
+- `/reset <id>` (`/azzera`) — rebase the reference price to the current one
 
-### Notification preferences (per-user)
-- `/mute <product_id|all> [duration]` — silence alerts
-- `/unmute <product_id|all>` — restore alerts
-- `/digest_mode <on|off>` — batch alerts into periodic digest
-- `/digest_now` — flush pending digest immediately
+### Thresholds and targets
+- `/threshold <id> <pct|off>` (`/soglia`) — percentage alert threshold
+- `/target <id> <price>` — alert when the price reaches this value
+- `/setinterval <id> <minutes>` (`/intervallo`) — per-product check interval
+- `/refresh` — global check interval
+
+### Notification preferences (per user)
+- `/mute <id|all> [duration]` / `/unmute <id|all>` — silence alerts
+- `/digest_mode <on|off>` — batch alerts into a periodic digest
+- `/digest_now` — flush the pending digest immediately
 - `/quiet_hours <HH:MM-HH:MM>` — silent window (timezone-aware)
 - `/timezone <IANA>` — your timezone (e.g. `Europe/Rome`)
 - `/throttle <max_per_hour>` — sliding-window rate limit
-- `/prefs` — view current preferences
+- `/prefs` — current preferences
+
+### Data
+- `/export` (`/esporta`) — CSV export of tracked products
+- `/importa` — import products from a CSV file
+- `/status` (`/stato`) — bot status and counters
+- `/errors` (`/errori`) — recent per-product read failures with the reason
 
 ### Admin
 - `/adduser <telegram_id>` — authorize a user
 - `/removeuser <telegram_id>` — revoke authorization
-- `/users` — list authorized users
-- `/nick <telegram_id> <nickname>` — assign display nickname
+- `/users` (`/utenti`) — list authorized users
+- `/nick <telegram_id> <nickname>` — assign a display nickname
+- `/health` — scraper health and quarantine state
+- `/debug <url>` — run a scraper against a URL without tracking it
 
 ## Supported sites
 
@@ -116,7 +133,7 @@ Drop a custom scraper file in `plugins/<name>.py` (gitignored except `README.md`
 
 ## Localization
 
-Two locales shipped: `en` (source language) and `it` (Italian translation). Runtime selection auto-detects from Telegram `language_code`, falls back to the `LANG` environment variable, then to `en`. To add a translation, see [docs/i18n.md](docs/i18n.md).
+Two locales shipped: `en` (source language) and `it` (Italian translation). Runtime selection auto-detects from Telegram `language_code`, falls back to the `LOCALE` environment variable, then to `en`. To add a translation, see [docs/i18n.md](docs/i18n.md).
 
 ## Project structure
 
@@ -131,13 +148,15 @@ src/price_tracker/
 └── locale/         # gettext catalogs (en, it_IT)
 plugins/            # extension point for custom scrapers
 docs/               # user + contributor documentation
-tests/              # pytest suite (≥430 tests, ≥90% coverage)
+tests/              # pytest suite (714 tests, ≥90% coverage)
 ```
 
 ## Roadmap
 
-- v0.1.0 — first public release (Plan 4 milestone): GitHub push + ghcr.io image
-- post-v0.1.0 — community plugins, additional locales, dashboard variants
+- v0.1.0 — first public release: GitHub + ghcr.io image
+- v0.2.0 — confirmation-based alerting: a single bad scrape can no longer raise a price-drop alert
+- next — grouped operational notifications, per-product check intervals honoured by the scheduler,
+  full UI localisation
 
 ## Contributing
 

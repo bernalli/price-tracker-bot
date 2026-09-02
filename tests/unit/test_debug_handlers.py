@@ -49,7 +49,7 @@ async def test_health_command_renders_locked_and_half_open() -> None:
     records = [
         ScraperHealth(domain="amazon.com", state="CLOSED", last_success_at=now),
         ScraperHealth(
-            domain="xteink.com",
+            domain="shop-a.com",
             state="LOCKED_T3",
             consecutive_blocks=12,
             locked_until=now + timedelta(hours=18, minutes=42),
@@ -72,11 +72,11 @@ async def test_health_command_renders_locked_and_half_open() -> None:
     rendered: str = update.message.reply_html.call_args.args[0]
 
     assert "Scraper Health Report" in rendered
-    assert "xteink.com" in rendered
+    assert "shop-a.com" in rendered
     assert "T3" in rendered
     assert "aliexpress.com" in rendered
     # CLOSED domain either omitted from problem lists or summarised as healthy count
-    assert "xteink.com" in rendered or "Locked" in rendered
+    assert "shop-a.com" in rendered or "Locked" in rendered
     # amazon.com only appears in healthy count summary, not in problem lists
     locked_section = rendered[rendered.find("Locked:") :] if "Locked:" in rendered else ""
     assert "amazon.com" not in locked_section
@@ -264,8 +264,8 @@ async def test_errori_command_lists_products_and_quarantine_state() -> None:
         ProductErrorRow(
             id=39,
             name="Riviera Weave",
-            url="https://www.fillingpieces.com/products/riviera-weave",
-            domain="fillingpieces.com",
+            url="https://www.shop-b.com/products/riviera-weave",
+            domain="shop-b.com",
             consecutive_errors=4,
             last_error="block: CAPTCHA detected (captcha-form)",
             last_error_at=(now - timedelta(minutes=10)).strftime("%Y-%m-%d %H:%M:%S"),
@@ -273,7 +273,7 @@ async def test_errori_command_lists_products_and_quarantine_state() -> None:
     ]
     records = [
         ScraperHealth(
-            domain="fillingpieces.com",
+            domain="shop-b.com",
             state="LOCKED_T3",
             consecutive_blocks=14,
             locked_until=now + timedelta(hours=20),
@@ -288,7 +288,7 @@ async def test_errori_command_lists_products_and_quarantine_state() -> None:
     update.message.reply_html.assert_awaited_once()
     rendered: str = update.message.reply_html.call_args.args[0]
     assert "Riviera Weave" in rendered
-    assert "fillingpieces.com" in rendered
+    assert "shop-b.com" in rendered
     assert "CAPTCHA" in rendered
     assert "4 letture fallite" in rendered
     assert "🔒" in rendered  # quarantine indicator for the locked domain

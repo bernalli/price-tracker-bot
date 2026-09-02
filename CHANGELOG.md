@@ -430,5 +430,5 @@ auto-quarantine, and a plugin extension point.
 - osv-scanner dependency vulnerability scan in CI.
 - Pre-commit hooks block secrets at commit time.
 
-[Unreleased]: https://github.com/SVM-98/price-tracker-bot/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/SVM-98/price-tracker-bot/releases/tag/v0.1.0
+[Unreleased]: https://github.com/bernalli/price-tracker-bot/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/bernalli/price-tracker-bot/releases/tag/v0.1.0

@@ -400,7 +400,7 @@ _WAF_FINGERPRINTS: tuple[tuple[str, re.Pattern[str]], ...] = (
 # <script>. Anchoring to those tags avoids matching the benign
 # `<script id="captcha-bootstrap">` that Shopify injects on every storefront
 # (PayPal/bot-management bootstrap) — the over-broad `id="captcha*"` pattern
-# falsely quarantined fillingpieces/clae/xteink for days (2026-06-13). The
+# falsely quarantined three live Shopify stores for days (2026-06-13). The
 # `[^>]{0,200}` cannot cross a `>`, so the match stays within a single tag.
 _CAPTCHA_CHALLENGE_RE = re.compile(
     r'<(?:form|div|iframe)\b[^>]{0,200}\bid\s*=\s*["\']captcha[\w-]*',
