@@ -36,7 +36,7 @@ def test_split_message_preserves_balanced_rows_under_safe_limit() -> None:
     for chunk in chunks:
         assert chunk.count("<b>") == chunk.count("</b>")
         assert chunk.count("<code>") == chunk.count("</code>")
-        assert len(re.findall(r"<a\\s", chunk)) == chunk.count("</a>")
+        assert len(re.findall(r"<a\s", chunk)) == chunk.count("</a>")
 
 
 def test_split_message_degrades_an_oversized_single_line() -> None:
