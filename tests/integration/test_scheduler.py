@@ -521,17 +521,17 @@ async def test_scheduler_skips_locked_domain(
     sample_products: list[ProductRecord],
 ) -> None:
     health_mgr: HealthManager = AsyncMock(spec=HealthManager)
-    health_mgr.is_locked = lambda d: d == "xteink.com"
+    health_mgr.is_locked = lambda d: d == "shop-a.com"
     health_mgr.is_half_open = lambda d: False
 
     scheduler: Scheduler = scheduler_factory(health_mgr=health_mgr)
-    products = [p for p in sample_products if "xteink.com" in p.url]
+    products = [p for p in sample_products if "shop-a.com" in p.url]
     scrape_calls: list[str] = []
     scheduler._scrape_one = AsyncMock(side_effect=lambda p: scrape_calls.append(p.url))
 
     await scheduler._run_tick(products)
 
-    assert scrape_calls == []  # all xteink products skipped
+    assert scrape_calls == []  # all shop-a products skipped
 
 
 @pytest.mark.asyncio
@@ -541,16 +541,16 @@ async def test_scheduler_half_open_sends_only_one_probe(
 ) -> None:
     health_mgr: HealthManager = AsyncMock(spec=HealthManager)
     health_mgr.is_locked = lambda d: False
-    half_open_for: set[str] = {"xteink.com"}
+    half_open_for: set[str] = {"shop-a.com"}
     health_mgr.is_half_open = lambda d: d in half_open_for
 
     scheduler: Scheduler = scheduler_factory(health_mgr=health_mgr)
-    xteink_products = [p for p in sample_products if "xteink.com" in p.url]
-    assert len(xteink_products) >= 2  # ensure multiple products on same domain
+    shop_a_products = [p for p in sample_products if "shop-a.com" in p.url]
+    assert len(shop_a_products) >= 2  # ensure multiple products on same domain
 
     calls: list[str] = []
     scheduler._scrape_one = AsyncMock(side_effect=lambda p: calls.append(p.url))
-    await scheduler._run_tick(xteink_products)
+    await scheduler._run_tick(shop_a_products)
 
     assert len(calls) == 1  # only one probe per half-open domain per tick
 

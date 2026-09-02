@@ -108,7 +108,7 @@ async def test_shopify_block_on_currency_html_does_not_discard_json_price() -> N
     """When the JSON API already yielded a price, a BlockEvent raised by the
     currency-only HTML fetch must NOT discard the scrape.
 
-    Root cause of the fillingpieces/clae/xteink quarantine: scrape() got the
+    Root cause of the three Shopify stores quarantine: scrape() got the
     price from JSON, then fetched the HTML purely to detect currency; a block on
     that body propagated out of scrape() and poisoned an already-successful
     result, feeding the domain quarantine.

@@ -77,8 +77,10 @@ class ShopifyScraper(AbstractScraper):
     domain_patterns: ClassVar[list[re.Pattern[str]]] = []
 
     # Known Shopify domains (extend as discovered)
+    # Seeded with well-known Shopify storefronts. It is a shortcut, not the
+    # contract: any URL carrying a /products/<handle> path is handled anyway,
+    # so a store missing from here still resolves to this scraper.
     KNOWN_SHOPIFY_DOMAINS: ClassVar[set[str]] = {
-        "fillingpieces.com",
         "allbirds.com",
         "gymshark.com",
         "colourpop.com",
@@ -86,7 +88,6 @@ class ShopifyScraper(AbstractScraper):
         "kith.com",
         "bombas.com",
         "brooklinen.com",
-        "decodedgear.com",
     }
 
     def can_handle(self, url: str) -> bool:
@@ -112,7 +113,7 @@ class ShopifyScraper(AbstractScraper):
                 # Detect currency from HTML page (JSON-LD, OG tags). This fetch is
                 # enrichment ONLY: the price is already in hand. A challenge/block
                 # marker in the HTML must NOT discard a valid scrape (it falsely
-                # quarantined fillingpieces/clae/xteink), so swallow BlockEvent and
+                # quarantined three Shopify stores), so swallow BlockEvent and
                 # fall back to the default currency.
                 try:
                     html = await self._fetch_html(url, client)

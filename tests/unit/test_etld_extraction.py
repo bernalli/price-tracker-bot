@@ -9,7 +9,7 @@ class TestExtractEtldPlusOne:
         [
             ("https://www.amazon.com/dp/B01", "amazon.com"),
             ("https://www.amazon.de/dp/B01", "amazon.de"),
-            ("https://www.xteink.com/products/x", "xteink.com"),
+            ("https://www.shop-a.com/products/x", "shop-a.com"),
             ("https://shop.example.co.uk/p/1", "example.co.uk"),
             ("https://store.google.com/product/pixel_8", "google.com"),
             ("https://www.aliexpress.com/item/1.html", "aliexpress.com"),

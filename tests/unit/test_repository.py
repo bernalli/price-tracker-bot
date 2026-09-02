@@ -416,7 +416,7 @@ class TestScraperHealthRepository:
     async def test_upsert_then_get_roundtrip(self, repo: Repository):
         now = datetime.now(UTC).replace(microsecond=0)
         record = ScraperHealth(
-            domain="xteink.com",
+            domain="shop-a.com",
             state="LOCKED_T1",
             consecutive_blocks=3,
             locked_until=now + timedelta(hours=1),
@@ -425,9 +425,9 @@ class TestScraperHealthRepository:
             last_success_at=None,
         )
         await repo.upsert_scraper_health(record)
-        loaded = await repo.get_scraper_health("xteink.com")
+        loaded = await repo.get_scraper_health("shop-a.com")
         assert loaded is not None
-        assert loaded.domain == "xteink.com"
+        assert loaded.domain == "shop-a.com"
         assert loaded.state == "LOCKED_T1"
         assert loaded.consecutive_blocks == 3
         assert loaded.last_block_reason == "HTTP 429"
