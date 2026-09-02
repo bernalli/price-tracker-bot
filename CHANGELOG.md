@@ -9,6 +9,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 (empty)
 
+## [1.0.0] - 2026-09-02
+
+First stable release. Nothing here is a rewrite: the version number changes
+because the two surfaces users build habits around — the SQLite schema and the
+command set — are now covered by a compatibility promise, and because the
+per-domain circuit breaker is finally reachable from every scraper that can be
+blocked.
+
+### Stability promise
+
+- Migrations from any 1.x to a later 1.x apply forward without data loss.
+- A command present in 1.0 keeps its name and its arguments for the whole 1.x line.
+- Removing a command or breaking the schema is a 2.0, not a 1.x.
+- Explicitly not covered: the internal Python API (this is an application, not a
+  library), the wording of notification texts, and the scraper set — sites change
+  their markup and scrapers follow, which is maintenance rather than a break.
+
+### Fixed
+
+- **An HTTP block on a Shopify store now reaches the circuit breaker.** The
+  Shopify scraper called `raise_for_status()` before `detect_block_event()`, so a
+  403 or 429 became an `HTTPStatusError` that the HTML fetch caught and turned
+  into `None`. The block detection two lines below was unreachable, the scrape
+  ended as a plain "price not found", and the failure was charged to the
+  *product* counter instead of tripping the *per-domain* breaker. A store that
+  started blocking was therefore hammered until every product tracked on it had
+  independently burned its ten-failure budget, and they were all suspended on the
+  same sweep — one message each. The generic scraper already had this fix; Shopify
+  had been left behind. Three regression tests pin the contract, each confirmed to
+  fail without the change.
+
+  Two intended side effects: a 429 is no longer retried three times before being
+  reported, since a block is not a transient error; and a blocking store now trips
+  the breaker after the first product rather than after ten failures on each.
+
+- **First run on a fresh deployment no longer crashes twice before startup.**
+- **Eight CVEs in a transitive image dependency**, cleared by moving pillow to 12.3.0.
+- **Three advisories in the HTTP stack**, cleared by moving aiohttp to 3.14.3.
+
+### Changed
+
+- Dependency floors raised and verified as a set rather than one at a time: ruff
+  0.16.5, mypy 2.3.1 (a major-version crossing, clean under `--strict` across 153
+  source files), curl_cffi 0.16.2, babel 2.18.0, brotli 1.2.0, and the OSV scanner
+  action to 2.5.1.
+- Documentation now matches the code. The command reference had listed five
+  commands that do not exist and omitted twelve that do; the configuration table
+  named an environment variable the code does not read; the test count and the
+  roadmap were stale.
+
+### Removed
+
+- **Real tracked listings are gone from the published artwork and fixtures.** The
+  chart in the README was a real price history — a named product on a named
+  retailer, two months of real readings, and a real target line — and the cover
+  and social images had a stale repository URL baked into the pixels, where no
+  text search could reach it. All three are now generated from
+  `scripts/make_docs_art.py`, the chart from an invented series rendered through
+  the bot's own chart function. Test fixtures identify stores by neutral example
+  hostnames.
+
 ## [0.2.0] - 2026-07-27
 
 Alert-correctness release. A tracked Amazon product reported three "price drop"
@@ -430,5 +491,7 @@ auto-quarantine, and a plugin extension point.
 - osv-scanner dependency vulnerability scan in CI.
 - Pre-commit hooks block secrets at commit time.
 
-[Unreleased]: https://github.com/bernalli/price-tracker-bot/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/bernalli/price-tracker-bot/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/bernalli/price-tracker-bot/compare/v0.2.0...v1.0.0
+[0.2.0]: https://github.com/bernalli/price-tracker-bot/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/bernalli/price-tracker-bot/releases/tag/v0.1.0
