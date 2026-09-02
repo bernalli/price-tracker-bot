@@ -71,6 +71,15 @@ def test_config_from_env_overrides_defaults(monkeypatch: pytest.MonkeyPatch) -> 
     assert cfg.log_level == "DEBUG"
 
 
+def test_listing_gone_confirmations_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "tok")
+    monkeypatch.delenv("LISTING_GONE_CONFIRMATIONS", raising=False)
+    assert Config.from_env().listing_gone_confirmations == 3
+
+    monkeypatch.setenv("LISTING_GONE_CONFIRMATIONS", "5")
+    assert Config.from_env().listing_gone_confirmations == 5
+
+
 def test_config_is_frozen(monkeypatch: pytest.MonkeyPatch) -> None:
     """Config is a frozen dataclass — fields cannot be mutated after construction."""
     from dataclasses import FrozenInstanceError

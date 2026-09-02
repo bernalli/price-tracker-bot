@@ -9,6 +9,7 @@ import httpx
 import pytest
 import respx
 
+from price_tracker.core.exceptions import ListingGone
 from price_tracker.scrapers import ebay as ebay_module
 from price_tracker.scrapers.ebay import EbayScraper
 
@@ -124,22 +125,35 @@ async def test_ebay_microdata_prefers_main_container_over_carousel_offers() -> N
 
 
 @pytest.mark.asyncio
-async def test_ebay_handles_404(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Non-retryable 404 → ProductInfo with error, price=None, no crash."""
+async def test_ebay_404_raises_listing_gone() -> None:
+    """A removed eBay listing must reach the scheduler as ListingGone."""
     scraper = EbayScraper()
+    url = "https://www.ebay.com/itm/MISSING"
 
-    # Bypass retry for fast test execution.
-    async def _fast_fetch(url: str, client: httpx.AsyncClient) -> str:
-        response = await client.get(url)
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).respond(404)
+        async with httpx.AsyncClient() as client:
+            with pytest.raises(ListingGone) as exc_info:
+                await scraper.scrape(url, client)
+
+    assert exc_info.value.status == 404
+
+
+@pytest.mark.asyncio
+async def test_ebay_500_remains_product_info_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    scraper = EbayScraper()
+    url = "https://www.ebay.com/itm/ERROR"
+
+    async def _fast_fetch(request_url: str, client: httpx.AsyncClient) -> str:
+        response = await client.get(request_url)
         response.raise_for_status()
         return response.text
 
     monkeypatch.setattr(ebay_module, "_fetch_ebay_html", _fast_fetch)
-
     with respx.mock(assert_all_called=False) as router:
-        router.get("https://www.ebay.com/itm/MISSING").respond(404)
+        router.get(url).respond(500)
         async with httpx.AsyncClient() as client:
-            info = await scraper.scrape("https://www.ebay.com/itm/MISSING", client)
+            info = await scraper.scrape(url, client)
 
     assert info.price is None
     assert info.error is not None

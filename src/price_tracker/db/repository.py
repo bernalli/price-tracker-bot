@@ -58,7 +58,8 @@ _PRODUCT_COLS = (
     "threshold_value, is_active, is_available, consecutive_errors, "
     "currency, check_interval_minutes, last_checked_at, last_notified_at, "
     "pending_alert_price, pending_alert_at, preferred_condition, preferred_seller, "
-    "pending_read_price, pending_read_count, pending_read_streak"
+    "pending_read_price, pending_read_count, pending_read_streak, last_error, "
+    "last_error_at, gone_streak, suspension_kind, suspension_reason"
 )
 
 
@@ -95,6 +96,11 @@ def _row_to_product(row: tuple[Any, ...]) -> ProductRecord:
         pending_read_price=_dec(row[23]),
         pending_read_count=int(row[24] or 0),
         pending_read_streak=int(row[25] or 0),
+        last_error=row[26],
+        last_error_at=row[27],
+        gone_streak=int(row[28] or 0),
+        suspension_kind=row[29],
+        suspension_reason=row[30],
     )
 
 
@@ -325,12 +331,17 @@ class Repository:
         await self._conn.commit()
 
     async def pause_product(self, product_id: int) -> None:
-        await self._conn.execute("UPDATE products SET is_active = 0 WHERE id = ?", (product_id,))
+        await self._conn.execute(
+            "UPDATE products SET is_active = 0, suspension_kind = 'manual', "
+            "suspension_reason = NULL, updated_at = datetime('now') WHERE id = ?",
+            (product_id,),
+        )
         await self._conn.commit()
 
     async def reactivate_product(self, product_id: int) -> None:
         await self._conn.execute(
-            "UPDATE products SET is_active = 1, consecutive_errors = 0 WHERE id = ?",
+            "UPDATE products SET is_active = 1, consecutive_errors = 0, gone_streak = 0, "
+            "suspension_kind = NULL, suspension_reason = NULL WHERE id = ?",
             (product_id,),
         )
         await self._conn.commit()
@@ -344,10 +355,48 @@ class Repository:
 
     async def reset_errors(self, product_id: int) -> None:
         await self._conn.execute(
-            "UPDATE products SET consecutive_errors = 0 WHERE id = ?",
+            "UPDATE products SET consecutive_errors = 0, gone_streak = 0 WHERE id = ?",
             (product_id,),
         )
         await self._conn.commit()
+
+    async def record_failure(
+        self, product_id: int, *, reason: str, detail: str | None = None
+    ) -> ProductRecord | None:
+        """Count one failed check in a single statement and return the fresh row.
+
+        ``gone_streak`` grows only on ``listing_gone`` and resets on any other
+        reason; ``last_error`` keeps the ``"{reason}: {detail}"`` shape /errori shows.
+        """
+        text = f"{reason}: {detail}" if detail else reason
+        await self._conn.execute(
+            "UPDATE products SET consecutive_errors = consecutive_errors + 1, "
+            "gone_streak = CASE WHEN ? = 'listing_gone' THEN gone_streak + 1 ELSE 0 END, "
+            "last_error = ?, last_error_at = datetime('now') WHERE id = ?",
+            (reason, text[:300], product_id),
+        )
+        await self._conn.commit()
+        return await self.get_product(product_id)
+
+    async def suspend_product(self, product_id: int, *, reason: str) -> bool:
+        cursor = await self._conn.execute(
+            "UPDATE products SET is_active = 0, suspension_kind = 'automatic', "
+            "suspension_reason = ?, updated_at = datetime('now') "
+            "WHERE id = ? AND is_active = 1",
+            (reason, product_id),
+        )
+        await self._conn.commit()
+        return cursor.rowcount == 1
+
+    async def list_auto_suspended_products(self, *, user_id: int) -> list[ProductRecord]:
+        cursor = await self._conn.execute(
+            f"SELECT {_PRODUCT_COLS} FROM products "
+            "WHERE user_id = ? AND is_active = 0 AND suspension_kind = 'automatic' "
+            "ORDER BY id ASC",
+            (user_id,),
+        )
+        rows = await cursor.fetchall()
+        return [_row_to_product(tuple(r)) for r in rows]
 
     async def set_last_error(self, product_id: int, error_text: str) -> None:
         """Persist the most recent scrape failure reason for /errori visibility."""
@@ -713,7 +762,7 @@ class Repository:
 
     # ── Digest queue ───────────────────────────────────────────
 
-    async def enqueue_digest(self, *, user_id: int, product_id: int, payload: str) -> int:
+    async def enqueue_digest(self, *, user_id: int, product_id: int | None, payload: str) -> int:
         cursor = await self._conn.execute(
             "INSERT INTO digest_queue (user_id, product_id, alert_payload_json) VALUES (?, ?, ?)",
             (user_id, product_id, payload),

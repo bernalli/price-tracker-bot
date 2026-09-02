@@ -69,7 +69,10 @@ async def post_init(application: Application[Any, Any, Any, Any, Any, Any]) -> N
     # reach it via context.bot_data.
     metrics: MetricsRegistry | None = application.bot_data.get("metrics")
     application.bot_data["digest_service"] = DigestService(
-        repo=repo, bot=application.bot, metrics=metrics
+        repo=repo,
+        bot=application.bot,
+        metrics=metrics,
+        lang=config.lang,
     )
 
 
@@ -100,9 +103,11 @@ async def _setup_scheduler(application: Application[Any, Any, Any, Any, Any, Any
             client=client,
             notifier=notifier,
             max_consecutive_errors=config.max_consecutive_errors,
+            listing_gone_confirmations=config.listing_gone_confirmations,
             delay_between_products=config.check_delay_seconds,
             notification_cooldown_hours=config.notification_cooldown_hours,
             read_confirmations=config.read_confirmations,
+            lang=config.lang,
             health_mgr=health_mgr,
             metrics=metrics,
         )

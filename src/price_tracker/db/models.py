@@ -72,6 +72,11 @@ class ProductRecord(_DictCompatMixin):
     pending_read_price: Decimal | None = None
     pending_read_count: int = 0
     pending_read_streak: int = 0
+    last_error: str | None = None
+    last_error_at: str | None = None
+    gone_streak: int = 0
+    suspension_kind: str | None = None
+    suspension_reason: str | None = None
 
 
 @dataclass(frozen=True)
@@ -137,7 +142,7 @@ class DigestEntry:
 
     id: int | None
     user_id: int
-    product_id: int
+    product_id: int | None
     alert_payload_json: str
     enqueued_at: datetime | None = None
     flushed_at: datetime | None = None

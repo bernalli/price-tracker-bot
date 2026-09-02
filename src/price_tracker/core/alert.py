@@ -3,12 +3,27 @@
 from __future__ import annotations
 
 import html
+import re
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING, Literal
+from typing import Literal
 
-if TYPE_CHECKING:
-    from datetime import datetime
+from price_tracker.bot.messages import _
+from price_tracker.core.notices import (
+    MAX_LISTED_PRODUCTS,
+    OPS_DELETE_PREFIX,
+    OPS_REACTIVATE_PREFIX,
+    NoticeGroup,
+    OperationalEvent,
+)
+from price_tracker.core.textlimits import (
+    DOMAIN_BUDGET,
+    ERROR_BUDGET,
+    NAME_BUDGET,
+    WHY_BUDGET,
+    truncate_visible,
+)
 
 ThresholdType = Literal["percentage", "absolute", "target", "any_drop"]
 
@@ -32,7 +47,196 @@ def _currency_symbol(currency: str) -> str:
 
 
 def _escape_html(text: str) -> str:
-    return html.escape(str(text), quote=True)
+    # User- and site-controlled values must remain inside one renderer row:
+    # split_message uses newline boundaries and must never split an open tag.
+    single_line = str(text).replace("\r", " ").replace("\n", " ")
+    return html.escape(single_line, quote=True)
+
+
+_UNREADABLE_COPY = (
+    "Price unreadable on {domain}",
+    "The pages load, but the price could not be read anymore (layout change or a different offer).",
+    "Reactivate to run a fresh check right now.",
+    False,
+)
+
+_REASON_COPY: dict[str, tuple[str, str, str, bool]] = {
+    "listing_gone": (
+        "Listings removed on {domain}",
+        "These pages answer HTTP 404/410: the store took them off the catalog.",
+        "Deleting keeps your list clean. Reactivate only if the store restores them.",
+        True,
+    ),
+    "parse_error": _UNREADABLE_COPY,
+    "price_none": _UNREADABLE_COPY,
+    "no_scraper": _UNREADABLE_COPY,
+    "condition_mismatch": _UNREADABLE_COPY,
+    "implausible_read": _UNREADABLE_COPY,
+    "http_error": (
+        "Site unreachable: {domain}",
+        "The site did not answer {max} checks in a row.",
+        "Try again later. Reactivate once the site is back.",
+        False,
+    ),
+    "unexpected": (
+        "Site unreachable: {domain}",
+        "The site did not answer {max} checks in a row.",
+        "Try again later. Reactivate once the site is back.",
+        False,
+    ),
+    "block": (
+        "Blocked by {domain}",
+        "The site is refusing automated checks (anti-bot).",
+        "Domain quarantine already paces retries. Reactivate once it clears.",
+        False,
+    ),
+}
+_DEFAULT_COPY = (
+    "Tracking suspended on {domain}",
+    "Checks kept failing.",
+    "Reactivate to retry.",
+    False,
+)
+_STATUS_RE = re.compile(r"\b(404|410)\b")
+
+
+def _copy_for(reason: str) -> tuple[str, str, str, bool]:
+    """Return the closed-copy mapping, with a safe default for unknown reasons."""
+    return _REASON_COPY.get(reason, _DEFAULT_COPY)
+
+
+def _why(reason: str | None, detail: str | None) -> str:
+    """Render a compact, reason-aware explanation for a product row."""
+    if reason == "listing_gone":
+        status_match = _STATUS_RE.search(detail or "")
+        status = status_match.group(1) if status_match is not None else "404"
+        return _("page not found (HTTP {status})").format(status=status)
+    if reason == "block":
+        return _("blocked")
+    if reason in {
+        "parse_error",
+        "price_none",
+        "no_scraper",
+        "condition_mismatch",
+        "implausible_read",
+    }:
+        return _("price not readable")
+    if reason in {"http_error", "unexpected"}:
+        return _("site unreachable")
+    return _("check failed")
+
+
+def _display_timestamp(value: str | None) -> str | None:
+    """Return a compact UTC timestamp, or ``None`` when persisted data is invalid."""
+    if not value:
+        return None
+    normalized = value.strip().replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        try:
+            parsed = datetime.strptime(normalized, "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC).strftime("%Y-%m-%d %H:%M UTC")
+
+
+def _product_lines(event: OperationalEvent) -> list[str]:
+    """Render one product using per-field budgets before HTML escaping."""
+    name = truncate_visible(event.product_name or event.url, NAME_BUDGET)
+    why = truncate_visible(_why(event.reason, event.detail), WHY_BUDGET)
+    lines = [f"• <b>{_escape_html(name)}</b> — {_escape_html(why)}"]
+    timestamp = _display_timestamp(event.last_checked_at)
+    if event.last_price is not None and timestamp is not None:
+        price = truncate_visible(
+            f"{event.last_price} {_currency_symbol(event.currency or '')}".strip(), 24
+        )
+        amount, separator, symbol = price.rpartition(" ")
+        if not separator:
+            amount, symbol = price, ""
+        lines.append(
+            _("Last good read: {price} {sym} on {date}").format(
+                price=_escape_html(amount),
+                sym=_escape_html(symbol),
+                date=timestamp,
+            )
+        )
+    else:
+        lines.append(_("No successful read yet"))
+    error = truncate_visible(event.last_error or _("unknown"), ERROR_BUDGET)
+    lines.append(_("Error: <code>{error}</code>").format(error=_escape_html(error)))
+    return lines
+
+
+def format_operational_notice(group: NoticeGroup) -> str:
+    """Format a suspended operational group as Telegram HTML under field budgets."""
+    if group.event != "suspended":
+        raise ValueError("format_operational_notice requires a suspended group")
+    if not group.events:
+        raise ValueError("notice group must contain at least one event")
+    title, headline, hint, _delete_first = _copy_for(group.primary_reason)
+    domain = _escape_html(truncate_visible(group.group_key, DOMAIN_BUDGET))
+    max_errors = group.events[0].max_errors
+    lines = [
+        f"⚠️ <b>{_(title).format(domain=domain)}</b> ({len(group.events)})",
+        "",
+        _(headline).format(max=max_errors),
+        "",
+    ]
+    for event in group.events[:MAX_LISTED_PRODUCTS]:
+        lines.extend(_product_lines(event))
+    remaining = len(group.events) - MAX_LISTED_PRODUCTS
+    if remaining > 0:
+        lines.append(_("… and {k} more").format(k=remaining))
+    lines.extend(("", _(hint)))
+    return "\n".join(lines)
+
+
+def format_warning_notice(group: NoticeGroup) -> str:
+    """Format a pre-suspension warning group as Telegram HTML."""
+    if group.event != "warning":
+        raise ValueError("format_warning_notice requires a warning group")
+    if not group.events:
+        raise ValueError("notice group must contain at least one event")
+    domain = _escape_html(truncate_visible(group.group_key, DOMAIN_BUDGET))
+    first = group.events[0]
+    lines = [
+        f"⏳ <b>{_('Checks failing on {domain}').format(domain=domain)}</b> ({len(group.events)})",
+        "",
+        _(
+            "{n} products failed {count}/{max} checks in a row. If it keeps failing "
+            "they will be suspended automatically."
+        ).format(n=len(group.events), count=first.error_count, max=first.max_errors),
+        "",
+    ]
+    for event in group.events[:MAX_LISTED_PRODUCTS]:
+        name = truncate_visible(event.product_name or event.url, NAME_BUDGET)
+        why = truncate_visible(_why(event.reason, event.detail), WHY_BUDGET)
+        lines.append(f"• <b>{_escape_html(name)}</b> — {_escape_html(why)}")
+    remaining = len(group.events) - MAX_LISTED_PRODUCTS
+    if remaining > 0:
+        lines.append(_("… and {k} more").format(k=remaining))
+    lines.extend(("", _("Details with /errori.")))
+    return "\n".join(lines)
+
+
+def operational_buttons(group: NoticeGroup) -> list[list[dict[str, str]]]:
+    """Return pure callback-button data for a suspended group, or no buttons for warnings."""
+    if group.event != "suspended" or not group.events:
+        return []
+    _title, _headline, _hint, delete_first = _copy_for(group.primary_reason)
+    count = len(group.events)
+    reactivate = {
+        "text": _("▶️ Reactivate and recheck ({n})").format(n=count),
+        "callback_data": f"{OPS_REACTIVATE_PREFIX}{group.anchor_product_id}",
+    }
+    delete = {
+        "text": _("🗑 Delete all ({n})").format(n=count),
+        "callback_data": f"{OPS_DELETE_PREFIX}{group.anchor_product_id}",
+    }
+    return [[delete], [reactivate]] if delete_first else [[reactivate], [delete]]
 
 
 @dataclass(frozen=True)
@@ -105,6 +309,7 @@ def format_back_in_stock(*, product_name: str, url: str, price: Decimal, currenc
     )
 
 
+# Deprecated: T4 removes this scheduler compatibility bridge.
 def format_error_notification(
     *,
     product: dict[str, str],

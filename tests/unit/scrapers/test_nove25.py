@@ -9,6 +9,7 @@ import httpx
 import pytest
 import respx
 
+from price_tracker.core.exceptions import ListingGone
 from price_tracker.scrapers.nove25 import Nove25Scraper
 
 if TYPE_CHECKING:
@@ -119,6 +120,18 @@ async def test_nove25_handles_http_error() -> None:
 
     assert info.price is None
     assert info.error is not None
+
+
+@pytest.mark.asyncio
+async def test_nove25_404_raises_listing_gone() -> None:
+    url = "https://www.nove25.net/it/dead/missing"
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).respond(404)
+        async with httpx.AsyncClient() as client:
+            with pytest.raises(ListingGone) as exc_info:
+                await Nove25Scraper().scrape(url, client)
+
+    assert exc_info.value.status == 404
 
 
 # ── _coerce_product (edge cases for JSON-LD shapes seen in the wild) ──
