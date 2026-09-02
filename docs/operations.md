@@ -43,7 +43,8 @@ All configuration is via environment variables, loaded from `.env` (or the host 
 | `LOG_LEVEL`                   | `INFO`                  | structlog log level (`DEBUG`, `INFO`, `WARNING`, `ERROR`)                                                              |
 | `PROMETHEUS_BIND`             | `127.0.0.1:9090`        | Prometheus exporter bind address (host:port)                                                                           |
 | `CHECK_INTERVAL_MINUTES`      | `360`                   | Default polling interval (per-product overridable via `/set_interval`)                                                 |
-| `MAX_CONSECUTIVE_ERRORS`      | `10`                    | Threshold before HealthManager quarantines a domain                                                                    |
+| `MAX_CONSECUTIVE_ERRORS`      | `10`                    | Failed checks before a product is auto-suspended (domain-wide quarantine uses the fixed tiers in `core/health.py`, not this variable) |
+| `LISTING_GONE_CONFIRMATIONS`  | `3`                     | Consecutive HTTP 404/410 answers before a removed listing is suspended                                                 |
 | `REQUEST_TIMEOUT`             | `30`                    | HTTP timeout in seconds for scraper requests                                                                           |
 | `NOTIFICATION_COOLDOWN_HOURS` | `24`                    | Per-product alert cooldown                                                                                             |
 | `METRICS_ENABLED`             | `true`                  | Prometheus exporter is on by default. Set `0` or `false` to disable.                                                  |
@@ -78,6 +79,11 @@ docker compose start price-tracker-bot
 ```
 
 The migrator at startup is idempotent: if the snapshot was taken on an older schema version, the next startup applies the missing migrations automatically.
+
+Migrations `014` (adds suspension provenance columns) and `015` (rebuilds `digest_queue` with
+a nullable `product_id`) ship together with the operational-notices feature. `015` recreates
+the `digest_queue` table rather than altering it in place — take a backup before upgrading, as
+for every release, and let the idempotent migrator run once at startup.
 
 ## Hardened deployment
 

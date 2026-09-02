@@ -67,6 +67,7 @@ All configuration is via environment variables. Copy `.env.example` to `.env` an
 | `LOCALE`                | `en`                     | Default locale fallback when the Telegram `language_code` is missing             |
 | `CHECK_INTERVAL_MINUTES`| `360`                    | Global sweep interval                                                            |
 | `MAX_CONSECUTIVE_ERRORS`| `10`                     | Failed checks before a product is auto-suspended                                 |
+| `LISTING_GONE_CONFIRMATIONS` | `3`                  | Consecutive HTTP 404/410 answers before a removed listing is suspended           |
 | `READ_CONFIRMATIONS`    | `3`                      | Agreeing checks required before an implausible price raises an alert             |
 | `PROMETHEUS_BIND`       | `127.0.0.1:9090`         | Prometheus exporter bind address (host:port)                                     |
 | `LOG_LEVEL`             | `INFO`                   | structlog log level                                                              |

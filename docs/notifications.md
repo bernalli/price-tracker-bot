@@ -9,16 +9,21 @@ When the alert engine triggers an alert for a user/product pair, the notifier wa
 ```
 1. mute (per-product or "all") — if active and not expired: DROP
 2. quiet hours — if alert falls inside the user's quiet window:
-   - if digest_mode=on: ENQUEUE in digest_queue (sent at next flush)
+   - if digest_mode=on: ENQUEUE in digest_queue (delivered at the first flush
+     after the quiet window ends, not merely the next periodic interval)
    - else: DROP silently
 3. throttle (sliding window, per user) — if user has reached their hourly cap:
    - if digest_mode=on: ENQUEUE in digest_queue
    - else: DROP silently
 4. digest mode — if user has digest_mode=on:
    - ENQUEUE the alert in digest_queue
-   - flush at the next periodic interval (default 60 min) or on /digest_now
+   - flush at the next periodic interval (default 60 min) or on /digest_now,
+     still subject to the quiet-hours hold above
 5. immediate dispatch — otherwise: send via TelegramNotifier.send_alert
 ```
+
+Operational notices (see below) go through the same chain, with one exception: they
+ignore mute (step 1 is skipped for them).
 
 Every step records a Prometheus metric. Drops increment `price_tracker_notification_skipped_total{reason="..."}` with one of `mute`, `quiet_hours`, `throttle`, `digest_pending`. Sends increment `price_tracker_notification_sent_total`. INFO-level logs include `user_id` and `product_id` for traceability.
 
@@ -114,6 +119,74 @@ When determining the effective preference for a given alert, the notifier resolv
 4. **Defaults** — applied for any unset field.
 
 The `EffectivePrefs` dataclass (`notifier/preferences.py:21`) is the resolved snapshot used at dispatch time, computed by `PreferencesManager.resolve(*, user_id, product_id)` (`preferences.py:68`).
+
+## Operational notices
+
+Besides price-drop alerts, the bot sends **operational notices**: automatic reports about a
+product's *tracking health* rather than its price — the listing was removed, the price could
+no longer be read, the site stopped answering, the site is blocking automated checks, or a
+site-wide quarantine. A pre-suspension warning fires at half the failure threshold, before the
+product is actually suspended.
+
+### Aggregation
+
+Notices are grouped **per user and per domain** (the eTLD+1 that groups Shopify stores,
+subdomains, etc. together) and batched during a sweep: a store that goes down taking twenty
+tracked products with it produces **one** message per user for that domain, not twenty. Each
+message lists up to 10 affected products (`… and {k} more` beyond that), with the reason,
+the last good read (price and date) if any, and the raw error truncated to a fixed budget.
+
+### Routing: mute is ignored, only global preferences apply
+
+Operational notices route with `kind="operational"` and always resolve preferences through
+`PreferencesManager.resolve_global(user_id)` — the user's **global** row only, never a
+per-product override. Two consequences:
+
+- **`/mute` has no effect on them.** A muted product can still trigger an operational notice
+  for its domain; mute only suppresses price-drop alerts. There is no separate command to
+  silence operational notices.
+- **Quiet hours, digest mode and throttle apply exactly as for price alerts** (see the
+  resolution chain above), using the user's account-wide settings — never a per-product
+  override, since a notice can cover several products from several owners' worth of
+  preferences in principle, but always resolves to the domain-group's single recipient.
+
+When an operational notice is deferred (quiet hours, throttle, or digest mode), it is queued
+with `product_id = NULL` rather than tied to one of the affected products: deleting any single
+product in the group does not drop the others' pending notice.
+
+### Buttons
+
+Suspension notices carry two buttons, `▶️ Reactivate and recheck (N)` and `🗑 Delete all (N)`
+(button order depends on the reason — deletion comes first when the listing is confirmed
+gone). Deleting asks for a `🗑 Yes, delete N` / `❌ Cancel` confirmation. Both actions apply to
+the **whole domain group** for that user, computed from persisted state at click time (see
+provenance below) — not from whatever the current failure threshold happens to be. The
+pre-suspension warning carries no buttons; use `/reactivate` or `/errori` for those.
+
+### `LISTING_GONE_CONFIRMATIONS`
+
+A listing is only ever confirmed *gone* — as opposed to merely unreachable or unreadable —
+after `LISTING_GONE_CONFIRMATIONS` (default `3`) consecutive HTTP 404/410 responses. Any
+other outcome in between (success or a different failure) resets the streak. See
+[operations.md](operations.md#environment-variables) for the environment variable.
+
+### Suspension provenance and pre-migration rows
+
+Every automatic suspension records `suspension_kind = 'automatic'` and the `suspension_reason`
+that caused it, distinct from a manual `/pause` (`suspension_kind = 'manual'`). The group
+buttons act only on rows with `suspension_kind = 'automatic'` for that domain: a product a
+user paused by hand is never swept up by "Delete all". Rows suspended **before** this
+provenance column existed have `suspension_kind IS NULL` — their origin cannot be
+reconstructed, so they are excluded from the group entirely; reactivating or deleting them
+goes through `/reactivate` one product at a time, same as before this feature.
+
+### Length limits and segmentation
+
+Every field is truncated to a fixed visible-character budget before escaping (name, domain,
+last error, the human-readable reason), and at most 10 products are listed per message. Any
+message that still exceeds Telegram's length limit is split across multiple messages on line
+boundaries, with the inline keyboard attached to the last chunk — the same segmentation
+contract used for digest pages and button responses (`core/textlimits.py`).
 
 ## Related docs
 

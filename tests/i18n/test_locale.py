@@ -14,6 +14,8 @@ from price_tracker.bot.messages import (
     ngettext,
     set_locale,
 )
+from price_tracker.core.alert import format_operational_notice, format_warning_notice
+from price_tracker.core.notices import NoticeGroup, OperationalEvent
 
 
 def test_normalize_lang_code_two_letter() -> None:
@@ -147,3 +149,119 @@ def test_compile_artifacts_present_smoke() -> None:
         pytest.skip("production catalog not yet compiled (Task T21)")
     assert en_mo.is_file()
     assert it_mo.is_file()
+
+
+@pytest.fixture
+def _reset_locale_after():
+    """Restore the locale ContextVar to English once the test is done.
+
+    `set_locale` writes to a module-level ContextVar with no per-test scoping;
+    left on `it_IT`, it silently leaks into whichever test runs next in this
+    process (regardless of file) and can flip *their* `_()` calls to Italian
+    once the production catalog actually has a translation for the msgid they
+    render -- exactly the failure mode this file's own render-time tests
+    exist to catch, just aimed at unrelated tests instead of this one.
+    """
+    yield
+    set_locale("en")
+    get_translation.cache_clear()
+
+
+def test_production_catalog_has_operational_notice_strings() -> None:
+    """The BUILT production .mo (not a test fixture) carries the operational-notice
+    msgids from the plan's §5.3 table, with the exact it_IT translations."""
+    get_translation.cache_clear()
+    translation = get_translation("it_IT")
+    assert translation.gettext("Listings removed on {domain}") == "Prodotti rimossi da {domain}"
+    assert translation.gettext("Blocked by {domain}") == "Bloccato da {domain}"
+    assert translation.gettext("Tracking suspended on {domain}") == "Tracking sospeso su {domain}"
+    assert translation.gettext("⚠️ Operational notices") == "⚠️ Avvisi operativi"
+    get_translation.cache_clear()
+
+
+def _operational_event(
+    *,
+    reason: str = "listing_gone",
+    domain: str = "example.com",
+    detail: str | None = "HTTP 404",
+) -> OperationalEvent:
+    return OperationalEvent(
+        event="suspended",
+        user_id=1,
+        product_id=1,
+        product_name="Widget",
+        url=f"https://{domain}/p/1",
+        group_key=domain,
+        reason=reason,
+        detail=detail,
+        last_error="listing_gone: HTTP 404",
+        error_count=10,
+        max_errors=10,
+        last_price=None,
+        currency="EUR",
+        last_checked_at=None,
+    )
+
+
+@pytest.mark.usefixtures("_reset_locale_after")
+def test_operational_notice_title_is_translated_at_render_time() -> None:
+    """Reproduces the real production path: `_REASON_COPY` holds plain-string
+    literals (not `_()` calls), so `format_operational_notice` must resolve the
+    translation of `title` at RENDER time via `_(title)`, using the ContextVar
+    locale current when the function runs -- not whatever locale was active at
+    *import* time of `core/alert.py`. If this regresses to an import-time bind
+    (e.g. the copy tuples get pre-translated at module load), this assertion
+    fails because the title stays in English regardless of `set_locale`.
+    """
+    get_translation.cache_clear()
+    group = NoticeGroup(
+        event="suspended",
+        user_id=1,
+        group_key="example.com",
+        events=(_operational_event(),),
+    )
+
+    set_locale("en")
+    english_text = format_operational_notice(group)
+    assert "Listings removed on example.com" in english_text
+
+    set_locale("it_IT")
+    italian_text = format_operational_notice(group)
+    assert "Prodotti rimossi da example.com" in italian_text
+    assert "Listings removed" not in italian_text
+
+    # Re-render in English on the same process, after having rendered Italian:
+    # proves resolution tracks the ContextVar per call, not a cached bind.
+    set_locale("en")
+    english_again = format_operational_notice(group)
+    assert "Listings removed on example.com" in english_again
+    get_translation.cache_clear()
+
+
+@pytest.mark.usefixtures("_reset_locale_after")
+def test_operational_warning_headline_is_translated_at_render_time() -> None:
+    """Same render-time proof for the pre-suspension warning copy."""
+    get_translation.cache_clear()
+    event = OperationalEvent(
+        event="warning",
+        user_id=1,
+        product_id=1,
+        product_name="Widget",
+        url="https://example.com/p/1",
+        group_key="example.com",
+        reason="listing_gone",
+        detail="HTTP 404",
+        last_error=None,
+        error_count=2,
+        max_errors=3,
+        last_price=None,
+        currency="EUR",
+        last_checked_at=None,
+    )
+    group = NoticeGroup(event="warning", user_id=1, group_key="example.com", events=(event,))
+
+    set_locale("it_IT")
+    text = format_warning_notice(group)
+    assert "Controlli in errore su example.com" in text
+    assert "Checks failing" not in text
+    get_translation.cache_clear()

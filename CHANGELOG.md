@@ -7,7 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-(empty)
+### Added
+
+- Removed-listing detection: a product whose page answers HTTP 404/410 for three
+  consecutive checks (`LISTING_GONE_CONFIRMATIONS`, default 3) is now suspended and
+  flagged as removed, instead of being retried for days as an ordinary read failure.
+- Aggregated operational notices with buttons: a store going down no longer produces
+  one message per affected product. Notices are grouped per user and per domain, with
+  `▶️ Reactivate and recheck` / `🗑 Delete all` buttons acting on the whole group.
+- A pre-suspension warning fires at half the failure threshold, so a struggling site is
+  flagged before its products are actually suspended.
+- `LISTING_GONE_CONFIRMATIONS` environment variable.
+- Suspension provenance: an automatic suspension is now distinguishable from a manual
+  pause, so bulk actions never sweep up a product a user paused on purpose.
+
+### Changed
+
+- Operational notices honour quiet hours and digest mode but ignore mute, resolved from
+  the user's global preferences rather than any single affected product's settings.
+- Digest flush now waits for the end of a user's quiet hours before delivering queued
+  entries, instead of firing on the next periodic interval regardless of the time of day.
+- Long notification messages are now split to stay under Telegram's length limit instead
+  of risking a rejected send.
+- Queued digest entries survive the deletion of the product that generated them.
+- The old `Tracking suspended` message has been replaced by the reason-aware operational
+  notice described above.
 
 ## [1.0.0] - 2026-09-02
 
