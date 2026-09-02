@@ -181,3 +181,31 @@ def test_paginate_degrades_a_block_with_malformed_markup() -> None:
     assert pages[0][1] == [1]
     assert "<b>" not in pages[0][0]
     assert "unterminated" in pages[0][0]
+
+
+def test_split_message_degrades_a_bare_greater_than_sign() -> None:
+    """Telegram wants ">" escaped as "&gt;": a bare one must not reach the wire."""
+    out = "".join(split_message("<b>maths</b> 5 > 3"))
+
+    assert "5 &gt; 3" in out
+    assert "5 > 3" not in out
+    assert "<b>" not in out
+
+
+def test_split_message_degrades_nested_blockquotes() -> None:
+    """Telegram rejects a blockquote nested inside another blockquote."""
+    chunks = split_message("<blockquote><blockquote>quoted</blockquote></blockquote>")
+
+    assert "<blockquote>" not in "".join(chunks)
+    assert "quoted" in "".join(chunks)
+
+
+def test_paginate_degrades_a_header_or_footer_with_malformed_markup() -> None:
+    """A broken envelope would break every page, so it is degraded too."""
+    pages = paginate("<b>broken header", [(1, "block")], "footer </i>")
+
+    assert len(pages) == 1
+    assert "<b>" not in pages[0][0]
+    assert "</i>" not in pages[0][0]
+    assert "broken header" in pages[0][0]
+    assert "footer" in pages[0][0]

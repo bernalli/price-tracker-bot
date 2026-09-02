@@ -39,6 +39,8 @@ _ALLOWED_TAGS = frozenset(
     }
 )
 _MARKUP_TAG_RE = re.compile(r"<(/?)([a-zA-Z][a-zA-Z0-9-]*)(?:\s[^>]*)?>")
+# Telegram rejects these tags when nested inside themselves.
+_NON_NESTABLE_TAGS = frozenset({"blockquote", "pre", "code"})
 # Only the four named entities Telegram documents, plus well-formed decimal
 # and hexadecimal numeric references, count as valid entities.
 _VALID_ENTITY_RE = re.compile(r"&(amp|lt|gt|quot|#[0-9]+|#[xX][0-9a-fA-F]+);")
@@ -98,8 +100,13 @@ def _is_valid_telegram_markup(fragment: str) -> bool:
                     return False
                 stack.pop()
             else:
+                if tag_name in _NON_NESTABLE_TAGS and tag_name in stack:
+                    return False
                 stack.append(tag_name)
             pos = tag_match.end()
+        elif char == ">":
+            # Telegram requires a bare ">" to be escaped as "&gt;".
+            return False
         elif char == "&":
             entity_match = _VALID_ENTITY_RE.match(fragment, pos)
             if entity_match is None:
@@ -156,9 +163,9 @@ def paginate(
 ) -> list[tuple[str, list[K]]]:
     """Paginate indivisible blocks with a repeated header and footer under ``limit``.
 
-    Each block must pass the restricted Telegram markup grammar; a block that
-    is too long or fails that grammar is degraded to escaped plain text
-    before being placed on a page (fail-closed, same rule as ``split_message``).
+    The header, the footer and each block must pass the restricted Telegram
+    markup grammar; anything too long or failing that grammar is degraded to
+    escaped plain text (fail-closed, same rule as ``split_message``).
     """
     if limit <= 2:
         raise ValueError("limit must leave room for a header, block, and footer")
@@ -166,6 +173,12 @@ def paginate(
         return []
 
     bounded_header, bounded_footer = _bounded_envelope(header, footer, limit)
+    # Fail-closed on the envelope too: a header or footer whose markup is not
+    # well-formed would break every page, not just one block.
+    if not _is_valid_telegram_markup(bounded_header):
+        bounded_header = _degrade_line(bounded_header, limit)
+    if not _is_valid_telegram_markup(bounded_footer):
+        bounded_footer = _degrade_line(bounded_footer, limit)
     room = limit - visible_length(bounded_header) - visible_length(bounded_footer) - 2
     if room <= 0:
         raise ValueError("header and footer leave no room for blocks")

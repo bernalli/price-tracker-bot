@@ -6,6 +6,7 @@ from decimal import Decimal
 
 import pytest
 
+from price_tracker.core import notices
 from price_tracker.core.notices import (
     OPS_DELETE_CONFIRM_PREFIX,
     OPS_DELETE_PREFIX,
@@ -135,3 +136,20 @@ def test_primary_reason_normalizes_none_before_tie_breaking(
         collector.add(_event(product_id=product_id, reason=reason))
 
     assert collector.groups()[0].primary_reason == expected
+
+
+def test_group_key_for_stays_total_when_the_resolver_raises_anything(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Grouping must be total: any resolver failure degrades to ``unknown``.
+
+    A narrower ``except ValueError`` would let this escape and break the whole
+    sweep's notice rendering, so the guard is asserted against a non-ValueError.
+    """
+
+    def _explode(url: str) -> str:
+        raise RuntimeError("resolver is unavailable")
+
+    monkeypatch.setattr(notices, "extract_etld_plus_one", _explode)
+
+    assert group_key_for("https://shop.example/p") == "unknown"

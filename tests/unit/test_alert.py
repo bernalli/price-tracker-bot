@@ -388,6 +388,26 @@ def test_closed_reason_copy_and_exact_callback_contract(
     assert [row[0]["callback_data"] for row in operational_buttons(group)] == callbacks
 
 
+@pytest.mark.parametrize(
+    ("reason", "headline_fragment", "hint_fragment"),
+    [
+        ("listing_gone", "took them off the catalog", "Deleting keeps your list clean"),
+        ("parse_error", "price could not be read anymore", "run a fresh check right now"),
+        ("http_error", "did not answer", "Reactivate once the site is back"),
+        ("block", "refusing automated checks", "Domain quarantine already paces retries"),
+        ("unknown_reason", "Checks kept failing", "Reactivate to retry"),
+    ],
+)
+def test_closed_reason_copy_renders_headline_and_hint_bodies(
+    reason: str, headline_fragment: str, hint_fragment: str
+) -> None:
+    """The body of each closed-list copy must reach the message, not only its title."""
+    text = format_operational_notice(_group(_operational_event(reason=reason)))
+
+    assert headline_fragment in text
+    assert hint_fragment in text
+
+
 def test_renderer_rejects_empty_and_wrong_event_groups() -> None:
     suspended_empty = NoticeGroup("suspended", 9, "example.com", ())
     warning_empty = NoticeGroup("warning", 9, "example.com", ())
