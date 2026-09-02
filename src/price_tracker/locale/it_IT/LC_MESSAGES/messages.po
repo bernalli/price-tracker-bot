@@ -639,3 +639,19 @@ msgstr "{domain} — in quarantena"
 #: src/price_tracker/notifier/digest.py:54
 msgid "Operational notice"
 msgstr "Avviso operativo"
+
+#: src/price_tracker/notifier/digest.py
+#, python-brace-format
+msgid "Product #{product_id}"
+msgstr "Prodotto #{product_id}"
+
+#: src/price_tracker/notifier/digest.py
+#, python-brace-format
+msgid "📊 <b>Digest — {n} price change</b>"
+msgid_plural "📊 <b>Digest — {n} price changes</b>"
+msgstr[0] "📊 <b>Riepilogo — {n} variazione di prezzo</b>"
+msgstr[1] "📊 <b>Riepilogo — {n} variazioni di prezzo</b>"
+
+#: src/price_tracker/notifier/digest.py
+msgid "Use /lista for full state."
+msgstr "Usa /lista per lo stato completo."

@@ -69,7 +69,10 @@ async def post_init(application: Application[Any, Any, Any, Any, Any, Any]) -> N
     # reach it via context.bot_data.
     metrics: MetricsRegistry | None = application.bot_data.get("metrics")
     application.bot_data["digest_service"] = DigestService(
-        repo=repo, bot=application.bot, metrics=metrics
+        repo=repo,
+        bot=application.bot,
+        metrics=metrics,
+        lang=config.lang,
     )
 
 

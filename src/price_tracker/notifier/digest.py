@@ -15,6 +15,7 @@ from datetime import UTC, datetime
 from html import escape
 from typing import TYPE_CHECKING, Any
 
+from price_tracker.bot.messages import _, ngettext, reset_locale, set_locale
 from price_tracker.core.alert import _why
 from price_tracker.core.textlimits import DOMAIN_BUDGET, NAME_BUDGET, paginate, truncate_visible
 from price_tracker.notifier.preferences import EffectivePrefs, is_quiet_now
@@ -51,7 +52,9 @@ def _positive_int(value: object, *, fallback: int) -> int:
 def _price_block(entry: DigestEntry, payload: dict[str, Any]) -> str:
     """Render one conventional price-change digest row."""
     fallback_name = (
-        f"Product #{entry.product_id}" if entry.product_id is not None else "Operational notice"
+        _("Product #{product_id}").format(product_id=entry.product_id)
+        if entry.product_id is not None
+        else _("Operational notice")
     )
     name = _safe_text(payload.get("product_name"), fallback=fallback_name, budget=NAME_BUDGET)
     old = _safe_text(payload.get("old_price"), fallback="?")
@@ -73,20 +76,25 @@ def _price_block(entry: DigestEntry, payload: dict[str, Any]) -> str:
 
 def _operational_block(payload: dict[str, Any], *, include_heading: bool) -> str:
     """Render one operational digest row, using safe defaults for sparse payloads."""
-    domain = _safe_text(payload.get("domain"), fallback="unknown", budget=DOMAIN_BUDGET)
+    domain = _safe_text(payload.get("domain"), fallback=_("unknown"), budget=DOMAIN_BUDGET)
     event = payload.get("event")
     if event == "warning":
         count = _positive_int(payload.get("count"), fallback=1)
         maximum = _positive_int(payload.get("max"), fallback=1)
-        row = f"{domain} — {count} products: checks failing ({count}/{maximum})"
+        row = _("{domain} — {n} products: checks failing ({count}/{max})").format(
+            domain=domain, n=count, count=count, max=maximum
+        )
     elif event == "quarantine":
-        row = f"{domain} — quarantined"
+        row = _("{domain} — quarantined").format(domain=domain)
     else:
         count = _positive_int(payload.get("count"), fallback=1)
         reason = payload.get("reason")
         why = _why(reason if isinstance(reason, str) else None, None)
-        row = f"{domain} — {count} products: tracking suspended ({escape(why)})"
-    return f"⚠️ Operational notices\n{row}" if include_heading else row
+        row = _("{domain} — {n} products: tracking suspended ({why})").format(
+            domain=domain, n=count, why=escape(why)
+        )
+    heading = _("⚠️ Operational notices")
+    return f"{heading}\n{row}" if include_heading else row
 
 
 def _digest_blocks(entries: list[DigestEntry]) -> tuple[str, list[tuple[int, str]], str, list[int]]:
@@ -115,10 +123,14 @@ def _digest_blocks(entries: list[DigestEntry]) -> tuple[str, list[tuple[int, str
             price_blocks.append((entry.id, _price_block(entry, payload)))
 
     price_count = len(price_blocks)
-    header = f"📊 <b>Digest — {price_count} price change{'s' if price_count != 1 else ''}</b>"
-    footer_parts = ["Use /lista for full state."]
+    header = ngettext(
+        "📊 <b>Digest — {n} price change</b>",
+        "📊 <b>Digest — {n} price changes</b>",
+        price_count,
+    ).format(n=price_count)
+    footer_parts = [_("Use /lista for full state.")]
     if operational_blocks:
-        footer_parts.insert(0, "Use /reactivate or /errori for details.")
+        footer_parts.insert(0, _("Use /reactivate or /errori for details."))
     return header, [*price_blocks, *operational_blocks], "\n".join(footer_parts), unrenderable_ids
 
 
@@ -155,10 +167,12 @@ class DigestService:
         repo: Repository,
         bot: Bot,
         metrics: MetricsRegistry | None = None,
+        lang: str | None = None,
     ) -> None:
         self._repo = repo
         self._bot = bot
         self._metrics = metrics
+        self._lang = lang
 
     async def enqueue(
         self, *, user_id: int, product_id: int | None, payload: dict[str, Any]
@@ -210,19 +224,23 @@ class DigestService:
         Per-user ``digest_interval_minutes`` is honoured; ``interval_minutes`` is the
         fallback when a user has no stored preference.
         """
-        flushed_total = 0
-        users = await self._repo.list_users_with_pending_digest()
-        now = datetime.now(UTC)
-        for user_id, oldest_enqueued_at in users:
-            prefs = await self._repo.get_notification_prefs(user_id=user_id, product_id=None)
-            threshold = (
-                prefs.digest_interval_minutes
-                if prefs is not None and prefs.digest_interval_minutes
-                else interval_minutes
-            )
-            age = (now - oldest_enqueued_at).total_seconds() / 60.0
-            if _row_is_quiet(prefs, now=now) if prefs is not None else False:
-                continue
-            if age >= threshold:
-                flushed_total += await self.flush_user(user_id=user_id)
-        return flushed_total
+        token = set_locale(self._lang)
+        try:
+            flushed_total = 0
+            users = await self._repo.list_users_with_pending_digest()
+            now = datetime.now(UTC)
+            for user_id, oldest_enqueued_at in users:
+                prefs = await self._repo.get_notification_prefs(user_id=user_id, product_id=None)
+                threshold = (
+                    prefs.digest_interval_minutes
+                    if prefs is not None and prefs.digest_interval_minutes
+                    else interval_minutes
+                )
+                age = (now - oldest_enqueued_at).total_seconds() / 60.0
+                if _row_is_quiet(prefs, now=now) if prefs is not None else False:
+                    continue
+                if age >= threshold:
+                    flushed_total += await self.flush_user(user_id=user_id)
+            return flushed_total
+        finally:
+            reset_locale(token)

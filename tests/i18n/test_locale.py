@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from unittest.mock import MagicMock
 
 import pytest
@@ -265,3 +266,121 @@ def test_operational_warning_headline_is_translated_at_render_time() -> None:
     assert "Controlli in errore su example.com" in text
     assert "Checks failing" not in text
     get_translation.cache_clear()
+
+
+@pytest.mark.usefixtures("_reset_locale_after")
+@pytest.mark.parametrize(
+    ("payload", "english_row", "italian_row"),
+    [
+        pytest.param(
+            {
+                "kind": "operational",
+                "event": "suspended",
+                "domain": "shop.example",
+                "count": 3,
+                "reason": "listing_gone",
+            },
+            "shop.example — 3 products: tracking suspended",
+            "shop.example — 3 prodotti: tracking sospeso",
+            id="suspended",
+        ),
+        pytest.param(
+            {
+                "kind": "operational",
+                "event": "warning",
+                "domain": "shop.example",
+                "count": 2,
+                "max": 10,
+            },
+            "shop.example — 2 products: checks failing (2/10)",
+            "shop.example — 2 prodotti: controlli in errore (2/10)",
+            id="warning",
+        ),
+        pytest.param(
+            {
+                "kind": "operational",
+                "event": "quarantine",
+                "domain": "shop.example",
+            },
+            "shop.example — quarantined",
+            "shop.example — in quarantena",
+            id="quarantine",
+        ),
+    ],
+)
+def test_digest_operational_section_is_translated_at_render_time(
+    payload: dict[str, object], english_row: str, italian_row: str
+) -> None:
+    from price_tracker.db.models import DigestEntry
+    from price_tracker.notifier.digest import _digest_blocks
+
+    entry = DigestEntry(
+        id=1,
+        user_id=1,
+        product_id=None,
+        alert_payload_json=json.dumps(payload),
+    )
+
+    set_locale("en")
+    _header, blocks_en, footer_en, _bad = _digest_blocks([entry])
+    set_locale("it_IT")
+    _header, blocks_it, footer_it, _bad = _digest_blocks([entry])
+
+    assert "Operational notices" in blocks_en[0][1]
+    assert english_row in blocks_en[0][1]
+    assert "Avvisi operativi" in blocks_it[0][1]
+    assert italian_row in blocks_it[0][1]
+    assert "dettagli" in footer_it
+    assert "details" in footer_en
+
+
+@pytest.mark.usefixtures("_reset_locale_after")
+def test_digest_fallback_name_is_translated_at_render_time() -> None:
+    from price_tracker.db.models import DigestEntry
+    from price_tracker.notifier.digest import _digest_blocks
+
+    entry = DigestEntry(
+        id=1,
+        user_id=1,
+        product_id=None,
+        alert_payload_json=json.dumps({"old_price": "120", "new_price": "99", "currency": "EUR"}),
+    )
+
+    set_locale("it_IT")
+    _header, blocks, _footer, _bad = _digest_blocks([entry])
+    assert "Avviso operativo" in blocks[0][1]
+    assert "Operational notice" not in blocks[0][1]
+
+
+@pytest.mark.usefixtures("_reset_locale_after")
+def test_digest_general_copy_is_translated_at_render_time() -> None:
+    from price_tracker.db.models import DigestEntry
+    from price_tracker.notifier.digest import _digest_blocks
+
+    price_entries = [
+        DigestEntry(
+            id=entry_id,
+            user_id=1,
+            product_id=entry_id,
+            alert_payload_json=json.dumps(
+                {"old_price": "120", "new_price": "99", "currency": "EUR"}
+            ),
+        )
+        for entry_id in (1, 2)
+    ]
+    operational = DigestEntry(
+        id=3,
+        user_id=1,
+        product_id=None,
+        alert_payload_json=json.dumps({"kind": "operational"}),
+    )
+
+    set_locale("it_IT")
+    singular, singular_blocks, _footer, _bad = _digest_blocks([price_entries[0]])
+    plural, blocks, footer, _bad = _digest_blocks([*price_entries, operational])
+
+    assert singular == "📊 <b>Riepilogo — 1 variazione di prezzo</b>"
+    assert plural == "📊 <b>Riepilogo — 2 variazioni di prezzo</b>"
+    assert "Prodotto #1" in singular_blocks[0][1]
+    assert "sconosciuto" in blocks[-1][1]
+    assert "Usa /lista per lo stato completo." in footer

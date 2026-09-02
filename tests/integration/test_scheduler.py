@@ -19,7 +19,7 @@ import pytest_asyncio
 from price_tracker.core.alert import format_operational_notice
 from price_tracker.core.exceptions import ListingGone, ParseError
 from price_tracker.core.health import HealthManager
-from price_tracker.core.notices import NoticeCollector, NoticeGroup
+from price_tracker.core.notices import NoticeCollector, NoticeGroup, OperationalEvent
 from price_tracker.core.registry import ScraperRegistry
 from price_tracker.core.scheduler import Scheduler, SchedulerDeps, _failure_reason
 from price_tracker.core.scraper_base import AbstractScraper, ProductInfo
@@ -1338,7 +1338,29 @@ async def test_flush_restores_locale_after_render_failure(
                 lang="it",
             )
         )
-        await scheduler.run_check_for_user(user_id=1)
+        # Call the flush DIRECTLY: run_check_for_user runs it inside a task,
+        # and a task copies the context, so the caller's locale can never be
+        # touched there — the assertion below would hold even without the reset.
+        collector = NoticeCollector()
+        collector.add(
+            OperationalEvent(
+                event="suspended",
+                user_id=1,
+                product_id=1,
+                product_name="Widget",
+                url="https://shop.example/p",
+                group_key="shop.example",
+                reason="listing_gone",
+                detail=None,
+                last_error=None,
+                error_count=1,
+                max_errors=1,
+                last_price=None,
+                currency=None,
+                last_checked_at=None,
+            )
+        )
+        await scheduler._flush_notices(collector)
     assert _("❌ Invalid ID.") == "❌ Invalid ID."
 
 
