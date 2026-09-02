@@ -158,11 +158,24 @@ class ShopifyScraper(AbstractScraper):
         # Surface WAF/CAPTCHA challenge bodies as a BlockEvent → domain quarantine (#7).
         detect_block_event(status_code=response.status_code, body=response.text, url=url)
         if not _is_product_path(response.url):
+            # A removed product does not always answer 404 straight away: measured
+            # against a real store, the first request on a cookieless session is
+            # redirected to the storefront home and answers 200, and only the next
+            # one 404s. Refusing to read a price off the homepage is right, but
+            # reporting it as "price not found" made a removal look like a parse
+            # failure — the useless message this whole path exists to stop sending.
+            # Landing on a *different* product is a different thing (a reshuffled
+            # URL, guarded by the handle comparison on the JSON path) and is left
+            # to the caller.
             logger.info(
-                "Shopify rejecting non-product redirect: %s -> %s",
+                "Shopify redirected away from the product path: %s -> %s",
                 url[:80],
                 str(response.url)[:80],
             )
+            if _is_product_path(url):
+                raise ListingGone(status=404, url=url)
+            # The tracked URL was not a product page to begin with (a collection,
+            # say): landing elsewhere says nothing about a listing being removed.
             return None
         return response.text
 

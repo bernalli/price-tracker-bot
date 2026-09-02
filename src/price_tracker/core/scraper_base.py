@@ -384,7 +384,23 @@ class AbstractScraper(ABC):
 
     @abstractmethod
     async def scrape(self, url: str, client: httpx.AsyncClient) -> ProductInfo:
-        """Fetch and parse the product page. Always return a ProductInfo (never raise)."""
+        """Fetch and parse the product page.
+
+        Return a ``ProductInfo`` for everything the scraper can survive: a
+        network error, an unparseable page, a missing price. ``error`` carries
+        the reason and the price stays ``None``.
+
+        Exactly two failures are raised instead of returned, because the
+        scheduler has to tell them apart from "I could not read the price" and
+        a returned ProductInfo cannot carry that distinction:
+
+        * ``BlockEvent`` (and subclasses) — the site is refusing us. Feeds the
+          per-domain circuit breaker, so the whole store gets quarantined
+          instead of each product burning its own error budget.
+        * ``ListingGone`` — the product was removed from the catalogue. Suspends
+          that one product early, with a reason the user can act on, and leaves
+          the domain healthy.
+        """
 
     def matches_domain(self, url: str) -> bool:
         """Helper for `can_handle`: True if URL netloc matches any domain_patterns."""

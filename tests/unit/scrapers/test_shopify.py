@@ -272,12 +272,15 @@ async def test_shopify_missing_price_selectors() -> None:
 
 @pytest.mark.asyncio
 async def test_shopify_rejects_redirect_to_home() -> None:
-    """Dead /products/<slug> that 301-redirects to home → must NOT parse price.
+    """Dead /products/<slug> redirecting to home → ListingGone, never a price.
 
-    Regression for bug that let `Filling Pieces® Official Webshop` get saved
-    as a product name (og:title of the home page) when the original URL had
-    been silently redirected. We reject any final URL whose path is not a
-    /products/<slug>.
+    Two things are asserted here, and the second one was added once the first
+    was measured against a real store. The scraper must not parse the home
+    page — that bug once saved a storefront's og:title as the product name.
+    And the redirect must be reported as a removed listing rather than as a
+    generic parse failure: a product taken out of the catalogue is redirected
+    to the storefront on a cookieless session and only 404s afterwards, so
+    treating the redirect as "price not found" hides the reason from the user.
     """
     scraper = ShopifyScraper()
     url = "https://shop.example.com/products/dead-slug"
@@ -295,10 +298,10 @@ async def test_shopify_rejects_redirect_to_home() -> None:
         router.get(url).respond(302, headers={"Location": "https://shop.example.com/"})
         router.get("https://shop.example.com/").respond(200, text=home_html)
         async with httpx.AsyncClient() as client:
-            info = await scraper.scrape(url, client)
+            with pytest.raises(ListingGone) as exc_info:
+                await scraper.scrape(url, client)
 
-    assert info.price is None, "scraper must NOT parse price from home page"
-    assert info.error is not None
+    assert exc_info.value.status == 404
 
 
 @pytest.mark.asyncio

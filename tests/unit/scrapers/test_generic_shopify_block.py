@@ -226,3 +226,44 @@ async def test_shopify_scrape_propagates_block_to_caller() -> None:
         async with httpx.AsyncClient() as client:
             with pytest.raises(BlockEvent):
                 await ShopifyScraper().scrape(url, client)
+
+
+# ── Measured live 2026-09-02: a removed product redirects before it 404s ──
+
+
+async def test_shopify_non_product_redirect_is_a_gone_listing() -> None:
+    """A redirect away from the product path means the listing is gone.
+
+    Measured against a real store: the first request for a removed product,
+    on a session with no cookies yet, is redirected to the storefront home and
+    answers 200. Only the second request — same session, now carrying cookies —
+    returns the 404. `_is_product_path` correctly refuses to read a price off
+    the homepage, but returning None there made the removal indistinguishable
+    from "I could not find the price", which is the useless message this whole
+    change exists to stop sending.
+    """
+    url = "https://shop.example/products/removed-item"
+    home = "https://shop.example/"
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).respond(302, headers={"Location": home})
+        router.get(home).respond(200, text="<html><body>storefront</body></html>")
+        async with httpx.AsyncClient() as client:
+            with pytest.raises(ListingGone) as exc_info:
+                await ShopifyScraper._fetch_html(url, client)
+    assert exc_info.value.status == 404
+
+
+async def test_shopify_redirect_to_another_product_is_not_a_gone_listing() -> None:
+    """Landing on a *different* product is a mismatch, not a removal.
+
+    The JSON path already guards this by comparing handles; the HTML path must
+    not turn it into a removal, or a store that reshuffles its URLs would have
+    its products suspended.
+    """
+    url = "https://shop.example/products/old-handle"
+    other = "https://shop.example/products/new-handle"
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).respond(302, headers={"Location": other})
+        router.get(other).respond(200, text="<html><body>a product</body></html>")
+        async with httpx.AsyncClient() as client:
+            assert await ShopifyScraper._fetch_html(url, client) is not None
