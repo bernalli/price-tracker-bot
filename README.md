@@ -8,6 +8,7 @@
 [![Security](https://github.com/bernalli/price-tracker-bot/actions/workflows/security.yml/badge.svg)](https://github.com/bernalli/price-tracker-bot/actions/workflows/security.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Version](https://img.shields.io/badge/version-1.0.0-brightgreen.svg)](https://github.com/bernalli/price-tracker-bot/releases)
 
 Self-hosted Telegram bot for multi-site price tracking with auto-quarantine, structured observability, fine-grained notification preferences, and a plugin architecture for adding new sites.
 
@@ -148,15 +149,28 @@ src/price_tracker/
 └── locale/         # gettext catalogs (en, it_IT)
 plugins/            # extension point for custom scrapers
 docs/               # user + contributor documentation
-tests/              # pytest suite (714 tests, ≥90% coverage)
+tests/              # pytest suite (717 tests, ≥90% coverage)
 ```
+
+## Stability
+
+**1.0 means the two things you build habits around are now stable**: the SQLite schema and
+the command surface. Migrations from any 1.x to a later 1.x apply forward without data loss,
+and a command that exists in 1.0 keeps its name and its arguments for the whole 1.x line.
+Removing a command or breaking the schema would be a 2.0, not a 1.x.
+
+What is explicitly *not* covered: the internal Python API (`price_tracker.*` is not a library),
+the wording of notification texts, and the scraper set — sites change their markup and scrapers
+follow them, which is maintenance rather than a breaking change.
 
 ## Roadmap
 
 - v0.1.0 — first public release: GitHub + ghcr.io image
 - v0.2.0 — confirmation-based alerting: a single bad scrape can no longer raise a price-drop alert
-- next — grouped operational notifications, per-product check intervals honoured by the scheduler,
-  full UI localisation
+- **v1.0.0 — stable schema and command surface**; per-domain quarantine reachable from every
+  scraper, public metadata and artwork carrying no real tracked listing
+- next — operational notices grouped per store and explaining themselves, per-product check
+  intervals honoured by the scheduler, full UI localisation
 
 ## Contributing
 
