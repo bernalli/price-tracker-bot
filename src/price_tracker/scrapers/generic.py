@@ -25,13 +25,14 @@ from typing import ClassVar
 import httpx
 from bs4 import BeautifulSoup, Tag
 
-from price_tracker.core.exceptions import BlockEvent
+from price_tracker.core.exceptions import BlockEvent, ListingGone
 from price_tracker.core.retry_policy import RetryConfig, with_retry
 from price_tracker.core.scraper_base import (
     AbstractScraper,
     ProductInfo,
     detect_block_event,
     detect_currency,
+    detect_listing_gone,
     get_headers,
     parse_price,
     select_jsonld_offer,
@@ -81,6 +82,7 @@ async def _fetch_generic_html(url: str, client: httpx.AsyncClient) -> str:
     # raise_for_status, so the scheduler quarantines the domain instead of
     # recording a generic failure (#16). with_retry never retries BlockEvents.
     detect_block_event(status_code=response.status_code, body=response.text, url=url)
+    detect_listing_gone(status_code=response.status_code, url=url)
     response.raise_for_status()
     return response.text
 
@@ -209,6 +211,14 @@ class GenericScraper(AbstractScraper):
                 fetched = await _fetch_generic_html(url, client)
                 if fetched:
                     html = fetched
+            except ListingGone:
+                if not html:
+                    raise
+                logger.debug(
+                    "Generic httpx fetch found a removed listing for %s; "
+                    "keeping the curl_cffi HTML",
+                    url[:60],
+                )
             except (httpx.HTTPError, ValueError) as e:
                 logger.debug("Generic httpx fetch failed for %s: %s", url[:60], e)
                 # Keep curl_cffi result (if any)

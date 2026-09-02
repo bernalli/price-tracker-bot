@@ -11,6 +11,7 @@ from bs4 import BeautifulSoup
 from price_tracker.core.exceptions import (
     CaptchaDetected,
     HTTPBlockStatus,
+    ListingGone,
     WAFBlocked,
 )
 from price_tracker.core.scraper_base import (
@@ -18,6 +19,7 @@ from price_tracker.core.scraper_base import (
     ProductInfo,
     detect_block_event,
     detect_currency,
+    detect_listing_gone,
     find_microdata_price_el,
     parse_price,
     select_jsonld_offer,
@@ -40,6 +42,43 @@ def test_product_info_with_values():
     assert info.name == "Widget"
     assert info.price == Decimal("12.34")
     assert info.currency == "EUR"
+
+
+@pytest.mark.parametrize(
+    ("status_code", "raises"),
+    [
+        (404, True),
+        (410, True),
+        (200, False),
+        (301, False),
+        (403, False),
+        (429, False),
+        (500, False),
+        (503, False),
+        (-1, False),
+        (0, False),
+    ],
+)
+def test_detect_listing_gone_only_for_terminal_statuses(status_code: int, *, raises: bool) -> None:
+    if raises:
+        with pytest.raises(ListingGone) as exc_info:
+            detect_listing_gone(status_code=status_code, url="https://shop.example/p/1")
+        assert exc_info.value.status == status_code
+        assert exc_info.value.url == "https://shop.example/p/1"
+    else:
+        detect_listing_gone(status_code=status_code, url="https://shop.example/p/1")
+
+
+def test_block_detection_precedes_listing_gone_on_403() -> None:
+    def run_detectors_in_order() -> None:
+        detect_block_event(status_code=403, body="blocked", url="https://shop.example/p/1")
+        detect_listing_gone(status_code=403, url="https://shop.example/p/1")
+
+    with pytest.raises(HTTPBlockStatus) as exc_info:
+        run_detectors_in_order()
+
+    assert exc_info.value.status == 403
+    assert not isinstance(exc_info.value, ListingGone)
 
 
 @pytest.mark.parametrize(

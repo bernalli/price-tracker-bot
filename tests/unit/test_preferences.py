@@ -67,6 +67,37 @@ async def test_resolve_per_product_overrides_global(repo_mock: AsyncMock) -> Non
 
 
 @pytest.mark.asyncio
+async def test_resolve_global_ignores_per_product_row(repo_mock: AsyncMock) -> None:
+    repo_mock.get_notification_prefs = AsyncMock(
+        return_value=NotificationPrefs(user_id=1, product_id=None, digest_mode=False)
+    )
+    mgr = PreferencesManager(repo=repo_mock)
+
+    eff = await mgr.resolve_global(user_id=1)
+
+    assert eff.digest_mode is False
+    repo_mock.get_notification_prefs.assert_awaited_once_with(user_id=1, product_id=None)
+
+
+@pytest.mark.asyncio
+async def test_resolve_global_returns_defaults_without_row(repo_mock: AsyncMock) -> None:
+    mgr = PreferencesManager(repo=repo_mock)
+
+    eff = await mgr.resolve_global(user_id=1)
+
+    assert eff == EffectivePrefs(
+        mute=False,
+        mute_until=None,
+        digest_mode=False,
+        digest_interval_minutes=60,
+        quiet_hours_start=None,
+        quiet_hours_end=None,
+        throttle_per_hour=None,
+        timezone="Europe/Rome",
+    )
+
+
+@pytest.mark.asyncio
 async def test_resolve_falls_back_field_by_field(repo_mock: AsyncMock) -> None:
     repo_mock.get_notification_prefs = AsyncMock(
         side_effect=[

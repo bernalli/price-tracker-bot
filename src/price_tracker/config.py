@@ -38,6 +38,7 @@ class Config:
     request_timeout: int
     log_level: str
     lang: str
+    listing_gone_confirmations: int = 3
     prometheus_bind: str = "127.0.0.1:9090"
     metrics_enabled: bool = True
     read_confirmations: int = REQUIRED_CONFIRMATIONS
@@ -69,6 +70,7 @@ class Config:
             request_timeout=int(os.getenv("REQUEST_TIMEOUT", "30")),
             log_level=os.getenv("LOG_LEVEL", "INFO"),
             lang=os.getenv("LOCALE", "en"),
+            listing_gone_confirmations=int(os.getenv("LISTING_GONE_CONFIRMATIONS", "3")),
             prometheus_bind=os.getenv("PROMETHEUS_BIND", "127.0.0.1:9090"),
             read_confirmations=int(os.getenv("READ_CONFIRMATIONS", str(REQUIRED_CONFIRMATIONS))),
             metrics_enabled=metrics_enabled,

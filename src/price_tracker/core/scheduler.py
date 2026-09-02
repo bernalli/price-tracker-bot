@@ -1,4 +1,4 @@
-"""Scheduler — periodic price check + threshold alert dispatch.
+"""Scheduler — periodic checks, price alerts, and grouped operational notices.
 
 Two dispatch modes:
 
@@ -10,7 +10,8 @@ Two dispatch modes:
   ``check_user_products_for_user`` accumulate :class:`CheckResult` objects and
   return them to the caller, which renders its own summary message
   (``/check``, ``/checkall``, menu/product callbacks). The notifier is **not**
-  invoked in pull mode — the handler is responsible for the user reply.
+  receives price alerts; operational notices are collected and flushed at the
+  end of that user-requested sweep.
 """
 
 from __future__ import annotations
@@ -23,17 +24,27 @@ from typing import TYPE_CHECKING, Any, Protocol, cast
 
 import httpx
 
+from price_tracker.bot.messages import reset_locale, set_locale
 from price_tracker.core.alert import (
     PriceAlert,
     ThresholdType,
+    _why,
     crosses_threshold,
     format_alert,
     format_back_in_stock,
-    format_error_notification,
+    format_operational_notice,
     format_quarantine_notification,
+    format_warning_notice,
+    operational_buttons,
 )
-from price_tracker.core.exceptions import BlockEvent, ParseError
+from price_tracker.core.exceptions import (
+    LISTING_GONE_STATUSES,
+    BlockEvent,
+    ListingGone,
+    ParseError,
+)
 from price_tracker.core.health import HealthManager, QuarantineState
+from price_tracker.core.notices import NoticeCollector, NoticeGroup, OperationalEvent, group_key_for
 from price_tracker.core.outlier import (
     MAX_HELD_READS,
     REQUIRED_CONFIRMATIONS,
@@ -45,6 +56,7 @@ from price_tracker.core.scraper_base import (
     handle_block_in_pipeline,
     handle_success_in_pipeline,
 )
+from price_tracker.core.textlimits import NAME_BUDGET, WHY_BUDGET, truncate_visible
 from price_tracker.core.url_utils import extract_etld_plus_one
 
 if TYPE_CHECKING:
@@ -88,6 +100,7 @@ def _alert_payload(alert: PriceAlert, *, domain: str) -> dict[str, Any]:
     trip even when the immediate message body is pre-rendered.
     """
     return {
+        "kind": "price",
         "product_id": alert.product_id,
         "product_name": alert.product_name,
         "url": alert.url,
@@ -113,6 +126,19 @@ def _parse_db_timestamp(value: str) -> datetime:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=UTC)
     return parsed
+
+
+def _failure_reason(exc: BaseException) -> tuple[str, str]:
+    """Map a failed check to ``(reason, detail)`` — the closed list in the plan."""
+    if isinstance(exc, ListingGone):
+        return "listing_gone", f"HTTP {exc.status}"
+    if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code in LISTING_GONE_STATUSES:
+        return "listing_gone", f"HTTP {exc.response.status_code}"
+    if isinstance(exc, ParseError):
+        return "parse_error", str(exc)
+    if isinstance(exc, httpx.HTTPError | ValueError | KeyError):
+        return "http_error", str(exc)
+    return "unexpected", str(exc)
 
 
 def _no_op_health_mgr() -> HealthManager:
@@ -150,11 +176,13 @@ class SchedulerDeps:
     client: httpx.AsyncClient
     notifier: NotifierFn
     max_consecutive_errors: int = 10
+    listing_gone_confirmations: int = 3
     delay_between_products: float = 5.0
     notification_cooldown_hours: int = 24
     health_mgr: HealthManager = field(default_factory=_no_op_health_mgr)
     metrics: MetricsRegistry | None = None
     read_confirmations: int = REQUIRED_CONFIRMATIONS
+    lang: str | None = None
     """Agreeing reads needed before an implausible price is trusted.
 
     Costs ``(read_confirmations - 1) × check_interval`` of latency on a genuine
@@ -178,6 +206,7 @@ class CheckResult:
     user_id: int
     alert: PriceAlert | None = None
     disabled: bool = False
+    reason: str | None = None
 
 
 class Scheduler:
@@ -186,7 +215,7 @@ class Scheduler:
     def __init__(self, deps: SchedulerDeps) -> None:
         self.deps = deps
 
-    async def _scrape_one(self, product: ProductRecord) -> None:
+    async def _scrape_one(self, product: ProductRecord, *, collector: NoticeCollector) -> None:
         """Scrape a single product and persist results (delegates to _check_product).
 
         Resolves scraper_name + domain at the top so that block/parse/error
@@ -200,7 +229,9 @@ class Scheduler:
         scraper_name = scraper.name if scraper is not None else "unknown"
         metrics = self.deps.metrics
         try:
-            await self._check_product(product.id, scraper_name=scraper_name, domain=domain)
+            await self._check_product(
+                product.id, scraper_name=scraper_name, domain=domain, collector=collector
+            )
         except BlockEvent as e:
             logger.warning("Block detected for product %d: %s", product.id, e)
             if metrics is not None:
@@ -215,7 +246,27 @@ class Scheduler:
                 if prev_state == QuarantineState.CLOSED and self.deps.health_mgr.is_locked(domain):
                     await self._notify_quarantine_entry(product, domain, reason=str(e))
             await self._record_failure_and_maybe_disable(
-                product, scraper_name=scraper_name, domain=domain, reason="block", detail=str(e)
+                product,
+                scraper_name=scraper_name,
+                domain=domain,
+                reason="block",
+                detail=str(e),
+                collector=collector,
+            )
+        except ListingGone as e:
+            logger.warning("Listing gone for product %d: %s", product.id, e)
+            if metrics is not None:
+                metrics.price_check_total.labels(
+                    scraper=scraper_name, domain=domain, status="error"
+                ).inc()
+            reason, detail = _failure_reason(e)
+            await self._record_failure_and_maybe_disable(
+                product,
+                scraper_name=scraper_name,
+                domain=domain,
+                reason=reason,
+                detail=detail,
+                collector=collector,
             )
         except ParseError as e:
             logger.warning("Parse error for product %d: %s", product.id, e)
@@ -229,6 +280,7 @@ class Scheduler:
                 domain=domain,
                 reason="parse_error",
                 detail=str(e),
+                collector=collector,
             )
         except (httpx.HTTPError, ValueError, KeyError) as e:
             logger.warning("Check failed for product %d: %s", product.id, e)
@@ -236,12 +288,14 @@ class Scheduler:
                 metrics.price_check_total.labels(
                     scraper=scraper_name, domain=domain, status="error"
                 ).inc()
+            reason, detail = _failure_reason(e)
             await self._record_failure_and_maybe_disable(
                 product,
                 scraper_name=scraper_name,
                 domain=domain,
-                reason="http_error",
-                detail=str(e),
+                reason=reason,
+                detail=detail,
+                collector=collector,
             )
         except Exception as e:  # noqa: BLE001 — one product must never abort the sweep
             # Unexpected: a scraper leaking a non-contract exception, or a DB error
@@ -259,6 +313,7 @@ class Scheduler:
                     domain=domain,
                     reason="unexpected",
                     detail=str(e),
+                    collector=collector,
                 )
             except Exception:  # noqa: BLE001 — bookkeeping must also not abort the sweep
                 logger.exception(
@@ -270,6 +325,7 @@ class Scheduler:
         products: list[ProductRecord],
         *,
         half_open_seen: set[str] | None = None,
+        collector: NoticeCollector,
     ) -> None:
         """One scheduler tick: scrape all eligible products.
 
@@ -295,7 +351,7 @@ class Scheduler:
             domain = extract_etld_plus_one(product.url)
             if not domain:
                 # Unknown domain — best-effort scrape (Generic scraper handles it)
-                await self._scrape_one(product)
+                await self._scrape_one(product, collector=collector)
                 await asyncio.sleep(self.deps.delay_between_products)
                 continue
 
@@ -309,13 +365,17 @@ class Scheduler:
                     continue  # only one probe per half-open domain per tick; no sleep needed
                 half_open_seen.add(domain)
 
-            await self._scrape_one(product)
+            await self._scrape_one(product, collector=collector)
             await asyncio.sleep(self.deps.delay_between_products)
 
     async def run_check_for_user(self, *, user_id: int) -> None:
         """Check every active product owned by `user_id` sequentially."""
         products = await self.deps.repo.list_products_for_user(user_id=user_id, only_active=True)
-        await self._run_tick(products)
+        collector = NoticeCollector()
+        try:
+            await self._run_tick(products, collector=collector)
+        finally:
+            await self._flush_guaranteed(collector)
 
     async def run_check_all(self) -> None:
         """Check every active product across every active user.
@@ -329,7 +389,11 @@ class Scheduler:
             products = await self.deps.repo.list_products_for_user(
                 user_id=u.user_id, only_active=True
             )
-            await self._run_tick(products, half_open_seen=half_open_seen)
+            collector = NoticeCollector()
+            try:
+                await self._run_tick(products, half_open_seen=half_open_seen, collector=collector)
+            finally:
+                await self._flush_guaranteed(collector)
 
     async def _notify_quarantine_entry(
         self, product: ProductRecord, domain: str, *, reason: str
@@ -344,14 +408,23 @@ class Scheduler:
             reason=reason,
             locked_until=self.deps.health_mgr.locked_until(domain),
         )
-        try:
-            await self.deps.notifier(product.user_id, message)
-        except Exception:  # noqa: BLE001 — notifier failure must not kill the tick
-            logger.exception(
-                "Notifier failed to deliver quarantine alert for domain %s (user %d)",
-                domain,
-                product.user_id,
-            )
+        product_name = truncate_visible(product.name or product.url, NAME_BUDGET)
+        await self._notify(
+            product.user_id,
+            message,
+            product_id=None,
+            payload={
+                "kind": "operational",
+                "event": "quarantine",
+                "domain": domain,
+                "products": [{"id": product.id, "name": product_name, "why": "blocked"}],
+                "count": 1,
+                "event_id": (
+                    f"ops:quarantine:{product.user_id}:{domain}:"
+                    f"{self.deps.health_mgr.locked_until(domain) or 'none'}"
+                ),
+            },
+        )
 
     async def _record_failure_and_maybe_disable(
         self,
@@ -361,66 +434,164 @@ class Scheduler:
         domain: str,
         reason: str,
         detail: str | None = None,
+        collector: NoticeCollector,
     ) -> bool:
         """Increment ``consecutive_errors`` and auto-disable on threshold.
 
-        Always increments the error count. Re-reads the product to obtain the
-        updated counter (so concurrent ticks see a consistent value), and when
-        the counter reaches ``deps.max_consecutive_errors`` it:
+        Always records the error and obtains the updated counters in one
+        repository operation. When either ``consecutive_errors`` reaches
+        ``deps.max_consecutive_errors`` or ``gone_streak`` reaches
+        ``deps.listing_gone_confirmations`` it:
 
-        * pauses the product via :meth:`Repository.deactivate_product`
-        * pushes one ``Tracking suspended`` notification to the owner via
-          ``deps.notifier`` so users get a persistent record of the suspension
-          even when the failure was detected during an interactive ``/checkall``.
+        * suspends the product via the compare-and-swap
+          :meth:`Repository.suspend_product`
+        * adds one grouped operational event to the collector owned by the
+          surrounding sweep, which flushes it in ``finally``.
 
-        The notifier is invoked under a broad try/except: a flaky transport
-        must not abort the surrounding scheduler tick. Returns ``True`` when
-        the product was disabled *by this call* so pull-mode callers can flag
-        the disabled status on their :class:`CheckResult`.
+        Returns ``True`` when the product was disabled *by this call* so
+        pull-mode callers can flag the disabled status on their
+        :class:`CheckResult`.
 
         ``scraper_name`` and ``domain`` are passed through for structured
         logging only. ``reason`` (plus optional ``detail``) is persisted as the
         product's ``last_error`` so the /errori command can surface it.
         """
-        await self.deps.repo.increment_errors(product.id)
-        await self.deps.repo.set_last_error(product.id, f"{reason}: {detail}" if detail else reason)
+        updated = await self.deps.repo.record_failure(product.id, reason=reason, detail=detail)
         # A check that failed produced no evidence about the price, so it breaks
         # any confirmation run in progress: two sightings either side of an
         # outage are not consecutive readings of the same claim.
         if product.pending_read_count or product.pending_read_streak:
             await self.deps.repo.clear_pending_read(product.id)
-        updated = await self.deps.repo.get_product(product.id)
         if updated is None:
             return False
-        if updated.consecutive_errors < self.deps.max_consecutive_errors:
+        max_errors = self.deps.max_consecutive_errors
+        half = max_errors // 2
+        suspended = (
+            updated.consecutive_errors >= max_errors
+            or updated.gone_streak >= self.deps.listing_gone_confirmations
+        )
+        if not suspended:
+            if 1 <= half < max_errors and updated.consecutive_errors == half:
+                collector.add(self._event("warning", updated, reason=reason, detail=detail))
             return False
-        await self.deps.repo.deactivate_product(product.id)
+        await self.deps.repo.suspend_product(product.id, reason=reason)
         logger.warning(
             "Product %d auto-disabled after %d consecutive errors "
-            "(scraper=%s, domain=%s, reason=%s)",
+            "(gone_streak=%d, scraper=%s, domain=%s, reason=%s)",
             product.id,
             updated.consecutive_errors,
+            updated.gone_streak,
             scraper_name,
             domain,
             reason,
         )
-        message = format_error_notification(
-            product={
-                "name": product.name or product.url,
-                "url": product.url,
-            },
-            error_count=updated.consecutive_errors,
-            max_errors=self.deps.max_consecutive_errors,
-        )
-        try:
-            await self.deps.notifier(product.user_id, message)
-        except Exception:  # noqa: BLE001 — notifier failure must not kill the tick
-            logger.exception(
-                "Notifier failed to deliver auto-disable alert for product %d (user %d)",
-                product.id,
-                product.user_id,
-            )
+        collector.add(self._event("suspended", updated, reason=reason, detail=detail))
         return True
+
+    def _event(
+        self,
+        event: str,
+        record: ProductRecord,
+        *,
+        reason: str,
+        detail: str | None,
+    ) -> OperationalEvent:
+        """Project one persisted failure into the closed operational event type."""
+        return OperationalEvent(
+            event=cast("Any", event),
+            user_id=record.user_id,
+            product_id=record.id,
+            product_name=record.name or record.url,
+            url=record.url,
+            group_key=group_key_for(record.url),
+            reason=reason,
+            detail=detail,
+            last_error=record.last_error,
+            error_count=record.consecutive_errors,
+            max_errors=self.deps.max_consecutive_errors,
+            last_price=record.current_price,
+            currency=record.currency,
+            last_checked_at=record.last_checked_at,
+        )
+
+    def _operational_payload(
+        self, group: NoticeGroup, sweep_started_at: datetime
+    ) -> dict[str, Any]:
+        """Build the JSON-serializable operational-notice contract."""
+        products = [
+            {
+                "id": event.product_id,
+                "name": truncate_visible(event.product_name or event.url, NAME_BUDGET),
+                "why": truncate_visible(_why(event.reason, event.detail), WHY_BUDGET),
+            }
+            for event in group.events
+        ]
+        first = group.events[0]
+        return {
+            "kind": "operational",
+            "event": group.event,
+            "event_id": (
+                f"ops:{group.event}:{group.user_id}:{group.group_key}:"
+                f"{sweep_started_at.isoformat()}"
+            ),
+            "user_id": group.user_id,
+            "domain": group.group_key,
+            "product_ids": [event.product_id for event in group.events],
+            "products": products,
+            "reason": group.primary_reason,
+            "count": len(group.events),
+            "error_count": first.error_count,
+            "max_errors": first.max_errors,
+            "buttons": operational_buttons(group),
+        }
+
+    async def _flush_notices(self, collector: NoticeCollector) -> None:
+        """Render and send every group, isolating failures per group."""
+        token = set_locale(self.deps.lang)
+        sweep_started_at = datetime.now(UTC)
+        try:
+            for group in collector.groups():
+                try:
+                    text = (
+                        format_operational_notice(group)
+                        if group.event == "suspended"
+                        else format_warning_notice(group)
+                    )
+                    delivered = await self._notify(
+                        group.user_id,
+                        text,
+                        product_id=None,
+                        payload=self._operational_payload(group, sweep_started_at),
+                    )
+                    if not delivered:
+                        logger.warning(
+                            "Operational notice was not delivered (user_id=%d, group_key=%s, "
+                            "product_ids=%s)",
+                            group.user_id,
+                            group.group_key,
+                            [event.product_id for event in group.events],
+                        )
+                except Exception:  # noqa: BLE001 — one group must not block the remaining groups
+                    logger.exception(
+                        "Failed to render or deliver operational notice (user_id=%d, group_key=%s)",
+                        group.user_id,
+                        group.group_key,
+                    )
+        finally:
+            reset_locale(token)
+
+    async def _flush_guaranteed(self, collector: NoticeCollector) -> None:
+        """Flush once; cancellation cannot cancel the independently shielded flush task."""
+        task = asyncio.create_task(self._flush_notices(collector))
+        cancelled = False
+        while not task.done():
+            try:
+                await asyncio.shield(task)
+            except asyncio.CancelledError:
+                cancelled = True
+        await task
+        if cancelled:
+            raise asyncio.CancelledError
 
     async def _check_product_core(
         self,
@@ -428,6 +599,7 @@ class Scheduler:
         *,
         scraper_name: str = "unknown",
         domain: str = "unknown",
+        collector: NoticeCollector,
     ) -> tuple[int, PriceAlert | None, bool] | None:
         """Scrape one product, persist, and return ``(user_id, alert, disabled)``.
 
@@ -437,10 +609,9 @@ class Scheduler:
         * Returns ``None`` when the product is missing or already inactive.
 
         Side-effects: writes price/history/errors to the repository and emits
-        metrics. The notifier is invoked **only** by
-        :meth:`_record_failure_and_maybe_disable` for auto-disable alerts;
+        metrics. Auto-disable and warning events are added to ``collector``;
         price-drop alerts are returned to the caller, which decides whether to
-        push (periodic job) or accumulate (interactive handler).
+        push (periodic job) or return them (interactive handler).
         """
         p = await self.deps.repo.get_product(product_id)
         if p is None or not p.is_active:
@@ -455,7 +626,11 @@ class Scheduler:
                     scraper=scraper_name, domain=domain, status="error"
                 ).inc()
             disabled = await self._record_failure_and_maybe_disable(
-                p, scraper_name=scraper_name, domain=domain, reason="no_scraper"
+                p,
+                scraper_name=scraper_name,
+                domain=domain,
+                reason="no_scraper",
+                collector=collector,
             )
             return (p.user_id, None, disabled)
 
@@ -474,7 +649,11 @@ class Scheduler:
                     scraper=scraper_name, domain=domain, status="error"
                 ).inc()
             disabled = await self._record_failure_and_maybe_disable(
-                p, scraper_name=scraper_name, domain=domain, reason="price_none"
+                p,
+                scraper_name=scraper_name,
+                domain=domain,
+                reason="price_none",
+                collector=collector,
             )
             return (p.user_id, None, disabled)
 
@@ -493,6 +672,7 @@ class Scheduler:
                 await handle_success_in_pipeline(health_mgr=self.deps.health_mgr, domain=domain)
             if p.pending_read_count or p.pending_read_streak:
                 await self.deps.repo.clear_pending_read(p.id)
+            await self.deps.repo.reset_errors(p.id)
             return (p.user_id, None, False)
 
         if not self._condition_matches(p, info.condition):
@@ -522,6 +702,7 @@ class Scheduler:
                 domain=domain,
                 reason="condition_mismatch",
                 detail=f"offer is {info.condition!r}, tracking {p.preferred_condition!r}",
+                collector=collector,
             )
             return (p.user_id, None, disabled)
 
@@ -551,6 +732,7 @@ class Scheduler:
                 domain=domain,
                 reason="implausible_read",
                 detail=f"{info.price} against a median of recent readings",
+                collector=collector,
             )
             return (p.user_id, None, disabled)
 
@@ -561,6 +743,7 @@ class Scheduler:
                 ).inc()
             if domain != "unknown":
                 await handle_success_in_pipeline(health_mgr=self.deps.health_mgr, domain=domain)
+            await self.deps.repo.reset_errors(p.id)
             return (p.user_id, None, False)
 
         old_price = p.current_price or p.initial_price
@@ -594,6 +777,7 @@ class Scheduler:
                 ),
                 product_id=p.id,
                 payload={
+                    "kind": "price",
                     "product_id": p.id,
                     "product_name": p.name or p.url,
                     "url": p.url,
@@ -725,15 +909,16 @@ class Scheduler:
         *,
         scraper_name: str = "unknown",
         domain: str = "unknown",
+        collector: NoticeCollector,
     ) -> None:
         """Push-mode check used by the periodic job: scrape and dispatch via notifier.
 
-        Auto-disable notifications are pushed inside
+        Operational notices are accumulated by
         :meth:`_record_failure_and_maybe_disable`; this wrapper only handles
         the price-drop alert path.
         """
         outcome = await self._check_product_core(
-            product_id, scraper_name=scraper_name, domain=domain
+            product_id, scraper_name=scraper_name, domain=domain, collector=collector
         )
         if outcome is None:
             return
@@ -777,164 +962,157 @@ class Scheduler:
         elapsed = (now or datetime.now(UTC)) - _parse_db_timestamp(last_at)
         return elapsed < timedelta(hours=self.deps.notification_cooldown_hours)
 
-    async def check_one_product_for_user(self, *, product_id: int, user_id: int) -> CheckResult:
-        """Pull-mode single-product check used by ``/check`` and the per-product
-        "Check now" inline button.
+    async def check_products_for_user(
+        self,
+        *,
+        product_ids: list[int],
+        user_id: int,
+        delay_between_products: float | None = None,
+    ) -> list[CheckResult]:
+        """Run the sole pull-mode loop and flush its isolated collector once."""
+        collector = NoticeCollector()
+        results: list[CheckResult] = []
+        effective_delay = (
+            self.deps.delay_between_products
+            if delay_between_products is None
+            else delay_between_products
+        )
+        half_open_seen: set[str] = set()
+        try:
+            for product_id in product_ids:
+                product = await self.deps.repo.get_product_for_user(product_id, user_id)
+                if product is None or not product.is_active:
+                    continue
+                domain = extract_etld_plus_one(product.url) or "unknown"
+                if domain != "unknown":
+                    if self.deps.health_mgr.is_locked(domain):
+                        if self.deps.metrics is not None:
+                            self.deps.metrics.quarantine_skip_total.labels(domain=domain).inc()
+                        continue
+                    if self.deps.health_mgr.is_half_open(domain):
+                        if domain in half_open_seen:
+                            continue
+                        half_open_seen.add(domain)
+                scraper = self.deps.registry.resolve(product.url)
+                scraper_name = scraper.name if scraper is not None else "unknown"
+                try:
+                    outcome = await self._check_product_core(
+                        product.id,
+                        scraper_name=scraper_name,
+                        domain=domain,
+                        collector=collector,
+                    )
+                except BlockEvent as exc:
+                    logger.warning("Block detected for product %d: %s", product.id, exc)
+                    if self.deps.metrics is not None:
+                        self.deps.metrics.price_check_total.labels(
+                            scraper=scraper_name, domain=domain, status="block"
+                        ).inc()
+                    if domain != "unknown":
+                        previous = self.deps.health_mgr.state(domain)
+                        await handle_block_in_pipeline(
+                            exc, health_mgr=self.deps.health_mgr, domain=domain
+                        )
+                        if previous == QuarantineState.CLOSED and self.deps.health_mgr.is_locked(
+                            domain
+                        ):
+                            await self._notify_quarantine_entry(product, domain, reason=str(exc))
+                    disabled = await self._record_failure_and_maybe_disable(
+                        product,
+                        scraper_name=scraper_name,
+                        domain=domain,
+                        reason="block",
+                        detail=str(exc),
+                        collector=collector,
+                    )
+                    results.append(
+                        CheckResult(product.id, user_id, disabled=disabled, reason="block")
+                    )
+                except ListingGone as exc:
+                    reason, detail = _failure_reason(exc)
+                    disabled = await self._record_failure_and_maybe_disable(
+                        product,
+                        scraper_name=scraper_name,
+                        domain=domain,
+                        reason=reason,
+                        detail=detail,
+                        collector=collector,
+                    )
+                    results.append(
+                        CheckResult(product.id, user_id, disabled=disabled, reason=reason)
+                    )
+                except ParseError as exc:
+                    disabled = await self._record_failure_and_maybe_disable(
+                        product,
+                        scraper_name=scraper_name,
+                        domain=domain,
+                        reason="parse_error",
+                        detail=str(exc),
+                        collector=collector,
+                    )
+                    results.append(
+                        CheckResult(product.id, user_id, disabled=disabled, reason="parse_error")
+                    )
+                except (httpx.HTTPError, ValueError, KeyError) as exc:
+                    reason, detail = _failure_reason(exc)
+                    disabled = await self._record_failure_and_maybe_disable(
+                        product,
+                        scraper_name=scraper_name,
+                        domain=domain,
+                        reason=reason,
+                        detail=detail,
+                        collector=collector,
+                    )
+                    results.append(
+                        CheckResult(product.id, user_id, disabled=disabled, reason=reason)
+                    )
+                except Exception as exc:  # noqa: BLE001 — preserve pull-loop isolation
+                    logger.exception("Unexpected error checking product %d: %s", product.id, exc)
+                    try:
+                        disabled = await self._record_failure_and_maybe_disable(
+                            product,
+                            scraper_name=scraper_name,
+                            domain=domain,
+                            reason="unexpected",
+                            detail=str(exc),
+                            collector=collector,
+                        )
+                    except Exception:  # noqa: BLE001 — failure bookkeeping is isolated too
+                        logger.exception("Failed to record failure for product %d", product.id)
+                        disabled = False
+                    results.append(
+                        CheckResult(product.id, user_id, disabled=disabled, reason="unexpected")
+                    )
+                else:
+                    if outcome is None:
+                        results.append(CheckResult(product.id, user_id))
+                    else:
+                        _outcome_user_id, alert, disabled = outcome
+                        results.append(
+                            CheckResult(product.id, user_id, alert=alert, disabled=disabled)
+                        )
+                await asyncio.sleep(effective_delay)
+            return results
+        finally:
+            await self._flush_guaranteed(collector)
 
-        The product is scraped through the same pipeline used by the periodic
-        job (outlier rejection, health-manager events, metrics) but the
-        resulting alert — if any — is returned to the caller instead of being
-        pushed to Telegram. ``user_id`` is recorded on the result so the caller
-        can verify ownership when needed. ``disabled`` is propagated from
-        :meth:`_check_product_core` so the handler can flag the auto-pause.
-        """
-        outcome = await self._check_product_core(product_id)
-        if outcome is None:
-            return CheckResult(product_id=product_id, user_id=user_id, alert=None)
-        _, alert, disabled = outcome
-        return CheckResult(product_id=product_id, user_id=user_id, alert=alert, disabled=disabled)
+    async def check_one_product_for_user(self, *, product_id: int, user_id: int) -> CheckResult:
+        """Delegate a single pull-mode check to the sole pull loop."""
+        results = await self.check_products_for_user(
+            product_ids=[product_id], user_id=user_id, delay_between_products=0
+        )
+        return results[0] if results else CheckResult(product_id=product_id, user_id=user_id)
 
     async def check_user_products_for_user(
         self, *, user_id: int, delay_between_products: float | None = None
     ) -> list[CheckResult]:
-        """Pull-mode batch check used by ``/checkall`` and the menu "Check all" button.
-
-        Iterates over every active product owned by ``user_id``, respecting the
-        same per-tick rate-limiting and domain quarantine rules as
-        ``_run_tick`` (so a quarantined domain is skipped silently rather than
-        scraped). Returns one :class:`CheckResult` per attempted product so the
-        caller can build a summary message inline.
-
-        ``delay_between_products`` overrides the per-product pause. The push
-        mode (periodic job) leaves it unset and inherits the gentle
-        ``deps.delay_between_products`` (default 5s) to be polite to upstream
-        servers. Interactive callers (``/checkall``, menu button) override
-        with a small value (≈0.5s) since the user is waiting in real time —
-        gentleness still matters but the UX gap matters more.
-        """
-        effective_delay = (
-            delay_between_products
-            if delay_between_products is not None
-            else self.deps.delay_between_products
-        )
+        """Delegate all active user products to the sole pull-mode loop."""
         products = await self.deps.repo.list_products_for_user(user_id=user_id, only_active=True)
-        results: list[CheckResult] = []
-        half_open_seen: set[str] = set()
-        for product in products:
-            domain = extract_etld_plus_one(product.url) or "unknown"
-
-            if domain != "unknown":
-                if self.deps.health_mgr.is_locked(domain):
-                    metrics = self.deps.metrics
-                    if metrics is not None:
-                        metrics.quarantine_skip_total.labels(domain=domain).inc()
-                    continue
-                if self.deps.health_mgr.is_half_open(domain):
-                    if domain in half_open_seen:
-                        continue
-                    half_open_seen.add(domain)
-
-            scraper = self.deps.registry.resolve(product.url)
-            scraper_name = scraper.name if scraper is not None else "unknown"
-            metrics = self.deps.metrics
-            try:
-                outcome = await self._check_product_core(
-                    product.id, scraper_name=scraper_name, domain=domain
-                )
-            except BlockEvent as e:
-                logger.warning("Block detected for product %d: %s", product.id, e)
-                if metrics is not None:
-                    metrics.price_check_total.labels(
-                        scraper=scraper_name, domain=domain, status="block"
-                    ).inc()
-                if domain != "unknown":
-                    await handle_block_in_pipeline(
-                        e, health_mgr=self.deps.health_mgr, domain=domain
-                    )
-                disabled = await self._record_failure_and_maybe_disable(
-                    product, scraper_name=scraper_name, domain=domain, reason="block"
-                )
-                results.append(
-                    CheckResult(
-                        product_id=product.id,
-                        user_id=user_id,
-                        alert=None,
-                        disabled=disabled,
-                    )
-                )
-            except ParseError as e:
-                logger.warning("Parse error for product %d: %s", product.id, e)
-                if metrics is not None:
-                    metrics.price_check_total.labels(
-                        scraper=scraper_name, domain=domain, status="error"
-                    ).inc()
-                disabled = await self._record_failure_and_maybe_disable(
-                    product, scraper_name=scraper_name, domain=domain, reason="parse_error"
-                )
-                results.append(
-                    CheckResult(
-                        product_id=product.id,
-                        user_id=user_id,
-                        alert=None,
-                        disabled=disabled,
-                    )
-                )
-            except (httpx.HTTPError, ValueError, KeyError) as e:
-                logger.warning("Check failed for product %d: %s", product.id, e)
-                if metrics is not None:
-                    metrics.price_check_total.labels(
-                        scraper=scraper_name, domain=domain, status="error"
-                    ).inc()
-                disabled = await self._record_failure_and_maybe_disable(
-                    product, scraper_name=scraper_name, domain=domain, reason="http_error"
-                )
-                results.append(
-                    CheckResult(
-                        product_id=product.id,
-                        user_id=user_id,
-                        alert=None,
-                        disabled=disabled,
-                    )
-                )
-            except Exception as e:  # noqa: BLE001 — one product must never abort /checkall
-                logger.exception("Unexpected error checking product %d: %s", product.id, e)
-                if metrics is not None:
-                    metrics.price_check_total.labels(
-                        scraper=scraper_name, domain=domain, status="error"
-                    ).inc()
-                try:
-                    disabled = await self._record_failure_and_maybe_disable(
-                        product, scraper_name=scraper_name, domain=domain, reason="unexpected"
-                    )
-                except Exception:  # noqa: BLE001 — bookkeeping must also not abort the sweep
-                    logger.exception(
-                        "Failed to record failure for product %d after unexpected error",
-                        product.id,
-                    )
-                    disabled = False
-                results.append(
-                    CheckResult(
-                        product_id=product.id,
-                        user_id=user_id,
-                        alert=None,
-                        disabled=disabled,
-                    )
-                )
-            else:
-                if outcome is None:
-                    results.append(CheckResult(product_id=product.id, user_id=user_id, alert=None))
-                else:
-                    _, alert, disabled = outcome
-                    results.append(
-                        CheckResult(
-                            product_id=product.id,
-                            user_id=user_id,
-                            alert=alert,
-                            disabled=disabled,
-                        )
-                    )
-            await asyncio.sleep(effective_delay)
-        return results
+        return await self.check_products_for_user(
+            product_ids=[product.id for product in products],
+            user_id=user_id,
+            delay_between_products=delay_between_products,
+        )
 
     async def cleanup_old_history(self, *, retention_days: int = 365) -> int:
         """Delete price_history rows older than `retention_days`. Returns row count."""

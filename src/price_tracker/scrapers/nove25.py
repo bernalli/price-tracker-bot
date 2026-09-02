@@ -23,6 +23,7 @@ from price_tracker.core.retry_policy import RetryConfig, with_retry
 from price_tracker.core.scraper_base import (
     AbstractScraper,
     ProductInfo,
+    detect_listing_gone,
     find_microdata_price_el,
     get_headers,
     jsonld_offer_availability,
@@ -36,6 +37,7 @@ logger = logging.getLogger(__name__)
 async def _fetch_nove25_html(url: str, client: httpx.AsyncClient) -> str:
     """Single GET with browser headers. Tenacity handles retries."""
     response = await client.get(url, headers=get_headers(), follow_redirects=True)
+    detect_listing_gone(status_code=response.status_code, url=url)
     response.raise_for_status()
     return response.text
 
