@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "price-tracker"
 version = "0.2.0"
 description = "Self-hosted Telegram bot for multi-site price tracking"
-authors = [{name = "SVM-98"}]
+authors = [{name = "Samuele Martinalli", email = "254686239+bernalli@users.noreply.github.com"}]
 license = {text = "MIT"}
 readme = "README.md"
 requires-python = ">=3.11"

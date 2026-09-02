@@ -7,7 +7,7 @@ Deploy, configure, back up, upgrade, and troubleshoot the bot. For the architect
 ### Docker compose (recommended)
 
 ```bash
-git clone https://github.com/SVM-98/price-tracker-bot.git
+git clone https://github.com/bernalli/price-tracker-bot.git
 cd price-tracker-bot
 cp .env.example .env
 # edit .env: TELEGRAM_BOT_TOKEN + ALLOWED_USERS
@@ -134,7 +134,7 @@ docker compose build
 docker compose up -d
 ```
 
-Once the `ghcr.io/svm-98/price-tracker-bot` image is available (Plan 4 F8 milestone):
+Once the `ghcr.io/bernalli/price-tracker-bot` image is available (Plan 4 F8 milestone):
 
 ```bash
 docker compose pull
