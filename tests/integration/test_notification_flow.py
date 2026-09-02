@@ -10,6 +10,7 @@ Covers the alert dispatch flow in TelegramNotifier (Task 28, F3.D):
 
 from __future__ import annotations
 
+import json
 from unittest.mock import AsyncMock
 
 import pytest
@@ -169,3 +170,86 @@ async def test_no_duplicate_notification_for_same_event(repo_mock: AsyncMock) ->
     await notifier.notify_alert(user_id=42, product_id=10, alert=alert)
     await notifier.notify_alert(user_id=42, product_id=10, alert=alert)  # replay same event
     assert bot.send_message.await_count == 1  # second is deduped
+
+
+@pytest.mark.asyncio
+async def test_operational_uses_global_prefs_not_product_override(repo_mock: AsyncMock) -> None:
+    """A domain-level notice must not inherit an anchor product's quiet hours."""
+    per_product = NotificationPrefs(
+        user_id=42,
+        product_id=10,
+        quiet_hours_start="22:00",
+        quiet_hours_end="08:00",
+        timezone="UTC",
+    )
+    global_prefs = NotificationPrefs(user_id=42, product_id=None)
+
+    async def get_prefs(*, user_id: int, product_id: int | None) -> NotificationPrefs | None:
+        assert user_id == 42
+        return per_product if product_id == 10 else global_prefs
+
+    repo_mock.get_notification_prefs = AsyncMock(side_effect=get_prefs)
+    bot = AsyncMock()
+    metrics = MetricsRegistry(registry=CollectorRegistry())
+    notifier = TelegramNotifier(
+        bot=bot,
+        metrics=metrics,
+        prefs=PreferencesManager(repo=repo_mock),
+        digest=DigestService(repo=repo_mock, bot=bot, metrics=metrics),
+    )
+
+    with freeze_time("2026-05-09 23:30:00"):
+        handled = await notifier(
+            42,
+            "operational",
+            product_id=None,
+            payload={"kind": "operational", "event_id": "ops-global-now"},
+        )
+
+    assert handled is True
+    bot.send_message.assert_awaited_once()
+    repo_mock.enqueue_digest.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_operational_global_quiet_hours_enqueues_without_digest_mode(
+    repo_mock: AsyncMock,
+) -> None:
+    """Operational notices are deferred instead of silently discarded."""
+    global_prefs = NotificationPrefs(
+        user_id=42,
+        product_id=None,
+        digest_mode=False,
+        quiet_hours_start="22:00",
+        quiet_hours_end="08:00",
+        timezone="UTC",
+    )
+    repo_mock.get_notification_prefs = AsyncMock(return_value=global_prefs)
+    bot = AsyncMock()
+    metrics = MetricsRegistry(registry=CollectorRegistry())
+    notifier = TelegramNotifier(
+        bot=bot,
+        metrics=metrics,
+        prefs=PreferencesManager(repo=repo_mock),
+        digest=DigestService(repo=repo_mock, bot=bot, metrics=metrics),
+    )
+
+    with freeze_time("2026-05-09 23:30:00"):
+        handled = await notifier(
+            42,
+            "operational",
+            product_id=None,
+            payload={"kind": "operational", "event_id": "ops-global-later"},
+        )
+
+    assert handled is True
+    repo_mock.enqueue_digest.assert_awaited_once()
+    call = repo_mock.enqueue_digest.await_args
+    assert call.kwargs["user_id"] == 42
+    assert call.kwargs["product_id"] is None
+    assert json.loads(call.kwargs["payload"]) == {
+        "kind": "operational",
+        "event_id": "ops-global-later",
+        "text": "operational",
+    }
+    bot.send_message.assert_not_awaited()

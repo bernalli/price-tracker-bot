@@ -17,10 +17,12 @@ from __future__ import annotations
 import dataclasses
 import logging
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 
+from price_tracker.core.textlimits import split_message
 from price_tracker.db.models import NotificationPrefs
 from price_tracker.notifier.preferences import (
     ThrottleWindow,
@@ -74,33 +76,69 @@ class TelegramNotifier:
         a send failure, or a preference that dropped it outright — so the caller
         must not record it as sent.
         """
-        if product_id is not None and self._prefs is not None:
+        kind = (payload or {}).get("kind")
+        if self._prefs is not None and (product_id is not None or kind == "operational"):
             alert: dict[str, Any] = {**(payload or {}), "text": text}
             return await self.notify_alert(user_id=user_id, product_id=product_id, alert=alert)
-        return await self._send_direct(user_id, text)
+        return await self._send_direct(user_id, text, reply_markup=_markup(payload))
 
-    async def _send_direct(self, user_id: int, text: str) -> bool:
-        try:
-            await self._bot.send_message(
-                chat_id=user_id,
-                text=text,
-                parse_mode=ParseMode.HTML,
-                disable_web_page_preview=False,
-            )
-        except Exception as e:  # noqa: BLE001 — Telegram errors are non-deterministic
-            logger.warning("Telegram send failed for user %d: %s", user_id, e)
-            return False
+    async def _send_direct(
+        self,
+        user_id: int,
+        text: str,
+        *,
+        reply_markup: InlineKeyboardMarkup | None = None,
+    ) -> bool:
+        chunks = split_message(text)
+        for index, chunk in enumerate(chunks, start=1):
+            try:
+                await self._bot.send_message(
+                    chat_id=user_id,
+                    text=chunk,
+                    parse_mode=ParseMode.HTML,
+                    disable_web_page_preview=False,
+                    reply_markup=reply_markup if index == len(chunks) else None,
+                )
+            except Exception as e:  # noqa: BLE001 — Telegram errors are non-deterministic
+                logger.warning(
+                    "Telegram send failed for user %d at chunk %d/%d after %d delivered: %s",
+                    user_id,
+                    index,
+                    len(chunks),
+                    index - 1,
+                    e,
+                )
+                return False
+        if not chunks:
+            return True
         if self._metrics is not None:
             self._metrics.notification_sent_total.labels(type="immediate", channel="telegram").inc()
         return True
 
-    async def send_alert(self, *, chat_id: int, text: str) -> None:
+    async def send_alert(
+        self,
+        *,
+        chat_id: int,
+        text: str,
+        reply_markup: InlineKeyboardMarkup | None = None,
+    ) -> None:
         """Send an HTML alert message and emit the immediate-sent metric."""
-        await self._bot.send_message(chat_id=chat_id, text=text, parse_mode="HTML")
+        chunks = split_message(text)
+        for index, chunk in enumerate(chunks, start=1):
+            await self._bot.send_message(
+                chat_id=chat_id,
+                text=chunk,
+                parse_mode=ParseMode.HTML,
+                reply_markup=reply_markup if index == len(chunks) else None,
+            )
+        if not chunks:
+            return
         if self._metrics is not None:
             self._metrics.notification_sent_total.labels(type="immediate", channel="telegram").inc()
 
-    async def notify_alert(self, *, user_id: int, product_id: int, alert: dict[str, Any]) -> bool:
+    async def notify_alert(
+        self, *, user_id: int, product_id: int | None, alert: dict[str, Any]
+    ) -> bool:
         """Dispatch an alert respecting the user's effective preferences.
 
         Flow:
@@ -118,27 +156,35 @@ class TelegramNotifier:
         user was waiting for is suppressed a second time once the preference
         that hid it no longer applies.
         """
-        event_id: str | None = alert.get("event_id")
+        raw_event_id = alert.get("event_id")
+        event_id = raw_event_id if isinstance(raw_event_id, str) else None
         if event_id is not None and event_id in self._dedupe_seen:
             return True  # already delivered once; not a delivery failure
 
         now = datetime.now(UTC)
-        eff = (
-            await self._prefs.resolve(user_id=user_id, product_id=product_id)
-            if self._prefs is not None
-            else None
-        )
+        operational = alert.get("kind") == "operational"
+        if self._prefs is None:
+            eff = None
+        elif operational:
+            eff = await self._prefs.resolve_global(user_id=user_id)
+        elif product_id is not None:
+            eff = await self._prefs.resolve(user_id=user_id, product_id=product_id)
+        else:
+            logger.warning("Price alert for user %d has no product id", user_id)
+            return False
 
-        if eff is not None and is_muted_now(eff, now_utc=now):
+        if eff is not None and not operational and is_muted_now(eff, now_utc=now):
             self._emit_skipped("mute")
             return False
 
         if eff is not None and is_quiet_now(eff, now_utc=now):
-            if eff.digest_mode and self._digest is not None:
-                await self._digest.enqueue(user_id=user_id, product_id=product_id, payload=alert)
-                self._emit_skipped("digest_pending")
-                self._mark_delivered(event_id)
-                return True
+            if eff.digest_mode or operational:
+                return await self._enqueue_for_digest(
+                    user_id=user_id,
+                    product_id=product_id,
+                    alert=alert,
+                    event_id=event_id,
+                )
             self._emit_skipped("quiet_hours")
             return False
 
@@ -149,13 +195,13 @@ class TelegramNotifier:
             )
             window = ThrottleWindow.from_json(row.throttle_state_json if row else None)
             if window.exceeded(limit=eff.throttle_per_hour, now=now):
-                if eff.digest_mode and self._digest is not None:
-                    await self._digest.enqueue(
-                        user_id=user_id, product_id=product_id, payload=alert
+                if eff.digest_mode or operational:
+                    return await self._enqueue_for_digest(
+                        user_id=user_id,
+                        product_id=product_id,
+                        alert=alert,
+                        event_id=event_id,
                     )
-                    self._emit_skipped("digest_pending")
-                    self._mark_delivered(event_id)
-                    return True
                 self._emit_skipped("throttle")
                 return False
             window.record(now)
@@ -170,16 +216,41 @@ class TelegramNotifier:
             await self._prefs._repo.upsert_notification_prefs(updated)  # noqa: SLF001
 
         if eff is not None and eff.digest_mode and self._digest is not None:
-            await self._digest.enqueue(user_id=user_id, product_id=product_id, payload=alert)
-            self._emit_skipped("digest_pending")
-            self._mark_delivered(event_id)
-            return True
+            return await self._enqueue_for_digest(
+                user_id=user_id,
+                product_id=product_id,
+                alert=alert,
+                event_id=event_id,
+            )
 
         # A caller that already rendered the message (the scheduler's rich
         # price-drop body) keeps its text; the dict-only fallback is for callers
         # that hand over structured data alone.
         text = alert.get("text") or _format_alert_message(alert)
-        await self.send_alert(chat_id=user_id, text=text)
+        await self.send_alert(chat_id=user_id, text=text, reply_markup=_markup(alert))
+        self._mark_delivered(event_id)
+        return True
+
+    async def _enqueue_for_digest(
+        self,
+        *,
+        user_id: int,
+        product_id: int | None,
+        alert: dict[str, Any],
+        event_id: str | None,
+    ) -> bool:
+        """Queue a deferred notification, keeping an unqueueable event visible."""
+        if self._digest is None:
+            logger.warning("Cannot defer notification for user %d: digest is unavailable", user_id)
+            return False
+        # The queue schema accepts a NULL owner for domain-level operational notices.
+        # DigestService's public annotation is widened by its owning task.
+        await self._digest.enqueue(
+            user_id=user_id,
+            product_id=cast("int", product_id),
+            payload=alert,
+        )
+        self._emit_skipped("digest_pending")
         self._mark_delivered(event_id)
         return True
 
@@ -210,3 +281,36 @@ def _format_alert_message(alert: dict[str, Any]) -> str:
     except (TypeError, ValueError):
         arrow = "•"
     return f"{arrow} <b>{name}</b>\n{currency}{old} → {currency}{new}\n{domain}"
+
+
+def _markup(payload: dict[str, Any] | None) -> InlineKeyboardMarkup | None:
+    """Build a safe inline keyboard from a serializable operational payload."""
+    if payload is None or "buttons" not in payload:
+        return None
+    buttons = payload["buttons"]
+    if not isinstance(buttons, list):
+        logger.warning("Ignoring malformed notification buttons")
+        return None
+
+    rows: list[list[InlineKeyboardButton]] = []
+    for row in buttons:
+        if not isinstance(row, list):
+            logger.warning("Ignoring malformed notification buttons")
+            return None
+        markup_row: list[InlineKeyboardButton] = []
+        for button in row:
+            if not isinstance(button, dict):
+                logger.warning("Ignoring malformed notification buttons")
+                return None
+            text = button.get("text")
+            callback_data = button.get("callback_data")
+            if (
+                not isinstance(text, str)
+                or not isinstance(callback_data, str)
+                or len(callback_data.encode("utf-8")) > 64
+            ):
+                logger.warning("Ignoring malformed notification buttons")
+                return None
+            markup_row.append(InlineKeyboardButton(text=text, callback_data=callback_data))
+        rows.append(markup_row)
+    return InlineKeyboardMarkup(rows)
