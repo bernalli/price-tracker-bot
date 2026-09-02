@@ -63,7 +63,9 @@ class DigestService:
         self._bot = bot
         self._metrics = metrics
 
-    async def enqueue(self, *, user_id: int, product_id: int, payload: dict[str, Any]) -> int:
+    async def enqueue(
+        self, *, user_id: int, product_id: int | None, payload: dict[str, Any]
+    ) -> int:
         """Enqueue an alert payload for digest delivery.
 
         The ``digest_pending`` skip metric is emitted by the caller
