@@ -14,6 +14,7 @@ from price_tracker.db.migrator import (
     get_current_version,
     list_migrations,
 )
+from price_tracker.db.repository import Repository
 
 MIGRATIONS_DIR = Path("src/price_tracker/db/migrations")
 
@@ -257,3 +258,95 @@ class TestMigration011:
                 await conn.execute(
                     "INSERT INTO notification_prefs (user_id, product_id) VALUES (1, NULL)"
                 )
+
+
+@pytest.mark.asyncio
+async def test_migration_014_adds_provenance_columns():
+    async with aiosqlite.connect(":memory:") as conn:
+        await apply_migrations(conn, MIGRATIONS_DIR)
+
+        cursor = await conn.execute("PRAGMA table_info(products)")
+        columns = {row[1]: row for row in await cursor.fetchall()}
+        assert columns["gone_streak"][2] == "INTEGER"
+        assert columns["gone_streak"][3] == 1
+        assert columns["gone_streak"][4] == "0"
+        assert columns["suspension_kind"][2] == "TEXT"
+        assert columns["suspension_kind"][3] == 0
+        assert columns["suspension_reason"][2] == "TEXT"
+        assert columns["suspension_reason"][3] == 0
+
+        await apply_migrations(conn, MIGRATIONS_DIR)
+        await conn.execute("INSERT INTO users (user_id) VALUES (1)")
+        await conn.execute(
+            "INSERT INTO products (user_id, url) VALUES (?, ?)",
+            (1, "https://example.com/product"),
+        )
+        with pytest.raises(aiosqlite.IntegrityError):
+            await conn.execute("UPDATE products SET suspension_kind = 'weird'")
+
+
+@pytest.mark.asyncio
+async def test_migration_015_rebuilds_digest_queue_with_set_null():
+    async with aiosqlite.connect(":memory:") as conn:
+        await apply_migrations(conn, MIGRATIONS_DIR, max_version=14)
+        await conn.execute("INSERT INTO users (user_id) VALUES (1)")
+        await conn.execute(
+            "INSERT INTO products (id, user_id, url) VALUES (?, ?, ?)",
+            (10, 1, "https://example.com/first"),
+        )
+        await conn.execute(
+            "INSERT INTO products (id, user_id, url) VALUES (?, ?, ?)",
+            (20, 1, "https://example.com/second"),
+        )
+        queued_id = 41
+        queued_row = (
+            queued_id,
+            1,
+            10,
+            '{"kind":"operational"}',
+            "2026-09-02 10:00:00",
+            None,
+        )
+        await conn.execute(
+            "INSERT INTO digest_queue "
+            "(id, user_id, product_id, alert_payload_json, enqueued_at, flushed_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            queued_row,
+        )
+        await conn.commit()
+
+        await apply_migrations(conn, MIGRATIONS_DIR, max_version=15)
+
+        cursor = await conn.execute("PRAGMA foreign_key_list(digest_queue)")
+        foreign_keys = await cursor.fetchall()
+        product_fk = next(row for row in foreign_keys if row[3] == "product_id")
+        assert product_fk[2] == "products"
+        assert product_fk[6] == "SET NULL"
+
+        cursor = await conn.execute(
+            "SELECT id, user_id, product_id, alert_payload_json, enqueued_at, flushed_at "
+            "FROM digest_queue WHERE id = ?",
+            (queued_id,),
+        )
+        assert await cursor.fetchone() == queued_row
+
+        repo = Repository(conn)
+        assert await repo.delete_product(10, user_id=1) is True
+        cursor = await conn.execute(
+            "SELECT product_id FROM digest_queue WHERE id = ?", (queued_id,)
+        )
+        row = await cursor.fetchone()
+        assert row is not None
+        assert row[0] is None
+
+        cursor = await conn.execute(
+            "INSERT INTO digest_queue (user_id, product_id, alert_payload_json) "
+            "VALUES (?, NULL, ?)",
+            (1, "{}"),
+        )
+        assert cursor.lastrowid == queued_id + 1
+
+        cursor = await conn.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_digest_pending'"
+        )
+        assert await cursor.fetchone() is not None
