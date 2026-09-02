@@ -104,6 +104,7 @@ async def _setup_scheduler(application: Application[Any, Any, Any, Any, Any, Any
             delay_between_products=config.check_delay_seconds,
             notification_cooldown_hours=config.notification_cooldown_hours,
             read_confirmations=config.read_confirmations,
+            lang=config.lang,
             health_mgr=health_mgr,
             metrics=metrics,
         )

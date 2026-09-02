@@ -21,6 +21,7 @@ import pytest
 from freezegun import freeze_time
 
 from price_tracker.core.health import HealthManager, QuarantineState
+from price_tracker.core.notices import NoticeCollector
 from price_tracker.db.models import ProductRecord
 
 if TYPE_CHECKING:
@@ -88,13 +89,15 @@ async def test_block_loop_does_not_recur(
         # Step 2 — scheduler must not hammer shop-a.com during the 1h lock window
         scheduler: Scheduler = scheduler_factory(health_mgr=mgr)
         scrape_attempts: list[str] = []
-        scheduler._scrape_one = AsyncMock(side_effect=lambda p: scrape_attempts.append(p.url))
+        scheduler._scrape_one = AsyncMock(
+            side_effect=lambda p, *, collector: scrape_attempts.append(p.url)
+        )
         shop_a_product = _make_product(1, SHOP_A_URL)
 
         # Simulate 6 ticks (every 10 minutes) during lockout window
         for offset in range(0, 60, 10):
             frozen.move_to(datetime(2026, 5, 9, 12, offset, tzinfo=UTC))
-            await scheduler._run_tick([shop_a_product])
+            await scheduler._run_tick([shop_a_product], collector=NoticeCollector())
         assert scrape_attempts == [], "scheduler must not scrape locked domain"
 
         # Step 3 — advance past 1h lockout → HALF_OPEN_T1
@@ -103,7 +106,7 @@ async def test_block_loop_does_not_recur(
 
         # Step 4 — tick with 2 products on same half-open domain → exactly 1 probe
         p2 = _make_product(2, f"{SHOP_A_URL}-2")
-        await scheduler._run_tick([shop_a_product, p2])
+        await scheduler._run_tick([shop_a_product, p2], collector=NoticeCollector())
         assert len(scrape_attempts) == 1, "half-open tick must send exactly one probe"
 
         # Step 5 — probe is still blocked → promote to LOCKED_T2
