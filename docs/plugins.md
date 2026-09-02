@@ -15,7 +15,7 @@ Every scraper subclasses `AbstractScraper` and provides:
 - `priority: ClassVar[int]` — resolution priority. Higher wins. Site-specific scrapers use 50; the Shopify generic uses 80; Amazon and eBay use 100. Pick a value that fits your scraper's specificity.
 - `domain_patterns: ClassVar[list[re.Pattern[str]]]` — list of compiled regexes against URL netloc (`urlparse(url).netloc`).
 - `def can_handle(self, url: str) -> bool` — required abstract method. For typical domain-based matching, just `return self.matches_domain(url)` (the helper in the base class checks each `domain_patterns` regex against the URL netloc).
-- `async def scrape(self, url: str, client: httpx.AsyncClient) -> ProductInfo` — fetch the URL with the injected `httpx.AsyncClient` (already configured with timeout, proxies, retry policy) and return a populated `ProductInfo`. Never raise on network or parse errors — return `ProductInfo(error="...")` instead.
+- `async def scrape(self, url: str, client: httpx.AsyncClient) -> ProductInfo` — fetch the URL with the injected `httpx.AsyncClient` (already configured with timeout, proxies, retry policy) and return a populated `ProductInfo`. Never raise on network or parse errors — return `ProductInfo(error="...")` instead. Two failures are the exception and MUST be raised: `BlockEvent` when the site refuses the request (403/429, WAF, CAPTCHA), and `ListingGone` when the product is gone from the catalogue (404/410, or a redirect away from the product path). The scheduler routes those two differently — a block quarantines the whole domain, a gone listing suspends that single product with a reason — and a returned `ProductInfo` cannot carry the distinction.
 
 `ProductInfo` is a dataclass with these fields (see `scraper_base.py:159`):
 - `name: str | None` — product title/name
@@ -156,7 +156,7 @@ Run with `pytest tests/unit/scrapers/test_myshop.py -v`. Coverage target: ≥80%
 ## Best practices
 
 - **Use the injected `client`** — it carries the bot's timeout, retry policy, and user-agent rotation. Do not create your own `httpx.AsyncClient` inside `scrape()`.
-- **Return errors, do not raise** — `ProductInfo(error="...")` is logged and the domain is recorded in `scraper_health`. Raising will be caught by the scheduler but the error context is lost.
+- **Return errors, do not raise** — `ProductInfo(error="...")` is logged and the domain is recorded in `scraper_health`. Raising anything other than `BlockEvent` or `ListingGone` will be caught by the scheduler but the error context is lost. Those two must be raised: swallowing them into a `ProductInfo` is what once let a blocking store suspend every product tracked on it, one message each, without ever tripping the circuit breaker.
 - **Use `parse_price()`** — handles thousands separators, currency symbols, comma decimals, and returns `Decimal | None`. Do not implement your own.
 - **Keep imports lazy** — heavy dependencies (Selenium, headless browsers) should be imported inside `scrape()` after a feature check, so the bot starts even if the dep is missing.
 - **Cache nothing in the instance** — scrapers are singletons, so an unbounded dict on `self` is a memory leak.
