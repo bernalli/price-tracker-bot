@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 from telegram.ext import Application, CallbackQueryHandler
 
 from price_tracker.bot.decorators import _db, with_locale
-from price_tracker.bot.handlers.callbacks import _actions, _admin, _menu, _product
+from price_tracker.bot.handlers.callbacks import _actions, _admin, _menu, _ops, _product
 
 if TYPE_CHECKING:
     from telegram import Update
@@ -38,6 +38,8 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     # Order matters — earlier handlers have higher specificity. Each helper
     # returns True when it handled the callback; on False we fall through.
+    if await _ops.handle_ops_buttons(query, context, db, user_id, data):
+        return
     if await _product.handle_delete_flow(query, context, db, user_id, data):
         return
     if await _product.handle_check_button(query, context, db, user_id, data):
