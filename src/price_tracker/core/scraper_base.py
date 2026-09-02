@@ -17,7 +17,14 @@ if TYPE_CHECKING:
 
     from price_tracker.core.health import HealthManager
 
-from price_tracker.core.exceptions import BlockEvent, CaptchaDetected, HTTPBlockStatus, WAFBlocked
+from price_tracker.core.exceptions import (
+    LISTING_GONE_STATUSES,
+    BlockEvent,
+    CaptchaDetected,
+    HTTPBlockStatus,
+    ListingGone,
+    WAFBlocked,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -442,6 +449,12 @@ def detect_block_event(*, status_code: int, body: str, url: str) -> None:
             raise CaptchaDetected(marker=marker, url=url)
 
     return None
+
+
+def detect_listing_gone(*, status_code: int, url: str) -> None:
+    """Raise :class:`ListingGone` on 404/410. Call AFTER detect_block_event."""
+    if status_code in LISTING_GONE_STATUSES:
+        raise ListingGone(status=status_code, url=url)
 
 
 # ── Pipeline helpers (HealthManager integration) ─────────────────

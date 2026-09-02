@@ -16,9 +16,10 @@ import httpx
 import pytest
 import pytest_asyncio
 
+from price_tracker.core.exceptions import ListingGone, ParseError
 from price_tracker.core.health import HealthManager
 from price_tracker.core.registry import ScraperRegistry
-from price_tracker.core.scheduler import Scheduler, SchedulerDeps
+from price_tracker.core.scheduler import Scheduler, SchedulerDeps, _failure_reason
 from price_tracker.core.scraper_base import AbstractScraper, ProductInfo
 from price_tracker.db.migrator import apply_migrations
 from price_tracker.db.repository import Repository
@@ -156,6 +157,56 @@ class _RaisingScraper(AbstractScraper):
 
     async def scrape(self, url: str, client: httpx.AsyncClient) -> ProductInfo:
         raise httpx.ConnectError("simulated network failure")
+
+
+class _ScriptedScraper(AbstractScraper):
+    """Return or raise one scripted outcome per real scheduler invocation."""
+
+    name = "scripted"
+    priority = 100
+
+    def __init__(self, outcomes: list[ProductInfo | BaseException]) -> None:
+        self._outcomes = iter(outcomes)
+
+    def can_handle(self, url: str) -> bool:
+        return True
+
+    async def scrape(self, url: str, client: httpx.AsyncClient) -> ProductInfo:
+        outcome = next(self._outcomes)
+        if isinstance(outcome, BaseException):
+            raise outcome
+        return outcome
+
+
+def _http_status_error(status: int) -> httpx.HTTPStatusError:
+    request = httpx.Request("GET", "https://example.com/p/1")
+    response = httpx.Response(status, request=request)
+    return httpx.HTTPStatusError(f"status {status}", request=request, response=response)
+
+
+@pytest.mark.parametrize(
+    ("exc", "expected"),
+    [
+        (ListingGone(status=404, url="https://example.com/p/1"), ("listing_gone", "HTTP 404")),
+        (_http_status_error(404), ("listing_gone", "HTTP 404")),
+        (_http_status_error(410), ("listing_gone", "HTTP 410")),
+        (_http_status_error(500), ("http_error", "status 500")),
+        (ParseError("missing price"), ("parse_error", "missing price")),
+        (KeyError("price"), ("http_error", "'price'")),
+        (RuntimeError("boom"), ("unexpected", "boom")),
+    ],
+    ids=[
+        "listing-gone",
+        "http-404",
+        "http-410",
+        "http-500",
+        "parse-error",
+        "key-error",
+        "unexpected",
+    ],
+)
+def test_failure_reason_classification(exc: BaseException, expected: tuple[str, str]) -> None:
+    assert _failure_reason(exc) == expected
 
 
 @pytest.mark.asyncio
@@ -895,6 +946,212 @@ async def test_check_user_products_for_user_marks_disabled_on_threshold(
     assert p.consecutive_errors == 2
 
 
+@pytest.mark.asyncio
+async def test_listing_gone_suspends_after_three_confirmations(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    repo, pid = repo_with_product
+    registry = ScraperRegistry()
+    registry.register(
+        _ScriptedScraper(
+            [
+                ListingGone(status=404, url="https://example.com/p/1"),
+                ListingGone(status=404, url="https://example.com/p/1"),
+                ListingGone(status=404, url="https://example.com/p/1"),
+            ]
+        )
+    )
+    notifier = AsyncMock()
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=notifier,
+                max_consecutive_errors=10,
+                listing_gone_confirmations=3,
+                delay_between_products=0.0,
+            )
+        )
+        await scheduler.run_check_for_user(user_id=1)
+        await scheduler.run_check_for_user(user_id=1)
+        after_two = await repo.get_product(pid)
+        assert after_two is not None
+        assert after_two.is_active is True
+        assert after_two.gone_streak == 2
+
+        await scheduler.run_check_for_user(user_id=1)
+
+    after_three = await repo.get_product(pid)
+    assert after_three is not None
+    assert after_three.is_active is False
+    assert after_three.last_error == "listing_gone: HTTP 404"
+    assert after_three.consecutive_errors == 3
+    assert after_three.suspension_kind == "automatic"
+    assert after_three.suspension_reason == "listing_gone"
+    notifier.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_listing_gone_streak_resets_on_other_failure(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    repo, pid = repo_with_product
+    registry = ScraperRegistry()
+    registry.register(
+        _ScriptedScraper(
+            [
+                ListingGone(status=404, url="https://example.com/p/1"),
+                ListingGone(status=410, url="https://example.com/p/1"),
+                ParseError("markup changed"),
+                ListingGone(status=404, url="https://example.com/p/1"),
+            ]
+        )
+    )
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=AsyncMock(),
+                max_consecutive_errors=10,
+                listing_gone_confirmations=3,
+                delay_between_products=0.0,
+            )
+        )
+        for _ in range(4):
+            await scheduler.run_check_for_user(user_id=1)
+
+    product = await repo.get_product(pid)
+    assert product is not None
+    assert product.is_active is True
+    assert product.gone_streak == 1
+    assert product.consecutive_errors == 4
+
+
+@pytest.mark.asyncio
+async def test_listing_gone_streak_resets_on_success(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    repo, pid = repo_with_product
+    registry = ScraperRegistry()
+    registry.register(
+        _ScriptedScraper(
+            [
+                ListingGone(status=404, url="https://example.com/p/1"),
+                ListingGone(status=404, url="https://example.com/p/1"),
+                ProductInfo(name="Widget", price=Decimal("99"), currency="EUR"),
+            ]
+        )
+    )
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=AsyncMock(),
+                max_consecutive_errors=10,
+                listing_gone_confirmations=3,
+                delay_between_products=0.0,
+            )
+        )
+        for _ in range(3):
+            await scheduler.run_check_for_user(user_id=1)
+
+    product = await repo.get_product(pid)
+    assert product is not None
+    assert product.is_active is True
+    assert product.gone_streak == 0
+    assert product.consecutive_errors == 0
+
+
+@pytest.mark.asyncio
+async def test_http_status_404_from_raising_scraper_counts_as_listing_gone(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    repo, pid = repo_with_product
+    registry = ScraperRegistry()
+    registry.register(_ScriptedScraper([_http_status_error(404)]))
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=AsyncMock(),
+                max_consecutive_errors=10,
+                delay_between_products=0.0,
+            )
+        )
+        await scheduler.run_check_for_user(user_id=1)
+
+    product = await repo.get_product(pid)
+    assert product is not None
+    assert product.last_error is not None
+    assert product.last_error.startswith("listing_gone")
+
+
+@pytest.mark.asyncio
+async def test_auto_suspension_writes_provenance(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    repo, pid = repo_with_product
+    registry = ScraperRegistry()
+    registry.register(_RaisingScraper())
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=AsyncMock(),
+                max_consecutive_errors=1,
+                delay_between_products=0.0,
+            )
+        )
+        await scheduler.run_check_for_user(user_id=1)
+
+    product = await repo.get_product(pid)
+    assert product is not None
+    assert product.is_active is False
+    assert product.suspension_kind == "automatic"
+    assert product.suspension_reason == "http_error"
+
+
+@pytest.mark.asyncio
+async def test_checkall_listing_gone_reaches_failure_recorder(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    repo, pid = repo_with_product
+    registry = ScraperRegistry()
+    registry.register(_ScriptedScraper([ListingGone(status=410, url="https://example.com/p/1")]))
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=AsyncMock(),
+                max_consecutive_errors=10,
+                listing_gone_confirmations=3,
+                delay_between_products=0.0,
+            )
+        )
+        results = await scheduler.check_user_products_for_user(
+            user_id=1, delay_between_products=0.0
+        )
+
+    product = await repo.get_product(pid)
+    assert len(results) == 1
+    assert results[0].disabled is False
+    assert product is not None
+    assert product.last_error == "listing_gone: HTTP 410"
+    assert product.gone_streak == 1
+
+
 # ── Anti-flap notification dedup (push path) ────────────────────────
 
 
@@ -1125,10 +1382,15 @@ async def test_run_check_all_sends_single_half_open_probe_across_users() -> None
 
     repo.list_products_for_user.side_effect = _list_products
 
-    async def _get_product(pid: int) -> ProductRecord:
+    async def _record_failure(
+        pid: int,
+        *,
+        reason: str,
+        detail: str | None = None,  # noqa: ARG001
+    ) -> ProductRecord:
         return _make_product(pid, 1)  # consecutive_errors=0 → never auto-disabled
 
-    repo.get_product.side_effect = _get_product
+    repo.record_failure.side_effect = _record_failure
 
     health_mgr: HealthManager = AsyncMock(spec=HealthManager)
     health_mgr.is_locked = lambda _d: False

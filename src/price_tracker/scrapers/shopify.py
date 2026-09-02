@@ -15,13 +15,14 @@ from urllib.parse import urlparse
 import httpx
 from bs4 import BeautifulSoup
 
-from price_tracker.core.exceptions import BlockEvent
+from price_tracker.core.exceptions import BlockEvent, ListingGone
 from price_tracker.core.retry_policy import RetryConfig, with_retry
 from price_tracker.core.scraper_base import (
     AbstractScraper,
     ProductInfo,
     detect_block_event,
     detect_currency,
+    detect_listing_gone,
     get_headers,
     parse_price,
 )
@@ -41,6 +42,7 @@ async def _fetch_shopify_response(url: str, client: httpx.AsyncClient) -> httpx.
     # raise_for_status, so the scheduler quarantines the domain instead of
     # recording a generic failure (#16). with_retry never retries BlockEvents.
     detect_block_event(status_code=response.status_code, body=response.text, url=url)
+    detect_listing_gone(status_code=response.status_code, url=url)
     response.raise_for_status()
     return response
 
@@ -121,7 +123,7 @@ class ShopifyScraper(AbstractScraper):
                 # fall back to the default currency.
                 try:
                     html = await self._fetch_html(url, client)
-                except BlockEvent:
+                except (BlockEvent, ListingGone):
                     html = None
                 if html:
                     detected = self._detect_currency_from_html(html)

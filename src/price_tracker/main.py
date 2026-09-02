@@ -100,6 +100,7 @@ async def _setup_scheduler(application: Application[Any, Any, Any, Any, Any, Any
             client=client,
             notifier=notifier,
             max_consecutive_errors=config.max_consecutive_errors,
+            listing_gone_confirmations=config.listing_gone_confirmations,
             delay_between_products=config.check_delay_seconds,
             notification_cooldown_hours=config.notification_cooldown_hours,
             read_confirmations=config.read_confirmations,

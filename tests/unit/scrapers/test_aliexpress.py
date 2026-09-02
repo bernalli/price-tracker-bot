@@ -9,7 +9,7 @@ import httpx
 import pytest
 import respx
 
-from price_tracker.core.exceptions import HTTPBlockStatus
+from price_tracker.core.exceptions import HTTPBlockStatus, ListingGone
 from price_tracker.scrapers.aliexpress import AliexpressScraper
 
 if TYPE_CHECKING:
@@ -126,3 +126,30 @@ async def test_aliexpress_raises_block_event_on_403() -> None:
             with pytest.raises(HTTPBlockStatus) as exc:
                 await scraper.scrape(url, client)
     assert exc.value.status == 403
+
+
+@pytest.mark.asyncio
+async def test_aliexpress_404_raises_listing_gone() -> None:
+    url = "https://www.aliexpress.com/item/1005005550000003.html"
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).respond(404)
+        async with httpx.AsyncClient() as client:
+            with pytest.raises(ListingGone) as exc_info:
+                await AliexpressScraper().scrape(url, client)
+
+    assert exc_info.value.status == 404
+
+
+@pytest.mark.asyncio
+async def test_aliexpress_500_remains_product_info_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("tenacity.wait.wait_random_exponential.__call__", _no_wait)
+    url = "https://www.aliexpress.com/item/1005005550000004.html"
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).respond(500)
+        async with httpx.AsyncClient() as client:
+            info = await AliexpressScraper().scrape(url, client)
+
+    assert info.price is None
+    assert info.error is not None

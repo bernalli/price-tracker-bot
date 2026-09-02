@@ -1,7 +1,12 @@
+import httpx
+
 from price_tracker.core.exceptions import (
+    LISTING_GONE_STATUSES,
     BlockEvent,
     CaptchaDetected,
     HTTPBlockStatus,
+    ListingGone,
+    ScrapeError,
     WAFBlocked,
 )
 
@@ -30,3 +35,14 @@ class TestBlockEventHierarchy:
     def test_captcha_carries_marker(self):
         exc = CaptchaDetected(marker="g-recaptcha", url="https://x.com")
         assert exc.marker == "g-recaptcha"
+
+
+def test_listing_gone_domain_exception_contract() -> None:
+    exc = ListingGone(status=404, url="https://shop.example/products/missing")
+
+    assert isinstance(exc, ScrapeError)
+    assert not isinstance(exc, BlockEvent)
+    assert not isinstance(exc, httpx.HTTPError)
+    assert exc.status == 404
+    assert exc.url == "https://shop.example/products/missing"
+    assert {404, 410} == LISTING_GONE_STATUSES

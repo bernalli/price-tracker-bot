@@ -32,7 +32,12 @@ from price_tracker.core.alert import (
     format_error_notification,
     format_quarantine_notification,
 )
-from price_tracker.core.exceptions import BlockEvent, ParseError
+from price_tracker.core.exceptions import (
+    LISTING_GONE_STATUSES,
+    BlockEvent,
+    ListingGone,
+    ParseError,
+)
 from price_tracker.core.health import HealthManager, QuarantineState
 from price_tracker.core.outlier import (
     MAX_HELD_READS,
@@ -115,6 +120,19 @@ def _parse_db_timestamp(value: str) -> datetime:
     return parsed
 
 
+def _failure_reason(exc: BaseException) -> tuple[str, str]:
+    """Map a failed check to ``(reason, detail)`` — the closed list in the plan."""
+    if isinstance(exc, ListingGone):
+        return "listing_gone", f"HTTP {exc.status}"
+    if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code in LISTING_GONE_STATUSES:
+        return "listing_gone", f"HTTP {exc.response.status_code}"
+    if isinstance(exc, ParseError):
+        return "parse_error", str(exc)
+    if isinstance(exc, httpx.HTTPError | ValueError | KeyError):
+        return "http_error", str(exc)
+    return "unexpected", str(exc)
+
+
 def _no_op_health_mgr() -> HealthManager:
     """Return a HealthManager subclass that never locks or half-opens anything."""
     from price_tracker.core.health import QuarantineState  # local import avoids circularity
@@ -150,6 +168,7 @@ class SchedulerDeps:
     client: httpx.AsyncClient
     notifier: NotifierFn
     max_consecutive_errors: int = 10
+    listing_gone_confirmations: int = 3
     delay_between_products: float = 5.0
     notification_cooldown_hours: int = 24
     health_mgr: HealthManager = field(default_factory=_no_op_health_mgr)
@@ -217,6 +236,20 @@ class Scheduler:
             await self._record_failure_and_maybe_disable(
                 product, scraper_name=scraper_name, domain=domain, reason="block", detail=str(e)
             )
+        except ListingGone as e:
+            logger.warning("Listing gone for product %d: %s", product.id, e)
+            if metrics is not None:
+                metrics.price_check_total.labels(
+                    scraper=scraper_name, domain=domain, status="error"
+                ).inc()
+            reason, detail = _failure_reason(e)
+            await self._record_failure_and_maybe_disable(
+                product,
+                scraper_name=scraper_name,
+                domain=domain,
+                reason=reason,
+                detail=detail,
+            )
         except ParseError as e:
             logger.warning("Parse error for product %d: %s", product.id, e)
             if metrics is not None:
@@ -236,12 +269,13 @@ class Scheduler:
                 metrics.price_check_total.labels(
                     scraper=scraper_name, domain=domain, status="error"
                 ).inc()
+            reason, detail = _failure_reason(e)
             await self._record_failure_and_maybe_disable(
                 product,
                 scraper_name=scraper_name,
                 domain=domain,
-                reason="http_error",
-                detail=str(e),
+                reason=reason,
+                detail=detail,
             )
         except Exception as e:  # noqa: BLE001 — one product must never abort the sweep
             # Unexpected: a scraper leaking a non-contract exception, or a DB error
@@ -364,11 +398,13 @@ class Scheduler:
     ) -> bool:
         """Increment ``consecutive_errors`` and auto-disable on threshold.
 
-        Always increments the error count. Re-reads the product to obtain the
-        updated counter (so concurrent ticks see a consistent value), and when
-        the counter reaches ``deps.max_consecutive_errors`` it:
+        Always records the error and obtains the updated counters in one
+        repository operation. When either ``consecutive_errors`` reaches
+        ``deps.max_consecutive_errors`` or ``gone_streak`` reaches
+        ``deps.listing_gone_confirmations`` it:
 
-        * pauses the product via :meth:`Repository.deactivate_product`
+        * suspends the product via the compare-and-swap
+          :meth:`Repository.suspend_product`
         * pushes one ``Tracking suspended`` notification to the owner via
           ``deps.notifier`` so users get a persistent record of the suspension
           even when the failure was detected during an interactive ``/checkall``.
@@ -382,19 +418,22 @@ class Scheduler:
         logging only. ``reason`` (plus optional ``detail``) is persisted as the
         product's ``last_error`` so the /errori command can surface it.
         """
-        await self.deps.repo.increment_errors(product.id)
-        await self.deps.repo.set_last_error(product.id, f"{reason}: {detail}" if detail else reason)
+        updated = await self.deps.repo.record_failure(product.id, reason=reason, detail=detail)
         # A check that failed produced no evidence about the price, so it breaks
         # any confirmation run in progress: two sightings either side of an
         # outage are not consecutive readings of the same claim.
         if product.pending_read_count or product.pending_read_streak:
             await self.deps.repo.clear_pending_read(product.id)
-        updated = await self.deps.repo.get_product(product.id)
         if updated is None:
             return False
-        if updated.consecutive_errors < self.deps.max_consecutive_errors:
+        suspended = (
+            updated.consecutive_errors >= self.deps.max_consecutive_errors
+            or updated.gone_streak >= self.deps.listing_gone_confirmations
+        )
+        if not suspended:
             return False
-        await self.deps.repo.deactivate_product(product.id)
+        if not await self.deps.repo.suspend_product(product.id, reason=reason):
+            return False
         logger.warning(
             "Product %d auto-disabled after %d consecutive errors "
             "(scraper=%s, domain=%s, reason=%s)",
@@ -862,6 +901,28 @@ class Scheduler:
                         disabled=disabled,
                     )
                 )
+            except ListingGone as e:
+                logger.warning("Listing gone for product %d: %s", product.id, e)
+                if metrics is not None:
+                    metrics.price_check_total.labels(
+                        scraper=scraper_name, domain=domain, status="error"
+                    ).inc()
+                reason, detail = _failure_reason(e)
+                disabled = await self._record_failure_and_maybe_disable(
+                    product,
+                    scraper_name=scraper_name,
+                    domain=domain,
+                    reason=reason,
+                    detail=detail,
+                )
+                results.append(
+                    CheckResult(
+                        product_id=product.id,
+                        user_id=user_id,
+                        alert=None,
+                        disabled=disabled,
+                    )
+                )
             except ParseError as e:
                 logger.warning("Parse error for product %d: %s", product.id, e)
                 if metrics is not None:
@@ -885,8 +946,13 @@ class Scheduler:
                     metrics.price_check_total.labels(
                         scraper=scraper_name, domain=domain, status="error"
                     ).inc()
+                reason, detail = _failure_reason(e)
                 disabled = await self._record_failure_and_maybe_disable(
-                    product, scraper_name=scraper_name, domain=domain, reason="http_error"
+                    product,
+                    scraper_name=scraper_name,
+                    domain=domain,
+                    reason=reason,
+                    detail=detail,
                 )
                 results.append(
                     CheckResult(
