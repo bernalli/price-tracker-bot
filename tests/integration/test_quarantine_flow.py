@@ -1,5 +1,5 @@
 # tests/integration/test_quarantine_flow.py
-"""Quarantine flow integration test — Bug #1 regression (xteink.com 429 loop).
+"""Quarantine flow integration test — Bug #1 regression (repeated 429 loop).
 
 Exercises the full pipeline:
   HealthManager state machine + Scheduler skip-on-locked + half-open probe
@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from price_tracker.core.scheduler import Scheduler
     from price_tracker.db.repository import Repository
 
-XTEINK_URL = "https://www.xteink.com/products/xteink-x3"
+SHOP_A_URL = "https://www.shop-a.com/products/shop-a-x3"
 
 
 @pytest.fixture
@@ -63,15 +63,15 @@ def _make_product(pid: int, url: str) -> ProductRecord:
 
 
 @pytest.mark.asyncio
-async def test_xteink_loop_does_not_recur(
+async def test_block_loop_does_not_recur(
     health_mgr_with_repo: HealthManager,
     scheduler_factory: object,
 ) -> None:
-    """Regression for Bug #1: xteink.com 429 loop is broken by quarantine.
+    """Regression for Bug #1: repeated 429 loop is broken by quarantine.
 
     Steps:
       1. Record 3 blocks → counter=3, LOCKED_T1
-      2. 6 ticks during 1h lockout → scheduler must NOT scrape xteink.com at all
+      2. 6 ticks during 1h lockout → scheduler must NOT scrape shop-a.com at all
       3. Advance to 13:01 → HALF_OPEN_T1
       4. Tick with 2 products on same domain → exactly 1 probe
       5. Record still-429 → LOCKED_T2; verify locked_until = 19:01
@@ -81,32 +81,32 @@ async def test_xteink_loop_does_not_recur(
     with freeze_time("2026-05-09 12:00:00") as frozen:
         # Step 1 — three blocks → LOCKED_T1
         for _ in range(3):
-            await mgr.record_block("xteink.com", reason="HTTP 429")
-        assert mgr.state("xteink.com") == QuarantineState.LOCKED_T1
-        assert mgr.is_locked("xteink.com")
+            await mgr.record_block("shop-a.com", reason="HTTP 429")
+        assert mgr.state("shop-a.com") == QuarantineState.LOCKED_T1
+        assert mgr.is_locked("shop-a.com")
 
-        # Step 2 — scheduler must not hammer xteink.com during the 1h lock window
+        # Step 2 — scheduler must not hammer shop-a.com during the 1h lock window
         scheduler: Scheduler = scheduler_factory(health_mgr=mgr)
         scrape_attempts: list[str] = []
         scheduler._scrape_one = AsyncMock(side_effect=lambda p: scrape_attempts.append(p.url))
-        xteink_product = _make_product(1, XTEINK_URL)
+        shop_a_product = _make_product(1, SHOP_A_URL)
 
         # Simulate 6 ticks (every 10 minutes) during lockout window
         for offset in range(0, 60, 10):
             frozen.move_to(datetime(2026, 5, 9, 12, offset, tzinfo=UTC))
-            await scheduler._run_tick([xteink_product])
+            await scheduler._run_tick([shop_a_product])
         assert scrape_attempts == [], "scheduler must not scrape locked domain"
 
         # Step 3 — advance past 1h lockout → HALF_OPEN_T1
         frozen.move_to("2026-05-09 13:01:00")
-        assert mgr.state("xteink.com") == QuarantineState.HALF_OPEN_T1
+        assert mgr.state("shop-a.com") == QuarantineState.HALF_OPEN_T1
 
         # Step 4 — tick with 2 products on same half-open domain → exactly 1 probe
-        p2 = _make_product(2, f"{XTEINK_URL}-2")
-        await scheduler._run_tick([xteink_product, p2])
+        p2 = _make_product(2, f"{SHOP_A_URL}-2")
+        await scheduler._run_tick([shop_a_product, p2])
         assert len(scrape_attempts) == 1, "half-open tick must send exactly one probe"
 
         # Step 5 — probe is still blocked → promote to LOCKED_T2
-        await mgr.record_block("xteink.com", reason="HTTP 429")
-        assert mgr.state("xteink.com") == QuarantineState.LOCKED_T2
-        assert mgr.locked_until("xteink.com") == datetime(2026, 5, 9, 19, 1, tzinfo=UTC)
+        await mgr.record_block("shop-a.com", reason="HTTP 429")
+        assert mgr.state("shop-a.com") == QuarantineState.LOCKED_T2
+        assert mgr.locked_until("shop-a.com") == datetime(2026, 5, 9, 19, 1, tzinfo=UTC)

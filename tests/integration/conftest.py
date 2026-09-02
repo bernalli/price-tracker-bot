@@ -84,7 +84,7 @@ def scheduler_factory() -> object:
 
 @pytest.fixture
 def sample_products() -> list[ProductRecord]:
-    """A mix of products across two domains: xteink and example.com (1)."""
+    """A mix of products across two domains: shop-a and example.com (1)."""
     from price_tracker.db.models import ProductRecord  # noqa: PLC0415
 
     def _make(pid: int, url: str) -> ProductRecord:
@@ -111,7 +111,7 @@ def sample_products() -> list[ProductRecord]:
         )
 
     return [
-        _make(1, "https://xteink.com/product/1"),
-        _make(2, "https://xteink.com/product/2"),
+        _make(1, "https://shop-a.com/product/1"),
+        _make(2, "https://shop-a.com/product/2"),
         _make(3, "https://example.com/product/3"),
     ]
