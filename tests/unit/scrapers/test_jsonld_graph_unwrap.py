@@ -72,3 +72,35 @@ def test_unwrap_jsonld_graph_mixed_list_with_nested_graph() -> None:
 def test_unwrap_jsonld_graph_non_dict_payload() -> None:
     assert unwrap_jsonld_graph("nope") == []
     assert unwrap_jsonld_graph(None) == []
+
+
+# ── schema.org Action wrappers ────────────────────────────────────────────
+
+
+def test_unwrap_jsonld_graph_descends_into_action_object() -> None:
+    """A Product carried as BuyAction.object must surface as its own node.
+
+    MediaMarkt emits `{"@type": "BuyAction", "object": {"@type": "Product"}}`;
+    scanning only top-level @type made the Product — and its price — invisible.
+    """
+    payload = {
+        "@context": "https://schema.org/",
+        "@type": "BuyAction",
+        "object": {
+            "@type": "Product",
+            "name": "Wrapped Monitor",
+            "offers": {"@type": "Offer", "price": "259", "priceCurrency": "EUR"},
+        },
+    }
+    nodes = unwrap_jsonld_graph(payload)
+    products = [n for n in nodes if "Product" in str(n.get("@type", ""))]
+    assert len(products) == 1
+    assert products[0]["name"] == "Wrapped Monitor"
+
+
+def test_unwrap_jsonld_graph_keeps_non_action_object_property_opaque() -> None:
+    """`object` is only followed on Actions, not on arbitrary nodes."""
+    payload = {"@type": "Product", "object": {"@type": "Product", "name": "Nested"}}
+    nodes = unwrap_jsonld_graph(payload)
+    assert len(nodes) == 1
+    assert nodes[0].get("name") is None

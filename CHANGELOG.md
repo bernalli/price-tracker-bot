@@ -33,6 +33,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The old `Tracking suspended` message has been replaced by the reason-aware operational
   notice described above.
 
+### Fixed
+
+- **MediaMarkt products no longer track.** Their pages moved the JSON-LD `Product`
+  inside a `BuyAction` and dropped the DOM wrapper the price fallback selected, so
+  every MediaMarkt product reported "Price not found in page" while still resolving
+  its name. Both page shapes are supported now.
+- **A valid offer could be discarded as monthly financing.** Any JSON-LD offer
+  carrying a `UnitPriceSpecification` was filtered out, which is how retailers state
+  ordinary strikethrough and loyalty-tier prices. Financing now has to be stated as
+  such — a billing period, a reference quantity, or "/mo"-style wording. This
+  affected every scraper that reads a JSON-LD offer, not only MediaMarkt.
+
 ## [1.0.0] - 2026-09-02
 
 First stable release. Nothing here is a rewrite: the version number changes

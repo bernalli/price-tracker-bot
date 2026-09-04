@@ -1,7 +1,7 @@
 """Mediamarkt scraper — extracts product info from mediamarkt.* (9 EU TLDs).
 
-Strategy: JSON-LD Product/offers (primary) with DOM fallback on
-[data-test=mms-pdp-product-price] [data-test=branded-price-whole-value].
+Strategy: JSON-LD Product/offers (primary) with DOM fallback on the
+[data-test=branded-price-*] spans.
 """
 
 from __future__ import annotations
@@ -22,8 +22,10 @@ from price_tracker.core.scraper_base import (
     detect_block_event,
     detect_currency,
     get_headers,
+    in_carousel_context,
     parse_price,
     select_jsonld_offer,
+    unwrap_jsonld_graph,
 )
 
 if TYPE_CHECKING:
@@ -129,10 +131,9 @@ class MediamarktScraper(AbstractScraper):
                 data = json.loads(raw)
             except (json.JSONDecodeError, ValueError):
                 continue
-            items = data if isinstance(data, list) else [data]
-            for item in items:
-                if not isinstance(item, dict):
-                    continue
+            # MediaMarkt nests the Product inside a BuyAction (`object`), and
+            # other sites use `@graph`; unwrap_jsonld_graph flattens both.
+            for item in unwrap_jsonld_graph(data):
                 type_val = item.get("@type", "")
                 type_str = " ".join(type_val) if isinstance(type_val, list) else str(type_val)
                 if "Product" not in type_str:
@@ -151,15 +152,61 @@ class MediamarktScraper(AbstractScraper):
                 return result
         return None
 
-    def _try_dom(self, soup: BeautifulSoup) -> StrategyResult | None:
+    @staticmethod
+    def _find_whole_value_span(soup: BeautifulSoup) -> Tag | None:
+        """Locate the main product's whole-value price span, old or new markup."""
+        selector = '[data-test="branded-price-whole-value"]'
         container = soup.select_one('[data-test="mms-pdp-product-price"]')
-        if not isinstance(container, Tag):
+        if isinstance(container, Tag):
+            whole = container.select_one(selector)
+            if isinstance(whole, Tag):
+                return whole
+        for candidate in soup.select(selector):
+            if not in_carousel_context(candidate):
+                return candidate
+        return None
+
+    def _try_dom(self, soup: BeautifulSoup) -> StrategyResult | None:
+        """Read the price off the [data-test=branded-price-*] spans.
+
+        Accepts both page shapes. Older pages wrap the price in
+        [data-test=mms-pdp-product-price]; that wrapper is gone from current
+        ones, which silently disabled this whole fallback. So the wrapper is
+        used as a scope when present — it pins the main product's price — and
+        otherwise the spans are located in the document, skipping any that sit
+        inside a recommendations carousel.
+        """
+        whole = self._find_whole_value_span(soup)
+        if whole is None:
             return None
-        whole = container.select_one('[data-test="branded-price-whole-value"]')
-        if not isinstance(whole, Tag):
-            return None
+        # Siblings of the whole-value span, when present: "259," + "–" + " €".
+        scope = whole.parent if isinstance(whole.parent, Tag) else soup
+        # The whole-value span carries the decimal separator and may carry a
+        # thousands separator too ("1.299,"), so join on it rather than
+        # stripping it — "1.299" + "." + "99" would not parse.
         text = whole.get_text(strip=True)
+
+        decimals = ""
+        decimal_el = scope.select_one('[data-test="branded-price-decimal-value"]')
+        if isinstance(decimal_el, Tag):
+            candidate = decimal_el.get_text(strip=True)
+            # A round price renders the decimals as a dash ("259,–"), not digits.
+            if candidate.isdigit():
+                decimals = candidate
+        if decimals:
+            separator = "" if text.endswith((",", ".")) else ","
+            text = f"{text}{separator}{decimals}"
+        else:
+            text = text.rstrip(",.")
+
         parsed = parse_price(text)
         if parsed is None:
             return None
-        return {"price": parsed}
+        result: StrategyResult = {"price": parsed}
+
+        currency_el = scope.select_one('[data-test="branded-price-currency"]')
+        if isinstance(currency_el, Tag):
+            currency = detect_currency(currency_el.get_text(strip=True))
+            if currency:
+                result["currency"] = currency
+        return result
