@@ -108,7 +108,7 @@ services:
     restart: unless-stopped
     env_file: .env
     volumes:
-      - ./data:/data:rw
+      - price-tracker-data:/data
 ```
 
 Notes:
@@ -116,7 +116,39 @@ Notes:
 - `cap_drop: [ALL]` removes every Linux capability — the bot needs none.
 - `no-new-privileges:true` blocks setuid escalation.
 - `mem_limit: 768m` + `cpus: 1.0` are the verified working budgets on production.
-- The `./data` volume is the only writable persistent path; back up its content (see [Backup & restore](#backup--restore)).
+- The `/data` volume is the only writable persistent path; back up its content (see [Backup & restore](#backup--restore)).
+
+### Bind mount instead of the named volume
+
+`docker-compose.yml` ships a **named volume** (`price-tracker-data`) on purpose: Docker seeds a
+named volume with the image's `/data` ownership, so the non-root process (`user: "1000:1000"`)
+can create the database on first run. A `./data` bind mount is created root-owned by the engine
+and breaks that first startup.
+
+A deployment that already keeps its database in a host directory (for example
+`/opt/price-tracker/data`, created before the container was hardened) must keep that bind — but
+**must not** edit the tracked compose file for it. Declare it as a local, untracked override:
+
+```yaml
+# docker-compose.override.yml — not tracked by git
+services:
+  price-tracker:
+    volumes:
+      - ./data:/data:rw
+```
+
+The override is a per-machine contract, and losing it is silent: `docker compose up` without it
+mounts the named volume, Docker creates it empty, the migrations run against a blank database and
+the bot comes back up **with no products and no error in the logs**. Before any deploy on such a
+host, verify the resolved configuration rather than grepping the file:
+
+```bash
+docker compose config --format json | python -c "import json,sys; \
+  print([v for v in json.load(sys.stdin)['services']['price-tracker']['volumes'] \
+  if v.get('target') == '/data'])"
+```
+
+Expect exactly one mount with `"type": "bind"` and the host path you intend.
 
 ## Troubleshooting
 
