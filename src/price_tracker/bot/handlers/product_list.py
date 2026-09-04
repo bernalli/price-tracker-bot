@@ -34,12 +34,12 @@ async def cmd_list(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     if not products:
         await update.message.reply_text(
-            _("📭 Non hai prodotti tracciati.\nIncollami un link per iniziare!")
+            _("📭 You have no tracked products.\nPaste me a link to get started!")
         )
         return
 
     await update.message.reply_text(
-        f"<b>📦 I tuoi prodotti ({len(products)})</b>",
+        _("<b>📦 Your products ({count})</b>").format(count=len(products)),
         parse_mode=ParseMode.HTML,
     )
 
@@ -48,7 +48,7 @@ async def cmd_list(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     for p in products:
         pid = p["id"]
-        name = p.get("name") or "Sconosciuto"
+        name = p.get("name") or _("Unknown")
         name_short = name[:60] + ("..." if len(name) > 60 else "")
         current = _safe_dec(p.get("current_price"))
         initial = _safe_dec(p.get("initial_price"))
@@ -56,7 +56,7 @@ async def cmd_list(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         lowest = _safe_dec(p.get("lowest_price"))
         url = p.get("url", "")
         currency = p.get("currency", "") or detect_currency(url) or "EUR"
-        price_str = _convert_display(current, currency) if current else "N/D"
+        price_str = _convert_display(current, currency) if current else _("N/A")
         threshold = _format_threshold(
             p.get("threshold_type", "percentage"),
             p.get("threshold_value", "10"),
@@ -68,18 +68,22 @@ async def cmd_list(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             diff = (initial - current) / initial * 100
             if diff > 0:
                 parts.append(
-                    f"📌 Prezzo iniziale: €{initial:.2f} (<i>-{diff:.1f}% dal tracking</i>)"
+                    _(
+                        "📌 Initial price: €{initial:.2f} (<i>-{diff:.1f}% since tracking</i>)"
+                    ).format(initial=initial, diff=diff)
                 )
             elif diff < 0:
                 increase = abs(diff)
                 parts.append(
-                    f"📈 Prezzo iniziale: €{initial:.2f} (<i>+{increase:.1f}% dal tracking</i>)"
+                    _(
+                        "📈 Initial price: €{initial:.2f} (<i>+{increase:.1f}% since tracking</i>)"
+                    ).format(initial=initial, increase=increase)
                 )
 
         if lowest and current and lowest < current:
             parts.append(f"📉 Min: €{lowest:.2f}")
 
-        parts.append(f"🎯 Soglia: {threshold}")
+        parts.append(_("🎯 Threshold: {threshold}").format(threshold=threshold))
         if target:
             parts.append(f"🏁 Target: €{target:.2f}")
 
@@ -90,34 +94,36 @@ async def cmd_list(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 int_str = f"{h:.0f}h" if h == int(h) else f"{h:.1f}h"
             else:
                 int_str = f"{custom_int}min"
-            parts.append(f"🔄 Check: ogni {int_str}")
+            parts.append(_("🔄 Check: every {interval}").format(interval=int_str))
 
         # Last check time
         ago = _format_relative_time(p.get("last_checked_at"))
         if ago:
-            parts.append(f"🕐 Ultimo check: {ago}")
+            parts.append(_("🕐 Last check: {ago}").format(ago=ago))
 
         errors = p.get("consecutive_errors", 0)
         if errors and errors > 0:
-            parts.append(f"⚠️ {errors} letture fallite di recente — dettagli con /errori")
+            parts.append(
+                _("⚠️ {count} failed reads recently — details with /errors").format(count=errors)
+            )
 
         text = "\n".join(parts)
 
         btn_rows = [
             [
-                InlineKeyboardButton("🔍 Check", callback_data=f"check_{pid}"),
-                InlineKeyboardButton("📊 Storico prezzo", callback_data=f"chart_{pid}"),
+                InlineKeyboardButton(_("🔍 Check"), callback_data=f"check_{pid}"),
+                InlineKeyboardButton(_("📊 Price history"), callback_data=f"chart_{pid}"),
             ],
             [
-                InlineKeyboardButton("⏸ Pausa", callback_data=f"pause_{pid}"),
-                InlineKeyboardButton("🗑 Elimina", callback_data=f"remove_{pid}"),
+                InlineKeyboardButton(_("⏸ Pause"), callback_data=f"pause_{pid}"),
+                InlineKeyboardButton(_("🗑 Delete"), callback_data=f"remove_{pid}"),
             ],
             [
-                InlineKeyboardButton("✏️ Modifica", callback_data=f"edit_{pid}"),
+                InlineKeyboardButton(_("✏️ Edit"), callback_data=f"edit_{pid}"),
             ],
         ]
         if url:
-            btn_rows[2].insert(0, InlineKeyboardButton("🔗 Apri", url=url))
+            btn_rows[2].insert(0, InlineKeyboardButton(_("🔗 Open"), url=url))
         keyboard = InlineKeyboardMarkup(btn_rows)
 
         await update.message.reply_text(
@@ -127,13 +133,13 @@ async def cmd_list(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             reply_markup=keyboard,
         )
 
-    # "Elimina tutti" button at the end
+    # "Delete all" button at the end
     if len(products) > 1:
         keyboard_all = InlineKeyboardMarkup(
-            [[InlineKeyboardButton("🗑 Elimina tutti i prodotti", callback_data="delete_all")]]
+            [[InlineKeyboardButton(_("🗑 Delete all products"), callback_data="delete_all")]]
         )
         await update.message.reply_text(
-            f"───────────────\n📦 <b>{len(products)}</b> prodotti tracciati",
+            _("───────────────\n📦 <b>{count}</b> tracked products").format(count=len(products)),
             parse_mode=ParseMode.HTML,
             reply_markup=keyboard_all,
         )

@@ -24,9 +24,29 @@ from telegram.ext import (
 )
 
 from price_tracker.bot.decorators import _client, _db, _scraper, restricted, with_locale
+from price_tracker.bot.handlers.callbacks._menu import CSV_HEADERS
 from price_tracker.bot.messages import _
 
 logger = logging.getLogger(__name__)
+
+# Import accepts both the current English headers and the Italian ones written
+# by releases up to 1.0.0, so a CSV exported before the i18n sweep still loads.
+CSV_ALIASES: dict[str, tuple[str, ...]] = {
+    "Name": ("Name", "Nome"),
+    "URL": ("URL",),
+    "Target": ("Target",),
+    "Threshold": ("Threshold", "Soglia"),
+    "Currency": ("Currency", "Valuta"),
+}
+
+
+def _cell(row: dict[str, str], field: str, default: str = "") -> str:
+    """Read `field` from a CSV row, falling back to its legacy header names."""
+    for key in CSV_ALIASES[field]:
+        value = row.get(key)
+        if value is not None and value.strip():
+            return value
+    return default
 
 
 @with_locale
@@ -38,25 +58,12 @@ async def cmd_export(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     products = await db.get_all_products(user_id)
 
     if not products:
-        await update.message.reply_text(_("📭 Non hai prodotti da esportare."))
+        await update.message.reply_text(_("📭 You have no products to export."))
         return
 
     buf = io.StringIO()
     writer = csv.writer(buf)
-    writer.writerow(
-        [
-            "ID",
-            "Nome",
-            "URL",
-            "Prezzo Iniziale",
-            "Prezzo Attuale",
-            "Prezzo Min",
-            "Target",
-            "Soglia",
-            "Attivo",
-            "Valuta",
-        ]
-    )
+    writer.writerow(CSV_HEADERS)
     for p in products:
         writer.writerow(
             [
@@ -68,16 +75,16 @@ async def cmd_export(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
                 p.get("lowest_price", ""),
                 p.get("target_price", ""),
                 f"{p.get('threshold_type', 'percentage')}:{p.get('threshold_value', '10')}",
-                "Si" if p.get("is_active") else "No",
+                "Yes" if p.get("is_active") else "No",
                 p.get("currency", "EUR"),
             ]
         )
 
     csv_bytes = buf.getvalue().encode("utf-8")
-    filename = f"prodotti_{datetime.now().strftime('%Y%m%d')}.csv"
+    filename = f"products_{datetime.now().strftime('%Y%m%d')}.csv"
     await update.message.reply_document(
         document=InputFile(io.BytesIO(csv_bytes), filename=filename),
-        caption=f"📊 {len(products)} prodotti esportati.",
+        caption=_("📊 {count} products exported.").format(count=len(products)),
     )
 
 
@@ -87,16 +94,18 @@ async def cmd_import(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     """Import products from a CSV file."""
     if not update.message.document:
         await update.message.reply_text(
-            "📁 <b>Importa prodotti da CSV</b>\n\n"
-            "Invia un file CSV (esportato con /esporta) come allegato.\n"
-            "I prodotti duplicati (stesso URL) verranno saltati.",
+            _(
+                "📁 <b>Import products from CSV</b>\n\n"
+                "Send a CSV file (the one produced by /export) as an attachment.\n"
+                "Duplicate products (same URL) will be skipped."
+            ),
             parse_mode=ParseMode.HTML,
         )
         return
 
     doc = update.message.document
     if not doc.file_name or not doc.file_name.endswith(".csv"):
-        await update.message.reply_text(_("❌ Il file deve essere un CSV."))
+        await update.message.reply_text(_("❌ The file must be a CSV."))
         return
 
     file = await context.bot.get_file(doc.file_id)
@@ -107,7 +116,7 @@ async def cmd_import(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     try:
         reader = csv.DictReader(io.StringIO(buf.read().decode("utf-8")))
     except Exception as e:  # noqa: BLE001 — surface parse error to user
-        await update.message.reply_text(f"❌ Errore nel parsing del CSV: {e}")
+        await update.message.reply_text(_("❌ Error parsing the CSV: {error}").format(error=e))
         return
 
     db = _db(context)
@@ -118,12 +127,12 @@ async def cmd_import(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     skipped = 0
     errors = 0
 
-    msg = await update.message.reply_text(_("⏳ Importazione in corso..."))
+    msg = await update.message.reply_text(_("⏳ Import in progress..."))
 
     from price_tracker.core.url_utils import extract_etld_plus_one  # noqa: PLC0415
 
     for row in reader:
-        url = row.get("URL", "").strip()
+        url = _cell(row, "URL").strip()
         if not url:
             continue
 
@@ -141,23 +150,23 @@ async def cmd_import(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
                 continue
             result = await scraper_for_url.scrape(url, client)
             price = result.price
-            name = result.name or row.get("Nome", "Importato")
+            name = result.name or _cell(row, "Name", _("Imported"))
 
             # Use CSV target if available
-            target_str = row.get("Target", "").strip()
+            target_str = _cell(row, "Target").strip()
             target = None
             if target_str:
                 with contextlib.suppress(ValueError, ArithmeticError):
                     target = Decimal(target_str)
 
             # Parse threshold from CSV
-            threshold_str = row.get("Soglia", "percentage:10")
+            threshold_str = _cell(row, "Threshold", "percentage:10")
             th_type, th_value = "percentage", "10"
             if ":" in threshold_str:
                 parts = threshold_str.split(":", 1)
                 th_type, th_value = parts[0], parts[1]
 
-            currency = row.get("Valuta", "EUR").strip() or "EUR"
+            currency = _cell(row, "Currency", "EUR").strip() or "EUR"
 
             new_pid = await db.add_product(
                 user_id=user_id,
@@ -176,12 +185,12 @@ async def cmd_import(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             logger.error("Import error for %s: %s", url[:60], e)
             errors += 1
 
-    lines = ["📁 <b>Importazione completata</b>"]
-    lines.append(f"✅ Importati: {imported}")
+    lines = [_("📁 <b>Import complete</b>")]
+    lines.append(_("✅ Imported: {count}").format(count=imported))
     if skipped:
-        lines.append(f"⏭️ Duplicati saltati: {skipped}")
+        lines.append(_("⏭️ Duplicates skipped: {count}").format(count=skipped))
     if errors:
-        lines.append(f"❌ Errori: {errors}")
+        lines.append(_("❌ Errors: {count}").format(count=errors))
     await msg.edit_text(chr(10).join(lines), parse_mode=ParseMode.HTML)
 
 

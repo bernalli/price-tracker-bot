@@ -9,16 +9,18 @@ from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from typing import TYPE_CHECKING, Any, cast
 
+from price_tracker.bot.messages import _
+
 if TYPE_CHECKING:
     from telegram.ext import ContextTypes
 
 
 def _format_relative_time(iso_ts: str | None, *, now: datetime | None = None) -> str | None:
-    """Render an ISO timestamp as a compact "Nmin/h/g fa" string, or None.
+    """Render an ISO timestamp as a compact "N min/h/d ago" string, or None.
 
     Normalises naive timestamps (the DB stores ``YYYY-MM-DD HH:MM:SS`` without
     tzinfo) to UTC before subtracting, so the comparison never raises the
-    naive-vs-aware ``TypeError`` that previously hid the "Ultimo check" line.
+    naive-vs-aware ``TypeError`` that previously hid the "Last check" line.
     """
     if not iso_ts:
         return None
@@ -31,10 +33,10 @@ def _format_relative_time(iso_ts: str | None, *, now: datetime | None = None) ->
     reference = now or datetime.now(UTC)
     seconds = (reference - checked).total_seconds()
     if seconds < 3600:
-        return f"{int(seconds / 60)}min fa"
+        return _("{n}min ago").format(n=int(seconds / 60))
     if seconds < 86400:
-        return f"{int(seconds / 3600)}h fa"
-    return f"{int(seconds / 86400)}g fa"
+        return _("{n}h ago").format(n=int(seconds / 3600))
+    return _("{n}d ago").format(n=int(seconds / 86400))
 
 
 def _escape_html(text: str) -> str:
@@ -56,20 +58,30 @@ def _parse_threshold_input(text: str) -> tuple[str, str]:
         try:
             Decimal(value)
         except InvalidOperation as exc:
-            raise ValueError(f"Valore non valido: {value}") from exc
+            raise ValueError(_("Invalid value: {value}").format(value=value)) from exc
         return ("percentage", value)
     value = text.replace(",", ".").replace("€", "").strip()
     try:
         Decimal(value)
     except InvalidOperation as exc:
-        raise ValueError(f"Valore non valido: {value}") from exc
+        raise ValueError(_("Invalid value: {value}").format(value=value)) from exc
     return ("absolute", value)
+
+
+def _format_minutes(minutes: int) -> str:
+    """Render an interval in minutes as a localized "N hours" / "N minutes"."""
+    if minutes >= 60:
+        hours = minutes / 60
+        if hours == int(hours):
+            return _("{n:.0f} hours").format(n=hours)
+        return _("{n:.1f} hours").format(n=hours)
+    return _("{n} minutes").format(n=minutes)
 
 
 def _format_threshold(threshold_type: str, threshold_value: str) -> str:
     """Render a threshold tuple as a user-facing string."""
     if threshold_type == "any_drop":
-        return "\U0001f514 Ogni ribasso"
+        return _("\U0001f514 Every drop")
     if threshold_type == "percentage":
         return f"-{threshold_value}%"
     return f"-€{Decimal(threshold_value):.2f}"
@@ -110,5 +122,5 @@ async def _get_product_name(db: Any, product_id: int) -> str:
     """Get product name by ID (truncated to 60 chars)."""
     product = await db.get_product(product_id)
     if product:
-        return (product.get("name") or "Sconosciuto")[:60]
-    return "Sconosciuto"
+        return (product.get("name") or _("Unknown"))[:60]
+    return _("Unknown")

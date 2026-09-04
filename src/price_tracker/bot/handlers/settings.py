@@ -17,6 +17,7 @@ from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler
 
 from price_tracker.bot.decorators import _config, _db, admin_only, restricted, with_locale
+from price_tracker.bot.handlers._helpers import _format_minutes
 from price_tracker.bot.messages import _
 from price_tracker.db.models import NotificationPrefs
 
@@ -37,9 +38,11 @@ async def cmd_set_interval(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     if not context.args:
         config = _config(context)
         await update.message.reply_text(
-            f"⏱ Intervallo attuale: <b>ogni {config.check_interval_minutes} minuti</b>\n\n"
-            f"Uso: /intervallo &lt;minuti&gt;\n"
-            f"Esempio: <code>/intervallo 120</code> per ogni 2 ore",
+            _(
+                "⏱ Current interval: <b>every {minutes} minutes</b>\n\n"
+                "Usage: /setinterval &lt;minutes&gt;\n"
+                "Example: <code>/setinterval 120</code> for every 2 hours"
+            ).format(minutes=config.check_interval_minutes),
             parse_mode=ParseMode.HTML,
         )
         return
@@ -47,25 +50,20 @@ async def cmd_set_interval(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     try:
         minutes = int(context.args[0])
     except ValueError:
-        await update.message.reply_text(_("❌ Valore non valido."))
+        await update.message.reply_text(_("❌ Invalid value."))
         return
     if minutes < 5:
-        await update.message.reply_text(_("❌ L'intervallo minimo è 5 minuti."))
+        await update.message.reply_text(_("❌ The minimum interval is 5 minutes."))
         return
     if minutes > 1440 * 7:
-        await update.message.reply_text(_("❌ L'intervallo massimo è 7 giorni."))
+        await update.message.reply_text(_("❌ The maximum interval is 7 days."))
         return
 
     await _db(context).set_config("check_interval_minutes", str(minutes))
     _reschedule_periodic_check(context, minutes)
 
-    if minutes >= 60:
-        hours = minutes / 60
-        display = f"{hours:.0f} ore" if hours == int(hours) else f"{hours:.1f} ore"
-    else:
-        display = f"{minutes} minuti"
     await update.message.reply_text(
-        f"✅ Intervallo aggiornato: <b>ogni {display}</b>",
+        _("✅ Interval updated: <b>every {interval}</b>").format(interval=_format_minutes(minutes)),
         parse_mode=ParseMode.HTML,
     )
 

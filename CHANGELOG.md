@@ -32,6 +32,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Queued digest entries survive the deletion of the product that generated them.
 - The old `Tracking suspended` message has been replaced by the reason-aware operational
   notice described above.
+- Spanish (`es_ES`) joins English and Italian as a shipped locale.
+- The whole interface is now translatable. The bot began as an Italian project and the
+  i18n pass only covered part of it, so 206 Italian literals never reached gettext and
+  17 catalog msgids were themselves Italian — `LOCALE=en` still produced a largely
+  Italian UI, worst of all in the admin menus. All 223 now use English source strings.
+- CSV export headers are English (`Name`, `Initial Price`, …). Import still accepts the
+  previous Italian headers, so files exported before this release keep working.
+
+### Fixed
+
+- **Digest plural forms were never translated.** String extraction did not pass the
+  `ngettext` argument positions, so the two forms were recorded as unrelated singular
+  entries and no locale could resolve either.
+- **Operational-notice copy risked losing its translations.** The reason tables in
+  `core/alert.py` were never marked for extraction, so a catalog update would have
+  declared their Italian text obsolete. They now use the standard `N_()` marker.
+- **Compiling the catalogs rejected valid translations.** `pybabel compile` reads a
+  literal percent in prose ("-10% since tracking") as a printf template and then refuses
+  any translation whose following word starts with a different letter. Compilation now
+  goes through the Babel API instead.
 
 ## [1.0.0] - 2026-09-02
 

@@ -37,7 +37,7 @@ jobs:
           pip install -e ".[dev]"
 
       - name: Compile i18n catalogs
-        run: pybabel compile -d src/price_tracker/locale
+        run: python scripts/i18n_compile.py src/price_tracker/locale
 
       - name: Ruff check
         run: ruff check .

@@ -114,11 +114,11 @@ def _tier_label(state: str) -> str:
 async def cmd_debug(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Debug scraping for a URL — shows what each strategy finds."""
     if not context.args:
-        await update.message.reply_text("❌ Uso: /debug <url>", parse_mode=ParseMode.HTML)
+        await update.message.reply_text(_("❌ Usage: /debug <url>"), parse_mode=ParseMode.HTML)
         return
 
     url = context.args[0]
-    msg = await update.message.reply_text(_("🔍 Analisi in corso..."))
+    msg = await update.message.reply_text(_("🔍 Analysis in progress..."))
 
     from bs4 import BeautifulSoup  # noqa: PLC0415 — heavy import deferred
 
@@ -136,7 +136,9 @@ async def cmd_debug(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             html = resp.text
             # If suspiciously small, try fresh client
             if len(html) < 80000 and "application/ld+json" not in html:
-                lines.append("⚠️ Risposta piccola senza dati strutturati, provo client fresco...")
+                lines.append(
+                    _("⚠️ Small response with no structured data, trying a fresh client...")
+                )
                 try:
                     async with httpx.AsyncClient(timeout=30, follow_redirects=True) as fresh:
                         r2 = await fresh.get(
@@ -158,11 +160,11 @@ async def cmd_debug(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                         )
                         if r2.status_code == 200 and len(r2.text) > len(html):
                             html = r2.text
-                            lines.append("✅ Client fresco ha ottenuto più dati!")
+                            lines.append(_("✅ The fresh client got more data!"))
                 except Exception as e:  # noqa: BLE001 — debug surface, never crash
                     lines.append(f"❌ httpx fresh: {str(e)[:60]}")
         elif resp.status_code == 403:
-            lines.append("⚠️ 403 — provo curl_cffi...")
+            lines.append(_("⚠️ 403 — trying curl_cffi..."))
             try:
                 from curl_cffi.requests import AsyncSession  # noqa: PLC0415
 
@@ -177,7 +179,7 @@ async def cmd_debug(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 lines.append(f"❌ curl_cffi: {str(e)[:60]}")
 
             if not html:
-                lines.append("⚠️ Provo Scrapling...")
+                lines.append(_("⚠️ Trying Scrapling..."))
                 try:
                     from scrapling import Fetcher  # noqa: PLC0415
 
@@ -196,7 +198,7 @@ async def cmd_debug(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         lines.append(f"❌ httpx: {str(e)[:80]}")
 
     if not html:
-        lines.append("\n❌ Impossibile caricare la pagina con nessun metodo.")
+        lines.append(_("\n❌ Could not load the page with any method."))
         await msg.edit_text("\n".join(lines), parse_mode=ParseMode.HTML)
         return
 
@@ -214,7 +216,7 @@ async def cmd_debug(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         ):
             try:
                 _json.loads(m.group(1).strip())
-                lines.append("📦 JSON-LD: ❌ BS4 non trova gli script, ma regex sì!")
+                lines.append(_("📦 JSON-LD: ❌ BS4 finds no scripts, but the regex does!"))
                 break
             except _json.JSONDecodeError:
                 pass
@@ -224,7 +226,7 @@ async def cmd_debug(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             try:
                 raw = s.string or s.get_text(strip=True)
                 if not raw:
-                    lines.append(f"📦 JSON-LD #{i + 1}: contenuto vuoto")
+                    lines.append(_("📦 JSON-LD #{n}: empty content").format(n=i + 1))
                     continue
                 data = _json.loads(raw)
                 tp = data.get("@type", "?")
@@ -244,7 +246,7 @@ async def cmd_debug(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             except Exception as e:  # noqa: BLE001 — debug parse surface
                 lines.append(f"📦 JSON-LD #{i + 1}: parse error: {str(e)[:40]}")
     else:
-        lines.append("📦 JSON-LD: ❌ non trovato")
+        lines.append(_("📦 JSON-LD: ❌ not found"))
 
     # Step 3: Check OG/meta tags
     og_price = soup.find("meta", property="og:price:amount") or soup.find(
@@ -256,7 +258,7 @@ async def cmd_debug(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if product_price:
         lines.append(f"🏷 product:price:amount: <b>{product_price.get('content', '?')}</b>")
     if not og_price and not product_price:
-        lines.append("🏷 OG/meta price: ❌ non trovato")
+        lines.append(_("🏷 OG/meta price: ❌ not found"))
 
     # Step 4: Check microdata
     itemprop_price = soup.find(attrs={"itemprop": "price"})
@@ -264,7 +266,7 @@ async def cmd_debug(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         val = itemprop_price.get("content") or itemprop_price.get_text(strip=True)
         lines.append(f"🔖 itemprop=price: <b>{str(val)[:30]}</b>")
     else:
-        lines.append("🔖 itemprop=price: ❌ non trovato")
+        lines.append(_("🔖 itemprop=price: ❌ not found"))
 
     # Step 5: Check common selectors
     found_css = False
@@ -284,7 +286,7 @@ async def cmd_debug(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             lines.append(f"🎯 CSS '{sel}': <b>{_escape_html(val_str[:40])}</b>")
             found_css = True
     if not found_css:
-        lines.append("🎯 CSS selectors: ❌ nessun match")
+        lines.append(_("🎯 CSS selectors: ❌ no match"))
 
     # Step 6: Regex price in first 3000 chars of body
     body = soup.find("body")
@@ -294,7 +296,7 @@ async def cmd_debug(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if price_matches:
             lines.append(f"🔎 Regex €: {', '.join(price_matches[:5])}")
         else:
-            lines.append("🔎 Regex €: ❌ nessun match")
+            lines.append(_("🔎 Regex €: ❌ no match"))
 
     # Step 7: Title
     title = soup.find("title")
@@ -304,14 +306,14 @@ async def cmd_debug(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # Step 8: Run actual scraper
     scraper = _scraper(context)
     scraper_for_url = scraper.resolve(url)
-    lines.append("\n🤖 <b>Risultato scraper:</b>")
+    lines.append(_("\n🤖 <b>Scraper result:</b>"))
     if scraper_for_url is None:
-        lines.append("   ❌ nessuno scraper conosciuto per questo dominio")
+        lines.append(_("   ❌ no known scraper for this domain"))
     else:
         result = await scraper_for_url.scrape(url, client)
-        lines.append(f"   Nome: {_escape_html((result.name or '❌')[:60])}")
+        lines.append(_("   Name: {name}").format(name=_escape_html((result.name or "❌")[:60])))
         price_repr = "€" + str(result.price) if result.price else "❌ " + (result.error or "")
-        lines.append(f"   Prezzo: {price_repr}")
+        lines.append(_("   Price: {price}").format(price=price_repr))
 
     await msg.edit_text("\n".join(lines), parse_mode=ParseMode.HTML, disable_web_page_preview=True)
 
@@ -336,11 +338,11 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         interval_str = f"{interval}min"
 
     lines = [
-        "📊 <b>Le tue statistiche</b>\n",
-        f"📦 Prodotti attivi: {user_stats['active_products']}",
-        f"📁 Prodotti totali: {user_stats['total_products']}",
-        f"🔍 Controlli effettuati: {user_stats['total_checks']}",
-        f"⏱ Intervallo check: ogni {interval_str}",
+        _("📊 <b>Your stats</b>\n"),
+        _("📦 Active products: {n}").format(n=user_stats["active_products"]),
+        _("📁 Total products: {n}").format(n=user_stats["total_products"]),
+        _("🔍 Checks run: {n}").format(n=user_stats["total_checks"]),
+        _("⏱ Check interval: every {interval}").format(interval=interval_str),
     ]
 
     products_tracked: int | None = None
@@ -351,10 +353,10 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         lines.extend(
             [
                 "",
-                "<b>👑 Panoramica admin</b>",
-                f"👥 Utenti attivi: {len(users)}",
-                f"📦 Prodotti totali (globali): {global_stats['active_products']}",
-                f"🔍 Check totali (globali): {global_stats['total_checks']}",
+                _("<b>👑 Admin overview</b>"),
+                _("👥 Active users: {n}").format(n=len(users)),
+                _("📦 Total products (global): {n}").format(n=global_stats["active_products"]),
+                _("🔍 Total checks (global): {n}").format(n=global_stats["total_checks"]),
             ]
         )
 
@@ -453,8 +455,8 @@ async def health_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 async def cmd_errori(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """User-facing: products with recent scrape errors + domain quarantine state.
 
-    Complements the admin-only English /health (domain-level) with a per-product,
-    Italian view that surfaces the persisted ``last_error`` for debugging.
+    Complements the admin-only /health (domain-level) with a per-product,
+    localized view that surfaces the persisted ``last_error`` for debugging.
     """
     from price_tracker.core.health import QuarantineState  # noqa: PLC0415
 
@@ -464,12 +466,15 @@ async def cmd_errori(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
     errored = await db.list_products_with_errors(user_id=user_id)
     if not errored:
-        await update.message.reply_text("✅ Nessun errore recente sui tuoi prodotti.")
+        await update.message.reply_text(_("✅ No recent errors on your products."))
         return
 
-    lines: list[str] = [f"⚠️ <b>Errori recenti ({len(errored)})</b>", ""]
+    lines: list[str] = [
+        _("⚠️ <b>Recent errors ({count})</b>").format(count=len(errored)),
+        "",
+    ]
     for row in errored:
-        name = _escape_html((row.name or "Sconosciuto")[:50])
+        name = _escape_html((row.name or _("Unknown"))[:50])
         lines.append(f"<b>#{row.id}</b> {name}")
 
         state_label = ""
@@ -477,9 +482,11 @@ async def cmd_errori(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             state = health_mgr.state(row.domain)
             if state != QuarantineState.CLOSED:
                 until = _format_remaining(health_mgr.locked_until(row.domain))
-                state_label = f" — 🔒 {_tier_label(state.value)} (riprende tra {until})"
+                state_label = _(" — 🔒 {tier} (resumes in {until})").format(
+                    tier=_tier_label(state.value), until=until
+                )
         lines.append(f"  🌐 {_escape_html(row.domain or '?')}{state_label}")
-        lines.append(f"  ❌ {row.consecutive_errors} letture fallite")
+        lines.append(_("  ❌ {n} failed reads").format(n=row.consecutive_errors))
         if row.last_error:
             when = _format_relative_time(row.last_error_at)
             when_str = f" — {when}" if when else ""
@@ -487,8 +494,10 @@ async def cmd_errori(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         lines.append("")
 
     lines.append(
-        "ℹ️ I siti in 🔒 quarantena riprendono da soli; "
-        "usa /reactivate per riattivare un prodotto sospeso."
+        _(
+            "ℹ️ Sites in 🔒 quarantine resume on their own; "
+            "use /reactivate to bring a paused product back."
+        )
     )
     await update.message.reply_html("\n".join(lines))
 

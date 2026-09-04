@@ -20,7 +20,7 @@ from pathlib import Path
 
 _LOCALE_DIR: Path = Path(__file__).parent.parent / "locale"
 _DEFAULT_LOCALE: str = os.getenv("LOCALE", "en")
-_AVAILABLE: set[str] = {"en", "it_IT"}
+_AVAILABLE: set[str] = {"en", "it_IT", "es_ES"}
 
 _null_translations: gettext.NullTranslations = gettext.NullTranslations()
 
@@ -109,6 +109,16 @@ def reset_locale(token: Token[gettext.NullTranslations]) -> None:
 def _(text: str) -> str:
     """Translate `text` per current ContextVar locale."""
     return _translation_var.get().gettext(text)
+
+
+def N_(text: str) -> str:
+    """Mark `text` for extraction without translating it here.
+
+    For strings declared far from where they are rendered — the reason-copy
+    tables in `core.alert`, say — so `pybabel extract` records the msgid while
+    the actual lookup still happens under the reader's locale at render time.
+    """
+    return text
 
 
 def ngettext(singular: str, plural: str, n: int) -> str:
