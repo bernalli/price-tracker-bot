@@ -199,16 +199,23 @@ _FINANCING_RE = re.compile(
 
 
 def _is_financing_offer(offer: dict[str, object]) -> bool:
-    """True when an Offer represents a recurring/monthly financing entry, not the price."""
+    """True when an Offer represents a recurring/monthly financing entry, not the price.
+
+    A bare ``UnitPriceSpecification`` is NOT enough on its own: retailers use it
+    for perfectly ordinary strikethrough and loyalty-tier prices (MediaMarkt
+    does), and treating that as financing dropped the real offer and left the
+    product priceless. Recurrence has to be stated — a billing period, a
+    reference quantity, or "/mo"-style wording.
+    """
     spec = offer.get("priceSpecification")
     specs = spec if isinstance(spec, list) else [spec]
     for s in specs:
-        if isinstance(s, dict) and (
-            "UnitPrice" in str(s.get("@type", ""))
-            or s.get("billingDuration")
-            or s.get("billingIncrement")
-            or s.get("referenceQuantity")
-        ):
+        if not isinstance(s, dict):
+            continue
+        if s.get("billingDuration") or s.get("billingIncrement") or s.get("referenceQuantity"):
+            return True
+        spec_blob = " ".join(str(s.get(k, "")) for k in ("name", "description", "priceType"))
+        if _FINANCING_RE.search(spec_blob):
             return True
     blob = " ".join(str(offer.get(k, "")) for k in ("name", "description", "category"))
     return bool(_FINANCING_RE.search(blob))
@@ -296,11 +303,13 @@ def jsonld_offer_availability(offers: object) -> bool | None:
 def unwrap_jsonld_graph(data: object) -> list[dict[str, object]]:
     """Flatten a JSON-LD payload into its node dicts, unwrapping ``@graph`` containers.
 
-    Handles a single dict, a list of nodes, and nested ``@graph`` wrappers
+    Handles a single dict, a list of nodes, nested ``@graph`` wrappers
     (Yoast/WordPress-style ``{"@context": ..., "@graph": [...]}``) — a Product
-    nested in ``@graph`` would otherwise be invisible to ``@type`` scans (#56).
-    The container dict itself is kept (callers filter by ``@type`` anyway);
-    non-dict entries are dropped.
+    nested in ``@graph`` would otherwise be invisible to ``@type`` scans (#56) —
+    and schema.org Action wrappers, which carry the Product under ``object``
+    (``{"@type": "BuyAction", "object": {"@type": "Product", ...}}``, as
+    MediaMarkt emits). The container dict itself is kept (callers filter by
+    ``@type`` anyway); non-dict entries are dropped.
     """
     if isinstance(data, list):
         items: list[dict[str, object]] = []
@@ -308,10 +317,15 @@ def unwrap_jsonld_graph(data: object) -> list[dict[str, object]]:
             items.extend(unwrap_jsonld_graph(entry))
         return items
     if isinstance(data, dict):
+        nested: list[dict[str, object]] = []
         graph = data.get("@graph")
         if isinstance(graph, list):
-            return [data, *unwrap_jsonld_graph(graph)]
-        return [data]
+            nested.extend(unwrap_jsonld_graph(graph))
+        type_val = data.get("@type", "")
+        type_str = " ".join(type_val) if isinstance(type_val, list) else str(type_val)
+        if type_str.endswith("Action"):
+            nested.extend(unwrap_jsonld_graph(data.get("object")))
+        return [data, *nested]
     return []
 
 
@@ -321,7 +335,7 @@ _CAROUSEL_CONTEXT_RE = re.compile(
 )
 
 
-def _in_carousel_context(el: Tag) -> bool:
+def in_carousel_context(el: Tag) -> bool:
     """True when `el` or an ancestor is id/class-marked as a related-items module."""
     node: Tag | None = el
     while node is not None:
@@ -347,7 +361,7 @@ def find_microdata_price_el(soup: BeautifulSoup) -> Tag | None:
 
     for scope_sel in ('[itemprop="offers"]', '[itemtype*="Offer"]', '[itemtype*="Product"]'):
         # Stable sort: non-carousel scopes first, document order preserved within groups.
-        for scope in sorted(soup.select(scope_sel), key=_in_carousel_context):
+        for scope in sorted(soup.select(scope_sel), key=in_carousel_context):
             el = scope.find(attrs={"itemprop": "price"})
             if isinstance(el, Tag):
                 return el
