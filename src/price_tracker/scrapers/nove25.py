@@ -91,7 +91,7 @@ class Nove25Scraper(AbstractScraper):
                 info.currency = "EUR"
             return info
 
-        return ProductInfo(error="Prezzo non trovato (Nove25)")
+        return ProductInfo(error="Price not found (Nove25)")
 
     @staticmethod
     def _parse_jsonld(soup: BeautifulSoup) -> ProductInfo | None:

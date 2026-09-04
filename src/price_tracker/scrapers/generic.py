@@ -290,7 +290,7 @@ class GenericScraper(AbstractScraper):
             info.currency = detect_currency(str(info.price or ""))
 
         if info.price is None:
-            info.error = "Prezzo non trovato nella pagina"
+            info.error = "Price not found on the page"
 
         return info
 

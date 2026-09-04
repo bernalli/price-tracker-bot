@@ -63,12 +63,12 @@ async def _product_picker(
     user_id = update.effective_user.id
     products = await db.get_active_products(user_id)
     if not products:
-        await update.message.reply_text(_("📭 Non hai prodotti tracciati."))
+        await update.message.reply_text(_("📭 You have no tracked products."))
         return True
 
     buttons = []
     for p in products:
-        name = (p.get("name") or "Sconosciuto")[:35]
+        name = (p.get("name") or _("Unknown"))[:35]
         current = _safe_dec(p.get("current_price"))
         price_tag = f" €{current:.2f}" if current else ""
         prefix = callback_prefix or action
@@ -95,10 +95,12 @@ async def cmd_add(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Track a new product. Usage: /add <url>"""
     if not context.args:
         await update.message.reply_text(
-            "❌ Uso: /add &lt;url&gt;\n\n"
-            "Esempio:\n"
-            "<code>/add https://www.amazon.it/dp/B09V3K...</code>\n\n"
-            "Oppure incolla direttamente il link in chat!",
+            _(
+                "❌ Usage: /add &lt;url&gt;\n\n"
+                "Example:\n"
+                "<code>/add https://www.amazon.it/dp/B09V3K...</code>\n\n"
+                "Or just paste the link straight into the chat!"
+            ),
             parse_mode=ParseMode.HTML,
         )
         return
@@ -116,12 +118,12 @@ async def cmd_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         user_id = update.effective_user.id
         products = await db.get_active_products(user_id)
         if not products:
-            await update.message.reply_text(_("📭 Non hai prodotti tracciati."))
+            await update.message.reply_text(_("📭 You have no tracked products."))
             return
 
         buttons = []
         for p in products:
-            name = (p.get("name") or "Sconosciuto")[:35]
+            name = (p.get("name") or _("Unknown"))[:35]
             price = _safe_dec(p.get("current_price"))
             label = f"#{p['id']} {name}"
             if price:
@@ -130,38 +132,42 @@ async def cmd_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
         if len(products) > 1:
             buttons.append(
-                [InlineKeyboardButton("🗑 Elimina tutti i prodotti", callback_data="delete_all")]
+                [InlineKeyboardButton(_("🗑 Delete all products"), callback_data="delete_all")]
             )
 
         await update.message.reply_text(
-            "📦 <b>Scegli prodotto da eliminare:</b>",
+            _("📦 <b>Pick a product to delete:</b>"),
             parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup(buttons),
         )
         return
     product_id = _parse_id(context.args[0])
     if product_id is None:
-        await update.message.reply_text(_("❌ ID non valido."))
+        await update.message.reply_text(_("❌ Invalid ID."))
         return
 
     product = await _get_user_product(context, product_id, update.effective_user.id)
     if not product:
-        await update.message.reply_text(_("❌ Prodotto non trovato."))
+        await update.message.reply_text(_("❌ Product not found."))
         return
 
-    name = product.get("name") or "Sconosciuto"
+    name = product.get("name") or _("Unknown")
     keyboard = InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("🗑 Sì, elimina", callback_data=f"confirm_delete_{product_id}"),
-                InlineKeyboardButton("❌ Annulla", callback_data="cancel_delete"),
+                InlineKeyboardButton(
+                    _("🗑 Yes, delete"), callback_data=f"confirm_delete_{product_id}"
+                ),
+                InlineKeyboardButton(_("❌ Cancel"), callback_data="cancel_delete"),
             ]
         ]
     )
     await update.message.reply_text(
-        f"⚠️ Vuoi eliminare <b>definitivamente</b> questo prodotto?\n\n"
-        f"📦 #{product_id} — {_escape_html(name[:80])}\n\n"
-        f"Verrà cancellato anche tutto lo storico prezzi.",
+        _(
+            "⚠️ Do you want to <b>permanently</b> delete this product?\n\n"
+            "📦 #{pid} — {name}\n\n"
+            "Its whole price history will be deleted too."
+        ).format(pid=product_id, name=_escape_html(name[:80])),
         parse_mode=ParseMode.HTML,
         reply_markup=keyboard,
     )
@@ -176,56 +182,64 @@ async def cmd_target(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             update,
             context,
             "target",
-            "Scegli prodotto per impostare target",
+            _("Pick a product to set a target for"),
             "settarget",
         )
         return
     if len(context.args) < 2:
         await update.message.reply_text(
-            "❌ Uso: /target &lt;id&gt; &lt;prezzo&gt;\n"
-            "Esempio: <code>/target 3 29.99</code>\n\n"
-            "Usa <code>/target &lt;id&gt; 0</code> per rimuovere il target.",
+            _(
+                "❌ Usage: /target &lt;id&gt; &lt;price&gt;\n"
+                "Example: <code>/target 3 29.99</code>\n\n"
+                "Use <code>/target &lt;id&gt; 0</code> to clear the target."
+            ),
             parse_mode=ParseMode.HTML,
         )
         return
 
     product_id = _parse_id(context.args[0])
     if product_id is None:
-        await update.message.reply_text(_("❌ ID non valido."))
+        await update.message.reply_text(_("❌ Invalid ID."))
         return
     try:
         target = Decimal(context.args[1].replace(",", ".").replace("€", ""))
     except (InvalidOperation, ValueError):
-        await update.message.reply_text(_("❌ Prezzo non valido."))
+        await update.message.reply_text(_("❌ Invalid price."))
         return
 
     product = await _get_user_product(context, product_id, update.effective_user.id)
     if not product:
-        await update.message.reply_text(_("❌ Prodotto non trovato."))
+        await update.message.reply_text(_("❌ Product not found."))
         return
 
     db = _db(context)
     if target <= 0:
         await db.set_target_price(product_id, None)
-        await update.message.reply_text(f"🎯 Target rimosso per #{product_id}.")
+        await update.message.reply_text(_("🎯 Target cleared for #{pid}.").format(pid=product_id))
         return
 
     await db.set_target_price(product_id, target)
-    name = product.get("name") or "Sconosciuto"
+    name = product.get("name") or _("Unknown")
     current = _safe_dec(product.get("current_price"))
     currency = product.get("currency", "EUR")
     target_display = _convert_display(target, currency)
     lines = [
-        f"🎯 Target impostato: <b>{target_display}</b>",
+        _("🎯 Target set: <b>{target}</b>").format(target=target_display),
         f"📦 {_escape_html(name[:80])}",
     ]
     if current:
         current_display = _convert_display(current, currency)
         if current <= target:
-            lines.append(f"💰 Attuale: {current_display} — <b>già raggiunto!</b>")
+            lines.append(
+                _("💰 Current: {price} — <b>already reached!</b>").format(price=current_display)
+            )
         else:
             diff_pct = ((current - target) / current) * 100
-            lines.append(f"💰 Attuale: {current_display} (-{diff_pct:.1f}% necessario)")
+            lines.append(
+                _("💰 Current: {price} (-{pct:.1f}% needed)").format(
+                    price=current_display, pct=diff_pct
+                )
+            )
     await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML)
 
 
@@ -238,24 +252,26 @@ async def cmd_threshold(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             update,
             context,
             "threshold",
-            "Scegli prodotto per impostare soglia",
+            _("Pick a product to set a threshold for"),
             "setsoglia",
         )
         return
     if len(context.args) < 2:
         await update.message.reply_text(
-            "❌ Uso: /soglia &lt;id&gt; &lt;valore&gt;\n\n"
-            "Esempi:\n"
-            "<code>/soglia 3 20%</code> — avvisami se scende del 20%\n"
-            "<code>/soglia 3 50</code> — avvisami se scende di €50\n"
-            "<code>/soglia 3 ogni</code> — avvisami ad ogni ribasso",
+            _(
+                "❌ Usage: /threshold &lt;id&gt; &lt;value&gt;\n\n"
+                "Examples:\n"
+                "<code>/threshold 3 20%</code> — alert me if it drops by 20%\n"
+                "<code>/threshold 3 50</code> — alert me if it drops by €50\n"
+                "<code>/threshold 3 any</code> — alert me on every drop"
+            ),
             parse_mode=ParseMode.HTML,
         )
         return
 
     product_id = _parse_id(context.args[0])
     if product_id is None:
-        await update.message.reply_text(_("❌ ID non valido."))
+        await update.message.reply_text(_("❌ Invalid ID."))
         return
     try:
         threshold_type, threshold_value = _parse_threshold_input(context.args[1])
@@ -265,15 +281,16 @@ async def cmd_threshold(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     product = await _get_user_product(context, product_id, update.effective_user.id)
     if not product:
-        await update.message.reply_text(_("❌ Prodotto non trovato."))
+        await update.message.reply_text(_("❌ Product not found."))
         return
 
     await _db(context).set_threshold(product_id, threshold_type, threshold_value)
-    name = product.get("name") or "Sconosciuto"
+    name = product.get("name") or _("Unknown")
     threshold_str = _format_threshold(threshold_type, threshold_value)
     await update.message.reply_text(
-        f"🎯 Soglia impostata: <b>{threshold_str}</b>\n"
-        f"📦 #{product_id} — {_escape_html(name[:80])}",
+        _("🎯 Threshold set: <b>{threshold}</b>\n📦 #{pid} — {name}").format(
+            threshold=threshold_str, pid=product_id, name=_escape_html(name[:80])
+        ),
         parse_mode=ParseMode.HTML,
     )
 
@@ -306,7 +323,7 @@ async def _add_product(
     except UnsafeURLError as e:
         logger.warning("Rejected unsafe product URL from user %d: %s", user_id, e)
         await update.message.reply_text(
-            "❌ URL non consentito: punta a un indirizzo privato o interno."
+            _("❌ URL not allowed: it points to a private or internal address.")
         )
         return
 
@@ -316,22 +333,30 @@ async def _add_product(
         is_active = existing.get("is_active", 0)
         if is_active:
             current = _safe_dec(existing.get("current_price"))
-            price_str = f"\n💰 Prezzo attuale: €{current:.2f}" if current else ""
+            price_str = (
+                _("\n💰 Current price: €{price:.2f}").format(price=current) if current else ""
+            )
             await update.message.reply_text(
-                f"ℹ️ Stai già tracciando questo prodotto (#{existing['id']}).{price_str}"
+                _("ℹ️ You are already tracking this product (#{pid}).{price}").format(
+                    pid=existing["id"], price=price_str
+                )
             )
             return
         await db.reactivate_product(existing["id"])
-        await update.message.reply_text(f"♻️ Prodotto riattivato! (#{existing['id']})")
+        await update.message.reply_text(
+            _("♻️ Product reactivated! (#{pid})").format(pid=existing["id"])
+        )
         return
 
-    msg = await update.message.reply_text(_("🔍 Analizzo il prodotto..."))
+    msg = await update.message.reply_text(_("🔍 Analysing the product..."))
     domain = extract_etld_plus_one(url)
     scraper_for_url = scraper.resolve(url)
     if scraper_for_url is None:
         await msg.edit_text(
-            "❌ Nessuno scraper conosciuto per questo dominio.\n\n"
-            "💡 Verifica che il link sia corretto o segnala il sito non supportato."
+            _(
+                "❌ No known scraper for this domain.\n\n"
+                "💡 Check that the link is correct, or report the unsupported site."
+            )
         )
         return
     from price_tracker.core.exceptions import BlockEvent  # noqa: PLC0415
@@ -341,18 +366,18 @@ async def _add_product(
     except BlockEvent:
         logger.info("Add blocked by site protection for %s", url[:60])
         await msg.edit_text(
-            "🛡 Il sito sta bloccando le richieste automatiche in questo momento.\n"
-            "Riprova tra qualche minuto."
+            _("🛡 The site is blocking automated requests right now.\nTry again in a few minutes.")
         )
         return
 
     if result.price is None:
-        error_msg = result.error or "Prezzo non trovato"
+        error_msg = result.error or _("Price not found")
         await msg.edit_text(
-            f"❌ Non sono riuscito a trovare il prezzo.\n"
-            f"Motivo: {error_msg}\n\n"
-            f"💡 Prova a verificare che il link sia corretto "
-            f"e il prodotto disponibile."
+            _(
+                "❌ I could not find the price.\n"
+                "Reason: {reason}\n\n"
+                "💡 Check that the link is correct and the product is available."
+            ).format(reason=error_msg)
         )
         return
 
@@ -369,38 +394,38 @@ async def _add_product(
         currency=currency,
     )
 
-    name = result.name or "Prodotto"
+    name = result.name or _("Product")
     name_short = name[:80] + ("..." if len(name) > 80 else "")
 
     lines = [
-        f"✅ <b>Prodotto aggiunto!</b> (#{product_id})",
+        _("✅ <b>Product added!</b> (#{pid})").format(pid=product_id),
         "",
         f"📦 {_escape_html(name_short)}",
-        f"💰 Prezzo: <b>{_convert_display(result.price, currency)}</b>",
-        f"🌐 Sito: {domain}",
+        _("💰 Price: <b>{price}</b>").format(price=_convert_display(result.price, currency)),
+        _("🌐 Site: {domain}").format(domain=domain),
     ]
 
     if domain and "amazon" in domain.lower():
         # Show Amazon preferences menu first
-        lines.append("\n📋 <b>Preferenze Amazon:</b>")
+        lines.append(_("\n📋 <b>Amazon preferences:</b>"))
         keyboard = InlineKeyboardMarkup(
             [
                 [
-                    InlineKeyboardButton("🆕 Solo Nuovo", callback_data=f"pref_new_{product_id}"),
-                    InlineKeyboardButton("♻️ Solo Usato", callback_data=f"pref_used_{product_id}"),
+                    InlineKeyboardButton(_("🆕 New only"), callback_data=f"pref_new_{product_id}"),
+                    InlineKeyboardButton(_("♻️ Used only"), callback_data=f"pref_used_{product_id}"),
                 ],
                 [
                     InlineKeyboardButton(
-                        "📦 Solo Amazon", callback_data=f"pref_amazon_{product_id}"
+                        _("📦 Amazon only"), callback_data=f"pref_amazon_{product_id}"
                     ),
                     InlineKeyboardButton(
-                        "🏪 Qualsiasi venditore",
+                        _("🏪 Any seller"),
                         callback_data=f"pref_anyseller_{product_id}",
                     ),
                 ],
                 [
                     InlineKeyboardButton(
-                        "👍 Va bene tutto (default)",
+                        _("👍 Anything goes (default)"),
                         callback_data=f"pref_default_{product_id}",
                     ),
                 ],
@@ -408,7 +433,7 @@ async def _add_product(
         )
     else:
         # Non-Amazon: show threshold menu directly
-        lines.append("\n<b>Come vuoi essere avvisato?</b>")
+        lines.append(_("\n<b>How do you want to be notified?</b>"))
         keyboard = build_threshold_keyboard(product_id)
 
     await msg.edit_text(

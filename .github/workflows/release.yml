@@ -28,7 +28,7 @@ jobs:
           pip install -e ".[dev]" build
 
       - name: Compile i18n catalogs
-        run: pybabel compile -d src/price_tracker/locale
+        run: python scripts/i18n_compile.py src/price_tracker/locale
 
       - name: Build sdist + wheel
         run: python -m build

@@ -1997,7 +1997,7 @@ async def test_scheduler_notifies_once_on_quarantine_entry(
     assert notifier.await_args is not None
     message = notifier.await_args.args[1]
     assert "example.com" in message
-    assert "pausa automatica" in message.lower() or "quarantena" in message.lower()
+    assert "auto-paused" in message.lower() or "quarantine" in message.lower()
 
     # last_error was persisted for /errori visibility (via the public projection).
     errored = await repo.list_products_with_errors(user_id=1)

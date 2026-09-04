@@ -18,15 +18,23 @@ from telegram.constants import ParseMode
 from price_tracker.bot.decorators import _config
 from price_tracker.bot.handlers._helpers import _escape_html, _parse_id
 from price_tracker.bot.keyboards import menu_back_button
+from price_tracker.bot.messages import _
 
 if TYPE_CHECKING:
     from telegram.ext import ContextTypes
 
 logger = logging.getLogger(__name__)
 
-_BACK_TO_ADMIN = InlineKeyboardMarkup(
-    [[InlineKeyboardButton("◀️ Impostazioni", callback_data="menu_admin")]]
-)
+
+def _back_to_admin() -> InlineKeyboardMarkup:
+    """Build the 'back to admin settings' markup under the caller's locale.
+
+    A module-level constant would freeze whichever locale was active at import
+    time; this is rebuilt per call instead.
+    """
+    return InlineKeyboardMarkup(
+        [[InlineKeyboardButton(_("◀️ Settings"), callback_data="menu_admin")]]
+    )
 
 
 async def handle_admin_menu(
@@ -41,25 +49,25 @@ async def handle_admin_menu(
         saved = await db.get_config("check_interval_minutes")
         interval = int(saved) if saved else config.check_interval_minutes
         rows = [
-            [InlineKeyboardButton("👥 Lista utenti", callback_data="menu_admin_users")],
+            [InlineKeyboardButton(_("👥 User list"), callback_data="menu_admin_users")],
             [
-                InlineKeyboardButton("➕ Aggiungi utente", callback_data="menu_admin_adduser"),
-                InlineKeyboardButton("🚫 Rimuovi utente", callback_data="menu_admin_removeuser"),
+                InlineKeyboardButton(_("➕ Add user"), callback_data="menu_admin_adduser"),
+                InlineKeyboardButton(_("🚫 Remove user"), callback_data="menu_admin_removeuser"),
             ],
-            [InlineKeyboardButton("✏️ Nickname utente", callback_data="menu_admin_nick")],
+            [InlineKeyboardButton(_("✏️ User nickname"), callback_data="menu_admin_nick")],
             [
                 InlineKeyboardButton(
-                    f"⏱ Intervallo globale: {interval} min",
+                    _("⏱ Global interval: {minutes} min").format(minutes=interval),
                     callback_data="menu_admin_interval",
                 )
             ],
-            [InlineKeyboardButton("🔧 Debug scraper", callback_data="menu_admin_debug")],
+            [InlineKeyboardButton(_("🔧 Scraper debug"), callback_data="menu_admin_debug")],
             menu_back_button(),
         ]
         await query.edit_message_text(
-            f"👑 <b>Impostazioni</b>\n\n"
-            f"👥 Utenti attivi: {len(users)}\n"
-            f"⏱ Intervallo globale: {interval} min",
+            _(
+                "👑 <b>Settings</b>\n\n👥 Active users: {users}\n⏱ Global interval: {minutes} min"
+            ).format(users=len(users), minutes=interval),
             parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup(rows),
         )
@@ -69,10 +77,10 @@ async def handle_admin_menu(
         if not await db.is_user_admin(user_id):
             return True
         users = await db.get_all_users()
-        txt = ["👥 <b>Utenti</b>\n"]
+        txt = [_("👥 <b>Users</b>\n")]
         for u in users:
             uid = u["user_id"]
-            nm = u.get("display_name") or u.get("username") or "N/D"
+            nm = u.get("display_name") or u.get("username") or _("N/A")
             role = "👑" if u.get("is_admin") else "👤"
             st = await db.get_stats(uid)
             txt.append(
@@ -81,7 +89,7 @@ async def handle_admin_menu(
         await query.edit_message_text(
             chr(10).join(txt),
             parse_mode=ParseMode.HTML,
-            reply_markup=_BACK_TO_ADMIN,
+            reply_markup=_back_to_admin(),
         )
         return True
 
@@ -90,7 +98,7 @@ async def handle_admin_menu(
             return True
         context.user_data["pending_action"] = ("admin_adduser", 0)
         await query.edit_message_text(
-            "➕ <b>Aggiungi utente</b>\n\nScrivi l'ID Telegram dell'utente da aggiungere:",
+            _("➕ <b>Add user</b>\n\nType the Telegram ID of the user to add:"),
             parse_mode=ParseMode.HTML,
         )
         return True
@@ -102,7 +110,7 @@ async def handle_admin_menu(
         removable = [u for u in users if not u.get("is_admin") and u["user_id"] != user_id]
         if not removable:
             await query.edit_message_text(
-                "❌ Nessun utente rimovibile.", reply_markup=_BACK_TO_ADMIN
+                _("❌ No removable users."), reply_markup=_back_to_admin()
             )
             return True
         rows = []
@@ -111,9 +119,9 @@ async def handle_admin_menu(
             rows.append(
                 [InlineKeyboardButton(f"🚫 {nm}", callback_data=f"admin_rm_{u['user_id']}")]
             )
-        rows.append([InlineKeyboardButton("◀️ Impostazioni", callback_data="menu_admin")])
+        rows.append([InlineKeyboardButton(_("◀️ Settings"), callback_data="menu_admin")])
         await query.edit_message_text(
-            "🚫 <b>Rimuovi utente</b>\n\nTocca per rimuovere:",
+            _("🚫 <b>Remove user</b>\n\nTap to remove:"),
             parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup(rows),
         )
@@ -124,17 +132,17 @@ async def handle_admin_menu(
             return True
         target_id = _parse_id(data.replace("admin_rm_", ""))
         if target_id is None:
-            await query.edit_message_text("❌ ID non valido.")
+            await query.edit_message_text(_("❌ Invalid ID."))
             return True
         removed = await db.remove_user(target_id)
         if removed:
             await query.edit_message_text(
-                f"✅ Utente <code>{target_id}</code> rimosso.",
+                _("✅ User <code>{uid}</code> removed.").format(uid=target_id),
                 parse_mode=ParseMode.HTML,
-                reply_markup=_BACK_TO_ADMIN,
+                reply_markup=_back_to_admin(),
             )
         else:
-            await query.edit_message_text("❌ Utente non trovato.", reply_markup=_BACK_TO_ADMIN)
+            await query.edit_message_text(_("❌ User not found."), reply_markup=_back_to_admin())
         return True
 
     if data == "menu_admin_nick":
@@ -147,9 +155,9 @@ async def handle_admin_menu(
             rows.append(
                 [InlineKeyboardButton(f"✏️ {nm}", callback_data=f"admin_nick_{u['user_id']}")]
             )
-        rows.append([InlineKeyboardButton("◀️ Impostazioni", callback_data="menu_admin")])
+        rows.append([InlineKeyboardButton(_("◀️ Settings"), callback_data="menu_admin")])
         await query.edit_message_text(
-            "✏️ <b>Nickname</b>\n\nScegli utente:",
+            _("✏️ <b>Nickname</b>\n\nPick a user:"),
             parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup(rows),
         )
@@ -160,15 +168,15 @@ async def handle_admin_menu(
             return True
         target_id = _parse_id(data.replace("admin_nick_", ""))
         if target_id is None:
-            await query.edit_message_text("❌ ID non valido.")
+            await query.edit_message_text(_("❌ Invalid ID."))
             return True
         context.user_data["pending_action"] = ("admin_nick", target_id)
         u = await db.get_user(target_id)
-        current_name = u.get("display_name", "N/D") if u else "N/D"
+        current_name = u.get("display_name", _("N/A")) if u else _("N/A")
         await query.edit_message_text(
-            f"✏️ <b>Nickname per {target_id}</b>\n"
-            f"Attuale: {_escape_html(str(current_name))}\n\n"
-            "Scrivi il nuovo nickname:",
+            _("✏️ <b>Nickname for {uid}</b>\nCurrent: {name}\n\nType the new nickname:").format(
+                uid=target_id, name=_escape_html(str(current_name))
+            ),
             parse_mode=ParseMode.HTML,
         )
         return True
@@ -178,8 +186,10 @@ async def handle_admin_menu(
             return True
         context.user_data["pending_action"] = ("admin_interval", 0)
         await query.edit_message_text(
-            "⏱ <b>Intervallo globale</b>\n\n"
-            "Scrivi i minuti (es. <code>60</code>, <code>360</code>):",
+            _(
+                "⏱ <b>Global interval</b>\n\n"
+                "Type the minutes (e.g. <code>60</code>, <code>360</code>):"
+            ),
             parse_mode=ParseMode.HTML,
         )
         return True
@@ -189,7 +199,7 @@ async def handle_admin_menu(
             return True
         context.user_data["pending_action"] = ("admin_debug", 0)
         await query.edit_message_text(
-            "🔧 <b>Debug scraper</b>\n\nIncolla l'URL del prodotto da analizzare:",
+            _("🔧 <b>Scraper debug</b>\n\nPaste the URL of the product to analyse:"),
             parse_mode=ParseMode.HTML,
         )
         return True
