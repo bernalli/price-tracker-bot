@@ -10,7 +10,8 @@ from __future__ import annotations
 import asyncio
 import io
 import logging
-from datetime import datetime
+import math
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, InputFile, Update
@@ -27,6 +28,9 @@ from price_tracker.bot.handlers._helpers import (
 from price_tracker.bot.messages import _
 
 logger = logging.getLogger(__name__)
+
+# The chart covers a period, not a number of readings (see _generate_chart).
+CHART_WINDOW_DAYS = 90
 
 
 def _render_chart(
@@ -49,7 +53,8 @@ def _render_chart(
     fig.patch.set_facecolor("#000000")
     ax.set_facecolor("#000000")
 
-    ax.plot(dates, prices, color="#ff9f1c", linewidth=2.2, antialiased=True)
+    # Steps, not a diagonal: a price holds until the next change.
+    ax.plot(dates, prices, color="#ff9f1c", linewidth=2.2, antialiased=True, drawstyle="steps-post")
 
     if target:
         try:
@@ -93,29 +98,50 @@ def _render_chart(
 async def _generate_chart(db: Any, product_id: int, product: dict[str, Any]) -> io.BytesIO | None:
     """Generate a price-history chart as PNG. Returns None if data is too sparse.
 
+    The window is a PERIOD, not a row count. Asking for the last 100 readings gave
+    a window of `100 x check interval` — about four days on production — and in
+    four days almost nothing moves, so every product drew a flat line while its
+    real history held several distinct prices.
+
     The matplotlib render is offloaded to a worker thread so it never blocks the
     event loop (and therefore every other user/handler) while drawing.
     """
-    history = await db.get_price_history(product_id, limit=100)
+    since = (datetime.now(UTC) - timedelta(days=CHART_WINDOW_DAYS)).strftime("%Y-%m-%d %H:%M:%S")
+    change_points = vars(db).get("get_price_change_points") or getattr(
+        type(db), "get_price_change_points", None
+    )
+    if change_points is None:
+        # Third-party repository implementations can adopt the chart query without
+        # turning a handler import into an immediate compatibility break.
+        history = await db.get_price_history(product_id, limit=100)
+    else:
+        history = await change_points(product_id, since=since)
     if not history or len(history) < 2:
         return None
 
-    dates: list[datetime] = []
-    prices: list[float] = []
+    points: list[tuple[datetime, float]] = []
     for record in history:
         try:
             dt = datetime.fromisoformat(record["checked_at"].replace("Z", "+00:00"))
+            dt = dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt.astimezone(UTC)
             price = float(record["price"])
-            dates.append(dt)
-            prices.append(price)
-        except (ValueError, TypeError):
+        except (AttributeError, KeyError, OverflowError, TypeError, ValueError):
             continue
+        # A corrupt value must not pull the axis away from the real price range.
+        if not math.isfinite(price) or price <= 0:
+            continue
+        points.append((dt, price))
 
-    if len(dates) < 2:
+    if len(points) < 2:
         return None
 
+    # The repository orders normalized timestamps and uses id as the tie-breaker.
+    dates, prices = zip(*points, strict=True)
+
     name = (product.get("name") or "Prodotto")[:50]
-    return await asyncio.to_thread(_render_chart, dates, prices, product.get("target_price"), name)
+    return await asyncio.to_thread(
+        _render_chart, list(dates), list(prices), product.get("target_price"), name
+    )
 
 
 @with_locale
