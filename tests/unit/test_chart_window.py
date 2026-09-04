@@ -10,6 +10,8 @@ between two and 134 distinct prices.
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock
 
@@ -177,3 +179,50 @@ async def test_chart_drops_malformed_and_non_finite_points(monkeypatch) -> None:
     assert buf is not None
     assert captured["prices"] == [352.0, 349.0]
     assert all(dt.tzinfo is UTC for dt in captured["dates"])
+
+
+async def test_generate_chart_works_against_a_real_repository() -> None:
+    """The handler must call the repository it is actually given.
+
+    Every other test here hands `_generate_chart` a mock whose methods live on the
+    instance. A real `Repository` keeps them on the class, and a dispatch that
+    reaches for the class attribute gets an unbound function: the first argument
+    becomes `self` and the call dies with a TypeError on every /history. Only a
+    real repository exercises that path.
+    """
+    import aiosqlite
+
+    from price_tracker.db.migrator import apply_migrations
+    from price_tracker.db.repository import Repository
+
+    conn = await aiosqlite.connect(":memory:")
+    conn.row_factory = aiosqlite.Row
+    await apply_migrations(conn, Path("src/price_tracker/db/migrations"))
+    try:
+        repo = Repository(conn)
+        pid = await repo.add_product(
+            user_id=1,
+            url="https://example.com/p/1",
+            name="Widget",
+            domain="example.com",
+            initial_price=Decimal("100"),
+            currency="EUR",
+        )
+        now = datetime.now(UTC)
+        for offset_days, price in ((40, "100"), (20, "90"), (1, "95")):
+            await conn.execute(
+                "INSERT INTO price_history (product_id, price, checked_at) VALUES (?, ?, ?)",
+                (
+                    pid,
+                    price,
+                    (now - timedelta(days=offset_days)).strftime("%Y-%m-%d %H:%M:%S"),
+                ),
+            )
+        await conn.commit()
+
+        buf = await history._generate_chart(repo, pid, {"name": "Widget"})
+
+        assert buf is not None
+        assert buf.getvalue()[:8] == b"\x89PNG\r\n\x1a\n"
+    finally:
+        await conn.close()

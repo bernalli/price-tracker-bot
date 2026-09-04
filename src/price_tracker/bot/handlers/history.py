@@ -107,15 +107,19 @@ async def _generate_chart(db: Any, product_id: int, product: dict[str, Any]) -> 
     event loop (and therefore every other user/handler) while drawing.
     """
     since = (datetime.now(UTC) - timedelta(days=CHART_WINDOW_DAYS)).strftime("%Y-%m-%d %H:%M:%S")
-    change_points = vars(db).get("get_price_change_points") or getattr(
-        type(db), "get_price_change_points", None
+    # Probe the type, then call through the instance. A real Repository keeps its
+    # methods on the class, so reaching for the class attribute and calling it
+    # would pass an unbound function — product_id would land in `self`. Probing
+    # with getattr() on the instance is no good either: a bare mock invents any
+    # attribute asked of it, and the probe would always say yes.
+    has_change_points = "get_price_change_points" in vars(db) or hasattr(
+        type(db), "get_price_change_points"
     )
-    if change_points is None:
-        # Third-party repository implementations can adopt the chart query without
-        # turning a handler import into an immediate compatibility break.
-        history = await db.get_price_history(product_id, limit=100)
+    if has_change_points:
+        history = await db.get_price_change_points(product_id, since=since)
     else:
-        history = await change_points(product_id, since=since)
+        # A repository that predates the chart query still gets a chart.
+        history = await db.get_price_history(product_id, limit=100)
     if not history or len(history) < 2:
         return None
 
