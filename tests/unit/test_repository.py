@@ -168,6 +168,73 @@ async def test_add_price_history_and_query(repo: Repository):
     assert history[1].price == Decimal("9")
 
 
+async def test_price_change_points_cover_the_window_across_timestamp_formats(
+    repo: Repository,
+):
+    """The chart query must cut by time and order both stored timestamp shapes.
+
+    A raw lexical order groups the space form before the ``T`` form, regardless
+    of the instant. The query has to normalize before applying LAG, otherwise it
+    treats interleaved readings as spurious price changes. Equal instants need
+    their insertion id to make the history deterministic.
+    """
+    pid = await repo.add_product(
+        user_id=1,
+        url="https://x/1",
+        name="A",
+        domain="x",
+        initial_price=Decimal("10"),
+        currency="EUR",
+    )
+    conn = repo._conn
+    await conn.execute(
+        "INSERT INTO price_history (product_id, price, checked_at) VALUES (?, ?, ?)",
+        (pid, "200", "2026-09-04 08:00:00"),
+    )
+    await conn.execute(
+        "INSERT INTO price_history (product_id, price, checked_at) VALUES (?, ?, ?)",
+        (pid, "100", "2026-09-04T09:00:00Z"),
+    )
+    await conn.execute(
+        "INSERT INTO price_history (product_id, price, checked_at) VALUES (?, ?, ?)",
+        (pid, "100", "2026-09-04 10:00:00"),
+    )
+    await conn.execute(
+        "INSERT INTO price_history (product_id, price, checked_at) VALUES (?, ?, ?)",
+        (pid, "90", "2026-09-04T11:00:00Z"),
+    )
+    await conn.execute(
+        "INSERT INTO price_history (product_id, price, checked_at) VALUES (?, ?, ?)",
+        (pid, "90", "2026-09-04 12:00:00"),
+    )
+    await conn.execute(
+        "INSERT INTO price_history (product_id, price, checked_at) VALUES (?, ?, ?)",
+        (pid, "80", "2026-09-04 13:00:00"),
+    )
+    await conn.execute(
+        "INSERT INTO price_history (product_id, price, checked_at) VALUES (?, ?, ?)",
+        (pid, "70", "2026-09-04 13:00:00"),
+    )
+    await conn.execute(
+        "INSERT INTO price_history (product_id, price, checked_at) VALUES (?, ?, ?)",
+        (pid, "70", "2026-09-04 14:00:00"),
+    )
+    await conn.commit()
+
+    points = await repo.get_price_change_points(pid, since="2026-09-04 09:00:00")
+
+    # The final 70 is included even though unchanged, because its timestamp is
+    # the chart window's right edge. IDs 6 then 7 prove the same-second tie.
+    assert [r.id for r in points] == [2, 4, 6, 7, 8]
+    assert [r.price for r in points] == [
+        Decimal("100"),
+        Decimal("90"),
+        Decimal("80"),
+        Decimal("70"),
+        Decimal("70"),
+    ]
+
+
 async def test_price_history_record_supports_dict_access(repo: Repository):
     """``_generate_chart`` accesses history rows as ``record["price"]`` /
     ``record["checked_at"]``. Without the ``_DictCompatMixin`` the subscript
