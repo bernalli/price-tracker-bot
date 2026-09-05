@@ -6,6 +6,7 @@ budget [Task 17].
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import csv
 import io
@@ -120,11 +121,25 @@ async def cmd_import(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
     msg = await update.message.reply_text(_("⏳ Importazione in corso..."))
 
-    from price_tracker.core.url_utils import extract_etld_plus_one  # noqa: PLC0415
+    from price_tracker.core.url_utils import (  # noqa: PLC0415
+        UnsafeURLError,
+        extract_etld_plus_one,
+        validate_public_url,
+    )
 
     for row in reader:
         url = row.get("URL", "").strip()
         if not url:
+            continue
+
+        # Same SSRF boundary as an interactive addition: a CSV row must not be
+        # able to point the bot at loopback, link-local or private addresses.
+        # Runs in a thread because getaddrinfo blocks.
+        try:
+            await asyncio.to_thread(validate_public_url, url)
+        except UnsafeURLError as e:
+            logger.warning("Rejected unsafe CSV product URL from user %d: %s", user_id, e)
+            errors += 1
             continue
 
         # Skip duplicates
