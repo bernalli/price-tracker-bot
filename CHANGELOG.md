@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- CSV import applies the same URL boundary as an interactive addition. `/aggiungi`
+  rejected loopback, link-local and private addresses before resolving or fetching a
+  URL, but `/importa` went straight from a CSV row to the scraper — and any host with a
+  `/products/<slug>` path is claimed by the Shopify scraper, which fetches it. A crafted
+  file was enough to make the bot request an internal address.
+
+### Fixed
+
+- Price charts covered a window measured in readings, not in time. History records every
+  check rather than every price change, so the last 100 rows spanned about four days on a
+  real deployment and nearly every product drew a flat line. Charts now cover 90 days,
+  with the price changes collapsed in SQL so a long window is never silently truncated.
+- Chart rendering no longer rebuilds a matplotlib cache on every call: `MPLCONFIGDIR`
+  points at the writable cache directory, which the read-only root filesystem denied.
+
 ### Added
 
 - Removed-listing detection: a product whose page answers HTTP 404/410 for three

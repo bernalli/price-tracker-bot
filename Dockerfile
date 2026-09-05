@@ -45,9 +45,13 @@ WORKDIR /app
 COPY --chown=botuser:botuser src ./src
 COPY --chown=botuser:botuser pyproject.toml ./
 
+# MPLCONFIGDIR points at the writable cache: with read_only rootfs matplotlib
+# cannot create its default directory under $HOME/.config, so it rebuilds a
+# throwaway cache — and logs a warning — on every chart render.
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONPATH=/app/src
+    PYTHONPATH=/app/src \
+    MPLCONFIGDIR=/home/botuser/.cache/matplotlib
 
 VOLUME ["/data"]
 
