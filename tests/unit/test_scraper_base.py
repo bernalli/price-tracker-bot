@@ -534,3 +534,55 @@ def test_select_jsonld_offer_rejects_lone_financing_spec_wrapped_in_a_list():
         ],
     }
     assert select_jsonld_offer(offer) is None
+
+
+@pytest.mark.parametrize("left", [0, 1, 2])
+@pytest.mark.parametrize("right", [0, 1, 2])
+def test_lone_financing_spec_ignores_null_padding(left: int, right: int) -> None:
+    """``null`` padding must not turn a sole specification into a sibling set.
+
+    In ordinary JSON-LD ``null`` adds no value, so ``[spec]``, ``[spec, null]`` and
+    ``[null, spec, null]`` carry one specification each. Counting the raw list length
+    let the padding reopen exactly the leak the sole-specification rule closes.
+    """
+    spec = {"@type": "UnitPriceSpecification", "price": "54.08"}
+    offer = {
+        "price": "54.08",
+        "priceCurrency": "USD",
+        "priceSpecification": [None] * left + [spec] + [None] * right,
+    }
+    assert select_jsonld_offer(offer) is None
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("billingDuration", 24),
+        ("billingIncrement", 1),
+        ("referenceQuantity", {"value": 1, "unitCode": "MON"}),
+        ("name", "monthly payment"),
+        ("description", "monthly payment"),
+        ("priceType", "monthly payment"),
+    ],
+)
+@pytest.mark.parametrize("reverse", [False, True])
+def test_financing_signal_in_sibling_specs(field: str, value: object, reverse: bool) -> None:
+    """Each recurrence marker must be read on a SIBLING specification, in either order.
+
+    The pre-existing marker tests all passed a sole ``UnitPriceSpecification``, so the
+    filter returned on the bare type before reading any marker: deleting the billing
+    check, or the wording check, left them all green. These pin the markers where they
+    are actually consulted.
+    """
+    specs: list[object] = [
+        {"@type": "UnitPriceSpecification", field: value},
+        {"@type": "UnitPriceSpecification", "price": "1299"},
+    ]
+    if reverse:
+        specs.reverse()
+    offer = {
+        "price": "54.08",
+        "priceCurrency": "USD",
+        "priceSpecification": specs,
+    }
+    assert select_jsonld_offer(offer) is None

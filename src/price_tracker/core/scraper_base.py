@@ -221,6 +221,7 @@ def _is_financing_offer(offer: dict[str, object]) -> bool:
     """
     spec = offer.get("priceSpecification")
     specs = spec if isinstance(spec, list) else [spec]
+    specs = [s for s in specs if s is not None]
     lone = specs[0] if len(specs) == 1 else None
     if isinstance(lone, dict) and "UnitPrice" in str(lone.get("@type", "")):
         return True
