@@ -159,12 +159,57 @@ def test_select_jsonld_offer_skips_financing_and_takes_highest():
     assert result == (Decimal("1299.00"), "USD")
 
 
-def test_select_jsonld_offer_filters_unit_price_specification():
+def test_select_jsonld_offer_filters_financing_by_billing_duration():
+    """A stated billing period marks the offer as financing, whatever its @type."""
     offers = [
         {
             "price": "50.00",
             "priceCurrency": "EUR",
             "priceSpecification": {"@type": "UnitPriceSpecification", "billingDuration": 24},
+        }
+    ]
+    assert select_jsonld_offer(offers) is None
+
+
+def test_select_jsonld_offer_keeps_plain_unit_price_specification():
+    """A bare UnitPriceSpecification is not financing — it is an ordinary price.
+
+    Regression: MediaMarkt states its strikethrough and loyalty-tier prices as
+    UnitPriceSpecification entries with no recurrence. Treating the @type alone
+    as a financing signal discarded the real offer and left products priceless.
+    """
+    offer = {
+        "@type": "Offer",
+        "price": 259,
+        "priceCurrency": "EUR",
+        "priceSpecification": [
+            {
+                "@type": "UnitPriceSpecification",
+                "priceType": "https://schema.org/StrikethroughPrice",
+                "price": 349,
+                "priceCurrency": "EUR",
+            },
+            {
+                "@type": "UnitPriceSpecification",
+                "name": "Standard price (loyalty members)",
+                "price": "259",
+                "priceCurrency": "EUR",
+            },
+        ],
+    }
+    assert select_jsonld_offer(offer) == (Decimal("259"), "EUR")
+
+
+def test_select_jsonld_offer_filters_financing_named_in_price_specification():
+    """Recurrence stated only in the priceSpecification name is still financing."""
+    offers = [
+        {
+            "price": "54.08",
+            "priceCurrency": "USD",
+            "priceSpecification": {
+                "@type": "UnitPriceSpecification",
+                "name": "24 monthly payments",
+            },
         }
     ]
     assert select_jsonld_offer(offers) is None
@@ -440,3 +485,24 @@ def test_brotli_available_for_httpx_decompression() -> None:
             "brotli/brotlicffi not installed — httpx cannot decode "
             "br-encoded responses (which get_headers() advertises)"
         )
+
+
+def test_select_jsonld_offer_rejects_lone_financing_offer_without_keywords_or_billing():
+    """A single UnitPriceSpecification offer, with no billing fields and no financing
+    wording anywhere, must still be rejected.
+
+    This is the Apple/Google leak (#9) the shared filter exists to prevent: a monthly
+    financing entry shaped that way does not always spell out "/mo" or set
+    ``billingDuration``, and every scraper that is not MediaMarkt passes a single
+    ``Offer`` here.
+    """
+    offer = {
+        "price": "54.08",
+        "priceCurrency": "USD",
+        "priceSpecification": {
+            "@type": "UnitPriceSpecification",
+            "price": "54.08",
+            "priceCurrency": "USD",
+        },
+    }
+    assert select_jsonld_offer(offer) is None
