@@ -172,11 +172,11 @@ def test_select_jsonld_offer_filters_financing_by_billing_duration():
 
 
 def test_select_jsonld_offer_keeps_plain_unit_price_specification():
-    """A bare UnitPriceSpecification is not financing — it is an ordinary price.
+    """Sibling UnitPriceSpecifications are not financing merely because of their type.
 
     Regression: MediaMarkt states its strikethrough and loyalty-tier prices as
-    UnitPriceSpecification entries with no recurrence. Treating the @type alone
-    as a financing signal discarded the real offer and left products priceless.
+    sibling entries with no recurrence. Treating either ``@type`` as a financing
+    signal discarded the real offer and left products priceless.
     """
     offer = {
         "@type": "Offer",
@@ -196,6 +196,175 @@ def test_select_jsonld_offer_keeps_plain_unit_price_specification():
                 "priceCurrency": "EUR",
             },
         ],
+    }
+    assert select_jsonld_offer(offer) == (Decimal("259"), "EUR")
+
+
+def test_select_jsonld_offer_keeps_lone_commercial_specification_in_list():
+    """An isolated commercial reference price must not hide the offer's buy price.
+
+    Regression: treating every lone ``UnitPriceSpecification`` as financing discards
+    this explicit strikethrough price. A caller that scans multiple products can then
+    continue to a different product and return that unrelated product's price.
+    """
+    offer = {
+        "@type": "Offer",
+        "price": 259,
+        "priceCurrency": "EUR",
+        "priceSpecification": [
+            {
+                "@type": "UnitPriceSpecification",
+                "priceType": "StrikethroughPrice",
+                "price": 349,
+            }
+        ],
+    }
+    assert select_jsonld_offer(offer) == (Decimal("259"), "EUR")
+
+
+def test_select_jsonld_offer_keeps_lone_commercial_specification_as_object():
+    """Object and one-element-list spellings must preserve the same commercial offer."""
+    offer = {
+        "@type": "Offer",
+        "price": 259,
+        "priceCurrency": "EUR",
+        "priceSpecification": {
+            "@type": "UnitPriceSpecification",
+            "priceType": "StrikethroughPrice",
+            "price": 349,
+        },
+    }
+    assert select_jsonld_offer(offer) == (Decimal("259"), "EUR")
+
+
+@pytest.mark.parametrize(
+    "price_type",
+    [
+        "ListPrice",
+        "MSRP",
+        "MinimumAdvertisedPrice",
+        "InvoicePrice",
+        "RegularPrice",
+        "SalePrice",
+        "StrikethroughPrice",
+    ],
+)
+@pytest.mark.parametrize(
+    "prefix", [pytest.param("", id="bare"), pytest.param("https://schema.org/", id="schema-org")]
+)
+def test_select_jsonld_offer_keeps_each_lone_commercial_price_type(
+    price_type: str, prefix: str
+) -> None:
+    """Every approved bare or schema.org-prefixed commercial type disables the fallback."""
+    offer = {
+        "price": "259",
+        "priceCurrency": "EUR",
+        "priceSpecification": {
+            "@type": "UnitPriceSpecification",
+            "priceType": f"{prefix}{price_type}",
+        },
+    }
+    assert select_jsonld_offer(offer) == (Decimal("259"), "EUR")
+
+
+def test_select_jsonld_offer_matches_commercial_price_type_case_insensitively():
+    """Publisher casing must not change an approved commercial type's meaning."""
+    offer = {
+        "price": "259",
+        "priceCurrency": "EUR",
+        "priceSpecification": {
+            "@type": "UnitPriceSpecification",
+            "priceType": "HTTPS://SCHEMA.ORG/sAlEpRiCe",
+        },
+    }
+    assert select_jsonld_offer(offer) == (Decimal("259"), "EUR")
+
+
+def test_select_jsonld_offer_keeps_lone_member_tier_specification():
+    """A member-tier key is positive evidence that an isolated spec is commercial."""
+    offer = {
+        "price": "259",
+        "priceCurrency": "EUR",
+        "priceSpecification": {
+            "@type": "UnitPriceSpecification",
+            "validForMemberTier": {"name": "Club member"},
+        },
+    }
+    assert select_jsonld_offer(offer) == (Decimal("259"), "EUR")
+
+
+@pytest.mark.parametrize("empty", [None, [], {}, ""])
+@pytest.mark.parametrize("as_list", [False, True])
+def test_empty_member_tier_is_not_commercial_evidence(empty: object, *, as_list: bool) -> None:
+    """An EMPTY member-tier key carries no evidence, so the #9 rejection must stand.
+
+    Testing the key's presence rather than its value let ``validForMemberTier: null``
+    — which a publisher emits for a product with no tier pricing — disable the filter
+    on an otherwise bare specification, and the instalment came back as the price.
+    Evidence is a value, not a key.
+    """
+    spec = {"@type": "UnitPriceSpecification", "validForMemberTier": empty}
+    offer = {
+        "price": "54.08",
+        "priceCurrency": "USD",
+        "priceSpecification": [spec] if as_list else spec,
+    }
+    assert select_jsonld_offer(offer) is None
+
+
+def test_select_jsonld_offer_rejects_commercial_type_with_billing_duration():
+    """An explicit billing period remains financing despite a commercial priceType."""
+    offer = {
+        "price": "54.08",
+        "priceCurrency": "USD",
+        "priceSpecification": {
+            "@type": "UnitPriceSpecification",
+            "priceType": "SalePrice",
+            "billingDuration": 24,
+        },
+    }
+    assert select_jsonld_offer(offer) is None
+
+
+def test_select_jsonld_offer_rejects_commercial_type_with_recurrence_name():
+    """Financing wording remains decisive despite a commercial priceType."""
+    offer = {
+        "price": "54.08",
+        "priceCurrency": "USD",
+        "priceSpecification": {
+            "@type": "UnitPriceSpecification",
+            "priceType": "SalePrice",
+            "name": "24 monthly payments",
+        },
+    }
+    assert select_jsonld_offer(offer) is None
+
+
+def test_select_jsonld_offer_rejects_recurrence_wording_in_price_type():
+    """A priceType that names recurrence remains an explicit financing signal."""
+    offer = {
+        "price": "54.08",
+        "priceCurrency": "USD",
+        "priceSpecification": {
+            "@type": "UnitPriceSpecification",
+            "priceType": "monthly payment",
+        },
+    }
+    assert select_jsonld_offer(offer) is None
+
+
+@pytest.mark.parametrize("left", [0, 1, 2])
+@pytest.mark.parametrize("right", [0, 1, 2])
+def test_lone_commercial_spec_ignores_null_padding(left: int, right: int) -> None:
+    """Null padding must not hide positive evidence on the sole real specification."""
+    spec = {
+        "@type": "UnitPriceSpecification",
+        "priceType": "StrikethroughPrice",
+    }
+    offer = {
+        "price": "259",
+        "priceCurrency": "EUR",
+        "priceSpecification": [None] * left + [spec] + [None] * right,
     }
     assert select_jsonld_offer(offer) == (Decimal("259"), "EUR")
 
@@ -488,13 +657,11 @@ def test_brotli_available_for_httpx_decompression() -> None:
 
 
 def test_select_jsonld_offer_rejects_lone_financing_offer_without_keywords_or_billing():
-    """A single UnitPriceSpecification offer, with no billing fields and no financing
-    wording anywhere, must still be rejected.
+    """A truly bare isolated UnitPriceSpecification remains conservatively rejected.
 
-    This is the Apple/Google leak (#9) the shared filter exists to prevent: a monthly
-    financing entry shaped that way does not always spell out "/mo" or set
-    ``billingDuration``, and every scraper that is not MediaMarkt passes a single
-    ``Offer`` here.
+    This pins the project policy that closes the Apple/Google monthly-instalment leak
+    (#9): in the absence of either recurrence markers or positive commercial evidence,
+    the shared selector rejects this ambiguous shape instead of recording a wrong price.
     """
     offer = {
         "price": "54.08",
@@ -504,5 +671,82 @@ def test_select_jsonld_offer_rejects_lone_financing_offer_without_keywords_or_bi
             "price": "54.08",
             "priceCurrency": "USD",
         },
+    }
+    assert select_jsonld_offer(offer) is None
+
+
+def test_select_jsonld_offer_rejects_lone_financing_spec_wrapped_in_a_list():
+    """A one-element list cannot bypass the conservative isolated-spec policy.
+
+    In the JSON-LD data model a property value and a one-element array of that value
+    are equivalent spellings, and publishers emit either for identical content. This
+    test keeps the verdict independent of those brackets.
+
+    The MediaMarkt fix (#29) needed sibling specifications to survive the bare-type
+    fallback. A one-element list has no sibling context, so accepting it reopened #9 and
+    allowed an ambiguous monthly instalment to become the recorded product price.
+    """
+    offer = {
+        "price": "54.08",
+        "priceCurrency": "USD",
+        "priceSpecification": [
+            {
+                "@type": "UnitPriceSpecification",
+                "price": "54.08",
+                "priceCurrency": "USD",
+            }
+        ],
+    }
+    assert select_jsonld_offer(offer) is None
+
+
+@pytest.mark.parametrize("left", [0, 1, 2])
+@pytest.mark.parametrize("right", [0, 1, 2])
+def test_lone_financing_spec_ignores_null_padding(left: int, right: int) -> None:
+    """``null`` padding must not turn a sole specification into a sibling set.
+
+    In ordinary JSON-LD ``null`` adds no value, so ``[spec]``, ``[spec, null]`` and
+    ``[null, spec, null]`` carry one specification each. Counting the raw list length
+    let the padding reopen exactly the leak the sole-specification rule closes.
+    """
+    spec = {"@type": "UnitPriceSpecification", "price": "54.08"}
+    offer = {
+        "price": "54.08",
+        "priceCurrency": "USD",
+        "priceSpecification": [None] * left + [spec] + [None] * right,
+    }
+    assert select_jsonld_offer(offer) is None
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("billingDuration", 24),
+        ("billingIncrement", 1),
+        ("referenceQuantity", {"value": 1, "unitCode": "MON"}),
+        ("name", "monthly payment"),
+        ("description", "monthly payment"),
+        ("priceType", "monthly payment"),
+    ],
+)
+@pytest.mark.parametrize("reverse", [False, True])
+def test_financing_signal_in_sibling_specs(field: str, value: object, reverse: bool) -> None:
+    """Each recurrence marker must be read on a SIBLING specification, in either order.
+
+    The pre-existing marker tests all passed a sole ``UnitPriceSpecification``, so the
+    filter returned on the bare type before reading any marker: deleting the billing
+    check, or the wording check, left them all green. These pin the markers where they
+    are actually consulted.
+    """
+    specs: list[object] = [
+        {"@type": "UnitPriceSpecification", field: value},
+        {"@type": "UnitPriceSpecification", "price": "1299"},
+    ]
+    if reverse:
+        specs.reverse()
+    offer = {
+        "price": "54.08",
+        "priceCurrency": "USD",
+        "priceSpecification": specs,
     }
     assert select_jsonld_offer(offer) is None
