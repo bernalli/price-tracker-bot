@@ -58,9 +58,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   its name. Both page shapes are supported now.
 - **A valid offer could be discarded as monthly financing.** Any JSON-LD offer
   carrying a `UnitPriceSpecification` was filtered out, which is how retailers state
-  ordinary strikethrough and loyalty-tier prices. Financing now has to be stated as
-  such — a billing period, a reference quantity, or "/mo"-style wording. This
-  affected every scraper that reads a JSON-LD offer, not only MediaMarkt.
+  ordinary strikethrough and loyalty-tier prices. Where an offer states several price
+  specifications, financing now has to be stated as such — a billing period, a
+  reference quantity, or "/mo"-style wording. A specification standing alone keeps
+  being read as financing on its bare type, which is how Apple and Google state a
+  monthly instalment. This affected every scraper that reads a JSON-LD offer, not
+  only MediaMarkt.
+- **A monthly instalment written inside brackets was read as the product price.**
+  "Standing alone" is now counted after unwrapping, so an offer whose whole
+  `priceSpecification` is a one-element list holding a bare `UnitPriceSpecification`
+  is filtered like the equivalent unwrapped one. JSON-LD treats a value and a
+  one-element array of it as the same document, and publishers emit either; deciding
+  on the brackets let the instalment through as the price of the product, on every
+  scraper that reads a JSON-LD offer.
 
 ## [1.0.0] - 2026-09-02
 

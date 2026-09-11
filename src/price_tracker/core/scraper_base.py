@@ -207,15 +207,23 @@ def _is_financing_offer(offer: dict[str, object]) -> bool:
     dropped the real offer and left the product priceless. Recurrence then has to
     be stated — a billing period, a reference quantity, or "/mo"-style wording.
 
-    But a SINGLE ``UnitPriceSpecification`` as the whole ``priceSpecification``
-    is schema.org's own idiom for a recurring/leasing amount (Apple/Google): a
-    real financing entry shaped that way does not always spell out "/mo" or set
-    ``billingDuration``, so the bare @type stays a sufficient signal there (#9).
+    But a LONE ``UnitPriceSpecification`` — the whole ``priceSpecification``, with
+    no sibling to give it context — is schema.org's own idiom for a recurring or
+    leasing amount (Apple/Google): a real financing entry shaped that way does not
+    always spell out "/mo" or set ``billingDuration``, so the bare @type stays a
+    sufficient signal there (#9).
+
+    "Lone" is counted after unwrapping, not by JSON type. In the JSON-LD data model
+    a property value and a one-element array of it are the same document, and
+    publishers emit either for identical content; deciding on the brackets would
+    reopen #9 for everyone who writes them, and a leaked instalment is a WRONG
+    price, not a missing one.
     """
     spec = offer.get("priceSpecification")
-    if isinstance(spec, dict) and "UnitPrice" in str(spec.get("@type", "")):
-        return True
     specs = spec if isinstance(spec, list) else [spec]
+    lone = specs[0] if len(specs) == 1 else None
+    if isinstance(lone, dict) and "UnitPrice" in str(lone.get("@type", "")):
+        return True
     for s in specs:
         if not isinstance(s, dict):
             continue

@@ -506,3 +506,31 @@ def test_select_jsonld_offer_rejects_lone_financing_offer_without_keywords_or_bi
         },
     }
     assert select_jsonld_offer(offer) is None
+
+
+def test_select_jsonld_offer_rejects_lone_financing_spec_wrapped_in_a_list():
+    """The same lone financing spec, written as a ONE-ELEMENT list, must be rejected too.
+
+    In the JSON-LD data model a property value and a one-element array of that value
+    are the same document: a publisher may emit either for identical content. So the
+    payload below is byte-for-byte the meaning of the ``dict`` case above, and any rule
+    that accepts one while rejecting the other is deciding on syntax, not on semantics.
+
+    The MediaMarkt regression (#29) needed a LIST of sibling specs to survive the filter,
+    and widened the list branch wholesale; a list of length one came along for the ride.
+    That reopens the Apple/Google leak (#9) for every publisher that wraps its single
+    spec in brackets — the monthly instalment is then read as the product price, which
+    is a wrong price rather than a missing one.
+    """
+    offer = {
+        "price": "54.08",
+        "priceCurrency": "USD",
+        "priceSpecification": [
+            {
+                "@type": "UnitPriceSpecification",
+                "price": "54.08",
+                "priceCurrency": "USD",
+            }
+        ],
+    }
+    assert select_jsonld_offer(offer) is None
