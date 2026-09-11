@@ -199,16 +199,30 @@ _FINANCING_RE = re.compile(
 
 
 def _is_financing_offer(offer: dict[str, object]) -> bool:
-    """True when an Offer represents a recurring/monthly financing entry, not the price."""
+    """True when an Offer represents a recurring/monthly financing entry, not the price.
+
+    A bare ``UnitPriceSpecification`` sitting in a LIST alongside siblings is NOT
+    enough on its own: retailers state ordinary strikethrough and loyalty-tier
+    prices that way (MediaMarkt does), and treating any sibling as financing
+    dropped the real offer and left the product priceless. Recurrence then has to
+    be stated — a billing period, a reference quantity, or "/mo"-style wording.
+
+    But a SINGLE ``UnitPriceSpecification`` as the whole ``priceSpecification``
+    is schema.org's own idiom for a recurring/leasing amount (Apple/Google): a
+    real financing entry shaped that way does not always spell out "/mo" or set
+    ``billingDuration``, so the bare @type stays a sufficient signal there (#9).
+    """
     spec = offer.get("priceSpecification")
+    if isinstance(spec, dict) and "UnitPrice" in str(spec.get("@type", "")):
+        return True
     specs = spec if isinstance(spec, list) else [spec]
     for s in specs:
-        if isinstance(s, dict) and (
-            "UnitPrice" in str(s.get("@type", ""))
-            or s.get("billingDuration")
-            or s.get("billingIncrement")
-            or s.get("referenceQuantity")
-        ):
+        if not isinstance(s, dict):
+            continue
+        if s.get("billingDuration") or s.get("billingIncrement") or s.get("referenceQuantity"):
+            return True
+        spec_blob = " ".join(str(s.get(k, "")) for k in ("name", "description", "priceType"))
+        if _FINANCING_RE.search(spec_blob):
             return True
     blob = " ".join(str(offer.get(k, "")) for k in ("name", "description", "category"))
     return bool(_FINANCING_RE.search(blob))
@@ -296,23 +310,42 @@ def jsonld_offer_availability(offers: object) -> bool | None:
 def unwrap_jsonld_graph(data: object) -> list[dict[str, object]]:
     """Flatten a JSON-LD payload into its node dicts, unwrapping ``@graph`` containers.
 
-    Handles a single dict, a list of nodes, and nested ``@graph`` wrappers
+    Handles a single dict, a list of nodes, nested ``@graph`` wrappers
     (Yoast/WordPress-style ``{"@context": ..., "@graph": [...]}``) — a Product
-    nested in ``@graph`` would otherwise be invisible to ``@type`` scans (#56).
-    The container dict itself is kept (callers filter by ``@type`` anyway);
-    non-dict entries are dropped.
+    nested in ``@graph`` would otherwise be invisible to ``@type`` scans (#56) —
+    and schema.org Action wrappers, which carry the Product under ``object``
+    (``{"@type": "BuyAction", "object": {"@type": "Product", ...}}``, as
+    MediaMarkt emits). The container dict itself is kept (callers filter by
+    ``@type`` anyway); non-dict entries are dropped.
+
+    Iterative on purpose: ``data`` is parsed from an untrusted page, and walking
+    it recursively raises ``RecursionError`` on a deeply nested ``@graph``/
+    ``object`` chain — trivial to craft in a few tens of KB of markup, and an
+    exception that is neither ``BlockEvent`` nor ``ListingGone``, so it would
+    escape ``scrape()``'s contract.
+
+    Order matches the recursive walk it replaces, which callers depend on: they
+    take the FIRST matching Product. Hence ``object`` is pushed before ``@graph``
+    — the stack pops in reverse, so ``@graph`` entries still come out first.
     """
-    if isinstance(data, list):
-        items: list[dict[str, object]] = []
-        for entry in data:
-            items.extend(unwrap_jsonld_graph(entry))
-        return items
-    if isinstance(data, dict):
-        graph = data.get("@graph")
+    items: list[dict[str, object]] = []
+    stack: list[object] = [data]
+    while stack:
+        node = stack.pop()
+        if isinstance(node, list):
+            stack.extend(reversed(node))
+            continue
+        if not isinstance(node, dict):
+            continue
+        items.append(node)
+        type_val = node.get("@type", "")
+        type_str = " ".join(type_val) if isinstance(type_val, list) else str(type_val)
+        if type_str.endswith("Action"):
+            stack.append(node.get("object"))
+        graph = node.get("@graph")
         if isinstance(graph, list):
-            return [data, *unwrap_jsonld_graph(graph)]
-        return [data]
-    return []
+            stack.append(graph)
+    return items
 
 
 # id/class keywords marking related-items modules (carousels, rails, sponsored).
@@ -321,7 +354,7 @@ _CAROUSEL_CONTEXT_RE = re.compile(
 )
 
 
-def _in_carousel_context(el: Tag) -> bool:
+def in_carousel_context(el: Tag) -> bool:
     """True when `el` or an ancestor is id/class-marked as a related-items module."""
     node: Tag | None = el
     while node is not None:
@@ -347,7 +380,7 @@ def find_microdata_price_el(soup: BeautifulSoup) -> Tag | None:
 
     for scope_sel in ('[itemprop="offers"]', '[itemtype*="Offer"]', '[itemtype*="Product"]'):
         # Stable sort: non-carousel scopes first, document order preserved within groups.
-        for scope in sorted(soup.select(scope_sel), key=_in_carousel_context):
+        for scope in sorted(soup.select(scope_sel), key=in_carousel_context):
             el = scope.find(attrs={"itemprop": "price"})
             if isinstance(el, Tag):
                 return el
