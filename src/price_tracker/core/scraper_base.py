@@ -196,35 +196,51 @@ def detect_currency(text: str | None) -> str | None:
 _FINANCING_RE = re.compile(
     r"/mo\b|/month|per month|a month|al mese|/mese|monthly|installment|financ|rate ", re.IGNORECASE
 )
+_COMMERCIAL_PRICE_TYPES = frozenset(
+    price_type.casefold()
+    for price_type in (
+        "ListPrice",
+        "MSRP",
+        "MinimumAdvertisedPrice",
+        "InvoicePrice",
+        "RegularPrice",
+        "SalePrice",
+        "StrikethroughPrice",
+    )
+)
+_SCHEMA_ORG_PREFIXES = ("https://schema.org/", "http://schema.org/")
+
+
+def _has_commercial_evidence(spec: dict[str, object]) -> bool:
+    """Whether an isolated price specification explicitly describes a sale price."""
+    if "validForMemberTier" in spec:
+        return True
+    price_type = str(spec.get("priceType", "")).casefold()
+    for prefix in _SCHEMA_ORG_PREFIXES:
+        if price_type.startswith(prefix):
+            price_type = price_type[len(prefix) :]
+            break
+    return price_type in _COMMERCIAL_PRICE_TYPES
 
 
 def _is_financing_offer(offer: dict[str, object]) -> bool:
     """True when an Offer represents a recurring/monthly financing entry, not the price.
 
-    A bare ``UnitPriceSpecification`` sitting in a LIST alongside siblings is NOT
-    enough on its own: retailers state ordinary strikethrough and loyalty-tier
-    prices that way (MediaMarkt does), and treating any sibling as financing
-    dropped the real offer and left the product priceless. Recurrence then has to
-    be stated — a billing period, a reference quantity, or "/mo"-style wording.
+    Explicit recurrence wins: billing fields and financing wording always reject the
+    offer, including when the specification also carries commercial evidence.
 
-    But a LONE ``UnitPriceSpecification`` — the whole ``priceSpecification``, with
-    no sibling to give it context — is schema.org's own idiom for a recurring or
-    leasing amount (Apple/Google): a real financing entry shaped that way does not
-    always spell out "/mo" or set ``billingDuration``, so the bare @type stays a
-    sufficient signal there (#9).
+    Otherwise, this project conservatively treats an isolated ``UnitPriceSpecification``
+    as financing to prevent the monthly-instalment leak in #9. The fallback does not
+    apply when that specification explicitly names a commercial ``priceType`` or has a
+    ``validForMemberTier`` key. Sibling specifications never trigger the fallback merely
+    because of their type; retailers use them for ordinary reference and member prices.
 
-    "Lone" is counted after unwrapping, not by JSON type. In the JSON-LD data model
-    a property value and a one-element array of it are the same document, and
-    publishers emit either for identical content; deciding on the brackets would
-    reopen #9 for everyone who writes them, and a leaked instalment is a WRONG
-    price, not a missing one.
+    Isolation is determined after unwrapping and removing ``null`` values, so an object,
+    a one-element list, and a null-padded one-element list receive the same verdict.
     """
     spec = offer.get("priceSpecification")
     specs = spec if isinstance(spec, list) else [spec]
     specs = [s for s in specs if s is not None]
-    lone = specs[0] if len(specs) == 1 else None
-    if isinstance(lone, dict) and "UnitPrice" in str(lone.get("@type", "")):
-        return True
     for s in specs:
         if not isinstance(s, dict):
             continue
@@ -234,7 +250,14 @@ def _is_financing_offer(offer: dict[str, object]) -> bool:
         if _FINANCING_RE.search(spec_blob):
             return True
     blob = " ".join(str(offer.get(k, "")) for k in ("name", "description", "category"))
-    return bool(_FINANCING_RE.search(blob))
+    if _FINANCING_RE.search(blob):
+        return True
+    lone = specs[0] if len(specs) == 1 else None
+    return bool(
+        isinstance(lone, dict)
+        and "UnitPrice" in str(lone.get("@type", ""))
+        and not _has_commercial_evidence(lone)
+    )
 
 
 def select_jsonld_offer(offers: object) -> tuple[Decimal, str | None] | None:
