@@ -213,7 +213,7 @@ _SCHEMA_ORG_PREFIXES = ("https://schema.org/", "http://schema.org/")
 
 def _has_commercial_evidence(spec: dict[str, object]) -> bool:
     """Whether an isolated price specification explicitly describes a sale price."""
-    if "validForMemberTier" in spec:
+    if spec.get("validForMemberTier"):
         return True
     price_type = str(spec.get("priceType", "")).casefold()
     for prefix in _SCHEMA_ORG_PREFIXES:

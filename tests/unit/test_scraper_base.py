@@ -293,6 +293,25 @@ def test_select_jsonld_offer_keeps_lone_member_tier_specification():
     assert select_jsonld_offer(offer) == (Decimal("259"), "EUR")
 
 
+@pytest.mark.parametrize("empty", [None, [], {}, ""])
+@pytest.mark.parametrize("as_list", [False, True])
+def test_empty_member_tier_is_not_commercial_evidence(empty: object, *, as_list: bool) -> None:
+    """An EMPTY member-tier key carries no evidence, so the #9 rejection must stand.
+
+    Testing the key's presence rather than its value let ``validForMemberTier: null``
+    — which a publisher emits for a product with no tier pricing — disable the filter
+    on an otherwise bare specification, and the instalment came back as the price.
+    Evidence is a value, not a key.
+    """
+    spec = {"@type": "UnitPriceSpecification", "validForMemberTier": empty}
+    offer = {
+        "price": "54.08",
+        "priceCurrency": "USD",
+        "priceSpecification": [spec] if as_list else spec,
+    }
+    assert select_jsonld_offer(offer) is None
+
+
 def test_select_jsonld_offer_rejects_commercial_type_with_billing_duration():
     """An explicit billing period remains financing despite a commercial priceType."""
     offer = {
