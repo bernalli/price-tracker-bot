@@ -160,7 +160,7 @@ def test_digest_renders_operational_section() -> None:
     assert "⚠️ Operational notices" in text
     assert "shop.example — 2 products: tracking suspended (page not found (HTTP 404))" in text
     assert "shop.example — 2 products: checks failing (2/10)" in text
-    assert "Use /reactivate or /errori for details." in footer
+    assert "Use /reactivate or /errors for details." in footer
     assert unrenderable_ids == []
 
 
@@ -178,7 +178,7 @@ def test_digest_only_operational_entries() -> None:
 
     assert "0 price changes" in header
     assert "⚠️ Operational notices" in "\n".join(block for _, block in blocks)
-    assert "Use /reactivate or /errori for details." in footer
+    assert "Use /reactivate or /errors for details." in footer
     assert unrenderable_ids == []
 
 

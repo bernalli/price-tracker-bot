@@ -87,7 +87,7 @@ async def _product_picker(
 @with_locale
 @restricted
 async def cmd_refresh(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Set per-product check interval. Usage: /refresh <id> <minuti>"""
+    """Set per-product check interval. Usage: /refresh <id> <minutes>"""
     if not context.args:
         await _product_picker(
             update,

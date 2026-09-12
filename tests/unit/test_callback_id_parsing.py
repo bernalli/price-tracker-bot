@@ -68,4 +68,4 @@ async def test_tampered_callback_id_replies_error_instead_of_crashing(
     assert handled is True
     query.edit_message_text.assert_awaited_once()
     msg = query.edit_message_text.await_args.args[0]
-    assert "ID non valido" in msg
+    assert "Invalid ID" in msg

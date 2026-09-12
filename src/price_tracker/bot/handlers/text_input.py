@@ -22,6 +22,7 @@ from telegram.ext import (
 from price_tracker.bot.decorators import _config, _convert_display, _db, restricted, with_locale
 from price_tracker.bot.handlers._helpers import (
     _escape_html,
+    _format_minutes,
     _format_threshold,
     _get_user_product,
     _parse_threshold_input,
@@ -75,50 +76,58 @@ async def handle_text_input(  # noqa: PLR0915 — verbatim port; cyclomatic spli
     action_type, product_id = pending_action
     del context.user_data["pending_action"]
 
-    if text.lower() in ("no", "skip", "salta", "-", "annulla"):
-        await update.message.reply_text(_("👍 Ok, nessuna modifica."))
+    if text.lower() in ("no", "skip", "salta", "-", "annulla", "cancel"):
+        await update.message.reply_text(_("👍 OK, nothing changed."))
         return
 
     db = _db(context)
     product = await _get_user_product(context, product_id, user_id)
     if not product:
-        await update.message.reply_text(_("❌ Prodotto non trovato."))
+        await update.message.reply_text(_("❌ Product not found."))
         return
-    name = (product.get("name") or "Sconosciuto")[:60]
+    name = (product.get("name") or _("Unknown"))[:60]
 
     if action_type == "target":
         try:
             target = Decimal(text.replace(",", ".").replace("€", "").strip())
         except (InvalidOperation, ValueError):
-            await update.message.reply_text(_("❌ Prezzo non valido. Riprova."))
+            await update.message.reply_text(_("❌ Invalid price. Try again."))
             context.user_data["pending_action"] = pending_action
             return
         if target <= 0:
             await db.set_target_price(product_id, None)
-            await update.message.reply_text(f"🎯 Target rimosso per #{product_id}.")
+            await update.message.reply_text(
+                _("🎯 Target cleared for #{pid}.").format(pid=product_id)
+            )
         else:
             await db.set_target_price(product_id, target)
             current = _safe_dec(product.get("current_price"))
             currency = product.get("currency", "EUR")
             target_display = _convert_display(target, currency)
-            msg = f"🎯 Target: <b>{target_display}</b>\n📦 {_escape_html(name)}"
+            msg = _("🎯 Target: <b>{target}</b>\n📦 {name}").format(
+                target=target_display, name=_escape_html(name)
+            )
             if current and target < current:
                 diff_pct = ((current - target) / current) * 100
                 current_display = _convert_display(current, currency)
-                msg += f"\n💰 Attuale: {current_display} (-{diff_pct:.1f}% necessario)"
+                msg += _("\n💰 Current: {price} (-{pct:.1f}% needed)").format(
+                    price=current_display, pct=diff_pct
+                )
             await update.message.reply_text(msg, parse_mode=ParseMode.HTML)
 
     elif action_type == "threshold":
         try:
             threshold_type, threshold_value = _parse_threshold_input(text)
         except ValueError:
-            await update.message.reply_text(_("❌ Valore non valido. Riprova (es. 20% o 50)."))
+            await update.message.reply_text(_("❌ Invalid value. Try again (e.g. 20% or 50)."))
             context.user_data["pending_action"] = pending_action
             return
         await db.set_threshold(product_id, threshold_type, threshold_value)
         threshold_str = _format_threshold(threshold_type, threshold_value)
         await update.message.reply_text(
-            f"🎯 Soglia: <b>{threshold_str}</b>\n📦 {_escape_html(name)}",
+            _("🎯 Threshold: <b>{threshold}</b>\n📦 {name}").format(
+                threshold=threshold_str, name=_escape_html(name)
+            ),
             parse_mode=ParseMode.HTML,
         )
 
@@ -126,42 +135,42 @@ async def handle_text_input(  # noqa: PLR0915 — verbatim port; cyclomatic spli
         try:
             new_uid = int(text.strip())
         except ValueError:
-            await update.message.reply_text(_("❌ ID non valido. Deve essere un numero."))
+            await update.message.reply_text(_("❌ Invalid ID. It must be a number."))
             context.user_data["pending_action"] = pending_action
             return
         existing = await db.get_user(new_uid)
         if existing and existing.get("is_active"):
             await update.message.reply_text(
-                f"ℹ️ Utente <code>{new_uid}</code> già autorizzato.",
+                _("ℹ️ User <code>{uid}</code> is already authorized.").format(uid=new_uid),
                 parse_mode=ParseMode.HTML,
             )
         else:
             await db.add_user(new_uid, is_admin=False)
             await update.message.reply_text(
-                f"✅ Utente <code>{new_uid}</code> aggiunto!",
+                _("✅ User <code>{uid}</code> added!").format(uid=new_uid),
                 parse_mode=ParseMode.HTML,
             )
             with contextlib.suppress(Exception):
                 await context.bot.send_message(
                     chat_id=new_uid,
-                    text="🎉 Sei stato autorizzato! Invia /start.",
+                    text=_("🎉 You have been authorized! Send /start."),
                 )
 
     elif action_type == "admin_nick":
         nickname = text.strip()
         if not nickname:
-            await update.message.reply_text(_("❌ Nickname vuoto."))
+            await update.message.reply_text(_("❌ Empty nickname."))
             return
         await db.update_user_info(product_id, display_name=nickname)
         await update.message.reply_text(
-            f"✅ Nickname aggiornato: <b>{_escape_html(nickname)}</b>",
+            _("✅ Nickname updated: <b>{name}</b>").format(name=_escape_html(nickname)),
             parse_mode=ParseMode.HTML,
         )
 
     elif action_type == "admin_debug":
         url_input = text.strip()
         if not url_input.startswith("http"):
-            await update.message.reply_text(_("❌ URL non valido."))
+            await update.message.reply_text(_("❌ Invalid URL."))
             return
         # Trigger the debug command
         from price_tracker.bot.handlers.debug import cmd_debug  # noqa: PLC0415
@@ -173,26 +182,23 @@ async def handle_text_input(  # noqa: PLR0915 — verbatim port; cyclomatic spli
         try:
             minutes = int(text.strip())
         except ValueError:
-            await update.message.reply_text(_("❌ Numero non valido."))
+            await update.message.reply_text(_("❌ Invalid number."))
             context.user_data["pending_action"] = pending_action
             return
         if minutes < 5:
-            await update.message.reply_text(_("❌ Minimo 5 minuti."))
+            await update.message.reply_text(_("❌ Minimum is 5 minutes."))
             context.user_data["pending_action"] = pending_action
             return
         if minutes > 1440 * 7:
-            await update.message.reply_text(_("❌ L'intervallo massimo è 7 giorni."))
+            await update.message.reply_text(_("❌ The maximum interval is 7 days."))
             context.user_data["pending_action"] = pending_action
             return
         await db.set_config("check_interval_minutes", str(minutes))
         _reschedule_periodic_check(context, minutes)
-        if minutes >= 60:
-            h = minutes / 60
-            display = f"{h:.0f} ore" if h == int(h) else f"{h:.1f} ore"
-        else:
-            display = f"{minutes} minuti"
         await update.message.reply_text(
-            f"✅ Intervallo aggiornato: <b>ogni {display}</b>",
+            _("✅ Interval updated: <b>every {interval}</b>").format(
+                interval=_format_minutes(minutes)
+            ),
             parse_mode=ParseMode.HTML,
         )
 
@@ -200,30 +206,27 @@ async def handle_text_input(  # noqa: PLR0915 — verbatim port; cyclomatic spli
         try:
             minutes = int(text.strip())
         except ValueError:
-            await update.message.reply_text(_("❌ Numero non valido. Riprova."))
+            await update.message.reply_text(_("❌ Invalid number. Try again."))
             context.user_data["pending_action"] = pending_action
             return
         if minutes <= 0:
             await db.set_product_interval(product_id, None)
             config = _config(context)
             await update.message.reply_text(
-                f"🔄 Intervallo ripristinato a globale "
-                f"({config.check_interval_minutes} min)\n"
-                f"📦 {_escape_html(name)}",
+                _("🔄 Interval reset to the global one ({minutes} min)\n📦 {name}").format(
+                    minutes=config.check_interval_minutes, name=_escape_html(name)
+                ),
                 parse_mode=ParseMode.HTML,
             )
         elif minutes < 5:
-            await update.message.reply_text(_("❌ Minimo 5 minuti."))
+            await update.message.reply_text(_("❌ Minimum is 5 minutes."))
             context.user_data["pending_action"] = pending_action
         else:
             await db.set_product_interval(product_id, minutes)
-            if minutes >= 60:
-                hours = minutes / 60
-                display = f"{hours:.0f} ore" if hours == int(hours) else f"{hours:.1f} ore"
-            else:
-                display = f"{minutes} minuti"
             await update.message.reply_text(
-                f"🔄 Check: ogni <b>{display}</b>\n📦 {_escape_html(name)}",
+                _("🔄 Check: every <b>{interval}</b>\n📦 {name}").format(
+                    interval=_format_minutes(minutes), name=_escape_html(name)
+                ),
                 parse_mode=ParseMode.HTML,
             )
 

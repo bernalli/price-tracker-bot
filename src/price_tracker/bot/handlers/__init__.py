@@ -31,6 +31,7 @@ from price_tracker.bot.handlers import (
     text_input,
 )
 from price_tracker.bot.handlers._helpers import _escape_html
+from price_tracker.bot.messages import _
 
 logger = logging.getLogger(__name__)
 
@@ -44,12 +45,14 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """`/start` — welcome message."""
     user = update.effective_user
     await update.message.reply_text(
-        f"👋 <b>Ciao {_escape_html(user.first_name)}!</b>\n\n"
-        "Monitoro i prezzi online e ti avviso quando scendono.\n\n"
-        "🚀 <b>Per iniziare:</b> incolla un link in chat\n"
-        "🎯 <b>Supporto:</b> Amazon, eBay, Shopify e altri\n"
-        "🛡 <b>Amazon:</b> filtro nuovo/usato e venditore\n\n"
-        "Premi /menu per tutte le funzioni.",
+        _(
+            "👋 <b>Hi {name}!</b>\n\n"
+            "I track online prices and let you know when they drop.\n\n"
+            "🚀 <b>To get started:</b> paste a link in the chat\n"
+            "🎯 <b>Supported:</b> Amazon, eBay, Shopify and more\n"
+            "🛡 <b>Amazon:</b> new/used and seller filters\n\n"
+            "Press /menu for everything else."
+        ).format(name=_escape_html(user.first_name)),
         parse_mode=ParseMode.HTML,
     )
 
@@ -71,19 +74,19 @@ async def _send_main_menu(message: object, is_admin: bool = False) -> None:
     """Render the main menu inline keyboard."""
     rows = [
         [
-            InlineKeyboardButton("📦 Prodotti", callback_data="menu_prodotti"),
-            InlineKeyboardButton("🔍 Prezzi", callback_data="menu_prezzi"),
+            InlineKeyboardButton(_("📦 Products"), callback_data="menu_prodotti"),
+            InlineKeyboardButton(_("🔍 Prices"), callback_data="menu_prezzi"),
         ],
         [
-            InlineKeyboardButton("🔔 Notifiche", callback_data="menu_notifiche"),
-            InlineKeyboardButton("💾 Dati", callback_data="menu_dati"),
+            InlineKeyboardButton(_("🔔 Notifications"), callback_data="menu_notifiche"),
+            InlineKeyboardButton(_("💾 Data"), callback_data="menu_dati"),
         ],
-        [InlineKeyboardButton("📊 Stato e info", callback_data="menu_info")],
+        [InlineKeyboardButton(_("📊 Status and info"), callback_data="menu_info")],
     ]
     if is_admin:
-        rows.append([InlineKeyboardButton("👑 Impostazioni (admin)", callback_data="menu_admin")])
+        rows.append([InlineKeyboardButton(_("👑 Settings (admin)"), callback_data="menu_admin")])
     await message.reply_text(  # type: ignore[attr-defined]
-        "📋 <b>Menu</b>\n\nCosa vuoi fare?",
+        _("📋 <b>Menu</b>\n\nWhat do you want to do?"),
         parse_mode=ParseMode.HTML,
         reply_markup=InlineKeyboardMarkup(rows),
     )
@@ -91,7 +94,7 @@ async def _send_main_menu(message: object, is_admin: bool = False) -> None:
 
 def _menu_back_button() -> list[InlineKeyboardButton]:
     """Single-row 'back to main menu' button (legacy alias)."""
-    return [InlineKeyboardButton("◀️ Menu", callback_data="menu_main")]
+    return [InlineKeyboardButton(_("◀️ Menu"), callback_data="menu_main")]
 
 
 # ── Error handler ─────────────────────────────────────────────────
@@ -105,7 +108,7 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
     if isinstance(update, Update) and update.message:
         with contextlib.suppress(Exception):
             await update.message.reply_text(
-                "❌ Si è verificato un errore. Riprova tra qualche istante."
+                _("❌ Something went wrong. Please try again in a moment.")
             )
 
 

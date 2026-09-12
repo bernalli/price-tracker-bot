@@ -61,7 +61,7 @@ async def test_reactivate_foreign_product_is_rejected() -> None:
 
     assert handled is True
     db.reactivate_product.assert_not_awaited()
-    query.edit_message_text.assert_awaited_once_with("❌ Prodotto non trovato.")
+    query.edit_message_text.assert_awaited_once_with("❌ Product not found.")
 
 
 @pytest.mark.asyncio
@@ -79,7 +79,7 @@ async def test_reactivate_own_product_succeeds() -> None:
     db.get_product_for_user.assert_awaited_once_with(PRODUCT_ID, OWNER_ID)
     db.reactivate_product.assert_awaited_once_with(PRODUCT_ID)
     msg = query.edit_message_text.await_args.args[0]
-    assert "Riattivato" in msg
+    assert "Reactivated" in msg
 
 
 @pytest.mark.asyncio
@@ -112,4 +112,4 @@ async def test_track_default_foreign_product_writes_nothing() -> None:
 
     assert handled is True
     db.set_threshold.assert_not_awaited()
-    query.edit_message_text.assert_awaited_once_with("❌ Prodotto non trovato.")
+    query.edit_message_text.assert_awaited_once_with("❌ Product not found.")

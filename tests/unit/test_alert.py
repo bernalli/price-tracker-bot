@@ -360,7 +360,7 @@ def test_warning_notice_format_and_has_no_buttons() -> None:
     text = format_warning_notice(group)
 
     assert "10/10" in text
-    assert "/errori" in text
+    assert "/errors" in text
     assert operational_buttons(group) == []
 
 

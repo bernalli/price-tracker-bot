@@ -58,17 +58,27 @@ mypy                                          # respects pyproject.toml [tool.my
 When you add or change user-facing strings, update the catalog:
 
 ```bash
-# Extract strings from source (writes messages.pot)
-pybabel extract -F babel.cfg -k _ -k ngettext -o messages.pot src/
-
-# Merge new strings into existing locale catalogs
-pybabel update -i messages.pot -d src/price_tracker/locale
+./scripts/i18n.sh extract    # source strings -> messages.pot
+./scripts/i18n.sh update     # merge into every locale catalog
 
 # Translate src/price_tracker/locale/<lang>/LC_MESSAGES/messages.po manually
 
-# Compile .mo binaries
-pybabel compile -d src/price_tracker/locale
+./scripts/i18n.sh compile    # .po -> .mo (both are committed)
 ```
+
+Use the helper rather than calling `pybabel` directly: extraction needs
+`-k N_ -k "ngettext:1,2"` to pick up deferred copy and plural forms, and
+compilation goes through `scripts/i18n_compile.py` because `pybabel compile`
+misreads a literal percent in prose as a printf template.
+
+Two rules when writing strings:
+
+- Source strings are English, wrapped in `_()`. Interpolate with `str.format`
+  (`_("Price: {p}").format(p=price)`), never an f-string — the extractor cannot
+  see a call nested inside one.
+- Copy declared far from where it is rendered (module-level tables) is marked
+  with `N_()` and translated with `_()` at the render site, so it picks up the
+  reader's locale rather than the import-time one.
 
 See [docs/i18n.md](docs/i18n.md) for full reference.
 

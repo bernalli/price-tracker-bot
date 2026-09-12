@@ -8,19 +8,18 @@
 #     (intentionally excludes ambiguous bigrams like "non" / "più" which
 #     appear in legitimate English compounds e.g. "non-EUR", "non-None")
 #
-# Coverage scope (Plan 3 F5/F7):
-#   - bot/decorators.py + bot/handlers/{auth,monitoring,_helpers}.py and
-#     descendants under callbacks/ that were swept in F5.
+# Coverage scope: all of src/price_tracker. The legacy handler bodies and
+# callback modules that F5 left in Italian were swept in the post-1.0.0 pass
+# (msgids are English throughout; it_IT/es_ES live in the catalogs).
 #
-# Out of scope (carry-over IT strings, scheduled for post-v0.1.0 sweep):
-#   - bot/handlers/{product,product_io,history,settings,text_input,debug}.py
-#     and callbacks/{_actions,_admin,_menu,_product}.py — legacy handler
-#     bodies; UX-visible strings already wrapped in `_()` but msgid texts
-#     remain Italian as of F5 (covered by it_IT catalog passthrough).
+# Out of scope:
 #   - scrapers/** — domain-specific IT/EN dual-language parsing logic
-#     (CSS selectors like .prezzo-attuale, error messages emitted to
-#     bot layer for translation upstream).
+#     (CSS selectors like .prezzo-attuale, regex alternations); user-facing
+#     error strings there are English and translated in the bot layer.
 #   - locale/** + bot/messages.py — translation catalogs and i18n module.
+#   - the Italian command aliases (/aggiungi, /soglia, …) registered next to
+#     their English names, and the legacy Italian CSV headers accepted by
+#     the importer — both are compatibility identifiers, not UI copy.
 #
 # Exit 1 if any matches are found in covered scope.
 set -euo pipefail
@@ -32,15 +31,6 @@ if matches=$(rg --pcre2 "$PATTERN" \
               --type py \
               --glob '!src/price_tracker/locale/**' \
               --glob '!src/price_tracker/bot/messages.py' \
-              --glob '!src/price_tracker/bot/handlers/product.py' \
-              --glob '!src/price_tracker/bot/handlers/product_io.py' \
-              --glob '!src/price_tracker/bot/handlers/product_list.py' \
-              --glob '!src/price_tracker/bot/handlers/history.py' \
-              --glob '!src/price_tracker/bot/handlers/settings.py' \
-              --glob '!src/price_tracker/bot/handlers/text_input.py' \
-              --glob '!src/price_tracker/bot/handlers/debug.py' \
-              --glob '!src/price_tracker/bot/handlers/__init__.py' \
-              --glob '!src/price_tracker/bot/handlers/callbacks/**' \
               --glob '!src/price_tracker/scrapers/**'); then
   echo "ERROR: Italian residual strings found in covered source:"
   echo "$matches"

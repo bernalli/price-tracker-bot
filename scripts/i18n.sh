@@ -6,7 +6,7 @@ LOCALE_DIR="src/price_tracker/locale"
 
 case "${1:-help}" in
   extract)
-    pybabel extract -F babel.cfg -k _ -k ngettext -o messages.pot src/
+    pybabel extract -F babel.cfg -k _ -k N_ -k "ngettext:1,2" -o messages.pot src/
     ;;
   init)
     [ -n "${2:-}" ] || { echo "usage: $0 init <lang>"; exit 1; }
@@ -16,7 +16,9 @@ case "${1:-help}" in
     pybabel update -i messages.pot -d "$LOCALE_DIR"
     ;;
   compile)
-    pybabel compile -d "$LOCALE_DIR"
+    # Not `pybabel compile`: its printf validator false-positives on literal
+    # percents in prose. See scripts/i18n_compile.py.
+    python3 scripts/i18n_compile.py "$LOCALE_DIR"
     ;;
   *)
     echo "usage: $0 {extract|init <lang>|update|compile}"

@@ -146,7 +146,7 @@ class ShopifyScraper(AbstractScraper):
             if css_result:
                 return css_result
 
-        return ProductInfo(error="Prezzo non trovato (Shopify)")
+        return ProductInfo(error="Price not found (Shopify)")
 
     @staticmethod
     async def _fetch_html(url: str, client: httpx.AsyncClient) -> str | None:

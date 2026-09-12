@@ -103,7 +103,7 @@ class EbayScraper(AbstractScraper):
             info.name = self._extract_name(soup)
 
         if info.price is None:
-            info.error = "Prezzo non trovato su eBay"
+            info.error = "Price not found on eBay"
 
         return info
 

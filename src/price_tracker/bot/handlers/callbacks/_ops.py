@@ -62,7 +62,7 @@ async def _load_group(
     """Parse and authorize an anchor, replying with the common error text."""
     anchor_id = _parse_id(data.removeprefix(prefix))
     if anchor_id is None:
-        await query.edit_message_text(_("❌ ID non valido."))
+        await query.edit_message_text(_("❌ Invalid ID."))
         return None
     anchor, domain, group = await _automatic_group(context, db, user_id, anchor_id)
     if anchor is None:

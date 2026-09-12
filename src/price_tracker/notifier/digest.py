@@ -128,9 +128,9 @@ def _digest_blocks(entries: list[DigestEntry]) -> tuple[str, list[tuple[int, str
         "📊 <b>Digest — {n} price changes</b>",
         price_count,
     ).format(n=price_count)
-    footer_parts = [_("Use /lista for full state.")]
+    footer_parts = [_("Use /list for full state.")]
     if operational_blocks:
-        footer_parts.insert(0, _("Use /reactivate or /errori for details."))
+        footer_parts.insert(0, _("Use /reactivate or /errors for details."))
     return header, [*price_blocks, *operational_blocks], "\n".join(footer_parts), unrenderable_ids
 
 

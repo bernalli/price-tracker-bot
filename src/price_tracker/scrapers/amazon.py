@@ -278,7 +278,7 @@ class AmazonScraper(AbstractScraper):
                 info.seller = None
 
         if info.price is None:
-            info.error = "Prezzo non trovato (prodotto non disponibile?)"
+            info.error = "Price not found (product unavailable?)"
 
         return info
 

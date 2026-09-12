@@ -384,3 +384,83 @@ def test_digest_general_copy_is_translated_at_render_time() -> None:
     assert "Prodotto #1" in singular_blocks[0][1]
     assert "sconosciuto" in blocks[-1][1]
     assert "Usa /lista per lo stato completo." in footer
+
+
+# ── Spanish catalog + LOCALE fallback semantics ───────────────────────────
+
+
+def test_production_catalog_serves_spanish() -> None:
+    """es/es-ES resolve to the built es_ES catalog, not to a near-miss locale."""
+    get_translation.cache_clear()
+    for code in ("es", "es-ES", "es_ES"):
+        translation = get_translation(code)
+        assert translation.info()["language"] == "es_ES"
+        assert translation.gettext("❌ Product not found.") == "❌ Producto no encontrado."
+    get_translation.cache_clear()
+
+
+def test_unavailable_language_falls_back_to_locale_env_not_a_sibling() -> None:
+    """An unsupported client language uses LOCALE, never whichever catalog exists.
+
+    Regression guard: a Portuguese client under LOCALE=en must get English —
+    the earlier bug was that untranslated source strings were Italian, so the
+    fallback *looked* like it resolved to it_IT.
+    """
+    get_translation.cache_clear()
+    translation = get_translation("pt-BR")
+    assert translation.info()["language"] == "en"
+    assert translation.gettext("❌ Product not found.") == "❌ Product not found."
+    get_translation.cache_clear()
+
+
+def test_available_client_language_wins_over_locale_env(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """LOCALE is the fallback, not an override: a supported client language wins."""
+    monkeypatch.setattr(msgs_mod, "_DEFAULT_LOCALE", "en", raising=False)
+    get_translation.cache_clear()
+    assert get_translation("it").info()["language"] == "it_IT"
+    assert get_translation("es").info()["language"] == "es_ES"
+    get_translation.cache_clear()
+
+
+def test_production_catalogs_are_fully_translated() -> None:
+    """Every shipped catalog translates every msgid — none is left empty.
+
+    The 1.0.0 catalogs covered 122 of the strings the bot actually renders; the
+    rest were Italian literals that never reached gettext, so `LOCALE=en` still
+    produced Italian. This asserts the catalogs stay complete as strings are
+    added, since an empty msgstr silently falls through to the source text.
+    """
+    from babel.messages.pofile import read_po
+
+    counts: dict[str, int] = {}
+    for locale in ("en", "it_IT", "es_ES"):
+        po_path = msgs_mod._LOCALE_DIR / locale / "LC_MESSAGES" / "messages.po"
+        with po_path.open(encoding="utf-8") as handle:
+            catalog = read_po(handle, locale=locale)
+
+        untranslated: list[str] = []
+        translated = 0
+        for message in catalog:
+            if not message.id:
+                continue  # catalog metadata header
+            if isinstance(message.id, (tuple, list)):
+                forms = message.string or ()
+                singular = str(message.id[0])
+                complete = bool(forms) and all(forms)
+            else:
+                singular = str(message.id)
+                complete = bool(message.string)
+            if complete:
+                translated += 1
+            else:
+                untranslated.append(singular)
+
+        assert not untranslated, (
+            f"{locale} leaves {len(untranslated)} msgid(s) untranslated: {untranslated[:5]}"
+        )
+        counts[locale] = translated
+
+    assert counts["en"] > 250, f"expected the full catalog, got {counts['en']} msgids"
+    assert len(set(counts.values())) == 1, f"catalogs are out of sync: {counts}"
