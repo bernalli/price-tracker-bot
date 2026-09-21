@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   gitleaks:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # gitleaks-action fetches the PR commits via the API on pull_request events
     # (GET /repos/.../pulls/{n}/commits); that needs pull-requests:read on top of
     # the workflow-level contents:read. Job-level permissions replace the inherited
@@ -22,22 +22,22 @@ jobs:
       contents: read
       pull-requests: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: Gitleaks history scan
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   bandit:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -50,15 +50,15 @@ jobs:
 
       - name: Upload bandit report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: bandit-report
           path: bandit-report.json
 
   osv-scanner:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: OSV scanner
         uses: google/osv-scanner-action/osv-scanner-action@v2.5.1
