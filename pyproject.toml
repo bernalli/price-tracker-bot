@@ -11,7 +11,7 @@ license = {text = "MIT"}
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "python-telegram-bot[job-queue]>=21.0",
+    "python-telegram-bot[job-queue]>=22.8",
     "httpx>=0.27.0",
     "brotli>=1.2.0",  # httpx needs this to decompress br-encoded responses (sites like nove25.net serve brotli by default)
     "beautifulsoup4>=4.12.0",
