@@ -61,8 +61,23 @@ One grammar, applied identically to the `[project] version` field of `pyproject.
 release heading in the CHANGELOG:
 
 ```
-^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$        matched with re.ASCII
+^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$
 ```
+
+The digit classes are written out as `[0-9]` and **must not** be shortened to `\d`. `\d` is
+Unicode-aware: `1١.0.0` — an ASCII `1` followed by an Arabic-Indic `1` — matches a `\d`-based
+grammar, and `int()` then parses that component as `11` without complaint, so a version outside the
+intended alphabet is silently normalised into a legitimate-looking one. Measured:
+
+```
+re.fullmatch(explicit, "1١.0.0")            -> None
+re.fullmatch(backslash_d, "1١.0.0")         -> match
+int("1١")                                    -> 11
+```
+
+Written out, the classes are ASCII-only by construction and `re.ASCII` adds nothing — do not pass
+it, and do not claim it as a defence. The defence is the explicit class, and §9.3 mutant 11 is what
+proves it.
 
 Accepted: `0.1.0`, `1.1.0`, `10.20.30`.
 
@@ -72,8 +87,8 @@ Rejected — each producing exit 2, never a skip and never a normalisation:
 - an empty string, or whitespace-only
 - leading zeros (`1.01.0`)
 - a sign (`1.0.-0`, `2.-1.0`, `+1.0.0`)
-- non-ASCII digits (the `int()` builtin accepts them; `re.ASCII` is what excludes them, so the flag
-  is load-bearing and has a mutant of its own in §9)
+- non-ASCII digits anywhere in a component, including after a leading ASCII digit (`1١.0.0`) —
+  this is the case the explicit digit classes exist for, and it carries a test of its own
 - any suffix: `-dev`, `rc1`, `.post1`, `+local`
 
 The project has historically tagged `0.1.0-dev` builds, so a development suffix is not an
@@ -259,7 +274,10 @@ suite green is a missing case, and the case is added before the work is called d
 8. `unreleased_content_lines` in the marker replaced by a constant
 9. `changelog_latest` in the marker replaced by a constant
 10. `pyproject` in the marker replaced by a constant
-11. the `re.ASCII` flag removed from the version grammar
+11. the explicit `[0-9]` classes of the version grammar replaced by `\d` (killed by the
+    `1١.0.0` case of §4; an earlier revision of this document named the removal of a `re.ASCII`
+    flag instead, which is an equivalent mutant — with the classes written out the flag changes no
+    accepted string, so nothing could kill it)
 12. the leading-zero guard relaxed to `\d+`
 13. the three-component check relaxed to accept any number of components
 14. fence tracking disabled (fence lines treated as ordinary lines)
