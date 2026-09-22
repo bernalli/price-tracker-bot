@@ -15,7 +15,7 @@ Version = tuple[int, ...]
 VERSION = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
 UNRELEASED = re.compile(r"## \[Unreleased\]\s*", re.IGNORECASE)
 RELEASE = re.compile(r"## \[([^\]]*)\] - ([0-9]{4}-[0-9]{2}-[0-9]{2})")
-LEVEL_TWO = re.compile(r"^##[^#]")
+LEVEL_TWO = re.compile(r"^##(?!#)")
 CATEGORY = re.compile(r"###\s+\S.*")
 FENCE = re.compile(r"^\s*(`{3,}|~{3,})")
 
@@ -55,7 +55,7 @@ def parse_version(value: object, path: Path | str) -> Version:
 def read_project_version(path: Path) -> Version:
     try:
         document = tomllib.loads(read_text(path))
-    except tomllib.TOMLDecodeError as exc:
+    except (tomllib.TOMLDecodeError, RecursionError) as exc:
         raise MeasurementError(f"{path}: could not parse TOML: {exc}") from exc
     project = document.get("project")
     if not isinstance(project, dict):

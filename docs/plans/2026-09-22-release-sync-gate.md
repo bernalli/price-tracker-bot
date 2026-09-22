@@ -112,8 +112,8 @@ pass.
 
 ### 5.2 Headings
 
-Only unfenced lines are considered. Every line matching `^##[^#]` (a level-2 heading, whatever its
-text) must be exactly one of:
+Only unfenced lines are considered. Every line matching `^##(?!#)` (a level-2 heading, whatever its
+text, **including a bare `##` with nothing after it**) must be exactly one of:
 
 - `## [Unreleased]` — case-insensitive, optional trailing whitespace
 - `## [X.Y.Z] - YYYY-MM-DD` — version per §4; the date mandatory, separated by exactly ` - `, and a
@@ -122,6 +122,14 @@ text) must be exactly one of:
 Any other level-2 heading → **exit 2**, naming the offending line. This is the heading-level form of
 rule (a): a truncated or differently punctuated release heading must not be quietly skipped, because
 skipping it shifts "the newest release" onto an older one.
+
+An earlier revision wrote this pattern as `^##[^#]`, which requires a third character and therefore
+does not recognise a bare `##`. Inside the `[Unreleased]` section that was harmless — §5.4 counts it
+as content — but **outside** it the line was neither recognised nor refused: it was *dropped*, which
+is the one thing rule (a) forbids, and a release heading truncated all the way to `##` would then
+shift the baseline onto an older release. The negative lookahead closes it at no cost. A bare `##` is
+now a level-2 heading carrying no version, so it is refused with exit 2 wherever it appears — which
+is why it is **not** in §5.4's content examples: the section never reaches the classifier.
 
 ### 5.3 Structure rules
 

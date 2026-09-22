@@ -131,7 +131,6 @@ def test_versions_compare_as_integer_triples(
         "###",
         "###   ",
         "###Added",
-        "##",
         "  ## Indented text",
     ],
 )
@@ -259,6 +258,28 @@ def test_unclosed_fences_are_unmeasurable(
         pytest.param(
             DEFAULT + "## [1.2.0] - 2026-09-10\n", "not descending", id="unordered-releases"
         ),
+        pytest.param(
+            "## [Unreleased]\n## [3.0.0] - 2026-01-03\n"
+            "## [1.0.0] - 2026-01-01\n## [2.0.0] - 2026-01-02\n",
+            "not descending",
+            id="unordered-releases-non-adjacent",
+        ),
+        pytest.param(
+            "## [Unreleased]\n## [2.0.0] - 2026-01-03\n"
+            "## [1.0.0] - 2026-01-01\n## [2.0.0] - 2026-01-02\n",
+            "duplicate release",
+            id="duplicate-release-non-adjacent",
+        ),
+        pytest.param(
+            "## [Unreleased]\n##\n## [1.0.0] - 2026-01-01\n",
+            "unrecognised level-2 heading",
+            id="bare-level-two-inside-unreleased",
+        ),
+        pytest.param(
+            "## [Unreleased]\n## [1.1.0] - 2026-09-11\n##\n## [1.0.0] - 2026-01-01\n",
+            "unrecognised level-2 heading",
+            id="bare-level-two-outside-unreleased",
+        ),
     ],
 )
 def test_structure_rules(
@@ -383,6 +404,7 @@ def test_integer_conversion_limit_is_unmeasurable(
         ("[project]\nversion = true", "non-empty string"),
         ("[project]\nversion = []", "non-empty string"),
         ("[project]\nversion = {}", "non-empty string"),
+        ('[project]\nversion = """1.0.0\n"""', "invalid version"),
     ],
 )
 def test_invalid_project_data_is_unmeasurable(
@@ -390,6 +412,15 @@ def test_invalid_project_data_is_unmeasurable(
 ) -> None:
     inputs[1].write_text(text)
     assert_unable(invoke(inputs, capsys), inputs[1], fact)
+
+
+def test_deeply_nested_toml_is_unmeasurable(
+    inputs: Inputs, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Exhausting the parser stack is a failure to measure, not an out-of-sync verdict."""
+    depth = 2000
+    inputs[1].write_text("a = " + "{a = " * depth + "1" + "}" * depth)
+    assert_unable(invoke(inputs, capsys), inputs[1], "could not parse TOML")
 
 
 @pytest.mark.parametrize("index", [0, 1], ids=["changelog", "project"])
