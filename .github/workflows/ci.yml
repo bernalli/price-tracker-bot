@@ -57,6 +57,9 @@ jobs:
       - name: English-only audit
         run: bash scripts/audit_english.sh
 
+      - name: Release sync (CHANGELOG vs version)
+        run: python scripts/check_release_sync.py
+
       - name: Upload coverage to Codecov
         if: matrix.python-version == '3.12'
         uses: codecov/codecov-action@v6
