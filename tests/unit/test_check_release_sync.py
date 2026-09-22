@@ -131,6 +131,7 @@ def test_versions_compare_as_integer_triples(
         "###",
         "###   ",
         "###Added",
+        "#",
         "  ## Indented text",
     ],
 )
