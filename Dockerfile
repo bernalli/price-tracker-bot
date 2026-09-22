@@ -8,10 +8,26 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         gcc g++ libcurl4-openssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY pyproject.toml README.md ./
-RUN pip install --user --no-cache-dir hatchling
+# Dependencies come from uv.lock, not from a fresh resolution. Before this, the
+# build copied pyproject.toml alone and ran `pip install .`, so every rebuild
+# resolved the transitive tree afresh: the image was not reproducible, and the
+# lockfile dependabot maintains never reached the runtime at all — anyio and
+# soupsieve, both bumped to patched versions in the lock, are transitive through
+# httpx and beautifulsoup4 and are not named in pyproject.toml.
+#
+# `uv export` is run rather than committing a generated requirements file: a
+# second copy of the pinned tree would drift from the lock, and nothing would
+# say so. uv itself is installed without --user so it stays out of /root/.local,
+# which the runtime stage copies wholesale.
+COPY pyproject.toml uv.lock README.md ./
+RUN pip install --user --no-cache-dir hatchling \
+    && pip install --no-cache-dir uv==0.12.7
 COPY src ./src
-RUN pip install --user --no-cache-dir .
+RUN uv export --frozen --no-dev --no-emit-project --format requirements.txt \
+        -o /tmp/requirements.txt \
+    && pip install --user --no-cache-dir --no-deps --require-hashes \
+        -r /tmp/requirements.txt \
+    && pip install --user --no-cache-dir --no-deps .
 
 # ── Runtime stage ────────────────────────────────────────────────
 
