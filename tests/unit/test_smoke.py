@@ -23,3 +23,16 @@ def test_version_matches_pyproject():
     """
     declared = tomllib.loads(PYPROJECT.read_text(encoding="utf-8"))["project"]["version"]
     assert __version__ == declared
+
+
+def test_lock_version_matches_pyproject():
+    """The committed lockfile must describe the same editable project version."""
+    project = tomllib.loads(PYPROJECT.read_text(encoding="utf-8"))["project"]
+    lock = tomllib.loads(PYPROJECT.with_name("uv.lock").read_text(encoding="utf-8"))
+    roots = [
+        package
+        for package in lock["package"]
+        if package["name"] == project["name"] and package.get("source") == {"editable": "."}
+    ]
+    assert len(roots) == 1
+    assert roots[0]["version"] == project["version"]
