@@ -67,3 +67,29 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # The multi-arch build above never loads an image into the daemon, so a
+      # green `build` proved that the image compiles and nothing about whether a
+      # container starts. Since dependencies now come from the lockfile rather
+      # than a fresh resolution, an incomplete pinned set would fail exactly
+      # here — at import — and nowhere earlier. Building amd64 alone into the
+      # local daemon is almost entirely cache hits from the step above.
+      - name: Load the amd64 image so it can be run
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          tags: price-tracker:smoke
+          cache-from: type=gha
+
+      - name: Smoke test — the container starts and the application imports
+        run: |
+          set -euo pipefail
+          declared=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          reported=$(docker run --rm price-tracker:smoke python -c 'import price_tracker; print(price_tracker.__version__)')
+          echo "pyproject=${declared} image=${reported}"
+          # Asserting agreement, not merely a non-empty string: an image built
+          # from stale sources would still print something.
+          test "${declared}" = "${reported}"
+          docker run --rm price-tracker:smoke python -c 'import price_tracker.main'
