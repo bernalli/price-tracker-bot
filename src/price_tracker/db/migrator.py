@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextlib
 import logging
 import re
+import sqlite3
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -17,6 +18,16 @@ logger = logging.getLogger(__name__)
 
 SCHEMA_VERSION_TABLE = "schema_version"
 _FILENAME_RE = re.compile(r"^(\d{3})_.+\.sql$")
+_PRAGMA_RE = re.compile(r"PRAGMA\b", re.IGNORECASE)
+
+
+class MigrationError(RuntimeError):
+    """A migration could not be applied; its changes were rolled back."""
+
+    def __init__(self, version: int, filename: str, reason: str) -> None:
+        super().__init__(f"migration {version:03d} ({filename}) failed: {reason}")
+        self.version = version
+        self.filename = filename
 
 
 def list_migrations(migrations_dir: Path) -> list[tuple[int, Path]]:
@@ -60,15 +71,81 @@ async def _column_exists(conn: aiosqlite.Connection, table: str, column: str) ->
     return any(r[1] == column for r in rows)
 
 
-async def _execute_migration_sql(conn: aiosqlite.Connection, sql: str) -> None:
-    """Execute a migration SQL. Each ALTER TABLE ADD COLUMN is wrapped to be idempotent."""
-    statements = [s.strip() for s in sql.split(";") if s.strip()]
+def _strip_leading_comments(sql: str) -> str:
+    """Return ``sql`` without leading whitespace, ``--`` and ``/* */`` comments."""
+    text = sql
+    while True:
+        text = text.lstrip()
+        if text.startswith("--"):
+            newline = text.find("\n")
+            text = "" if newline == -1 else text[newline + 1 :]
+        elif text.startswith("/*"):
+            end = text.find("*/", 2)
+            text = "" if end == -1 else text[end + 2 :]
+        else:
+            return text
+
+
+def _split_statements(sql: str) -> list[str]:
+    """Split a migration script into complete SQL statements.
+
+    A ``;`` only ends a statement when SQLite agrees the text so far is a
+    complete statement, so semicolons inside comments, string literals and
+    ``CREATE TRIGGER ... BEGIN ... END`` bodies are kept. Empty statements are
+    dropped. Raises ``ValueError`` if code (not just comments or whitespace)
+    follows the last complete statement.
+    """
+    statements: list[str] = []
+    buffer = ""
+    pieces = sql.split(";")
+    for piece in pieces[:-1]:
+        buffer += piece + ";"
+        if sqlite3.complete_statement(buffer):
+            if _strip_leading_comments(buffer) != ";":
+                statements.append(buffer.strip())
+            buffer = ""
+    tail = buffer + pieces[-1]
+    if _strip_leading_comments(tail):
+        raise ValueError(f"unterminated statement at end of file: {tail.strip()[:80]!r}")
+    return statements
+
+
+def _is_pragma(statement: str) -> bool:
+    return _PRAGMA_RE.match(_strip_leading_comments(statement)) is not None
+
+
+def _parse_migration(sql: str) -> tuple[list[str], list[str]]:
+    """Return ``(prologue, body)``: the leading PRAGMA statements and the rest.
+
+    Some PRAGMAs cannot run inside a transaction (``journal_mode`` raises,
+    ``foreign_keys`` is silently ignored), so they are only accepted as a
+    prologue that runs before the migration's transaction. A PRAGMA after the
+    first non-PRAGMA statement raises ``ValueError``.
+    """
+    prologue: list[str] = []
+    body: list[str] = []
+    for stmt in _split_statements(sql):
+        if not _is_pragma(stmt):
+            body.append(stmt)
+        elif body:
+            raise ValueError(
+                "PRAGMA is only allowed before the first non-PRAGMA statement: "
+                f"{_strip_leading_comments(stmt)[:80]!r}"
+            )
+        else:
+            prologue.append(stmt)
+    return prologue, body
+
+
+async def _execute_statements(conn: aiosqlite.Connection, statements: list[str]) -> None:
+    """Execute migration statements. Each ALTER TABLE ADD COLUMN is made idempotent."""
     for stmt in statements:
-        upper = stmt.upper()
+        code = _strip_leading_comments(stmt)
+        upper = code.upper()
         if upper.startswith("ALTER TABLE") and "ADD COLUMN" in upper:
             m = re.match(
                 r"ALTER\s+TABLE\s+(\w+)\s+ADD\s+COLUMN\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)",
-                stmt,
+                code,
                 re.IGNORECASE,
             )
             if m:
@@ -89,6 +166,11 @@ async def apply_migrations(
 
     If ``max_version`` is given, only migrations with version ``<= max_version``
     are applied. Useful in tests to bootstrap an older schema baseline.
+
+    Each migration runs in its own transaction together with its
+    ``schema_version`` row: if any statement fails, the migration is rolled
+    back entirely and ``MigrationError`` names its version and file. Leading
+    PRAGMA statements run before that transaction and are not rolled back.
     """
     await _ensure_schema_version_table(conn)
     current = await get_current_version(conn)
@@ -98,13 +180,29 @@ async def apply_migrations(
 
     for version, path in pending:
         logger.info("Applying migration %03d (%s)", version, path.name)
-        sql = path.read_text(encoding="utf-8")
-        await _execute_migration_sql(conn, sql)
-        await conn.execute(
-            f"INSERT INTO {SCHEMA_VERSION_TABLE}(version) VALUES (?)",
-            (version,),
-        )
-        await conn.commit()
+        try:
+            prologue, body = _parse_migration(path.read_text(encoding="utf-8"))
+        except ValueError as exc:
+            raise MigrationError(version, path.name, str(exc)) from exc
+        try:
+            for stmt in prologue:
+                await conn.execute(stmt)
+            # The sqlite3 module does not open implicit transactions for DDL,
+            # so without an explicit BEGIN every CREATE/DROP/ALTER would be
+            # committed on its own and a failure would leave a half-applied
+            # schema with no version recorded.
+            await conn.execute("BEGIN")
+            await _execute_statements(conn, body)
+            await conn.execute(
+                f"INSERT INTO {SCHEMA_VERSION_TABLE}(version) VALUES (?)",
+                (version,),
+            )
+            await conn.commit()
+        except BaseException as exc:
+            await conn.rollback()
+            if isinstance(exc, sqlite3.Error):
+                raise MigrationError(version, path.name, str(exc)) from exc
+            raise
 
     return await get_current_version(conn)
 
