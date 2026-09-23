@@ -129,7 +129,7 @@ def _parse_db_timestamp(value: str) -> datetime:
 
 
 def _failure_reason(exc: BaseException) -> tuple[str, str]:
-    """Map a failed check to ``(reason, detail)`` — the closed list in the plan."""
+    """Map a failed check to a supported ``(reason, detail)`` pair."""
     if isinstance(exc, ListingGone):
         return "listing_gone", f"HTTP {exc.status}"
     if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code in LISTING_GONE_STATUSES:
