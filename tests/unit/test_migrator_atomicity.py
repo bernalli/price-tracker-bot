@@ -427,3 +427,36 @@ async def test_interruption_mid_migration_is_rolled_back_and_not_wrapped(
         assert await _schema(conn) == schema_before
         assert await get_current_version(conn) == 1
         assert await _rows(conn, "SELECT v FROM base ORDER BY id") == [("keep1",), ("keep2",)]
+
+
+@pytest.mark.asyncio
+async def test_version_insert_failure_rolls_back_body(tmp_path: Path) -> None:
+    mig = _write_migrations(tmp_path / "m", {"001_base.sql": _ATOMIC_BASE})
+    db = tmp_path / "db.sqlite"
+    async with aiosqlite.connect(db) as conn:
+        assert await apply_migrations(conn, mig) == 1
+        await conn.execute(
+            "CREATE TRIGGER reject_version BEFORE INSERT ON schema_version "
+            "WHEN NEW.version = 2 BEGIN "
+            "SELECT RAISE(ABORT, 'version blocked'); END;"
+        )
+        await conn.commit()
+        before = await _schema(conn)
+        _write_migrations(mig, {"002_extra.sql": _ATOMIC_GOOD})
+        with pytest.raises(migrator_module.MigrationError, match="version blocked"):
+            await apply_migrations(conn, mig)
+        assert not conn.in_transaction
+        await conn.commit()
+    async with aiosqlite.connect(db) as conn:
+        assert await _schema(conn) == before
+        assert await get_current_version(conn) == 1
+        assert await _rows(conn, "SELECT v FROM base ORDER BY id") == [("keep1",), ("keep2",)]
+        await conn.execute("DROP TRIGGER reject_version")
+        await conn.commit()
+        assert await apply_migrations(conn, mig) == 2
+        assert await _table_exists(conn, "extra")
+        assert await _rows(conn, "SELECT v FROM base ORDER BY id") == [
+            ("keep1",),
+            ("keep2",),
+            ("new",),
+        ]

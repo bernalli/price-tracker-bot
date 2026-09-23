@@ -75,13 +75,15 @@ def _strip_leading_comments(sql: str) -> str:
     """Return ``sql`` without leading whitespace, ``--`` and ``/* */`` comments."""
     text = sql
     while True:
-        text = text.lstrip()
+        text = re.sub(r"^[\s\ufeff]+", "", text)
         if text.startswith("--"):
             newline = text.find("\n")
             text = "" if newline == -1 else text[newline + 1 :]
         elif text.startswith("/*"):
             end = text.find("*/", 2)
-            text = "" if end == -1 else text[end + 2 :]
+            if end == -1:
+                raise ValueError("unterminated block comment")
+            text = text[end + 2 :]
         else:
             return text
 
@@ -125,6 +127,11 @@ def _parse_migration(sql: str) -> tuple[list[str], list[str]]:
     prologue: list[str] = []
     body: list[str] = []
     for stmt in _split_statements(sql):
+        code = _strip_leading_comments(stmt)
+        if re.match(r"EXPLAIN\b", code, re.IGNORECASE):
+            raise ValueError("EXPLAIN is not allowed in migrations")
+        if re.match(r"(?:BEGIN|COMMIT|END|ROLLBACK|SAVEPOINT|RELEASE)\b", code, re.IGNORECASE):
+            raise ValueError(f"transaction control is not allowed: {code[:80]!r}")
         if not _is_pragma(stmt):
             body.append(stmt)
         elif body:
@@ -172,6 +179,8 @@ async def apply_migrations(
     back entirely and ``MigrationError`` names its version and file. Leading
     PRAGMA statements run before that transaction and are not rolled back.
     """
+    if conn.in_transaction:
+        raise ValueError("apply_migrations requires a connection outside a transaction")
     await _ensure_schema_version_table(conn)
     current = await get_current_version(conn)
     pending = [(v, p) for v, p in list_migrations(migrations_dir) if v > current]
@@ -197,9 +206,15 @@ async def apply_migrations(
                 f"INSERT INTO {SCHEMA_VERSION_TABLE}(version) VALUES (?)",
                 (version,),
             )
-            await conn.commit()
+            await conn.execute("COMMIT")
         except BaseException as exc:
-            await conn.rollback()
+            try:
+                if conn.in_transaction:
+                    await conn.execute("ROLLBACK")
+            except BaseException as rollback_exc:  # noqa: BLE001 — a failed rollback must not replace the original error
+                exc.add_note(
+                    f"rollback failed: {rollback_exc!r}; close this connection before retrying"
+                )
             if isinstance(exc, sqlite3.Error):
                 raise MigrationError(version, path.name, str(exc)) from exc
             raise
