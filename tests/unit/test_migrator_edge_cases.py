@@ -8,6 +8,7 @@ around PRAGMA statements in the prologue.
 
 import asyncio
 import sqlite3
+import sys
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
@@ -16,6 +17,12 @@ import aiosqlite
 import pytest
 
 from price_tracker.db import migrator as m
+
+# sqlite3.connect(autocommit=...) and PEP 249 transaction control exist only from
+# Python 3.12; on 3.11 a connection cannot be in either mode, so there is nothing to test.
+requires_sqlite_autocommit = pytest.mark.skipif(
+    sys.version_info < (3, 12), reason="sqlite3 autocommit attribute requires Python 3.12"
+)
 
 
 async def rows(conn: aiosqlite.Connection, sql: str) -> Iterable[Any]:
@@ -108,6 +115,7 @@ async def test_caller_transaction_is_untouched(tmp_path):
         assert await rows(conn, "SELECT name FROM sqlite_master WHERE name='schema_version'") == []
 
 
+@requires_sqlite_autocommit
 async def test_pep249_rejected_before_touching_db(tmp_path):
     directory = migration(tmp_path, "CREATE TABLE t(x);")
     async with aiosqlite.connect(tmp_path / "db", autocommit=False) as conn:
@@ -116,6 +124,7 @@ async def test_pep249_rejected_before_touching_db(tmp_path):
         assert await rows(conn, "SELECT name FROM sqlite_master") == []
 
 
+@requires_sqlite_autocommit
 @pytest.mark.parametrize("fail", [False, True])
 async def test_true_autocommit_is_durable_and_atomic(tmp_path, fail):
     directory = migration(
