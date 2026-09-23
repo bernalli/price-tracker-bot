@@ -1,13 +1,17 @@
-"""`channel_post` / `edited_channel_post` must not reach message-shaped handlers.
+"""`channel_post` / `edited_channel_post` / `guest_message` must not reach
+message-shaped handlers.
 
 In python-telegram-bot 22.8, ``Update.effective_user`` started falling through to
 ``channel_post.from_user`` / ``edited_channel_post.from_user`` (previously ``None``
-for those two update types). Because ``MessageHandler.check_update`` filters on
-``Update.effective_message`` — which has always included ``channel_post`` and
-``edited_channel_post`` — a channel post whose sender happens to be an authorized
-user now clears ``@restricted`` too. Three handlers registered as ``MessageHandler``
-dereference ``update.message`` directly and would raise ``AttributeError`` on such
-an update, since ``update.message`` stays ``None`` for a channel post:
+for those two update types), and PTB 22.8 also introduced ``Update.guest_message``,
+considered by both ``effective_message`` and ``effective_user`` from that same
+release. Because ``MessageHandler.check_update`` filters on
+``Update.effective_message`` — which now includes all three of these update kinds
+— an update whose sender happens to be an authorized user clears ``@restricted``
+too, regardless of which of the three kinds it is. Three handlers registered as
+``MessageHandler`` dereference ``update.message`` directly and would raise
+``AttributeError`` on such an update, since ``update.message`` stays ``None`` for
+a channel post or a guest message:
 
 * ``handle_url`` and ``handle_text_input`` (``text_input.register``, PLC0415-local
   ``filters.TEXT`` handlers around line 236-240)
@@ -17,9 +21,9 @@ an update, since ``update.message`` stays ``None`` for a channel post:
 This test reproduces the property with the exact mechanism PTB uses to route an
 update: ``BaseHandler.check_update()``. It registers the handlers via the real
 ``register()`` functions (so a future change to their filters is caught here too),
-then feeds each one three update shapes built from real ``telegram`` objects — an
+then feeds each one four update shapes built from real ``telegram`` objects — an
 ordinary ``message`` (must be accepted) and a ``channel_post`` / ``edited_channel_post``
-from an authorized user (must be rejected).
+/ ``guest_message`` from an authorized user (must be rejected).
 """
 
 from __future__ import annotations
@@ -95,6 +99,9 @@ _UPDATE_KINDS: dict[str, tuple[str, bool]] = {
     "message": (Chat.PRIVATE, True),
     "channel_post": (Chat.CHANNEL, False),
     "edited_channel_post": (Chat.CHANNEL, False),
+    # Guest mode supports private chats; this case uses one such chat.
+    # The message is carried on Update.guest_message, not Update.message.
+    "guest_message": (Chat.PRIVATE, False),
 }
 
 
@@ -131,15 +138,17 @@ def _message_for(handler_name: str, chat_type: str) -> Message:
 
 
 def _build_update(update_kind: str, message: Message) -> Update:
-    """Wrap `message` as `message`, `channel_post` or `edited_channel_post` — the
-    three Update fields `effective_message` (and, since PTB 22.8, `effective_user`)
-    fall through to."""
+    """Wrap the message in one of the four Update fields exercised here.
+
+    PTB 22.8 considers all four in both `effective_message` and `effective_user`."""
     if update_kind == "message":
         return Update(update_id=_UPDATE_ID, message=message)
     if update_kind == "channel_post":
         return Update(update_id=_UPDATE_ID, channel_post=message)
     if update_kind == "edited_channel_post":
         return Update(update_id=_UPDATE_ID, edited_channel_post=message)
+    if update_kind == "guest_message":
+        return Update(update_id=_UPDATE_ID, guest_message=message)
     raise ValueError(f"unknown update kind: {update_kind!r}")  # pragma: no cover
 
 
@@ -162,7 +171,7 @@ def test_message_handler_ignores_channel_posts(handler_name: str, update_kind: s
         assert not accepted, (
             f"{handler_name}: check_update() accepted a {update_kind!r} update whose "
             f"from_user is an authorized user. In PTB 22.8 Update.effective_user "
-            f"surfaces channel_post/edited_channel_post senders too, so this handler "
-            f"would run with update.message is None and crash on the first attribute "
-            f"access."
+            f"surfaces channel_post/edited_channel_post/guest_message senders too, so "
+            f"this handler would run with update.message is None and crash on the "
+            f"first attribute access."
         )
