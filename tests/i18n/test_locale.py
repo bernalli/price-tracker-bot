@@ -1,4 +1,4 @@
-"""i18n test suite (regression tests). Verifies bot/messages.py behavior."""
+"""i18n test suite. Verifies bot/messages.py behavior."""
 
 from __future__ import annotations
 
@@ -170,7 +170,7 @@ def _reset_locale_after():
 
 def test_production_catalog_has_operational_notice_strings() -> None:
     """The BUILT production .mo (not a test fixture) carries the operational-notice
-    msgids, with the exact it_IT translations."""
+    msgids with the exact it_IT translations."""
     get_translation.cache_clear()
     translation = get_translation("it_IT")
     assert translation.gettext("Listings removed on {domain}") == "Prodotti rimossi da {domain}"
