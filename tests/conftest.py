@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -56,12 +55,6 @@ async def http_client() -> AsyncIterator[httpx.AsyncClient]:
 def mock_router() -> respx.Router:
     """respx router for HTTP mocking. Use with `with router:` or `router.start()`."""
     return respx.mock(assert_all_called=False)
-
-
-@pytest.fixture
-def event_loop_policy():
-    """Pytest-asyncio event loop policy fixture (one per session)."""
-    return asyncio.DefaultEventLoopPolicy()
 
 
 @pytest.fixture
