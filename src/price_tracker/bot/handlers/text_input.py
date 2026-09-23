@@ -234,7 +234,17 @@ def register(app: Application) -> None:
 
     # URL auto-detection
     app.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND & filters.Regex(URL_PATTERN), handle_url)
+        MessageHandler(
+            filters.UpdateType.MESSAGE
+            & filters.TEXT
+            & ~filters.COMMAND
+            & filters.Regex(URL_PATTERN),
+            handle_url,
+        )
     )
     # Generic text for pending inputs
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_input))
+    app.add_handler(
+        MessageHandler(
+            filters.UpdateType.MESSAGE & filters.TEXT & ~filters.COMMAND, handle_text_input
+        )
+    )
