@@ -55,6 +55,7 @@ dev = [
     "types-python-dateutil",
     "pre-commit>=4.6.2",
     "freezegun>=1.5",
+    "hypothesis==6.168.1",
 ]
 
 [project.entry-points."price_tracker.scrapers"]
