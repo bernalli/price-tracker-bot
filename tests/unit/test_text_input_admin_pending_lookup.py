@@ -1,28 +1,28 @@
-"""admin_* pending-action branches must not depend on a product lookup.
+"""Pending-action product lookup must not swallow admin replies.
 
-`handle_text_input` fetches `_get_user_product(context, product_id, user_id)`
-BEFORE dispatching on `action_type` (handlers/text_input.py, lines ~82-86).
-Admin flows that set `pending_action` with a placeholder `product_id=0`
-(admin_adduser, admin_interval, admin_debug — see handlers/callbacks/_admin.py)
-are not about any product: on a real database `get_product(0)` returns
-`None` because SQLite `AUTOINCREMENT` ids start at 1, so the shared
-lookup always fails and the admin's reply is swallowed with
-"Prodotto non trovato" instead of being processed.
+`handle_text_input` used to fetch `_get_user_product(context, product_id,
+user_id)` unconditionally, BEFORE dispatching on `action_type`
+(handlers/text_input.py, previously lines ~82-86). Admin flows set
+`pending_action` with a placeholder `product_id=0` (admin_adduser,
+admin_interval, admin_debug) or with an unrelated target user id
+(admin_nick) — see handlers/callbacks/_admin.py. On a real database
+`get_product(0)` returns `None` (SQLite `AUTOINCREMENT` ids start at 1),
+so the shared lookup always failed and every admin reply was swallowed
+with "Prodotto non trovato" instead of being processed.
 
 Uses the real in-memory SQLite `Repository` (migrations applied), not a
 mock, because a mock DB that returns a product for every id hides this
-defect entirely (see test_text_input_admin_interval.py, which stubs
-`db.get_product` to always return `{"name": "x"}`).
+defect entirely.
 """
 
 from __future__ import annotations
 
+from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
 
 import aiosqlite
-import pytest
 import pytest_asyncio
 
 from price_tracker.bot.handlers.text_input import handle_text_input
@@ -33,10 +33,15 @@ from price_tracker.db.repository import Repository
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
+    import pytest
+
 MIGRATIONS_DIR = Path("src/price_tracker/db/migrations")
 
 ADMIN_ID = 987654321
+OTHER_USER_ID = 111222333
 NEW_USER_ID = 555000111
+TARGET_NICK_USER_ID = 444555666
+NONEXISTENT_PRODUCT_ID = 999999
 
 
 @pytest_asyncio.fixture
@@ -67,61 +72,200 @@ def _make_config() -> Config:
     )
 
 
-def _make_update_and_context(repo: Repository, text: str) -> tuple[MagicMock, MagicMock]:
+def _make_update_and_context(
+    repo: Repository, *, user_id: int, text: str, pending_action: tuple[str, int]
+) -> tuple[MagicMock, MagicMock]:
     job_queue = MagicMock()
     job_queue.get_jobs_by_name.return_value = []
 
     update = MagicMock()
-    update.effective_user.id = ADMIN_ID
+    update.effective_user.id = user_id
     update.effective_user.language_code = "it"
-    update.effective_user.first_name = "Admin"
-    update.effective_user.full_name = "Admin"
+    update.effective_user.first_name = "User"
+    update.effective_user.full_name = "User"
     update.effective_user.username = None
     update.message.text = text
     update.message.reply_text = AsyncMock()
 
     context = MagicMock()
-    context.user_data = {"pending_action": ("admin_adduser", 0)}
+    context.user_data = {"pending_action": pending_action}
     context.bot_data = {"db": repo, "config": _make_config()}
     context.job_queue = job_queue
 
     return update, context
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Confirmed defect: handle_text_input's shared pending-action product "
-        "lookup (handlers/text_input.py ~82-86) runs before the action_type "
-        "dispatch, so admin_adduser's placeholder product_id=0 always misses "
-        "on a real DB and the admin's reply is dropped. Fix pending in a "
-        "coordinated PR touching the same file; xfail marks the defect until "
-        "then so its disappearance becomes a visible event."
-    ),
-)
-async def test_admin_adduser_is_swallowed_by_the_product_lookup(repo: Repository) -> None:
-    """Reproduces the suspected defect for the admin_adduser branch.
+def _last_reply(update: MagicMock) -> str:
+    return str(update.message.reply_text.await_args.args[0])
 
-    `pending_action = ("admin_adduser", 0)` is set by handlers/callbacks/_admin.py
-    when an admin taps "add user" and is asked to paste the new user's numeric
-    Telegram id. `product_id=0` is a placeholder, never a real product: on the
-    real SQLite repository `get_product(0)` is always `None`, so the shared
-    lookup at the top of `handle_text_input` rejects the admin's reply before
-    it ever reaches the `admin_adduser` branch, and the new user is never
-    added.
-    """
+
+# ── admin_adduser ─────────────────────────────────────────────────────
+
+
+async def test_admin_adduser_routes_without_a_product_lookup(repo: Repository) -> None:
+    """pending_action=("admin_adduser", 0): 0 is a placeholder, not a product id."""
     await repo.ensure_user(ADMIN_ID, is_admin=True)
-
-    update, context = _make_update_and_context(repo, str(NEW_USER_ID))
+    update, context = _make_update_and_context(
+        repo, user_id=ADMIN_ID, text=str(NEW_USER_ID), pending_action=("admin_adduser", 0)
+    )
 
     await handle_text_input(update, context)
 
-    # What SHOULD have happened (per the admin_adduser branch, lines 125-148):
     added = await repo.get_user(NEW_USER_ID)
-    assert added is not None, (
-        "admin_adduser must add the new user; instead the pending-action "
-        "product lookup rejected the reply as 'Prodotto non trovato' before "
-        "the admin_adduser branch ever ran"
+    assert added is not None, "admin_adduser must add the new user"
+    assert added.is_active
+    assert "aggiunto" in _last_reply(update).lower()
+
+
+# ── admin_interval ───────────────────────────────────────────────────
+
+
+async def test_admin_interval_routes_without_a_product_lookup(repo: Repository) -> None:
+    """pending_action=("admin_interval", 0): 0 is a placeholder, not a product id."""
+    await repo.ensure_user(ADMIN_ID, is_admin=True)
+    update, context = _make_update_and_context(
+        repo, user_id=ADMIN_ID, text="45", pending_action=("admin_interval", 0)
     )
-    reply_text = update.message.reply_text.await_args.args[0]
-    assert "aggiunto" in reply_text.lower()
+
+    await handle_text_input(update, context)
+
+    stored = await repo.get_config("check_interval_minutes")
+    assert stored == "45", "admin_interval must persist the new global interval"
+    assert "aggiornato" in _last_reply(update).lower()
+
+
+# ── admin_debug ──────────────────────────────────────────────────────
+
+
+async def test_admin_debug_routes_without_a_product_lookup(
+    repo: Repository, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """pending_action=("admin_debug", 0): 0 is a placeholder, not a product id.
+
+    `cmd_debug` itself (network scraping) is out of scope here: the property
+    under test is only that the admin_debug branch is reached at all instead
+    of being rejected by the shared product lookup, so `cmd_debug` is
+    replaced with a spy.
+
+    The input text starts with "http" (satisfying `admin_debug`'s own
+    `url_input.startswith("http")` check) but has no "://", so it does not
+    match `handle_text_input`'s unrelated, pre-existing `URL_PATTERN` guard
+    at the top of the function — a real "https://..." input would return
+    there before ever reaching pending-action dispatch, which is a separate,
+    out-of-scope routing question from the one this fix addresses.
+    """
+    import price_tracker.bot.handlers.debug as debug_module
+
+    spy = AsyncMock()
+    monkeypatch.setattr(debug_module, "cmd_debug", spy)
+
+    await repo.ensure_user(ADMIN_ID, is_admin=True)
+    update, context = _make_update_and_context(
+        repo,
+        user_id=ADMIN_ID,
+        text="httpdebugtarget",
+        pending_action=("admin_debug", 0),
+    )
+
+    await handle_text_input(update, context)
+
+    # If the product lookup had swallowed the reply, cmd_debug would never
+    # have been invoked at all — that is the property under test.
+    spy.assert_awaited_once()
+    assert context.args == ["httpdebugtarget"]
+
+
+# ── admin_nick ───────────────────────────────────────────────────────
+
+
+async def test_admin_nick_routes_without_a_product_lookup(repo: Repository) -> None:
+    """pending_action=("admin_nick", target_id): target_id is a USER id, not a product id.
+
+    `TARGET_NICK_USER_ID` deliberately does not match any product row, to
+    prove the nickname update no longer depends on one existing.
+    """
+    await repo.ensure_user(ADMIN_ID, is_admin=True)
+    await repo.ensure_user(TARGET_NICK_USER_ID, is_admin=False)
+
+    update, context = _make_update_and_context(
+        repo,
+        user_id=ADMIN_ID,
+        text="Mario",
+        pending_action=("admin_nick", TARGET_NICK_USER_ID),
+    )
+
+    await handle_text_input(update, context)
+
+    updated = await repo.get_user(TARGET_NICK_USER_ID)
+    assert updated is not None
+    assert updated.display_name == "Mario", "admin_nick must update the target user's nickname"
+    assert "aggiornato" in _last_reply(update).lower()
+
+
+# ── negative case: target/threshold/refresh still require a real product ──
+
+
+async def test_target_with_nonexistent_product_id_is_rejected_and_writes_nothing(
+    repo: Repository,
+) -> None:
+    await repo.ensure_user(OTHER_USER_ID, is_admin=False)
+    update, context = _make_update_and_context(
+        repo,
+        user_id=OTHER_USER_ID,
+        text="19.99",
+        pending_action=("target", NONEXISTENT_PRODUCT_ID),
+    )
+
+    await handle_text_input(update, context)
+
+    assert "prodotto non trovato" in _last_reply(update).lower()
+    product = await repo.get_product(NONEXISTENT_PRODUCT_ID)
+    assert product is None
+
+
+async def test_threshold_on_someone_elses_product_is_rejected_and_writes_nothing(
+    repo: Repository,
+) -> None:
+    await repo.ensure_user(OTHER_USER_ID, is_admin=False)
+    await repo.ensure_user(ADMIN_ID, is_admin=False)  # non-admin here: ownership must be enforced
+    owner_pid = await repo.add_product(
+        user_id=ADMIN_ID,
+        url="https://example.com/p/owned-by-admin",
+        name="Not yours",
+        domain="example.com",
+        initial_price=Decimal("100"),
+        currency="EUR",
+    )
+
+    update, context = _make_update_and_context(
+        repo,
+        user_id=OTHER_USER_ID,
+        text="20%",
+        pending_action=("threshold", owner_pid),
+    )
+
+    await handle_text_input(update, context)
+
+    assert "prodotto non trovato" in _last_reply(update).lower()
+    product = await repo.get_product(owner_pid)
+    assert product is not None
+    # Untouched: still the default threshold set by add_product.
+    assert product.threshold_value == Decimal("10")
+
+
+async def test_refresh_with_nonexistent_product_id_is_rejected_and_writes_nothing(
+    repo: Repository,
+) -> None:
+    await repo.ensure_user(OTHER_USER_ID, is_admin=False)
+    update, context = _make_update_and_context(
+        repo,
+        user_id=OTHER_USER_ID,
+        text="30",
+        pending_action=("refresh", NONEXISTENT_PRODUCT_ID),
+    )
+
+    await handle_text_input(update, context)
+
+    assert "prodotto non trovato" in _last_reply(update).lower()
+    product = await repo.get_product(NONEXISTENT_PRODUCT_ID)
+    assert product is None
