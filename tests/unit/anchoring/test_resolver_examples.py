@@ -1,4 +1,4 @@
-"""Example tests of price ownership: the named cases of the specification and verdicts.
+"""Example tests of price ownership, covering the boundary cases in this module.
 
 Each negative case asserts the exact state and reason and has a positive control on the
 same path, so that ``price is None`` cannot pass because of an unrelated failure.
@@ -149,7 +149,7 @@ def test_generic_two_products_no_identity_yields_no_price() -> None:
     assert control.reason == "owned"
 
 
-# ------------------------------------------------------------ verdict S2-2
+# ------------------------------------------------------------ node identity and dedup
 
 
 def test_identity_is_never_taken_from_the_final_url() -> None:
@@ -300,7 +300,7 @@ def test_carousel_member_is_foreign_whatever_its_identity() -> None:
     )
 
 
-# ------------------------------------------------------------ verdict N3
+# ------------------------------------------------------------ foreign-only fixtures
 
 
 def _fixture_pair() -> tuple[PageSpec, PageSpec, PageSpec]:
@@ -344,7 +344,7 @@ def test_foreign_only_fixture_has_no_owned_observations() -> None:
     )
 
 
-# ------------------------------------------------------------ verdict N1
+# ------------------------------------------------------------ contradictory identity fields
 
 
 def _n1_payload(order: str) -> str:
