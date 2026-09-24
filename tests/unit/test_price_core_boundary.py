@@ -76,13 +76,16 @@ def test_price_core_imports_are_effect_free() -> None:
         )
 
 
-def test_price_core_has_no_callers_yet() -> None:
-    """Nothing outside the five core modules references them yet.
+def test_price_core_has_documented_callers_only() -> None:
+    """Every file outside the five core modules that references them is on this
+    explicit allow-list.
 
-    This is a deliberate tripwire, not a permanent invariant. The PR that
-    wires the price-core nucleus into scraper_base/generic/the registry
-    REPLACES this test with one that asserts an explicit, documented
-    allow-list of callers — it does not add an exemption here.
+    Replaces ``test_price_core_has_no_callers_yet``: the tripwire's own docstring
+    said the PR that wires the nucleus into a caller replaces it with an
+    allow-list, not an exemption. Wired by the Shopify headless (Next.js/Hydrogen)
+    fallback: a JSON API 404 on a headless storefront falls back to the JSON-LD
+    ``ProductGroup``/``hasVariant`` structure via ``identity``, ``pricegrammar``
+    and ``structured_data.decode_json_strict`` instead of duplicating them.
     """
     core_dir = SRC_ROOT / "core"
     exempt = {
@@ -95,20 +98,23 @@ def test_price_core_has_no_callers_yet() -> None:
             "structured_data.py",
         )
     }
+    allowed_callers = {SRC_ROOT / "scrapers" / "shopify.py"}
     reference = re.compile(
         r"price_tracker\.core\.(money|pricegrammar|anchoring|identity|structured_data)"
     )
     offenders: list[str] = []
     for py in SRC_ROOT.rglob("*.py"):
-        if py in exempt:
+        if py in exempt or py in allowed_callers:
             continue
         text = py.read_text(encoding="utf-8")
         if reference.search(text):
             offenders.append(str(py.relative_to(SRC_ROOT)))
     assert not offenders, (
-        "the price-core nucleus already has callers, but this PR is a pure "
-        f"port with no wiring: {offenders}"
+        "the price-core nucleus has undocumented callers — add them to "
+        f"allowed_callers above if intentional: {offenders}"
     )
+    for path in allowed_callers:
+        assert path.exists(), f"allow-listed caller no longer exists: {path}"
 
 
 def test_parse_price_untouched_by_the_port() -> None:

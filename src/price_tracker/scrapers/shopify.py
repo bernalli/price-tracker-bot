@@ -8,14 +8,18 @@ from __future__ import annotations
 import json
 import logging
 import re
+from collections.abc import Mapping
 from decimal import Decimal
 from typing import ClassVar
-from urllib.parse import urlparse
+from urllib.parse import parse_qsl, urlencode, urlparse
 
 import httpx
 from bs4 import BeautifulSoup
 
 from price_tracker.core.exceptions import BlockEvent, ListingGone
+from price_tracker.core.identity import RequestedIdentity
+from price_tracker.core.money import Money
+from price_tracker.core.pricegrammar import Unreadable, select_offer
 from price_tracker.core.retry_policy import RetryConfig, with_retry
 from price_tracker.core.scraper_base import (
     AbstractScraper,
@@ -25,7 +29,9 @@ from price_tracker.core.scraper_base import (
     detect_listing_gone,
     get_headers,
     parse_price,
+    unwrap_jsonld_graph,
 )
+from price_tracker.core.structured_data import StructureError, decode_json_strict
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +61,82 @@ def _is_product_path(url: httpx.URL | str) -> bool:
     """
     path = url.path if isinstance(url, httpx.URL) else urlparse(str(url)).path
     return bool(_SHOPIFY_PRODUCT_PATH_RE.search(path))
+
+
+_SCHEMA_ORG_TYPE_PREFIXES = ("https://schema.org/", "http://schema.org/")
+
+
+def _schema_type_names(node: Mapping[str, object]) -> frozenset[str]:
+    """Lower-cased ``@type`` names of a JSON-LD node, schema.org prefix stripped."""
+    raw = node.get("@type")
+    if raw is None:
+        return frozenset()
+    values = raw if isinstance(raw, list) else [raw]
+    names: set[str] = set()
+    for value in values:
+        if not isinstance(value, str):
+            continue
+        text = value.strip()
+        for prefix in _SCHEMA_ORG_TYPE_PREFIXES:
+            if text.startswith(prefix):
+                text = text[len(prefix) :]
+                break
+        if text:
+            names.add(text.casefold())
+    return frozenset(names)
+
+
+def _url_matches_requested(value: object, requested: RequestedIdentity) -> bool:
+    """True when a JSON-LD ``url`` field (a string, or a list of strings) is the
+    requested product. A list matches only when EVERY entry resolves to the
+    requested URL — a list naming the requested product alongside a foreign one
+    is a mismatch, not a match."""
+    if isinstance(value, str):
+        return requested.resolve(value) == requested.url
+    if isinstance(value, list) and value:
+        resolved = {requested.resolve(v) for v in value if isinstance(v, str)}
+        return resolved == {requested.url}
+    return False
+
+
+def _requested_variant_id(url: str) -> str | None:
+    """The ``variant`` query parameter of the requested URL, if present."""
+    for key, value in parse_qsl(urlparse(url).query, keep_blank_values=True):
+        if key == "variant" and value:
+            return value
+    return None
+
+
+def _without_variant_param(url: str) -> str:
+    """``url`` with any ``variant`` query parameter removed.
+
+    A ``ProductGroup`` identifies the product family, not one SKU: its own ``url``
+    never carries a ``?variant=`` selector, so the group-identity comparison must
+    not either — only the per-variant Offer URLs do.
+    """
+    parsed = urlparse(url)
+    kept = [(k, v) for k, v in parse_qsl(parsed.query, keep_blank_values=True) if k != "variant"]
+    return parsed._replace(query=urlencode(kept)).geturl()
+
+
+def _variant_offer_id(variant: Mapping[str, object]) -> str | None:
+    """The variant's identifier: the ``variant`` query param of its own Offer URL
+    (the common Shopify/Hydrogen shape — each variant's Offer echoes the storefront
+    URL with ``?variant=<id>``), else its ``sku``."""
+    offers = variant.get("offers")
+    offer = offers[0] if isinstance(offers, list) and offers else offers
+    if isinstance(offer, Mapping):
+        offer_url = offer.get("url")
+        if isinstance(offer_url, str):
+            for key, value in parse_qsl(urlparse(offer_url).query, keep_blank_values=True):
+                if key == "variant" and value:
+                    return value
+    sku = variant.get("sku")
+    if isinstance(sku, str) and sku.strip():
+        return sku.strip()
+    if isinstance(sku, int) and not isinstance(sku, bool):
+        return str(sku)
+    return None
 
 
 @with_retry(RetryConfig(max_attempts=3, base_wait=2.0, max_wait=10.0))
@@ -136,8 +218,27 @@ class ShopifyScraper(AbstractScraper):
         # Fallback: fetch HTML and parse embedded Shopify product data
         html = await self._fetch_html(url, client)
         if html:
-            result = self._try_html_extraction(html)
-            if result and result.price is not None:
+            embedded = self._try_embedded_product_json(html)
+            if embedded is not None and embedded.price is not None:
+                embedded.currency = detect_currency("")
+                return embedded
+
+            # A headless (Next.js/Hydrogen) storefront has no legacy embedded Shopify
+            # JSON at all: its JSON-LD carries a ProductGroup/hasVariant instead. Once
+            # a matching ProductGroup is found, it is authoritative for this page — it
+            # always returns a ProductInfo, never None, so neither the whole-document
+            # cents scan nor the generic CSS selectors below can override an
+            # identity-confirmed read with an unrelated price. It must run BEFORE the
+            # cents scan: that scan also matches a numeric JSON-LD ``"price": 129.0``
+            # and would read it as 1.29.
+            group_result = self._try_product_group(html, url)
+            if group_result is not None:
+                return group_result
+
+            result = self._try_cents_price(html)
+            if result is not None:
+                if embedded is not None:
+                    result.name = embedded.name
                 result.currency = detect_currency("")
                 return result
 
@@ -214,13 +315,32 @@ class ShopifyScraper(AbstractScraper):
             logger.debug("Shopify JSON API: status %s", response.status_code)
 
             if response.status_code == 403:
-                # Try curl_cffi fallback
+                # Try curl_cffi fallback before conceding the block: it can bypass
+                # some WAFs the primary client can't. Only when it ALSO fails do we
+                # surface the block — until then this must never become a silent
+                # "no data": block detection precedes parsing (#16).
                 data = await self._fetch_json_via_curl_cffi(json_url)
                 if data is None:
-                    return None
+                    detect_block_event(
+                        status_code=response.status_code, body=response.text, url=json_url
+                    )
+                    return None  # pragma: no cover - detect_block_event always raises here
+            elif response.status_code == 404:
+                # Not a block: a headless (Next.js/Hydrogen) storefront has no static
+                # .json endpoint at all. Fall through to the HTML fallback.
+                return None
             elif response.status_code != 200:
+                # 429 and any other non-200 status (a WAF/CAPTCHA body can also ride
+                # on a 200) must surface as a BlockEvent when it is one, never as a
+                # swallowed None (#16, JSON branch never checked this before).
+                detect_block_event(
+                    status_code=response.status_code, body=response.text, url=json_url
+                )
                 return None
             else:
+                detect_block_event(
+                    status_code=response.status_code, body=response.text, url=json_url
+                )
                 data = response.json()
 
             product = data.get("product", {})
@@ -309,8 +429,112 @@ class ShopifyScraper(AbstractScraper):
             logger.debug("Shopify curl_cffi fallback failed: %s", e)
         return None
 
-    def _try_html_extraction(self, html: str) -> ProductInfo | None:
-        """Extract product data from embedded Shopify JSON in HTML."""
+    @staticmethod
+    def _try_product_group(html: str, url: str) -> ProductInfo | None:
+        """Fallback for a headless storefront: JSON-LD ``ProductGroup``/``hasVariant``.
+
+        A JSON API 404 is not a block on a headless (Next.js/Hydrogen) storefront:
+        the static ``.json`` endpoint simply doesn't exist there, but the
+        server-rendered page carries a ``ProductGroup`` node whose ``url`` echoes
+        the requested product and whose ``hasVariant`` list carries one ``Offer``
+        per SKU.
+
+        Returns ``None`` only when no ``ProductGroup`` matching the requested
+        identity was found at all — letting the caller still try its other HTML
+        heuristics. Once a matching node is found it is authoritative: every other
+        exit returns a ``ProductInfo`` (with or without a price), so a wrong or
+        foreign price can never be picked afterwards.
+        """
+        try:
+            requested = RequestedIdentity.from_url(_without_variant_param(url))
+        except ValueError:
+            return None
+
+        soup = BeautifulSoup(html, "lxml")
+        groups: list[Mapping[str, object]] = []
+        for script in soup.find_all("script", type="application/ld+json"):
+            raw = script.string or script.get_text(strip=True)
+            if not raw:
+                continue
+            try:
+                data = decode_json_strict(raw)
+            except StructureError:
+                continue
+            for node in unwrap_jsonld_graph(data):
+                if "productgroup" not in _schema_type_names(node):
+                    continue
+                if _url_matches_requested(node.get("url"), requested):
+                    groups.append(node)
+
+        if not groups:
+            return None
+
+        # Several nodes owned by the requested product must agree; the first one
+        # does not win (same rule as owned sources in core.anchoring).
+        results = [ShopifyScraper._read_product_group(group, url) for group in groups]
+        first = results[0]
+        if any((r.price, r.currency) != (first.price, first.currency) for r in results[1:]):
+            return ProductInfo(
+                error="Prezzo ambiguo (Shopify): ProductGroup discordanti per lo stesso prodotto"
+            )
+        return first
+
+    @staticmethod
+    def _read_product_group(group: Mapping[str, object], url: str) -> ProductInfo:
+        """Price of one identity-confirmed ``ProductGroup``; never ``None``."""
+        name = group.get("name") if isinstance(group.get("name"), str) else None
+
+        variants_raw = group.get("hasVariant")
+        variants_list = variants_raw if isinstance(variants_raw, list) else [variants_raw]
+        variants = [v for v in variants_list if isinstance(v, Mapping)]
+        if not variants:
+            return ProductInfo(error="Prezzo non trovato (Shopify): ProductGroup senza varianti")
+
+        requested_variant_id = _requested_variant_id(url)
+        if requested_variant_id is not None:
+            matches = [v for v in variants if _variant_offer_id(v) == requested_variant_id]
+            if len(matches) > 1:
+                return ProductInfo(
+                    error=(
+                        "Prezzo ambiguo (Shopify): variante "
+                        f"{requested_variant_id!r} presente più volte"
+                    )
+                )
+            if not matches:
+                return ProductInfo(
+                    error=(
+                        "Prezzo non trovato (Shopify): variante "
+                        f"{requested_variant_id!r} non trovata"
+                    )
+                )
+            selected = select_offer(matches[0].get("offers"))
+            if isinstance(selected, Unreadable):
+                return ProductInfo(
+                    error=(
+                        "Prezzo non trovato (Shopify): prezzo variante illeggibile "
+                        f"({selected.reason})"
+                    )
+                )
+            return ProductInfo(name=name, price=selected.amount, currency=selected.currency)
+
+        readable: list[Money] = []
+        for variant in variants:
+            selected = select_offer(variant.get("offers"))
+            if isinstance(selected, Money):
+                readable.append(selected)
+        if not readable:
+            return ProductInfo(
+                error="Prezzo non trovato (Shopify): nessuna variante con prezzo leggibile"
+            )
+        if len(set(readable)) > 1:
+            return ProductInfo(
+                error=("Prezzo ambiguo (Shopify): varianti a prezzi diversi, nessuna selezionata")
+            )
+        chosen = readable[0]
+        return ProductInfo(name=name, price=chosen.amount, currency=chosen.currency)
+
+    def _try_embedded_product_json(self, html: str) -> ProductInfo | None:
+        """Extract product data from the theme's embedded Shopify product JSON."""
         info = ProductInfo()
 
         patterns = [
@@ -340,8 +564,14 @@ class ShopifyScraper(AbstractScraper):
                                     return info
                 except (json.JSONDecodeError, TypeError, AttributeError):
                     continue
+        # A product JSON whose title was read but no price parsed still hands the
+        # title on to the cents scan, as the single-method version did.
+        return info if info.name is not None else None
 
-        # Also try Shopify-style price in cents (e.g. 2999 = €29.99)
+    @staticmethod
+    def _try_cents_price(html: str) -> ProductInfo | None:
+        """Last-resort Shopify-style price in cents anywhere in the page (2999 = 29.99)."""
+        info = ProductInfo()
         cents_patterns = [
             r'"price"\s*:\s*(\d{3,7})\b',
             r'"price_min"\s*:\s*(\d{3,7})\b',
