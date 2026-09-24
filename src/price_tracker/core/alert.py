@@ -309,7 +309,7 @@ def format_back_in_stock(*, product_name: str, url: str, price: Decimal, currenc
     )
 
 
-# Deprecated: this scheduler compatibility bridge will be removed.
+# Deprecated: scheduled for removal once callers stop using this bridge.
 def format_error_notification(
     *,
     product: dict[str, str],
