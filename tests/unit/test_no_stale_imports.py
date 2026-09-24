@@ -1,6 +1,6 @@
 """Regression: no source file may import from legacy pre-refactor top-level names.
 
-The Phase 1 F1 monolith split moved everything under ``price_tracker.*`` but
+Splitting the bot.py monolith moved everything under ``price_tracker.*`` but
 several call sites retained deferred imports of legacy module names
 (``scrapers``, ``checker``, ``chart``). Those imports raised
 ``ModuleNotFoundError`` at runtime — the bot returned the generic
@@ -27,7 +27,7 @@ from pathlib import Path
 
 SRC_ROOT = Path(__file__).resolve().parents[2] / "src" / "price_tracker"
 
-# Bare module names that used to live at top-level in the pre-Phase 1 layout.
+# Bare module names that used to live at top-level before the module split.
 # Every one of them has a price_tracker.* equivalent today; nothing in src/
 # may import them again.
 LEGACY_MODULES = (
@@ -58,6 +58,6 @@ def test_no_top_level_legacy_import_in_src() -> None:
             if _STALE_RE.match(line):
                 offenders.append(f"{py.relative_to(SRC_ROOT)}:{line_no}: {line.strip()}")
     assert not offenders, (
-        "Stale top-level legacy module import (Phase 1 F1 regression). Use the "
+        "Stale top-level legacy module import. Use the "
         "price_tracker.* equivalent instead. Offending lines:\n  " + "\n  ".join(offenders)
     )

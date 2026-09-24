@@ -1,7 +1,7 @@
 """Main-menu callback handlers (non-admin).
 
 Split out of `handlers/callbacks/__init__.py` to keep the dispatcher under
-the 500-LOC budget [item 17].
+a 500-line budget.
 """
 
 from __future__ import annotations

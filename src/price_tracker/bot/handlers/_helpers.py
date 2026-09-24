@@ -1,6 +1,6 @@
 """Private helpers shared by handler modules.
 
-Ported verbatim from monolithic bot.py [item 17].
+Split out of the original monolithic bot.py module, verbatim.
 """
 
 from __future__ import annotations

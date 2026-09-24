@@ -1,6 +1,6 @@
 """Reusable inline-keyboard builders for the bot UI.
 
-Ported from monolithic bot.py [item 17].
+Split out of the original monolithic bot.py module.
 """
 
 from __future__ import annotations

@@ -44,19 +44,19 @@ async def post_init(application: Application[Any, Any, Any, Any, Any, Any]) -> N
     await apply_migrations(db_conn, MIGRATIONS_DIR)
     repo = Repository(db_conn)
     application.bot_data["repo"] = repo
-    # Alias used by Phase 2 F3.D notification handlers.
+    # Alias used by the notification handlers.
     application.bot_data["repository"] = repo
     # Alias used by ``bot.decorators._db`` and direct
     # ``context.bot_data["db"]`` lookups across handler modules
     # (product_io, history, product_list, monitoring, debug, callbacks/*).
-    # Pre-refactor monolith stored the repository under ``"db"``; the
-    # Phase 1 F1 split renamed the post_init key to ``"repo"`` but left the
+    # Pre-refactor monolith stored the repository under ``"db"``; splitting
+    # bot.py renamed the post_init key to ``"repo"`` but left the
     # handler-side lookups untouched, so this alias keeps them wired.
     application.bot_data["db"] = repo
     # Alias used by ``bot.decorators._scraper`` and direct
     # ``context.bot_data["scraper"]`` lookups (product, product_io,
-    # monitoring, debug, callbacks/_menu, callbacks/_product). Same Phase 1
-    # F1 naming drift: bootstrap stores the registry under ``"registry"``,
+    # monitoring, debug, callbacks/_menu, callbacks/_product). Same
+    # naming drift: bootstrap stores the registry under ``"registry"``,
     # handlers expect ``"scraper"``.
     application.bot_data["scraper"] = application.bot_data["registry"]
 

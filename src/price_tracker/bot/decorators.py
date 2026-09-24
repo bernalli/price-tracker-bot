@@ -1,10 +1,10 @@
 """Auth decorators and shared `bot_data` accessors.
 
-Ported from monolithic bot.py [item 17].
+Split out of the original monolithic bot.py module.
 
 `_db`, `_config`, `_scraper`, `_client` resolve runtime dependencies stashed
 into `application.bot_data` at startup; the bootstrap glue lives outside this
-module (Phase 3 — item 19) so handlers stay framework-agnostic.
+module so handlers stay framework-agnostic.
 """
 
 from __future__ import annotations
@@ -131,7 +131,7 @@ def _client(ctx: ContextTypes.DEFAULT_TYPE) -> httpx.AsyncClient:
     return ctx.bot_data["http_client"]
 
 
-# ── Currency conversion helpers (kept here per item 17 mapping) ──
+# ── Currency conversion helpers ──
 
 _FALLBACK_RATES: dict[str, Decimal] = {
     "CHF": Decimal("0.94"),

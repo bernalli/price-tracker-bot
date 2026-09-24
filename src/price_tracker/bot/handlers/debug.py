@@ -1,6 +1,6 @@
 """Debug & status handlers: /debug, /stato.
 
-Ported from monolithic bot.py [item 17]. The verbose scraper-debug command
+Split out of the original monolithic bot.py module. The verbose scraper-debug command
 exercises every detection path used by the registry; URL/text intake handlers
 live in `handlers/product.py` (paste-link UX).
 """

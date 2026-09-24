@@ -92,7 +92,7 @@ python_version = "3.12"
 files = ["src/price_tracker", "tests"]
 plugins = []
 
-# Test code relaxations (F7 item 35).
+# Test code relaxations.
 # Pragmatic deviation from plan's 4-batch -> None annotation sweep: with 222
 # `no-untyped-def` candidates across 53 test files, mechanical annotations
 # add maintenance noise without catching real bugs. Real type errors are
@@ -105,11 +105,11 @@ disallow_any_decorated = false
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
 
-# Legacy modules carried over from pre-refactor codebase (Tasks 11, 17).
-# These pre-date F1.5 strict typing and contain widespread null-unchecked PTB
+# Legacy modules carried over from the pre-refactor codebase.
+# These pre-date strict typing and contain widespread null-unchecked PTB
 # Update/Message/User patterns plus BeautifulSoup attribute typing issues.
-# Tracked as technical debt for F2; intentionally relaxed here so F1.5 CI gate
-# enforces strict typing on new foundation code (core/, db/, notifier/, main).
+# Tracked as technical debt; intentionally relaxed here so the CI gate
+# enforces strict typing on the newer foundation code (core/, db/, notifier/, main).
 [[tool.mypy.overrides]]
 module = [
     "price_tracker.bot.*",
@@ -140,14 +140,14 @@ markers = [
     "slow: slow tests (>1s)",
 ]
 
-# Coverage gate (item 26 / F1.5 foundation):
-# - Global threshold ≥75% on F1.5-foundation modules (core/, db/, notifier/__init__,
+# Coverage gate:
+# - Global threshold ≥75% on the foundation modules (core/, db/, notifier/__init__,
 #   config, package init).
 # - Legacy modules carried over from pre-refactor code (bot/*, scrapers carrying mypy
-#   strict-override) are omitted. They are tracked as F2 technical debt and will be
+#   strict-override) are omitted. They are tracked as technical debt and will be
 #   gated separately when their suites land. Same scope alignment as `[tool.mypy.overrides]`.
 # - main.py (entry point) and notifier/telegram.py (real Telegram I/O) are omitted —
-#   covered by Phase 2 / Phase 3 E2E tests.
+#   covered by unit and integration tests directly, just not gated on percentage here.
 [tool.coverage.run]
 source = ["src/price_tracker"]
 omit = [

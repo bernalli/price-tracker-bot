@@ -8,15 +8,15 @@
 #     (intentionally excludes ambiguous bigrams like "non" / "più" which
 #     appear in legitimate English compounds e.g. "non-EUR", "non-None")
 #
-# Coverage scope (Phase 3 F5/F7):
+# Coverage scope:
 #   - bot/decorators.py + bot/handlers/{auth,monitoring,_helpers}.py and
-#     descendants under callbacks/ that were swept in F5.
+#     the descendants under callbacks/ that have already been swept.
 #
-# Out of scope (carry-over IT strings, scheduled for post-v0.1.0 sweep):
+# Out of scope (carry-over IT strings, scheduled for a later sweep):
 #   - bot/handlers/{product,product_io,history,settings,text_input,debug}.py
 #     and callbacks/{_actions,_admin,_menu,_product}.py — legacy handler
 #     bodies; UX-visible strings already wrapped in `_()` but msgid texts
-#     remain Italian as of F5 (covered by it_IT catalog passthrough).
+#     remain Italian (covered by it_IT catalog passthrough).
 #   - scrapers/** — domain-specific IT/EN dual-language parsing logic
 #     (CSS selectors like .prezzo-attuale, error messages emitted to
 #     bot layer for translation upstream).

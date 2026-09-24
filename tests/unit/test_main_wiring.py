@@ -48,8 +48,8 @@ async def test_post_init_wires_health_manager_into_bot_data(
 ) -> None:
     """``_combined_post_init`` must populate ``bot_data["health_manager"]``.
 
-    Regression guard for the item 9 reviewer note: prior code left the key
-    unset, so ``/health`` would crash with KeyError in production.
+    Regression guard: prior code left the key unset, so ``/health`` would
+    crash with KeyError in production.
     """
     import aiosqlite
 
