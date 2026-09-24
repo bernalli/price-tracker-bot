@@ -16,6 +16,8 @@ from price_tracker.scrapers.shopify import ShopifyScraper
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from price_tracker.core.scraper_base import ProductInfo
+
 
 # ── can_handle ────────────────────────────────────────────────────
 
@@ -346,7 +348,13 @@ def test_shopify_is_product_path_helper() -> None:
     assert not _is_product_path("https://x.test/collections/men?page=4")
 
 
-# ── Defect 1: JSON branch must surface blocks, not swallow them ───
+# ── JSON endpoint: blocks surface as BlockEvent, never as no data ──
+
+
+# A product page whose price the HTML fallback WOULD read: a JSON block that is
+# swallowed instead of raised then yields this price and the test fails on the
+# missing BlockEvent, not on an unmocked route.
+_PRICED_HTML = '<html><body><span class="product__price">$12.00</span></body></html>'
 
 
 @pytest.mark.asyncio
@@ -363,6 +371,7 @@ async def test_shopify_json_403_raises_block_event_when_curl_cffi_unavailable() 
 
     with respx.mock(assert_all_called=False) as router:
         router.get(json_url).respond(403, text="forbidden")
+        router.get(url).respond(200, text=_PRICED_HTML)
         async with httpx.AsyncClient() as client:
             with pytest.raises(BlockEvent):
                 await scraper.scrape(url, client)
@@ -378,6 +387,7 @@ async def test_shopify_json_429_raises_block_event() -> None:
 
     with respx.mock(assert_all_called=False) as router:
         router.get(json_url).respond(429, text="too many requests")
+        router.get(url).respond(200, text=_PRICED_HTML)
         async with httpx.AsyncClient() as client:
             with pytest.raises(BlockEvent):
                 await scraper.scrape(url, client)
@@ -393,6 +403,7 @@ async def test_shopify_json_200_waf_body_raises_block_event() -> None:
 
     with respx.mock(assert_all_called=False) as router:
         router.get(json_url).respond(200, text=challenge_body)
+        router.get(url).respond(200, text=_PRICED_HTML)
         async with httpx.AsyncClient() as client:
             with pytest.raises(BlockEvent):
                 await scraper.scrape(url, client)
@@ -416,7 +427,7 @@ async def test_shopify_json_404_is_not_a_block() -> None:
     assert info.error is not None
 
 
-# ── Defect 2: headless storefront, JSON-LD ProductGroup fallback ──
+# ── headless storefront: JSON-LD ProductGroup fallback ────────────
 
 
 def _product_group_html(
@@ -703,3 +714,139 @@ async def test_shopify_headless_currency_absent_stays_none() -> None:
 
     assert info.price == Decimal("19.99")
     assert info.currency is None
+
+
+async def _scrape_headless(url: str, html: str) -> ProductInfo:
+    scraper = ShopifyScraper()
+    json_url = url.split("?")[0] + ".json"
+    with respx.mock(assert_all_called=False) as router:
+        router.get(json_url).respond(404)
+        router.get(url).respond(200, text=html)
+        async with httpx.AsyncClient() as client:
+            return await scraper.scrape(url, client)
+
+
+@pytest.mark.asyncio
+async def test_shopify_headless_numeric_price_is_not_read_as_cents() -> None:
+    """schema.org allows a Number price; the page-wide cents scan must not see it first."""
+    variants = """[
+        {"@type": "Product", "sku": "WIDGET",
+         "offers": {"@type": "Offer", "price": 129.00, "priceCurrency": "USD",
+                    "url": "https://shop.example.com/products/widget?variant=111"}}
+    ]"""
+    info = await _scrape_headless(
+        "https://shop.example.com/products/widget", _product_group_html(variants=variants)
+    )
+    assert info.price == Decimal("129.00")
+    assert info.currency == "USD"
+
+
+@pytest.mark.asyncio
+async def test_shopify_headless_numeric_prices_still_ambiguous() -> None:
+    variants = """[
+        {"@type": "Product", "sku": "WIDGET",
+         "offers": {"@type": "Offer", "price": 129.00, "priceCurrency": "USD",
+                    "url": "https://shop.example.com/products/widget?variant=111"}},
+        {"@type": "Product", "sku": "WIDGET-CASE",
+         "offers": {"@type": "Offer", "price": 49.00, "priceCurrency": "USD",
+                    "url": "https://shop.example.com/products/widget?variant=222"}}
+    ]"""
+    info = await _scrape_headless(
+        "https://shop.example.com/products/widget", _product_group_html(variants=variants)
+    )
+    assert info.price is None
+    assert info.error is not None
+
+
+@pytest.mark.asyncio
+async def test_shopify_headless_group_is_authoritative_over_css() -> None:
+    """An ambiguous identity-confirmed group must not fall through to a generic selector."""
+    variants = """[
+        {"@type": "Product", "sku": "WIDGET",
+         "offers": {"@type": "Offer", "price": "19.99", "priceCurrency": "USD",
+                    "url": "https://shop.example.com/products/widget?variant=111"}},
+        {"@type": "Product", "sku": "WIDGET-CASE",
+         "offers": {"@type": "Offer", "price": "9.99", "priceCurrency": "USD",
+                    "url": "https://shop.example.com/products/widget?variant=222"}}
+    ]"""
+    html = _product_group_html(variants=variants).replace(
+        '<div id="root"></div>', '<span class="product__price">$7.77</span>'
+    )
+    info = await _scrape_headless("https://shop.example.com/products/widget", html)
+    assert info.price is None
+    assert info.error is not None
+
+
+@pytest.mark.asyncio
+async def test_shopify_headless_two_matching_groups_disagree_no_price() -> None:
+    one = """[{"@type": "Product", "sku": "W", "offers": {"@type": "Offer", "price": "19.99",
+              "priceCurrency": "USD"}}]"""
+    two = """[{"@type": "Product", "sku": "W", "offers": {"@type": "Offer", "price": "9.99",
+              "priceCurrency": "USD"}}]"""
+    html = _product_group_html(variants=one) + _product_group_html(variants=two)
+    info = await _scrape_headless("https://shop.example.com/products/widget", html)
+    assert info.price is None
+    assert info.error is not None
+
+
+@pytest.mark.asyncio
+async def test_shopify_headless_two_matching_groups_agree() -> None:
+    one = """[{"@type": "Product", "sku": "W", "offers": {"@type": "Offer", "price": "19.99",
+              "priceCurrency": "USD"}}]"""
+    html = _product_group_html(variants=one) + _product_group_html(variants=one)
+    info = await _scrape_headless("https://shop.example.com/products/widget", html)
+    assert info.price == Decimal("19.99")
+
+
+@pytest.mark.asyncio
+async def test_shopify_headless_url_list_with_foreign_entry_is_not_a_match() -> None:
+    html = """
+    <html><head><script type="application/ld+json">
+    {"@type": "ProductGroup", "name": "Widget",
+     "url": ["https://shop.example.com/products/widget",
+             "https://shop.example.com/products/other"],
+     "hasVariant": [{"@type": "Product", "sku": "W",
+                     "offers": {"@type": "Offer", "price": "5.00", "priceCurrency": "USD"}}]}
+    </script></head><body></body></html>
+    """
+    info = await _scrape_headless("https://shop.example.com/products/widget", html)
+    assert info.price is None
+
+
+@pytest.mark.asyncio
+async def test_shopify_headless_duplicate_variant_id_is_ambiguous() -> None:
+    variants = """[
+        {"@type": "Product", "sku": "A",
+         "offers": {"@type": "Offer", "price": "19.99", "priceCurrency": "USD",
+                    "url": "https://shop.example.com/products/widget?variant=222"}},
+        {"@type": "Product", "sku": "B",
+         "offers": {"@type": "Offer", "price": "9.99", "priceCurrency": "USD",
+                    "url": "https://shop.example.com/products/widget?variant=222"}}
+    ]"""
+    info = await _scrape_headless(
+        "https://shop.example.com/products/widget?variant=222",
+        _product_group_html(variants=variants),
+    )
+    assert info.price is None
+    assert info.error is not None
+    assert "ambiguo" in info.error
+
+
+@pytest.mark.asyncio
+async def test_shopify_headless_other_query_params_keep_identity() -> None:
+    """Removing ?variant= must not re-encode the other query pairs differently."""
+    variants = """[
+        {"@type": "Product", "sku": "A",
+         "offers": {"@type": "Offer", "price": "19.99", "priceCurrency": "USD",
+                    "url": "https://shop.example.com/products/widget?variant=111"}},
+        {"@type": "Product", "sku": "B",
+         "offers": {"@type": "Offer", "price": "9.99", "priceCurrency": "USD",
+                    "url": "https://shop.example.com/products/widget?variant=222"}}
+    ]"""
+    html = _product_group_html(
+        group_url="https://shop.example.com/products/widget?ref=a%20b", variants=variants
+    )
+    info = await _scrape_headless(
+        "https://shop.example.com/products/widget?ref=a%20b&variant=222", html
+    )
+    assert info.price == Decimal("9.99")

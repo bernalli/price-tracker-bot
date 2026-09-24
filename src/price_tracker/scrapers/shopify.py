@@ -11,7 +11,7 @@ import re
 from collections.abc import Mapping
 from decimal import Decimal
 from typing import ClassVar
-from urllib.parse import parse_qsl, urlparse
+from urllib.parse import parse_qsl, urlencode, urlparse
 
 import httpx
 from bs4 import BeautifulSoup
@@ -116,8 +116,7 @@ def _without_variant_param(url: str) -> str:
     """
     parsed = urlparse(url)
     kept = [(k, v) for k, v in parse_qsl(parsed.query, keep_blank_values=True) if k != "variant"]
-    query = "&".join(f"{k}={v}" for k, v in kept)
-    return parsed._replace(query=query).geturl()
+    return parsed._replace(query=urlencode(kept)).geturl()
 
 
 def _variant_offer_id(variant: Mapping[str, object]) -> str | None:
@@ -219,7 +218,7 @@ class ShopifyScraper(AbstractScraper):
         # Fallback: fetch HTML and parse embedded Shopify product data
         html = await self._fetch_html(url, client)
         if html:
-            result = self._try_html_extraction(html)
+            result = self._try_embedded_product_json(html)
             if result and result.price is not None:
                 result.currency = detect_currency("")
                 return result
@@ -227,12 +226,19 @@ class ShopifyScraper(AbstractScraper):
             # A headless (Next.js/Hydrogen) storefront has no legacy embedded Shopify
             # JSON at all: its JSON-LD carries a ProductGroup/hasVariant instead. Once
             # a matching ProductGroup is found, it is authoritative for this page — it
-            # always returns a ProductInfo, never None, so the generic CSS-selector
-            # fallback below can never override an identity-confirmed read with an
-            # unrelated price.
+            # always returns a ProductInfo, never None, so neither the whole-document
+            # cents scan nor the generic CSS selectors below can override an
+            # identity-confirmed read with an unrelated price. It must run BEFORE the
+            # cents scan: that scan also matches a numeric JSON-LD ``"price": 129.0``
+            # and would read it as 1.29.
             group_result = self._try_product_group(html, url)
             if group_result is not None:
                 return group_result
+
+            result = self._try_cents_price(html)
+            if result is not None:
+                result.currency = detect_currency("")
+                return result
 
             soup = BeautifulSoup(html, "lxml")
             css_result = self._try_shopify_selectors(soup)
@@ -310,7 +316,7 @@ class ShopifyScraper(AbstractScraper):
                 # Try curl_cffi fallback before conceding the block: it can bypass
                 # some WAFs the primary client can't. Only when it ALSO fails do we
                 # surface the block — until then this must never become a silent
-                # "no data" (invariant 1: block detection precedes parsing/#16).
+                # "no data": block detection precedes parsing (#16).
                 data = await self._fetch_json_via_curl_cffi(json_url)
                 if data is None:
                     detect_block_event(
@@ -443,7 +449,7 @@ class ShopifyScraper(AbstractScraper):
             return None
 
         soup = BeautifulSoup(html, "lxml")
-        group: Mapping[str, object] | None = None
+        groups: list[Mapping[str, object]] = []
         for script in soup.find_all("script", type="application/ld+json"):
             raw = script.string or script.get_text(strip=True)
             if not raw:
@@ -456,14 +462,24 @@ class ShopifyScraper(AbstractScraper):
                 if "productgroup" not in _schema_type_names(node):
                     continue
                 if _url_matches_requested(node.get("url"), requested):
-                    group = node
-                    break
-            if group is not None:
-                break
+                    groups.append(node)
 
-        if group is None:
+        if not groups:
             return None
 
+        # Several nodes owned by the requested product must agree; the first one
+        # does not win (same rule as owned sources in core.anchoring).
+        results = [ShopifyScraper._read_product_group(group, url) for group in groups]
+        first = results[0]
+        if any((r.price, r.currency) != (first.price, first.currency) for r in results[1:]):
+            return ProductInfo(
+                error="Prezzo ambiguo (Shopify): ProductGroup discordanti per lo stesso prodotto"
+            )
+        return first
+
+    @staticmethod
+    def _read_product_group(group: Mapping[str, object], url: str) -> ProductInfo:
+        """Price of one identity-confirmed ``ProductGroup``; never ``None``."""
         name = group.get("name") if isinstance(group.get("name"), str) else None
 
         variants_raw = group.get("hasVariant")
@@ -475,7 +491,14 @@ class ShopifyScraper(AbstractScraper):
         requested_variant_id = _requested_variant_id(url)
         if requested_variant_id is not None:
             matches = [v for v in variants if _variant_offer_id(v) == requested_variant_id]
-            if len(matches) != 1:
+            if len(matches) > 1:
+                return ProductInfo(
+                    error=(
+                        "Prezzo ambiguo (Shopify): variante "
+                        f"{requested_variant_id!r} presente più volte"
+                    )
+                )
+            if not matches:
                 return ProductInfo(
                     error=(
                         "Prezzo non trovato (Shopify): variante "
@@ -508,8 +531,8 @@ class ShopifyScraper(AbstractScraper):
         chosen = readable[0]
         return ProductInfo(name=name, price=chosen.amount, currency=chosen.currency)
 
-    def _try_html_extraction(self, html: str) -> ProductInfo | None:
-        """Extract product data from embedded Shopify JSON in HTML."""
+    def _try_embedded_product_json(self, html: str) -> ProductInfo | None:
+        """Extract product data from the theme's embedded Shopify product JSON."""
         info = ProductInfo()
 
         patterns = [
@@ -539,8 +562,12 @@ class ShopifyScraper(AbstractScraper):
                                     return info
                 except (json.JSONDecodeError, TypeError, AttributeError):
                     continue
+        return None
 
-        # Also try Shopify-style price in cents (e.g. 2999 = €29.99)
+    @staticmethod
+    def _try_cents_price(html: str) -> ProductInfo | None:
+        """Last-resort Shopify-style price in cents anywhere in the page (2999 = 29.99)."""
+        info = ProductInfo()
         cents_patterns = [
             r'"price"\s*:\s*(\d{3,7})\b',
             r'"price_min"\s*:\s*(\d{3,7})\b',
