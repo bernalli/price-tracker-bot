@@ -415,7 +415,7 @@ def test_one_node_described_with_two_identities_is_contradictory() -> None:
 
 
 def test_page_meta_vetoed_by_disagreeing_unknown_node() -> None:
-    """A1: a readable unidentified node rejects a disagreeing page-level price."""
+    """A readable unidentified node rejects a disagreeing page-level price."""
     page = obs(Ownership.PAGE, "19.99", ref="meta:og", source="og")
     unknown = obs(Ownership.UNKNOWN, "24.99", ref="jsonld:0")
     result = resolve_anchor((page, unknown))
@@ -427,7 +427,7 @@ def test_page_meta_vetoed_by_disagreeing_unknown_node() -> None:
 
 
 def test_page_meta_agreeing_with_unknown_node_is_found() -> None:
-    """A2: an unidentified node that agrees does not join the deciding set."""
+    """An unidentified node that agrees does not join the deciding set."""
     page = obs(Ownership.PAGE, "19.99", ref="meta:og", source="og")
     unknown = obs(Ownership.UNKNOWN, "19.99", ref="jsonld:0")
     result = resolve_anchor((page, unknown))
@@ -437,7 +437,7 @@ def test_page_meta_agreeing_with_unknown_node_is_found() -> None:
 
 
 def test_unreadable_unknown_node_never_vetoes() -> None:
-    """A3: an unidentified node with no readable price cannot veto anything."""
+    """An unidentified node with no readable price cannot veto anything."""
     page = obs(Ownership.PAGE, "19.99", ref="meta:og", source="og")
     unreadable = obs(Ownership.UNKNOWN, None, ref="jsonld:0")
     result = resolve_anchor((page, unreadable))
@@ -446,7 +446,7 @@ def test_unreadable_unknown_node_never_vetoes() -> None:
 
 
 def test_page_meta_vetoed_by_disagreeing_unknown_currency() -> None:
-    """A4: a currency disagreement vetoes even when the amount matches."""
+    """A currency disagreement vetoes even when the amount matches."""
     page = obs(Ownership.PAGE, "19.99", ref="meta:og", source="og")
     unknown = obs(Ownership.UNKNOWN, "19.99", ref="jsonld:0", currency="USD")
     result = resolve_anchor((page, unknown))
@@ -458,7 +458,7 @@ def test_page_meta_vetoed_by_disagreeing_unknown_currency() -> None:
 
 
 def test_page_meta_with_no_currency_vetoed_by_unknown_never_gains_one() -> None:
-    """A5: an unidentified node never lends its currency to the attributed price."""
+    """An unidentified node never lends its currency to the attributed price."""
     page = obs(Ownership.PAGE, "19.99", ref="meta:og", source="og", currency=None)
     unknown = obs(Ownership.UNKNOWN, "19.99", ref="jsonld:0")
     result = resolve_anchor((page, unknown))
@@ -467,7 +467,7 @@ def test_page_meta_with_no_currency_vetoed_by_unknown_never_gains_one() -> None:
 
 
 def test_page_meta_vetoed_by_either_of_two_disagreeing_unknown_nodes() -> None:
-    """A6: two unidentified nodes with different node keys, one disagreeing, vetoes."""
+    """Two unidentified nodes with different node keys, one disagreeing, vetoes."""
     page = obs(Ownership.PAGE, "19.99", ref="meta:og", source="og")
     a = obs(Ownership.UNKNOWN, "19.99", ref="jsonld:0", key="sku:A")
     b = obs(Ownership.UNKNOWN, "24.99", ref="jsonld:1", key="sku:B")
@@ -480,7 +480,7 @@ def test_page_meta_vetoed_by_either_of_two_disagreeing_unknown_nodes() -> None:
 
 
 def test_trusted_container_vetoed_by_disagreeing_unknown_node() -> None:
-    """A7: the veto applies identically when the attributed source is TRUSTED."""
+    """The veto applies identically when the attributed source is TRUSTED."""
     trusted = obs(Ownership.TRUSTED, "19.99", ref="container:#buybox", source="container")
     unknown = obs(Ownership.UNKNOWN, "24.99", ref="jsonld:0")
     result = resolve_anchor((trusted, unknown))
@@ -492,7 +492,7 @@ def test_trusted_container_vetoed_by_disagreeing_unknown_node() -> None:
 
 
 def test_requested_node_ignores_disagreeing_unknown_node() -> None:
-    """A8: rule 1 (owned) never looks at unknown nodes."""
+    """Rule 1 (owned) never looks at unknown nodes."""
     requested = obs(Ownership.REQUESTED, "19.99", ref="n0", key="id:" + REQUESTED_URL)
     unknown = obs(Ownership.UNKNOWN, "24.99", ref="jsonld:0")
     result = resolve_anchor((requested, unknown))
@@ -525,7 +525,7 @@ def test_integration_unidentified_product_node_vetoes_page_meta() -> None:
 
 
 def test_unknown_veto_is_permutation_and_duplication_invariant() -> None:
-    """A9: the veto outcome does not depend on order or duplication."""
+    """The veto outcome does not depend on order or duplication."""
     page = obs(Ownership.PAGE, "19.99", ref="meta:og", source="og")
     unknown = obs(Ownership.UNKNOWN, "24.99", ref="jsonld:0")
     baseline = resolve_anchor((page, unknown))

@@ -114,7 +114,7 @@ async def _run(repo: Repository, scraper: AbstractScraper, notifier: AsyncMock, 
 async def test_single_transient_drop_does_not_alert(
     repo_with_history: tuple[Repository, int],
 ) -> None:
-    """The exact production timeline: steady, one glitch, steady again.
+    """A real-world timeline: steady, one glitch, steady again.
 
     A lone 187.95 sample between two 386.25 samples must not notify the user
     and must not be persisted as the product's current price.

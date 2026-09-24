@@ -601,7 +601,7 @@ def _message_handlers(h: Harness) -> list[BaseHandler[Any, Any, Any]]:
 async def test_channel_posts_reach_no_handler(
     h: Harness, kind: str, with_from: bool, text: str
 ) -> None:
-    """E16 / constraint F1: rejected by check_update of every message-shaped handler."""
+    """E16: channel posts are rejected by check_update of every message-shaped handler."""
     await _open_value(h, CHANNEL, USER, 1, "th")
     calls_before = len(h.request.calls)
     services_before = len(h.services.calls)

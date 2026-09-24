@@ -1,4 +1,4 @@
-"""Digest queue + flush logic for batched notifications (Feature D).
+"""Digest queue + flush logic for batched notifications.
 
 Three flush triggers:
   1. Interval — every digest_interval_minutes per user with pending entries

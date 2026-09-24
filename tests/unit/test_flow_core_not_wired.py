@@ -33,7 +33,7 @@ def _build_app_with_handlers() -> Application[Any, Any, Any, Any, Any, Any]:
 
 
 def test_register_handlers_does_not_wire_the_guided_flow_coordinator() -> None:
-    """T-B1: register_handlers() registers none of the new coordinator's handlers."""
+    """register_handlers() registers none of the new coordinator's handlers."""
     app = _build_app_with_handlers()
     counts_by_group = {group: len(handlers) for group, handlers in app.handlers.items()}
 
@@ -51,7 +51,7 @@ def test_register_handlers_does_not_wire_the_guided_flow_coordinator() -> None:
 
 
 def test_bot_handlers_and_main_do_not_import_the_coordinator() -> None:
-    """T-B2: neither entry point pulls in the coordinator's modules."""
+    """Neither entry point pulls in the coordinator's modules."""
     probe = (
         "import sys\n"
         "import price_tracker.bot.handlers\n"
@@ -112,7 +112,7 @@ def _imported_names(path: Path) -> set[str]:
 
 
 def test_only_flows_imports_app_inputs_or_bot_callbacks() -> None:
-    """T-B3: static scan — app.inputs/bot.callbacks have exactly one importer."""
+    """Static scan — app.inputs/bot.callbacks have exactly one importer."""
     importers_of_app_inputs = []
     importers_of_bot_callbacks = []
     importers_of_bot_flows = []
@@ -142,7 +142,7 @@ def test_only_flows_imports_app_inputs_or_bot_callbacks() -> None:
 
 
 def test_app_inputs_never_imports_telegram_or_bot() -> None:
-    """T-B4: app.inputs stays below the layer boundary (C7.2)."""
+    """app.inputs stays below the layer boundary."""
     probe = (
         "import sys\n"
         "import price_tracker.app.inputs\n"

@@ -66,9 +66,5 @@ jobs:
           scan-args: |-
             --lockfile=./uv.lock
 
-  # NOTE: actions/dependency-review-action was removed — it requires the
-  # GitHub Advanced Security Dependency Review API, which this repository
-  # does not have, so it always failed with "Resource not accessible by
-  # integration" on PRs.
-  # Dependency CVE scanning is already covered by the osv-scanner job above
+  # Dependency CVE scanning is covered by the osv-scanner job above
   # (scans uv.lock).
