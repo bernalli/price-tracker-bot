@@ -80,7 +80,7 @@ _ALL_SEPARATORS: Final = _DUAL_SEPARATORS | _DECIMAL_ONLY | _GROUPING_ONLY
 
 _NO_CENTS_MARKERS: Final = (",-", ".-", ",\u2013", ",\u2014", ".\u2013")
 
-# Currency symbols the grammar strips (prototype subset; the generated table of the
+# Currency symbols the grammar strips (a curated subset; the generated table of the
 # currency engine replaces it). A symbol maps to every currency that writes it; the
 # grammar uses the set only to decide the precision, never to name the currency.
 SYMBOLS: Final[Mapping[str, frozenset[str]]] = {
