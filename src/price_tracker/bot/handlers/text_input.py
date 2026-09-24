@@ -10,7 +10,7 @@ from __future__ import annotations
 import contextlib
 import logging
 from decimal import Decimal, InvalidOperation
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from telegram.constants import ParseMode
 from telegram.ext import (
@@ -80,11 +80,21 @@ async def handle_text_input(  # noqa: PLR0915 — verbatim port; not yet split i
         return
 
     db = _db(context)
-    product = await _get_user_product(context, product_id, user_id)
-    if not product:
-        await update.message.reply_text(_("❌ Prodotto non trovato."))
-        return
-    name = (product.get("name") or "Sconosciuto")[:60]
+
+    # Only the product-bound actions (target/threshold/refresh) need a real
+    # product behind `product_id`. The admin_* actions repurpose the same
+    # tuple slot for an unrelated value (a placeholder, or a target user id
+    # for admin_nick) — running the product lookup unconditionally for them
+    # rejected every admin reply with "Prodotto non trovato" before it ever
+    # reached its branch, since that placeholder never matches a real row.
+    product: dict[str, Any] | None = None
+    name = ""
+    if action_type in ("target", "threshold", "refresh"):
+        product = await _get_user_product(context, product_id, user_id)
+        if not product:
+            await update.message.reply_text(_("❌ Prodotto non trovato."))
+            return
+        name = (product.get("name") or "Sconosciuto")[:60]
 
     if action_type == "target":
         try:
@@ -148,11 +158,14 @@ async def handle_text_input(  # noqa: PLR0915 — verbatim port; not yet split i
                 )
 
     elif action_type == "admin_nick":
+        # The pending-action tuple reuses its second slot for the target
+        # user's id here, not a product id.
+        target_user_id = product_id
         nickname = text.strip()
         if not nickname:
             await update.message.reply_text(_("❌ Nickname vuoto."))
             return
-        await db.update_user_info(product_id, display_name=nickname)
+        await db.update_user_info(target_user_id, display_name=nickname)
         await update.message.reply_text(
             f"✅ Nickname aggiornato: <b>{_escape_html(nickname)}</b>",
             parse_mode=ParseMode.HTML,

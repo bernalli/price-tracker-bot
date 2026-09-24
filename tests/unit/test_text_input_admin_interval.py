@@ -35,7 +35,13 @@ async def test_admin_interval_over_seven_days_is_rejected() -> None:
     db = AsyncMock()
     db.is_user_allowed = AsyncMock(return_value=True)
     db.is_user_admin = AsyncMock(return_value=True)
-    db.get_product = AsyncMock(return_value={"name": "x"})
+    # admin_interval's pending_action carries a placeholder product_id=0,
+    # which never matches a real row (see get_product's real behaviour:
+    # SQLite AUTOINCREMENT ids start at 1). get_product must return None
+    # here, not a stub product — a mock that hands back a product for any
+    # id would hide a regression of the product-lookup fix instead of
+    # catching it.
+    db.get_product = AsyncMock(return_value=None)
     job_queue = MagicMock()
     job_queue.get_jobs_by_name.return_value = []
     update = MagicMock()
@@ -50,6 +56,10 @@ async def test_admin_interval_over_seven_days_is_rejected() -> None:
 
     await handle_text_input(update, context)
 
+    # admin_interval must not depend on a product lookup at all: it should
+    # reject "9999999" on its own 7-day cap, not because get_product(0)
+    # returned nothing.
+    db.get_product.assert_not_awaited()
     db.set_config.assert_not_awaited()
     job_queue.run_repeating.assert_not_called()
     msg = update.message.reply_text.await_args.args[0]
