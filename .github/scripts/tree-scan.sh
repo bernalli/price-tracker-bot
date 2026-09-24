@@ -23,9 +23,8 @@
 #
 # Stages:
 #   PATH   — tracked paths matching LEAK_PATH_TERMS: the path itself is the
-#            finding (directories/files that must not exist in a public
-#            repo at all — internal tooling directories, internal
-#            roadmap/journal files, and the like). Files hit by PATH are
+#            finding (directories/files that must never be committed to a
+#            public repo at all, whatever they are called). Files hit by PATH are
 #            excluded from the four content stages below, so a hit is
 #            reported once, under PATH. LEAK_PATH_TERMS is secret exactly
 #            like the other four: it names specific internal paths, not a
@@ -76,7 +75,7 @@
 #       could not be measured (exit code neither 0 nor 1). Never 0, never 1.
 #
 # Pattern MATCHING happens only through grep -E (via `git grep -E`), never
-# through awk's regex engine: awk here (mawk, in this environment) does NOT
+# through awk's regex engine: mawk does NOT
 # implement \b as a GNU-grep word boundary — measured: `printf
 # 'foo@example.com\n' | awk '/\bexample\b/'` does not match what `grep -E`
 # matches on the same input, and a PII term anchored on \b depends on that
@@ -84,15 +83,14 @@
 # `git grep -z` records and for exact-string set lookups (never a `~`/regex
 # test). No `git grep -z` output is ever passed through bash command
 # substitution ($(...)): bash silently drops embedded NUL bytes there
-# ("ignored null byte in input", measured on this machine) and reassembles
+# ("ignored null byte in input") and reassembles
 # path/line/content into one corrupted field. NUL bytes are converted to
 # TAB inside an unbroken pipe (git grep | tr), and only the TAB-safe result
 # ever touches a bash variable.
 #
 # PERFORMANCE / large-blob exclusion: measured on real repositories, the
-# unrestricted PII_TERMS pattern against a handful of vendored/generated
-# blobs (a multi-MB geodata TSV in one repo, several 50-120KB-single-line
-# deployment-artifact JSON files in another) did not finish in 60s — not a
+# unrestricted PII_TERMS pattern against a handful of large vendored/generated
+# single-line blobs (multi-megabyte TSV/JSON data files) did not finish in 60s — not a
 # bug in this script, the regex engine's automaton grows with each
 # bounded-repetition alternative in a term list this size, and that cost is
 # paid per byte scanned. Files above LEAK_SCAN_CI_MAX_BYTES (default 51200
@@ -459,10 +457,9 @@ grep -nE "$PII_ALLOW" "${pii_raw}.content" 2>/dev/null | cut -d: -f1 | sort -un 
 # entire second file too (both start at 1 on file2's first line and
 # increment together forever after) — so NR==FNR is true for every single
 # line of file2, and the whole file is swallowed into the exclusion branch,
-# not just its first line. Measured twice while building this script: the
-# test bench went green with zero findings on content that plainly matched,
-# and a real baseline scan reported a clean tree while genuine
-# gettext-boilerplate matches were silently swallowed.
+# not just its first line. Left unhandled, this reports zero findings on
+# content that plainly matches PII_TERMS, hiding genuine hits behind an
+# allowlist file that happens to be empty.
 # "0" is never a valid FNR (awk line numbers start at 1), so appending it
 # guarantees file1 is never empty without ever excluding a real record.
 printf '0\n' >> "${pii_raw}.allow_lines"

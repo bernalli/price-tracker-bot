@@ -1,4 +1,4 @@
-"""The input grammar of section 11.5.
+"""Grammar of the free-text inputs accepted by the guided flows.
 
 Per-parser corpora (``tests/support/input_corpus.py``) pin accepted values and
 rejections; a property over random Unicode proves every parser is total and

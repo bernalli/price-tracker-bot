@@ -1,4 +1,4 @@
-"""Requested identity and echo comparison (I3)."""
+"""Requested identity and echo comparison."""
 
 from __future__ import annotations
 

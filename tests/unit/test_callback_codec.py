@@ -1,7 +1,7 @@
 """Callback codec: round trip, hostile decoding and the registry language.
 
 The oracle below is written from the action inventory of
-``bot/callbacks.py::build_registry`` (sections 8.1, 8.2, 9 and 11 plus the
+``bot/callbacks.py::build_registry`` (every registered action plus the
 flow-token shape), independently of the codec itself: it has
 its own shape list, its own token regexes and its own enum values. Tests compare
 the codec with it and never use the codec to compute an expected value.

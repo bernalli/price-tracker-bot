@@ -58,7 +58,7 @@ def found(result: AnchorResult) -> Decimal:
     return result.price.amount
 
 
-# ------------------------------------------------------------ named in the spec
+# ------------------------------------------------------------ worked examples
 
 
 def test_single_foreign_node_is_ambiguous() -> None:
@@ -75,7 +75,7 @@ def test_single_foreign_node_is_ambiguous() -> None:
 
 
 def test_foreign_presence_blocks_unknown_fallback() -> None:
-    """I12: a foreign node plus an unidentified one is still foreign-only."""
+    """A foreign node plus an unidentified one is still foreign-only."""
     foreign = obs(Ownership.FOREIGN, "89.99", ref="n1", key="id:https://x.example.com/b")
     unknown = obs(Ownership.UNKNOWN, "99.99", ref="n2")
     unscoped = obs(Ownership.UNSCOPED, "99.99", ref="attr:0", source="attr:data-price")
@@ -108,7 +108,7 @@ def test_unscoped_only_is_no_candidate() -> None:
 
 
 def test_requested_unreadable_never_substituted() -> None:
-    """I21, the P13 shape: financing-only requested product, second Product priced."""
+    """Financing-only requested product, second Product priced."""
     page = PageSpec(
         nodes=(
             NodeSpec(0, Decimal("19.99"), requested=True, price_mode=FINANCING),
@@ -201,7 +201,7 @@ def test_same_node_key_across_sources_is_one_node() -> None:
 
 
 def test_duplicated_observation_without_key_is_one_node() -> None:
-    """I22: emitting the same unidentified observation twice does not create a node."""
+    """Emitting the same unidentified observation twice does not create a node."""
     single = obs(Ownership.UNKNOWN, "50.00", ref="jsonld:0")
     assert resolve_anchor((single,)) == resolve_anchor((single, single, single))
     assert found(resolve_anchor((single, single))) == Decimal("50.00")

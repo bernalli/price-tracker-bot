@@ -102,7 +102,7 @@ async def _open_value(h: Harness, chat: int, user: int, product: int, verb: str)
 
 
 async def test_second_prompt_supersedes_first_and_one_answer_applies_once(h: Harness) -> None:
-    """11.7 item 1: threshold then target, one answer."""
+    """Threshold then target, superseding prompt, one answer applies once."""
     _, first_message = await _open_value(h, PRIVATE, USER, 1, "th")
     second_token, _ = await _open_value(h, PRIVATE, USER, 1, "tg")
 
@@ -472,7 +472,7 @@ async def test_forbidden_on_supersede_edit_skips_new_prompt(h: Harness) -> None:
 
 
 async def test_unknown_currency_holds_no_row_until_a_choice(h: Harness) -> None:
-    """11.7 item 10: AWAIT_CURRENCY inserts nothing; the button inserts with USD."""
+    """AWAIT_CURRENCY inserts nothing; the button inserts with USD."""
     await h.text(PRIVATE, USER, URL_NOCUR)
     assert h.services.writes == []
     token = _token_of(h.last_prompt(PRIVATE).callback_data())
@@ -546,7 +546,7 @@ async def test_currency_step_closed_without_choice_adds_nothing(h: Harness, how:
 async def test_scope_branch_follows_add_scope_default(
     default: str, step: bool, expect_prompt: bool, expect_scope: tuple[Any, ...] | None
 ) -> None:
-    """11.7 item 11 (a): the table over add_scope_default x ADD_SCOPE_STEP."""
+    """Table over add_scope_default x ADD_SCOPE_STEP."""
     services = _services()
     services.scope_defaults[USER] = default  # type: ignore[assignment]
     harness = Harness(services, config=FlowConfig(add_scope_step=step))
@@ -775,7 +775,7 @@ async def test_timeout_is_armed_with_the_configured_delay() -> None:
     assert [a.delay for a in timer.armed] == [42.0]
 
 
-# --- rejection => no mutation (11.7 item 13, per-parser corpus) ------------
+# --- rejection => no mutation (per-parser corpus) --------------------------
 
 _FLOW_VERBS = {"threshold": "th", "target": "tg", "product_interval": "iv"}
 
