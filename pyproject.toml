@@ -132,6 +132,23 @@ disable_error_code = [
     "assignment",
 ]
 
+# The guided-flow coordinator is strict: this concrete section takes
+# precedence over the legacy `price_tracker.bot.*` wildcard above and
+# re-enables every error code that wildcard disables.
+[[tool.mypy.overrides]]
+module = ["price_tracker.bot.callbacks", "price_tracker.bot.flows"]
+enable_error_code = [
+    "union-attr",
+    "arg-type",
+    "type-arg",
+    "index",
+    "import-not-found",
+    "no-any-return",
+    "no-untyped-call",
+    "no-redef",
+    "assignment",
+]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
