@@ -188,7 +188,7 @@ def test_symbol_glued_to_a_word_is_not_a_token() -> None:
     assert parse_price_text("EUR10") == Decimal("10")
 
 
-# ------------------------------------------------ structured strings (verdict S2-1)
+# ------------------------------------------------ structured strings
 
 
 def test_structured_price_with_excess_precision_is_rejected() -> None:
@@ -222,7 +222,7 @@ def test_json_number_is_not_the_string_1e3() -> None:
     assert parse_price_value(Decimal("12.340"), PriceContext(currency="EUR")) == Decimal("12.34")
 
 
-# ------------------------------------------------------------------ scale (S2-1)
+# ------------------------------------------------------------------ scale
 
 
 def test_data_price_2999_next_to_29_99_is_never_scaled() -> None:
