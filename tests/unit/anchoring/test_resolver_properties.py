@@ -31,7 +31,11 @@ from price_tracker.core.anchoring import (
     resolve_anchor,
 )
 from price_tracker.core.identity import RequestedIdentity
-from price_tracker.core.structured_data import anchor_structured_page, jsonld_observations
+from price_tracker.core.structured_data import (
+    _IDENTIFIER_FIELDS,
+    anchor_structured_page,
+    jsonld_observations,
+)
 
 from ._docgen import (
     FINANCING,
@@ -494,7 +498,17 @@ _NON_OWNING_EDGES = [
     "offers",
     "itemOffered",
 ]
-_RANDOM_NAME = st.text(alphabet="abcdefghijklmnopqrstuvwxyz", min_size=1, max_size=16)
+# An edge name that collides with a field structured_data.py treats as node identity
+# ("url", plus the scalar identifier fields) turns the wrapping node from an arbitrary
+# foreign carrier into a genuinely malformed Product/Offer node once that node's own
+# @type is "Product": the decoder raises StructureError on it (terminal AMBIGUOUS
+# malformed_structure, covered by test_not_well_formed.py's identity-field tests),
+# which is a different property than "nested foreign price never returned" and must
+# not be generated here.
+_IDENTITY_FIELD_NAMES = frozenset({"url", *_IDENTIFIER_FIELDS})
+_RANDOM_NAME = st.text(alphabet="abcdefghijklmnopqrstuvwxyz", min_size=1, max_size=16).filter(
+    lambda name: name not in _IDENTITY_FIELD_NAMES
+)
 
 
 @st.composite
