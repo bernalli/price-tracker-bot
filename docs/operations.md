@@ -87,7 +87,7 @@ for every release, and let the idempotent migrator run once at startup.
 
 ## Hardened deployment
 
-`docker-compose.yml` ships F7 hardening directives (Plan 3 F7 closure). Reference excerpt:
+`docker-compose.yml` ships hardening directives out of the box. Reference excerpt:
 
 ```yaml
 services:
@@ -164,7 +164,7 @@ Expect exactly one mount with `"type": "bind"` and the host path you intend.
 
 ## Upgrade procedure
 
-Until Plan 4 publishes the GitHub Container Registry image:
+The default `docker-compose.yml` builds the image locally:
 
 ```bash
 git pull
@@ -172,7 +172,19 @@ docker compose build
 docker compose up -d
 ```
 
-Once the `ghcr.io/bernalli/price-tracker-bot` image is available (Plan 4 F8 milestone):
+Every tagged release also publishes a multi-arch image to
+`ghcr.io/bernalli/price-tracker-bot`. To deploy from the published image instead of
+building locally, override the `image` field with the same untracked-override
+mechanism as [Bind mount instead of the named volume](#bind-mount-instead-of-the-named-volume):
+
+```yaml
+# docker-compose.override.yml — not tracked by git
+services:
+  price-tracker:
+    image: ghcr.io/bernalli/price-tracker-bot:latest
+```
+
+Then pull:
 
 ```bash
 docker compose pull

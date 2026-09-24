@@ -1,7 +1,7 @@
 """`/lista` handler — list the user's tracked products with per-row buttons.
 
-Split out of `handlers/product.py` to keep each module under the 500-LOC
-budget [Task 17].
+Split out of `handlers/product.py` to keep each module under a 500-line
+budget.
 """
 
 from __future__ import annotations
@@ -43,7 +43,7 @@ async def cmd_list(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         parse_mode=ParseMode.HTML,
     )
 
-    # Deferred import: scrapers package may evolve (Task 11+).
+    # Deferred import: the scrapers package may evolve independently of this handler.
     from price_tracker.core.scraper_base import detect_currency  # noqa: PLC0415
 
     for p in products:

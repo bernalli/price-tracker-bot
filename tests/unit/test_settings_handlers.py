@@ -1,4 +1,4 @@
-"""Tests for the Plan 2 F3.D notification preference handlers."""
+"""Tests for the notification preference handlers."""
 
 from __future__ import annotations
 
@@ -185,7 +185,7 @@ async def test_digest_now_invokes_flush():
     assert "3" in msg
 
 
-# ── Plan 2 F3.D Task 29 followup: regression coverage for read-before-write
+# ── Followup: regression coverage for read-before-write
 # in mute/unmute and for input-validation guards.
 
 

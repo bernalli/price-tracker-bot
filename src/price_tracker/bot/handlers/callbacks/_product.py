@@ -1,7 +1,7 @@
 """Product-scoped callback handlers (delete/check/chart/edit/pause/remove/...).
 
 Split out of `handlers/callbacks/__init__.py` to keep the dispatcher under
-the 500-LOC budget [Task 17]. Each function takes the `(query, context, db,
+a 500-line budget. Each function takes the `(query, context, db,
 user_id, data)` tuple and returns `True` if it handled the callback, `False`
 otherwise — keeps the dispatcher a thin if/elif on prefixes.
 """

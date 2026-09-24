@@ -17,7 +17,7 @@ src/price_tracker/
 ├── db/              # repository, models, versioned migrations (001-010)
 ├── notifier/        # telegram delivery, preferences, digest queue
 ├── observability/   # Prometheus metrics + structured JSON logging
-└── locale/          # gettext catalogs (en, it_IT) — populated in F5
+└── locale/          # gettext catalogs (en, it_IT)
 plugins/             # extension point for custom scrapers (gitignored except README.md)
 ```
 
