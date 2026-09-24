@@ -326,14 +326,19 @@ def test_result_types_accept_well_formed_construction() -> None:
 
 
 def test_result_types_reject_malformed_construction() -> None:
-    with pytest.raises(ValueError):  # noqa: PT011 - any rejection is the property
-        InsufficientHistory(_coverage(), "other", None)
-    with pytest.raises(ValueError):  # noqa: PT011
-        PriceStats(
-            _coverage(), Decimal(11), Decimal(10), Decimal(12), Decimal(9), Decimal(13), None
-        )
-    with pytest.raises(ValueError):  # noqa: PT011
-        Coverage(HOUR, 2 * HOUR, 1, 0)
+    _raises_code("bad_reason", InsufficientHistory, _coverage(), "other", None)
+    _raises_code(
+        "unordered_statistics",
+        PriceStats,
+        _coverage(),
+        Decimal(11),
+        Decimal(10),
+        Decimal(12),
+        Decimal(9),
+        Decimal(13),
+        None,
+    )
+    _raises_code("bad_coverage", Coverage, HOUR, 2 * HOUR, 1, 0)
 
 
 @pytest.mark.parametrize(
@@ -350,8 +355,9 @@ def test_result_types_reject_malformed_construction() -> None:
 )
 def test_price_stats_rejects_every_broken_order(fields: tuple[Decimal, ...]) -> None:
     low, median, high, minimum, maximum = fields
-    with pytest.raises(ValueError):  # noqa: PT011
-        PriceStats(_coverage(), low, median, high, minimum, maximum, None)
+    _raises_code(
+        "unordered_statistics", PriceStats, _coverage(), low, median, high, minimum, maximum, None
+    )
 
 
 @pytest.mark.parametrize(
@@ -360,5 +366,4 @@ def test_price_stats_rejects_every_broken_order(fields: tuple[Decimal, ...]) -> 
     ids=["negative-covered", "empty-window"],
 )
 def test_coverage_rejects_malformed_spans(window: timedelta, covered: timedelta) -> None:
-    with pytest.raises(ValueError):  # noqa: PT011
-        Coverage(window, covered, 0, 1)
+    _raises_code("bad_coverage", Coverage, window, covered, 0, 1)

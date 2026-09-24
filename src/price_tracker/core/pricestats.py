@@ -38,7 +38,7 @@ Scope and contract:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from fractions import Fraction
 from typing import TYPE_CHECKING, Final
@@ -55,6 +55,18 @@ INSUFFICIENT_REASONS: Final = frozenset({"no_readings", "low_coverage"})
 
 _MICROSECOND: Final = timedelta(microseconds=1)
 _ZERO: Final = timedelta(0)
+_EPOCH: Final = datetime(1970, 1, 1, tzinfo=UTC)
+
+
+def _instant(value: datetime) -> int:
+    """Whole microseconds from the Unix epoch to ``value``, as an absolute instant.
+
+    Python subtracts and compares two aware datetimes that share a ``tzinfo``
+    object on their wall clocks, which is wrong across a daylight-saving
+    transition or fold; measuring each instant against a fixed UTC epoch always
+    goes through ``utcoffset`` and never builds an out-of-range datetime.
+    """
+    return (value - _EPOCH) // _MICROSECOND
 
 
 def _check_instant(value: object) -> None:
@@ -147,22 +159,26 @@ def _check_positive_span(value: object, code: str) -> timedelta:
     return value
 
 
-def _validated(readings: Iterable[Reading], now: datetime) -> tuple[Reading, ...]:
-    """Materialise ``readings`` once and check type, strict order and no future instant."""
+def _validated(readings: Iterable[Reading], now: int) -> tuple[tuple[Reading, ...], list[int]]:
+    """Materialise ``readings`` once and check type, strict order and no future instant.
+
+    Returns the readings and their instants in epoch microseconds.
+    """
     items = tuple(readings)
-    previous: datetime | None = None
+    instants: list[int] = []
     for item in items:
         if type(item) is not Reading:
             raise TypeError(f"expected a Reading, got {type(item).__name__}")
-        if previous is not None:
-            if item.at == previous:
+        at = _instant(item.at)
+        if instants:
+            if at == instants[-1]:
                 raise ValueError("duplicate_timestamp")
-            if item.at < previous:
+            if at < instants[-1]:
                 raise ValueError("unsorted")
-        if item.at > now:
+        if at > now:
             raise ValueError("future_reading")
-        previous = item.at
-    return items
+        instants.append(at)
+    return items, instants
 
 
 def _quantile(groups: list[tuple[Decimal, int]], total: int, q: Fraction) -> Decimal:
@@ -194,18 +210,19 @@ def price_context(
     _check_instant(now)
     _check_positive_span(window, "bad_window")
     try:
-        start = now - window
+        now - window  # only the overflow matters; instants are compared in UTC
     except OverflowError:
         raise ValueError("bad_window") from None
     _check_positive_span(max_hold, "bad_max_hold")
     if type(min_coverage) is not Fraction or not 0 < min_coverage <= 1:
         raise ValueError("bad_min_coverage")
-    items = _validated(readings, now)
+    now_at = _instant(now)
+    items, instants = _validated(readings, now_at)
 
     # Integer microsecond offsets from the window start; the window is [0, end).
     end = window // _MICROSECOND
     hold = max_hold // _MICROSECOND
-    offsets = [(item.at - start) // _MICROSECOND for item in items]
+    offsets = [at - (now_at - end) for at in instants]
 
     groups: dict[Decimal, int] = {}
     covered = 0
@@ -230,7 +247,7 @@ def price_context(
         gaps += 1
 
     current: Decimal | None = None
-    if items and now - items[-1].at < max_hold:
+    if items and now_at - instants[-1] < hold:
         current = items[-1].price
 
     coverage = Coverage(window, covered * _MICROSECOND, used, gaps)

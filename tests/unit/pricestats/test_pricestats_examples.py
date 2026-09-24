@@ -11,6 +11,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal
 from fractions import Fraction
+from zoneinfo import ZoneInfo
 
 from price_tracker.core.pricestats import (
     DEFAULT_MIN_COVERAGE,
@@ -23,6 +24,7 @@ from price_tracker.core.pricestats import (
 
 NOW = datetime(2026, 1, 10, 12, 0, tzinfo=UTC)
 HOUR = timedelta(hours=1)
+ROME = ZoneInfo("Europe/Rome")
 
 
 def _reading(at: datetime, price: str | int) -> Reading:
@@ -198,3 +200,40 @@ def test_weights_are_microsecond_exact() -> None:
     assert stats.coverage.ratio == Fraction(1)
     assert stats.low == Decimal(10)
     assert stats.median == Decimal(12)
+
+
+def test_window_is_elapsed_time_across_a_daylight_saving_change() -> None:
+    # Clocks in Rome go from 02:00 to 03:00 on 2026-03-29: 12:00 local is 10:00 UTC,
+    # and 24 hours earlier is 11:00 local on the previous day, not 12:00.
+    now = datetime(2026, 3, 29, 12, 0, tzinfo=ROME)
+    now_utc = datetime(2026, 3, 29, 10, 0, tzinfo=UTC)
+    readings = [_reading(now_utc - timedelta(minutes=30), 10)]
+    for instant in (now, now_utc):
+        result = price_context(readings, now=instant, window=24 * HOUR, max_hold=2 * HOUR)
+        assert isinstance(result, InsufficientHistory), result
+        assert result.coverage == Coverage(24 * HOUR, timedelta(minutes=30), 1, 1)
+        assert result.current == Decimal(10)
+
+
+def test_same_zone_readings_are_ordered_by_instant_across_a_fold() -> None:
+    # Clocks in Rome go back from 03:00 to 02:00 on 2026-10-25: 02:30 before the
+    # change (00:30 UTC) precedes 02:10 after it (01:10 UTC).
+    before = datetime(2026, 10, 25, 2, 30, tzinfo=ROME, fold=0)
+    after = datetime(2026, 10, 25, 2, 10, tzinfo=ROME, fold=1)
+    now = datetime(2026, 10, 25, 2, 40, tzinfo=ROME, fold=1)  # 01:40 UTC
+    readings = [_reading(before, 10), _reading(after, 12)]
+    stats = _stats(price_context(readings, now=now, window=HOUR + HOUR // 6, max_hold=HOUR))
+    assert stats.coverage.covered == HOUR + HOUR // 6
+    assert stats.coverage.gaps == 0
+    assert (stats.low, stats.median, stats.high) == (Decimal(10), Decimal(10), Decimal(12))
+    assert stats.current == Decimal(12)
+
+
+def test_current_expires_exactly_at_max_hold() -> None:
+    window = 2 * HOUR
+    expired = price_context([_reading(NOW - HOUR, 10)], now=NOW, window=window, max_hold=HOUR)
+    assert expired.coverage.covered == HOUR
+    assert expired.current is None
+    fresh_at = NOW - HOUR + timedelta(microseconds=1)
+    fresh = price_context([_reading(fresh_at, 10)], now=NOW, window=window, max_hold=HOUR)
+    assert fresh.current == Decimal(10)
