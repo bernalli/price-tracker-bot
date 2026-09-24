@@ -362,7 +362,9 @@ def currency_choices() -> tuple[str, ...]:
 
 
 def build_registry() -> ActionRegistry:
-    """The action registry of SP1 (sections 8.1, 8.2, 9 and 11)."""
+    """The full closed action registry: menus, lists, product actions, settings,
+    guided-flow callbacks and admin.
+    """
     specs = [
         ActionSpec("home", (_lit("h"),)),
         ActionSpec("noop", (_lit("noop"),)),

@@ -1,4 +1,4 @@
-"""The input grammar of SP1 section 11.5 as corrected by the second review round.
+"""The input grammar of section 11.5.
 
 Per-parser corpora (``tests/support/input_corpus.py``) pin accepted values and
 rejections; a property over random Unicode proves every parser is total and

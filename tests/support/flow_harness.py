@@ -1,4 +1,4 @@
-"""A real ``Application`` wired with the guided-flow prototype and fake boundaries.
+"""A real ``Application`` wired with the guided-flow coordinator and fake boundaries.
 
 Groups: 0 the coordinator; 1 ``/cancel`` outside a flow, a stand-in router for
 registered non-flow actions and ``/help``/``/menu``; 3 the catch-all callback

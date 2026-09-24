@@ -26,8 +26,8 @@ Guarantees (proved by ``tests/integration/test_guided_flow*.py``):
 * G3 - every check-and-update of the registry is synchronous (no ``await`` between
   the token comparison and the mutation); side effects run only after the entry
   was claimed.
-* G4 - every event in every state has a defined outcome (see the prototype
-  document ``docs/plans/2026-09-23-guided-flow-prototype.md``).
+* G4 - every event in every state has a defined outcome (see the event x state
+  test matrix in ``tests/integration/test_guided_flow.py``).
 """
 
 from __future__ import annotations
@@ -371,7 +371,7 @@ class Route:
     text: str | None = None
 
 
-# --- texts (English; catalogues are out of scope for the prototype) --------
+# --- texts (English; catalogues are out of scope for this module) ----------
 
 TEXT_EXPIRED: Final = "This button has expired."
 TEXT_NOT_AUTHORISED: Final = "Not authorised."

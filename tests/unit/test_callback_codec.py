@@ -1,7 +1,8 @@
 """Callback codec: round trip, hostile decoding and the registry language.
 
-The oracle below is written from the SP1 action inventory (sections 8.1, 8.2, 9
-and 11 plus the flow-token shape), independently of ``bot/callbacks.py``: it has
+The oracle below is written from the action inventory of
+``bot/callbacks.py::build_registry`` (sections 8.1, 8.2, 9 and 11 plus the
+flow-token shape), independently of the codec itself: it has
 its own shape list, its own token regexes and its own enum values. Tests compare
 the codec with it and never use the codec to compute an expected value.
 """
@@ -239,7 +240,7 @@ def test_registry_names_equal_the_independent_model() -> None:
 
 
 def test_every_verb_the_spec_uses_fits_the_grammar() -> None:
-    """S1-3: rmok and rmallok (seven characters) are registered literals."""
+    """rmok and rmallok (seven characters) are registered literals."""
     assert decode("l:rmallok") == Action("list.remove_all_ok")
     assert decode("p:42:rmok") == Action("product.remove_ok", (42,))
     assert decode("s:lang:pt_BR") == Action("settings.language", ("pt_BR",))

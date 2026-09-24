@@ -66,7 +66,7 @@ def test_bot_handlers_and_main_do_not_import_the_coordinator() -> None:
     result = subprocess.run(
         [sys.executable, "-c", probe], capture_output=True, text=True, check=True
     )
-    loaded = eval(result.stdout.strip())  # noqa: S307 — trusted literal from our own probe
+    loaded = ast.literal_eval(result.stdout.strip())
     assert loaded == {"app.inputs": False, "bot.callbacks": False, "bot.flows": False}
 
     # Positive control: importing bot.flows really does load all three, so
@@ -84,7 +84,7 @@ def test_bot_handlers_and_main_do_not_import_the_coordinator() -> None:
     result_positive = subprocess.run(
         [sys.executable, "-c", probe_positive], capture_output=True, text=True, check=True
     )
-    loaded_positive = eval(result_positive.stdout.strip())  # noqa: S307
+    loaded_positive = ast.literal_eval(result_positive.stdout.strip())
     assert loaded_positive == {"app.inputs": True, "bot.callbacks": True, "bot.flows": True}
 
 
@@ -155,7 +155,7 @@ def test_app_inputs_never_imports_telegram_or_bot() -> None:
     result = subprocess.run(
         [sys.executable, "-c", probe], capture_output=True, text=True, check=True
     )
-    loaded = eval(result.stdout.strip())  # noqa: S307
+    loaded = ast.literal_eval(result.stdout.strip())
     assert loaded == {"telegram": False, "bot": False}
 
     # Positive control: bot.flows really does pull in both.
@@ -171,5 +171,5 @@ def test_app_inputs_never_imports_telegram_or_bot() -> None:
     result_positive = subprocess.run(
         [sys.executable, "-c", probe_positive], capture_output=True, text=True, check=True
     )
-    loaded_positive = eval(result_positive.stdout.strip())  # noqa: S307
+    loaded_positive = ast.literal_eval(result_positive.stdout.strip())
     assert loaded_positive == {"telegram": True, "bot": True}

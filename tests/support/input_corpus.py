@@ -1,4 +1,4 @@
-"""Accepted and rejected corpora, one per parser, written from the SP1 grammar.
+"""Accepted and rejected corpora, one per parser, written from the input grammar.
 
 Each corpus is specific to its parser: sentinels and percentages appear only
 where the grammar defines them, nickname text such as ``NaN`` is accepted, and a

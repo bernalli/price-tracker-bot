@@ -3,7 +3,7 @@
 Every case feeds real ``Update`` objects through ``Application.process_update``;
 the bot talks to a fake HTTP layer, the services are fakes that log every write,
 and timeouts fire only when a test fires them. Each test name states the event of
-the SP1 events x states table it proves.
+the events x states table it proves.
 """
 
 from __future__ import annotations
@@ -102,7 +102,7 @@ async def _open_value(h: Harness, chat: int, user: int, product: int, verb: str)
 
 
 async def test_second_prompt_supersedes_first_and_one_answer_applies_once(h: Harness) -> None:
-    """11.7 item 1 (the stress-test PoC inverted): threshold then target, one answer."""
+    """11.7 item 1: threshold then target, one answer."""
     _, first_message = await _open_value(h, PRIVATE, USER, 1, "th")
     second_token, _ = await _open_value(h, PRIVATE, USER, 1, "tg")
 

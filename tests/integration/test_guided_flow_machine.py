@@ -6,8 +6,9 @@ disarmed ones firing late), restarts, revocations, scope-default changes,
 channel posts and transport failures, and drives them through a real
 ``Application.process_update``.
 
-The reference model below is written from the SP1 events x states table as
-corrected for S1-1. It never calls the code under test: it keeps its own flow
+The reference model below is written from the events x states table as
+documented in ``tests/integration/test_guided_flow.py``. It never calls the
+code under test: it keeps its own flow
 per ``(chat_id, user_id)``, its own expected write log and its own labelled
 input corpus. Tokens are learned from what the bot *sent* (the keyboard of the
 prompt the user saw), parsed with the model's own regex.
