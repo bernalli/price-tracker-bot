@@ -16,6 +16,8 @@ from price_tracker.scrapers.shopify import ShopifyScraper
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from price_tracker.core.scraper_base import ProductInfo
+
 
 # ── can_handle ────────────────────────────────────────────────────
 
@@ -344,3 +346,519 @@ def test_shopify_is_product_path_helper() -> None:
     assert not _is_product_path("https://x.test/")
     assert not _is_product_path("https://x.test/collections/all")
     assert not _is_product_path("https://x.test/collections/men?page=4")
+
+
+# ── JSON endpoint: blocks surface as BlockEvent, never as no data ──
+
+
+# A product page whose price the HTML fallback WOULD read: a JSON block that is
+# swallowed instead of raised then yields this price and the test fails on the
+# missing BlockEvent, not on an unmocked route.
+_PRICED_HTML = '<html><body><span class="product__price">$12.00</span></body></html>'
+
+
+@pytest.mark.asyncio
+async def test_shopify_json_403_raises_block_event_when_curl_cffi_unavailable() -> None:
+    """A 403 on the .json endpoint whose curl_cffi bypass fails must raise BlockEvent.
+
+    curl_cffi is not installed in the test environment, so `_fetch_json_via_curl_cffi`
+    returns None (ImportError path) and the block must surface, never become a silent
+    ProductInfo(error=...).
+    """
+    scraper = ShopifyScraper()
+    url = "https://shop.example.com/products/blocked-json"
+    json_url = "https://shop.example.com/products/blocked-json.json"
+
+    with respx.mock(assert_all_called=False) as router:
+        router.get(json_url).respond(403, text="forbidden")
+        router.get(url).respond(200, text=_PRICED_HTML)
+        async with httpx.AsyncClient() as client:
+            with pytest.raises(BlockEvent):
+                await scraper.scrape(url, client)
+
+
+@pytest.mark.asyncio
+async def test_shopify_json_429_raises_block_event() -> None:
+    """429 on the .json endpoint had NO handling at all before the fix — the sharpest
+    regression case: it fell straight into `elif status != 200: return None`."""
+    scraper = ShopifyScraper()
+    url = "https://shop.example.com/products/rate-limited"
+    json_url = "https://shop.example.com/products/rate-limited.json"
+
+    with respx.mock(assert_all_called=False) as router:
+        router.get(json_url).respond(429, text="too many requests")
+        router.get(url).respond(200, text=_PRICED_HTML)
+        async with httpx.AsyncClient() as client:
+            with pytest.raises(BlockEvent):
+                await scraper.scrape(url, client)
+
+
+@pytest.mark.asyncio
+async def test_shopify_json_200_waf_body_raises_block_event() -> None:
+    """A 200 whose body is a WAF challenge page must not be parsed as product JSON."""
+    scraper = ShopifyScraper()
+    url = "https://shop.example.com/products/waf-challenge"
+    json_url = "https://shop.example.com/products/waf-challenge.json"
+    challenge_body = "<html><title>Attention Required! | Cloudflare</title>Just a moment...</html>"
+
+    with respx.mock(assert_all_called=False) as router:
+        router.get(json_url).respond(200, text=challenge_body)
+        router.get(url).respond(200, text=_PRICED_HTML)
+        async with httpx.AsyncClient() as client:
+            with pytest.raises(BlockEvent):
+                await scraper.scrape(url, client)
+
+
+@pytest.mark.asyncio
+async def test_shopify_json_404_is_not_a_block() -> None:
+    """404 on .json must fall through to the HTML path, never raise BlockEvent."""
+    scraper = ShopifyScraper()
+    url = "https://shop.example.com/products/headless-404"
+    json_url = "https://shop.example.com/products/headless-404.json"
+    html_no_price = "<!DOCTYPE html><html><body><h1>Widget</h1></body></html>"
+
+    with respx.mock(assert_all_called=False) as router:
+        router.get(json_url).respond(404)
+        router.get(url).respond(200, text=html_no_price)
+        async with httpx.AsyncClient() as client:
+            info = await scraper.scrape(url, client)
+
+    assert info.price is None
+    assert info.error is not None
+
+
+# ── headless storefront: JSON-LD ProductGroup fallback ────────────
+
+
+def _product_group_html(
+    *,
+    group_url: str = "https://shop.example.com/products/widget",
+    variants: str,
+) -> str:
+    return f"""
+    <!DOCTYPE html><html><head>
+    <script type="application/ld+json">
+    {{
+      "@context": "https://schema.org",
+      "@type": "ProductGroup",
+      "name": "Widget",
+      "url": "{group_url}",
+      "hasVariant": {variants}
+    }}
+    </script>
+    </head><body><div id="root"></div></body></html>
+    """
+
+
+@pytest.mark.asyncio
+async def test_shopify_headless_single_variant_json_ld() -> None:
+    variants = """[
+        {"@type": "Product", "sku": "WIDGET-RED",
+         "offers": {"@type": "Offer", "price": "19.99", "priceCurrency": "USD",
+                    "url": "https://shop.example.com/products/widget?variant=111"}}
+    ]"""
+    html = _product_group_html(variants=variants)
+    scraper = ShopifyScraper()
+    url = "https://shop.example.com/products/widget"
+    json_url = "https://shop.example.com/products/widget.json"
+
+    with respx.mock(assert_all_called=False) as router:
+        router.get(json_url).respond(404)
+        router.get(url).respond(200, text=html)
+        async with httpx.AsyncClient() as client:
+            info = await scraper.scrape(url, client)
+
+    assert info.price == Decimal("19.99")
+    assert info.currency == "USD"
+    assert info.error is None
+
+
+@pytest.mark.asyncio
+async def test_shopify_headless_two_variants_different_prices_no_selector() -> None:
+    """A ProductGroup + accessory at different prices, no ?variant= → AMBIGUOUS: no price."""
+    variants = """[
+        {"@type": "Product", "sku": "WIDGET",
+         "offers": {"@type": "Offer", "price": "19.99", "priceCurrency": "USD",
+                    "url": "https://shop.example.com/products/widget?variant=111"}},
+        {"@type": "Product", "sku": "WIDGET-CASE",
+         "offers": {"@type": "Offer", "price": "9.99", "priceCurrency": "USD",
+                    "url": "https://shop.example.com/products/widget?variant=222"}}
+    ]"""
+    html = _product_group_html(variants=variants)
+    scraper = ShopifyScraper()
+    url = "https://shop.example.com/products/widget"
+    json_url = "https://shop.example.com/products/widget.json"
+
+    with respx.mock(assert_all_called=False) as router:
+        router.get(json_url).respond(404)
+        router.get(url).respond(200, text=html)
+        async with httpx.AsyncClient() as client:
+            info = await scraper.scrape(url, client)
+
+    assert info.price is None
+    assert info.error is not None
+
+
+@pytest.mark.asyncio
+async def test_shopify_headless_variant_query_param_selects_price() -> None:
+    variants = """[
+        {"@type": "Product", "sku": "WIDGET",
+         "offers": {"@type": "Offer", "price": "19.99", "priceCurrency": "USD",
+                    "url": "https://shop.example.com/products/widget?variant=111"}},
+        {"@type": "Product", "sku": "WIDGET-CASE",
+         "offers": {"@type": "Offer", "price": "9.99", "priceCurrency": "USD",
+                    "url": "https://shop.example.com/products/widget?variant=222"}}
+    ]"""
+    html = _product_group_html(variants=variants)
+    scraper = ShopifyScraper()
+    url = "https://shop.example.com/products/widget?variant=222"
+    json_url = "https://shop.example.com/products/widget.json"
+
+    with respx.mock(assert_all_called=False) as router:
+        router.get(json_url).respond(404)
+        router.get(url).respond(200, text=html)
+        async with httpx.AsyncClient() as client:
+            info = await scraper.scrape(url, client)
+
+    assert info.price == Decimal("9.99")
+    assert info.currency == "USD"
+    assert info.error is None
+
+
+@pytest.mark.asyncio
+async def test_shopify_headless_same_price_variants_collapse() -> None:
+    variants = """[
+        {"@type": "Product", "sku": "WIDGET-RED",
+         "offers": {"@type": "Offer", "price": "19.99", "priceCurrency": "USD",
+                    "url": "https://shop.example.com/products/widget?variant=111"}},
+        {"@type": "Product", "sku": "WIDGET-BLUE",
+         "offers": {"@type": "Offer", "price": "19.99", "priceCurrency": "USD",
+                    "url": "https://shop.example.com/products/widget?variant=222"}}
+    ]"""
+    html = _product_group_html(variants=variants)
+    scraper = ShopifyScraper()
+    url = "https://shop.example.com/products/widget"
+    json_url = "https://shop.example.com/products/widget.json"
+
+    with respx.mock(assert_all_called=False) as router:
+        router.get(json_url).respond(404)
+        router.get(url).respond(200, text=html)
+        async with httpx.AsyncClient() as client:
+            info = await scraper.scrape(url, client)
+
+    assert info.price == Decimal("19.99")
+    assert info.currency == "USD"
+    assert info.error is None
+
+
+@pytest.mark.asyncio
+async def test_shopify_headless_malformed_jsonld_script_is_skipped() -> None:
+    """A broken JSON-LD script next to a valid ProductGroup: the valid one still resolves."""
+    good_variants = """[
+        {"@type": "Product", "sku": "WIDGET",
+         "offers": {"@type": "Offer", "price": "19.99", "priceCurrency": "USD",
+                    "url": "https://shop.example.com/products/widget?variant=111"}}
+    ]"""
+    html = f"""
+    <!DOCTYPE html><html><head>
+    <script type="application/ld+json">{{ this is not json </script>
+    <script type="application/ld+json">
+    {{
+      "@context": "https://schema.org",
+      "@type": "ProductGroup",
+      "name": "Widget",
+      "url": "https://shop.example.com/products/widget",
+      "hasVariant": {good_variants}
+    }}
+    </script>
+    </head><body></body></html>
+    """
+    scraper = ShopifyScraper()
+    url = "https://shop.example.com/products/widget"
+    json_url = "https://shop.example.com/products/widget.json"
+
+    with respx.mock(assert_all_called=False) as router:
+        router.get(json_url).respond(404)
+        router.get(url).respond(200, text=html)
+        async with httpx.AsyncClient() as client:
+            info = await scraper.scrape(url, client)
+
+    assert info.price == Decimal("19.99")
+
+
+@pytest.mark.asyncio
+async def test_shopify_headless_only_malformed_jsonld_falls_through() -> None:
+    """A page whose ONLY JSON-LD script is broken falls through to 'price not found'."""
+    html = """
+    <!DOCTYPE html><html><head>
+    <script type="application/ld+json">{ not json at all </script>
+    </head><body></body></html>
+    """
+    scraper = ShopifyScraper()
+    url = "https://shop.example.com/products/broken-jsonld"
+    json_url = "https://shop.example.com/products/broken-jsonld.json"
+
+    with respx.mock(assert_all_called=False) as router:
+        router.get(json_url).respond(404)
+        router.get(url).respond(200, text=html)
+        async with httpx.AsyncClient() as client:
+            info = await scraper.scrape(url, client)
+
+    assert info.price is None
+    assert info.error is not None
+
+
+@pytest.mark.asyncio
+async def test_shopify_headless_product_group_without_variants() -> None:
+    html = _product_group_html(variants="[]")
+    scraper = ShopifyScraper()
+    url = "https://shop.example.com/products/widget"
+    json_url = "https://shop.example.com/products/widget.json"
+
+    with respx.mock(assert_all_called=False) as router:
+        router.get(json_url).respond(404)
+        router.get(url).respond(200, text=html)
+        async with httpx.AsyncClient() as client:
+            info = await scraper.scrape(url, client)
+
+    assert info.price is None
+    assert info.error is not None
+
+
+@pytest.mark.asyncio
+async def test_shopify_headless_variants_without_price() -> None:
+    variants = """[
+        {"@type": "Product", "sku": "WIDGET",
+         "offers": {"@type": "Offer", "priceCurrency": "USD",
+                    "url": "https://shop.example.com/products/widget?variant=111"}}
+    ]"""
+    html = _product_group_html(variants=variants)
+    scraper = ShopifyScraper()
+    url = "https://shop.example.com/products/widget"
+    json_url = "https://shop.example.com/products/widget.json"
+
+    with respx.mock(assert_all_called=False) as router:
+        router.get(json_url).respond(404)
+        router.get(url).respond(200, text=html)
+        async with httpx.AsyncClient() as client:
+            info = await scraper.scrape(url, client)
+
+    assert info.price is None
+    assert info.error is not None
+
+
+@pytest.mark.asyncio
+async def test_shopify_headless_url_of_another_product() -> None:
+    """ProductGroup.url names a DIFFERENT product than requested → never a price."""
+    variants = """[
+        {"@type": "Product", "sku": "OTHER",
+         "offers": {"@type": "Offer", "price": "5.00", "priceCurrency": "USD",
+                    "url": "https://shop.example.com/products/other?variant=999"}}
+    ]"""
+    html = _product_group_html(
+        group_url="https://shop.example.com/products/other", variants=variants
+    )
+    scraper = ShopifyScraper()
+    url = "https://shop.example.com/products/widget"
+    json_url = "https://shop.example.com/products/widget.json"
+
+    with respx.mock(assert_all_called=False) as router:
+        router.get(json_url).respond(404)
+        router.get(url).respond(200, text=html)
+        async with httpx.AsyncClient() as client:
+            info = await scraper.scrape(url, client)
+
+    assert info.price is None
+    assert info.error is not None
+
+
+@pytest.mark.asyncio
+async def test_shopify_headless_nonexistent_variant_id() -> None:
+    variants = """[
+        {"@type": "Product", "sku": "WIDGET",
+         "offers": {"@type": "Offer", "price": "19.99", "priceCurrency": "USD",
+                    "url": "https://shop.example.com/products/widget?variant=111"}}
+    ]"""
+    html = _product_group_html(variants=variants)
+    scraper = ShopifyScraper()
+    url = "https://shop.example.com/products/widget?variant=999999"
+    json_url = "https://shop.example.com/products/widget.json"
+
+    with respx.mock(assert_all_called=False) as router:
+        router.get(json_url).respond(404)
+        router.get(url).respond(200, text=html)
+        async with httpx.AsyncClient() as client:
+            info = await scraper.scrape(url, client)
+
+    assert info.price is None
+    assert info.error is not None
+
+
+@pytest.mark.asyncio
+async def test_shopify_headless_currency_absent_stays_none() -> None:
+    variants = """[
+        {"@type": "Product", "sku": "WIDGET",
+         "offers": {"@type": "Offer", "price": "19.99",
+                    "url": "https://shop.example.com/products/widget?variant=111"}}
+    ]"""
+    html = _product_group_html(variants=variants)
+    scraper = ShopifyScraper()
+    url = "https://shop.example.com/products/widget"
+    json_url = "https://shop.example.com/products/widget.json"
+
+    with respx.mock(assert_all_called=False) as router:
+        router.get(json_url).respond(404)
+        router.get(url).respond(200, text=html)
+        async with httpx.AsyncClient() as client:
+            info = await scraper.scrape(url, client)
+
+    assert info.price == Decimal("19.99")
+    assert info.currency is None
+
+
+async def _scrape_headless(url: str, html: str) -> ProductInfo:
+    scraper = ShopifyScraper()
+    json_url = url.split("?")[0] + ".json"
+    with respx.mock(assert_all_called=False) as router:
+        router.get(json_url).respond(404)
+        router.get(url).respond(200, text=html)
+        async with httpx.AsyncClient() as client:
+            return await scraper.scrape(url, client)
+
+
+@pytest.mark.asyncio
+async def test_shopify_headless_numeric_price_is_not_read_as_cents() -> None:
+    """schema.org allows a Number price; the page-wide cents scan must not see it first."""
+    variants = """[
+        {"@type": "Product", "sku": "WIDGET",
+         "offers": {"@type": "Offer", "price": 129.00, "priceCurrency": "USD",
+                    "url": "https://shop.example.com/products/widget?variant=111"}}
+    ]"""
+    info = await _scrape_headless(
+        "https://shop.example.com/products/widget", _product_group_html(variants=variants)
+    )
+    assert info.price == Decimal("129.00")
+    assert info.currency == "USD"
+
+
+@pytest.mark.asyncio
+async def test_shopify_headless_numeric_prices_still_ambiguous() -> None:
+    variants = """[
+        {"@type": "Product", "sku": "WIDGET",
+         "offers": {"@type": "Offer", "price": 129.00, "priceCurrency": "USD",
+                    "url": "https://shop.example.com/products/widget?variant=111"}},
+        {"@type": "Product", "sku": "WIDGET-CASE",
+         "offers": {"@type": "Offer", "price": 49.00, "priceCurrency": "USD",
+                    "url": "https://shop.example.com/products/widget?variant=222"}}
+    ]"""
+    info = await _scrape_headless(
+        "https://shop.example.com/products/widget", _product_group_html(variants=variants)
+    )
+    assert info.price is None
+    assert info.error is not None
+
+
+@pytest.mark.asyncio
+async def test_shopify_headless_group_is_authoritative_over_css() -> None:
+    """An ambiguous identity-confirmed group must not fall through to a generic selector."""
+    variants = """[
+        {"@type": "Product", "sku": "WIDGET",
+         "offers": {"@type": "Offer", "price": "19.99", "priceCurrency": "USD",
+                    "url": "https://shop.example.com/products/widget?variant=111"}},
+        {"@type": "Product", "sku": "WIDGET-CASE",
+         "offers": {"@type": "Offer", "price": "9.99", "priceCurrency": "USD",
+                    "url": "https://shop.example.com/products/widget?variant=222"}}
+    ]"""
+    html = _product_group_html(variants=variants).replace(
+        '<div id="root"></div>', '<span class="product__price">$7.77</span>'
+    )
+    info = await _scrape_headless("https://shop.example.com/products/widget", html)
+    assert info.price is None
+    assert info.error is not None
+
+
+@pytest.mark.asyncio
+async def test_shopify_headless_two_matching_groups_disagree_no_price() -> None:
+    one = """[{"@type": "Product", "sku": "W", "offers": {"@type": "Offer", "price": "19.99",
+              "priceCurrency": "USD"}}]"""
+    two = """[{"@type": "Product", "sku": "W", "offers": {"@type": "Offer", "price": "9.99",
+              "priceCurrency": "USD"}}]"""
+    html = _product_group_html(variants=one) + _product_group_html(variants=two)
+    info = await _scrape_headless("https://shop.example.com/products/widget", html)
+    assert info.price is None
+    assert info.error is not None
+
+
+@pytest.mark.asyncio
+async def test_shopify_headless_two_matching_groups_agree() -> None:
+    one = """[{"@type": "Product", "sku": "W", "offers": {"@type": "Offer", "price": "19.99",
+              "priceCurrency": "USD"}}]"""
+    html = _product_group_html(variants=one) + _product_group_html(variants=one)
+    info = await _scrape_headless("https://shop.example.com/products/widget", html)
+    assert info.price == Decimal("19.99")
+
+
+@pytest.mark.asyncio
+async def test_shopify_headless_url_list_with_foreign_entry_is_not_a_match() -> None:
+    html = """
+    <html><head><script type="application/ld+json">
+    {"@type": "ProductGroup", "name": "Widget",
+     "url": ["https://shop.example.com/products/widget",
+             "https://shop.example.com/products/other"],
+     "hasVariant": [{"@type": "Product", "sku": "W",
+                     "offers": {"@type": "Offer", "price": "5.00", "priceCurrency": "USD"}}]}
+    </script></head><body></body></html>
+    """
+    info = await _scrape_headless("https://shop.example.com/products/widget", html)
+    assert info.price is None
+
+
+@pytest.mark.asyncio
+async def test_shopify_headless_duplicate_variant_id_is_ambiguous() -> None:
+    variants = """[
+        {"@type": "Product", "sku": "A",
+         "offers": {"@type": "Offer", "price": "19.99", "priceCurrency": "USD",
+                    "url": "https://shop.example.com/products/widget?variant=222"}},
+        {"@type": "Product", "sku": "B",
+         "offers": {"@type": "Offer", "price": "9.99", "priceCurrency": "USD",
+                    "url": "https://shop.example.com/products/widget?variant=222"}}
+    ]"""
+    info = await _scrape_headless(
+        "https://shop.example.com/products/widget?variant=222",
+        _product_group_html(variants=variants),
+    )
+    assert info.price is None
+    assert info.error is not None
+    assert "ambiguo" in info.error
+
+
+@pytest.mark.asyncio
+async def test_shopify_headless_other_query_params_keep_identity() -> None:
+    """Removing ?variant= must not re-encode the other query pairs differently."""
+    variants = """[
+        {"@type": "Product", "sku": "A",
+         "offers": {"@type": "Offer", "price": "19.99", "priceCurrency": "USD",
+                    "url": "https://shop.example.com/products/widget?variant=111"}},
+        {"@type": "Product", "sku": "B",
+         "offers": {"@type": "Offer", "price": "9.99", "priceCurrency": "USD",
+                    "url": "https://shop.example.com/products/widget?variant=222"}}
+    ]"""
+    html = _product_group_html(
+        group_url="https://shop.example.com/products/widget?ref=a%20b", variants=variants
+    )
+    info = await _scrape_headless(
+        "https://shop.example.com/products/widget?ref=a%20b&variant=222", html
+    )
+    assert info.price == Decimal("9.99")
+
+
+@pytest.mark.asyncio
+async def test_shopify_embedded_title_survives_cents_fallback() -> None:
+    """Embedded product JSON with an unreadable price keeps its title on the cents read."""
+    html = (
+        '<script>var meta = {"product":{"title":"Widget","variants":[{"price":"n/a"}]}};'
+        '</script><script>{"price_min": 2999}</script>'
+    )
+    info = await _scrape_headless("https://shop.example.com/products/widget", html)
+    assert info.price == Decimal("29.99")
+    assert info.name == "Widget"
