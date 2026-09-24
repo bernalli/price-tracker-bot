@@ -250,7 +250,8 @@ def test_every_verb_the_spec_uses_fits_the_grammar() -> None:
 
 def test_currency_callback_belongs_to_the_grammar() -> None:
     """p:<32-hex flow token>:cur:<choice> is a registered shape."""
-    # A 32-character hex flow token.
+    # A 32-character hex flow token, kept as two literals so secret scanners do
+    # not report this test value as a credential (a false positive).
     token = "01234567" "89abcdef" * 2  # fmt: skip
     for choice in ("USD", "type", "cancel"):
         wire = f"p:{token}:cur:{choice}"
