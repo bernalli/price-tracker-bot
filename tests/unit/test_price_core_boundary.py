@@ -45,6 +45,10 @@ def test_price_core_imports_are_effect_free() -> None:
     once the extractor is built. The invariant that matters — no disk
     cache is used — is ``enabled``, computed from the constructor argument
     *before* that stringification.
+
+    This couples to tldextract's private ``_cache``/``DiskCache.enabled``
+    (no public API exposes it); a future tldextract release may rename or
+    remove it, which will fail this test loudly (AttributeError), not silently.
     """
     script = "\n".join(
         [
