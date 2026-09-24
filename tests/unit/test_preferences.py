@@ -1,4 +1,4 @@
-"""Tests for PreferencesManager + EffectivePrefs resolution chain (F3.D Task 24)."""
+"""Tests for PreferencesManager + EffectivePrefs resolution chain."""
 
 from __future__ import annotations
 

@@ -42,7 +42,7 @@ pytest --cov=src/price_tracker               # with coverage report
 pytest tests/unit/scrapers/test_amazon.py -v # single file verbose
 ```
 
-Coverage: current enforced gate is ≥75% (`pyproject.toml`). Plan 3 closure targets: global ≥90%, core ≥93%, per-scraper ≥80%.
+Coverage: the CI gate enforces ≥75% on the coverage-tracked modules (see `pyproject.toml`). The project holds itself to a higher bar in practice: global ≥90%, core ≥93%, per-scraper ≥80%.
 
 ## Linting & type-checking
 
@@ -97,4 +97,4 @@ Optional but encouraged. See [GitHub docs](https://docs.github.com/en/authentica
 
 ## Where to ask questions
 
-GitHub Discussions (enabled after Plan 4 first push) or open an Issue with the `question` label.
+GitHub Discussions or open an Issue with the `question` label.

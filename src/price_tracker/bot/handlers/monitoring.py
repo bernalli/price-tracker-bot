@@ -1,6 +1,6 @@
 """Price-monitoring handlers: /check, /checkall, /refresh, /pausa, /riattiva.
 
-Ported from monolithic bot.py [Task 17]. The periodic scrape loop lives in
+Split out of the original monolithic bot.py module. The periodic scrape loop lives in
 ``core.scheduler.Scheduler``; this module exposes the interactive Telegram
 commands and the rich :func:`_send_alert` helper used by both modes when a
 threshold fires.

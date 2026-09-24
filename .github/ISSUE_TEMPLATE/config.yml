@@ -2,4 +2,4 @@ blank_issues_enabled: false
 contact_links:
   - name: Discussions
     url: https://github.com/bernalli/price-tracker-bot/discussions
-    about: Ask a general question or share an idea (after Plan 4 F8 enables Discussions)
+    about: Ask a general question or share an idea

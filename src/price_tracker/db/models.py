@@ -14,7 +14,7 @@ class _DictCompatMixin:
     """Mapping-style access for legacy handlers still using dict semantics.
 
     The original ``bot.py`` monolith spoke to a row-as-``dict`` repository.
-    Plan 1 F1 split bot.py into modules and switched the repository to typed
+    Splitting bot.py into modules switched the repository to typed
     ``@dataclass`` records, but most handlers still call ``record.get("key")``
     or ``record["key"]``. Until handlers are migrated to attribute access,
     this mixin keeps both APIs working without copying every row to a dict.

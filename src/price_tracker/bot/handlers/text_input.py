@@ -1,7 +1,7 @@
 """URL & text-input intake handlers.
 
-Split out of `handlers/product.py` to keep each module under the 500-LOC
-budget [Task 17]. Handles paste-link UX (`handle_url`) and pending-action
+Split out of `handlers/product.py` to keep each module under a 500-line
+budget. Handles paste-link UX (`handle_url`) and pending-action
 text replies (`handle_text_input`).
 """
 
@@ -55,7 +55,7 @@ async def handle_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 @with_locale
 @restricted
-async def handle_text_input(  # noqa: PLR0915 — verbatim port; cyclomatic split planned for F6
+async def handle_text_input(  # noqa: PLR0915 — verbatim port; not yet split into smaller functions
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:
     """Handle non-URL plain-text input that satisfies a pending inline-button action."""

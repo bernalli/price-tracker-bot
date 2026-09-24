@@ -1,8 +1,8 @@
 """Price-history & reset handlers: /history, /reset.
 
-Ported from monolithic bot.py [Task 17]. The chart renderer (`_generate_chart`)
-is kept here as a private helper until the chart module gets its own home in
-Plan 3 (F4).
+Split out of the original monolithic bot.py module. The chart renderer
+(`_generate_chart`) is kept here as a private helper rather than its own
+module.
 """
 
 from __future__ import annotations

@@ -101,7 +101,7 @@ async def test_post_init_populates_all_handler_lookup_keys(
     """Regression: every key looked up by bot decorators / handlers must be
     populated by ``_combined_post_init``.
 
-    The Plan 1 F1 monolith split introduced naming drift between bootstrap
+    Splitting the bot.py monolith introduced naming drift between bootstrap
     (sets ``bot_data["repo"]``, ``["registry"]``) and handler code (looks up
     ``bot_data["db"]``, ``["scraper"]``). Without these aliases, every
     command going through ``bot.decorators._db`` / ``_scraper`` crashes with

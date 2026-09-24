@@ -101,7 +101,7 @@ def test_discover_builtin_scrapers_loads_real_modules():
 
     r = ScraperRegistry()
     discover_builtin_scrapers(r)
-    # Built-in scrapers from Task 24: amazon, ebay, shopify, generic, playwright_fallback
+    # Built-in scrapers: amazon, ebay, shopify, generic, playwright_fallback
     names = {s.name for s in r}
     # We don't pin the exact set (drop-in changes are possible) — just check non-empty
     assert len(names) >= 1

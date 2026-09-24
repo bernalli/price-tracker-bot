@@ -1,6 +1,6 @@
 """Integration test for notify_alert wiring: prefs + digest + dedupe.
 
-Covers the alert dispatch flow in TelegramNotifier (Task 28, F3.D):
+Covers the alert dispatch flow in TelegramNotifier:
 - immediate send when no prefs
 - mute drops alert
 - quiet hours + digest mode -> enqueue

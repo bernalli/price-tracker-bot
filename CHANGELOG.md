@@ -306,7 +306,7 @@ Found during the same audit, not addressed here:
 - `/check`, `/checkall`, the menu **🔍 Check all** button and the per-product
   inline **Check now** button all crashed with `ModuleNotFoundError: No
   module named 'checker'` (and `_send_alert` would also have crashed on
-  `chart` for the photo path). Plan 1 F1 left **seven** deferred imports of
+  `chart` for the photo path). Splitting the bot.py monolith left **seven** deferred imports of
   the legacy bare module names (`from checker import PriceChecker, format_alert`
   in `bot/handlers/monitoring.py` ×4, `bot/handlers/callbacks/_menu.py`,
   `bot/handlers/callbacks/_product.py`; `from chart import render_price_history`
@@ -361,7 +361,7 @@ Found during the same audit, not addressed here:
   drift** on methods that *did* exist. `bot/handlers/product.py:335`
   and `bot/handlers/product_io.py:162` were still calling
   `add_product(price=..., target_price=..., threshold_value="10")`
-  against the post-F1 signature
+  against the post-split signature
   `add_product(*, initial_price=..., threshold_value: Decimal=...)`
   (no `target_price` keyword).
 - Aligned both call sites: `price` → `initial_price`,
@@ -384,7 +384,7 @@ Found during the same audit, not addressed here:
 - The `/add <url>` flow crashed in production with
   `AttributeError: 'Repository' object has no attribute
   'get_product_by_url_for_user'` whenever a user sent a Telegram link to
-  the bot. A handler-side audit revealed that the Plan 1 F1 monolith
+  the bot. A handler-side audit revealed that the bot.py monolith
   split left **13 distinct `db.<method>(…)` calls** in
   `src/price_tracker/bot/**` referencing repository methods that no
   longer exist post-refactor: `get_product_by_url_for_user`,
@@ -424,8 +424,8 @@ Found during the same audit, not addressed here:
   `ModuleNotFoundError: No module named 'scrapers'` in
   `bot/handlers/product.py` and `bot/handlers/product_io.py`, plus the
   `/debug` command crashed with `AttributeError` because
-  `ScraperRegistry` was being called like an individual scraper. Plan 1
-  F1 monolith split left two stale deferred imports
+  `ScraperRegistry` was being called like an individual scraper. The
+  bot.py monolith split left two stale deferred imports
   (`from scrapers import identify_site`) and three call sites still
   invoking `scraper.scrape(url, client)` directly on the
   ``ScraperRegistry`` instance instead of going through
@@ -447,7 +447,7 @@ Found during the same audit, not addressed here:
   `"❌ Si è verificato un errore. Riprova tra qualche istante."` to
   Telegram users on every command going through `bot.decorators._db` /
   `_scraper` (add/list/history/debug/monitoring/callbacks). Root cause:
-  the Plan 1 F1 monolith split renamed the bootstrap keys to
+  the bot.py monolith split renamed the bootstrap keys to
   `bot_data["repo"]` / `["registry"]` but left the handler-side lookups
   expecting `["db"]` / `["scraper"]`. Added the two missing aliases in
   `main.post_init` and a regression test
@@ -481,67 +481,60 @@ auto-quarantine, and a plugin extension point.
   (refactored from monolith) plus walmart, target, bestbuy, etsy, newegg,
   wayfair, mediamarkt, otto, zalando, apple_store, google_store, aliexpress.
 - HealthManager with per-domain auto-quarantine and tier-based exponential
-  backoff (Plan 2 F3.B): closes bug #1 (xteink.com infinite 429 loop).
+  backoff: closes bug #1 (xteink.com infinite 429 loop).
 - NotificationPrefs system with 8 commands: `/mute`, `/unmute`, `/digest_mode`,
-  `/quiet_hours`, `/timezone`, `/throttle`, `/prefs`, `/digest_now` (Plan 2 F3.D).
-- DigestService for batched alerts with periodic flush (Plan 2 F3.D).
+  `/quiet_hours`, `/timezone`, `/throttle`, `/prefs`, `/digest_now`.
+- DigestService for batched alerts with periodic flush.
 - Prometheus exporter on `127.0.0.1:9090` with counter/gauge/histogram
   metrics for scraper duration, block events, quarantine state, alerts
-  sent/skipped, currency lookups (Plan 2 F3.L).
-- Structured JSON logging via structlog (Plan 2 F3.L).
-- Grafana dashboard with 14 panels (Plan 2 F3.L).
+  sent/skipped, currency lookups.
+- Structured JSON logging via structlog.
+- Grafana dashboard with 14 panels.
 - Plugin extension point at `plugins/` for custom scrapers (entry-point
   group `price_tracker.scrapers` + auto-discovery).
 - Bilingual UI (English source + Italian translation) with auto-detect
-  from Telegram `language_code`, fallback to `LANG` environment variable
-  (Plan 3 F5).
+  from Telegram `language_code`, fallback to `LANG` environment variable.
 - Generic scraper extraction chain: JSON-LD, microdata, OpenGraph,
-  RDFa, heuristic regex (Plan 2 F3.M Task 31).
+  RDFa, heuristic regex.
 - Versioned database migrations (001-010) replacing inline ALTER TABLE
-  statements (Plan 1 F1.5).
-- Tenacity-based retry policy replacing ad-hoc `2**attempt` loops
-  (Plan 1 F1.5).
-- Persistent ECB currency rate cache with TTL (Plan 1 F1.5).
+  statements.
+- Tenacity-based retry policy replacing ad-hoc `2**attempt` loops.
+- Persistent ECB currency rate cache with TTL.
 - Comprehensive test suite with at least 430 tests, at least 90% global
-  coverage, at least 93% core coverage, at least 80% per-scraper coverage
-  (Plan 1 F2 + Plan 2 + Plan 3).
+  coverage, at least 93% core coverage, at least 80% per-scraper coverage.
 - GitHub Actions CI/CD: ci.yml (matrix py3.11/3.12/3.13), security.yml,
   release.yml (tag-triggered GitHub Release with sdist + wheel),
-  docker-build.yml (multi-arch verify-only) (Plan 3 F6).
-- Dependabot for pip + github-actions weekly updates (Plan 3 F6).
-- Issue templates and PR template (Plan 3 F6).
+  docker-build.yml (multi-arch verify-only).
+- Dependabot for pip + github-actions weekly updates.
+- Issue templates and PR template.
 - Documentation site: README, architecture, observability, scrapers,
-  plugins, notifications, operations, i18n (Plan 3 F4).
-- Contributor docs: CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md
-  (Plan 3 F4).
+  plugins, notifications, operations, i18n.
+- Contributor docs: CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md.
 
 ### Changed
 - `bot.py` monolith (2664 LOC) split into modular
-  `bot/handlers/{auth,monitoring,settings,product,history,debug,...}.py`
-  (Plan 1 F1).
+  `bot/handlers/{auth,monitoring,settings,product,history,debug,...}.py`.
 - `database.py` monolith (807 LOC) split into
-  `db/{models,repository,migrator}.py` (Plan 1 F1).
-- `checker.py` (609 LOC) split into `core/{scheduler,alert,outlier}.py`
-  (Plan 1 F1).
+  `db/{models,repository,migrator}.py`.
+- `checker.py` (609 LOC) split into `core/{scheduler,alert,outlier}.py`.
 - All exception handlers narrowed from broad `except Exception` to
-  specific exception types (BLE001 enforced via ruff) (Plan 1 F1.5).
+  specific exception types (BLE001 enforced via ruff).
 - Container deploy hardened: read-only root filesystem, capability drop,
-  no-new-privileges, resource limits (Plan 3 F7).
+  no-new-privileges, resource limits.
 
 ### Fixed
-- Bug #1: infinite 429 loop on xteink.com (HealthManager auto-quarantine,
-  Plan 2 F3.B).
-- Bug #2: 27+ broad `except Exception` (Plan 1 F1.5, ruff BLE001 enforced).
-- Bug #3: zero test coverage (now at least 430 tests, Plan 1 F2 + Plan 2 + Plan 3).
-- Bug #4: bot.py 2664 LOC monolith (Plan 1 F1 split).
+- Bug #1: infinite 429 loop on xteink.com (HealthManager auto-quarantine).
+- Bug #2: 27+ broad `except Exception` (ruff BLE001 enforced).
+- Bug #3: zero test coverage (now at least 430 tests).
+- Bug #4: bot.py 2664 LOC monolith (module split).
 - Bug #5: 22 inline ALTER TABLE without migration versioning
-  (Plan 1 F1 versioned migrations).
-- Bug #6: ad-hoc `2**attempt` retry (Plan 1 F1.5 tenacity).
-- Bug #7: checker.py mixing concerns (Plan 1 F1 split).
-- Bug #8: ECB currency cache lost on restart (Plan 1 F1.5 persistent
+  (versioned migrations).
+- Bug #6: ad-hoc `2**attempt` retry (tenacity-based retry).
+- Bug #7: checker.py mixing concerns (module split).
+- Bug #8: ECB currency cache lost on restart (persistent
   cache with TTL).
 - Bug #9: container deploy without read-only root, resource limits, or
-  `.dockerignore` (Plan 3 F7 hardening).
+  `.dockerignore` (hardening).
 
 ### Security
 - Container runs as non-root `botuser` (uid 1000).

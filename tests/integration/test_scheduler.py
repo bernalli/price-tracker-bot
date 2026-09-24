@@ -619,13 +619,13 @@ async def test_scheduler_cleanup_old_history(
 
 
 # ---------------------------------------------------------------------------
-# Task 8 fixtures: scheduler_factory + sample_products
-# (now defined in tests/integration/conftest.py and shared across integration tests)
+# Shared fixtures: scheduler_factory + sample_products
+# (defined in tests/integration/conftest.py and shared across integration tests)
 # ---------------------------------------------------------------------------
 
 
 # ---------------------------------------------------------------------------
-# Task 8 tests: skip-on-locked + half-open single probe
+# Domain-lock tests: skip-on-locked + half-open single probe
 # ---------------------------------------------------------------------------
 
 
@@ -672,7 +672,7 @@ async def test_scheduler_half_open_sends_only_one_probe(
 
 
 # ---------------------------------------------------------------------------
-# Task 16 tests: Prometheus metric emission from Scheduler
+# Prometheus metric emission from Scheduler
 # ---------------------------------------------------------------------------
 
 

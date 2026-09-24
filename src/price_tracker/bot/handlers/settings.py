@@ -1,8 +1,8 @@
 """Settings handler: /intervallo (admin global check interval).
 
-Ported from monolithic bot.py [Task 17].
+Split out of the original monolithic bot.py module.
 
-Plan 2 F3.D additions [Task 29]: per-user notification preference commands
+Also includes the per-user notification preference commands
 (/mute /unmute /digest_mode /quiet_hours /timezone /throttle /prefs /digest_now).
 """
 
@@ -70,7 +70,7 @@ async def cmd_set_interval(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     )
 
 
-# ── Plan 2 F3.D: notification preference commands ────────────────────
+# ── Notification preference commands ──────────────────────────────────
 
 
 def _reschedule_periodic_check(context: ContextTypes.DEFAULT_TYPE, minutes: int) -> None:
@@ -378,7 +378,7 @@ def register(app: Application) -> None:
     """Register settings command handlers on ``app``."""
     app.add_handler(CommandHandler("intervallo", cmd_set_interval))
     app.add_handler(CommandHandler("setinterval", cmd_set_interval))
-    # Plan 2 F3.D notification preference commands [Task 29]
+    # Notification preference commands
     app.add_handler(CommandHandler("mute", mute_command))
     app.add_handler(CommandHandler("unmute", unmute_command))
     app.add_handler(CommandHandler("digest_mode", digest_mode_command))
