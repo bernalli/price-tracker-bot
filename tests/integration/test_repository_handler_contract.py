@@ -1,6 +1,6 @@
-"""Repository ↔ handler contract — defense against refactor drift.
+"""Repository ↔ handler contract — defense against handler/repository drift.
 
-Lesson learned in CONTINUITY 2026-05-14: after the monolithic ``bot.py`` was
+Lesson learned the hard way: after the monolithic ``bot.py`` was
 split into ``bot/handlers/**`` modules, four successive hotfixes (v0.1.1
 through v0.1.4) patched individual KeyErrors / AttributeErrors / TypeErrors
 discovered when real users exercised the handlers. v0.1.4 added the
@@ -111,7 +111,7 @@ def test_every_db_call_resolves_on_repository() -> None:
         )
         pytest.fail(
             f"{len(missing)} db.<method>() handler calls have no matching "
-            f"Repository attribute (naming drift after the module split). Either add "
+            f"Repository attribute (drift from the bot.py split). Either add "
             f"the method to Repository or update the handler:\n{detail}"
         )
 
@@ -121,7 +121,7 @@ def test_every_db_kwarg_exists_on_repository_signature() -> None:
 
     Catches the v0.1.5 class of regressions where the Repository renamed a
     keyword (``price`` → ``initial_price``) or dropped one (``target_price``)
-    during the module refactor but the handlers still pass the old name.
+    during the refactor but the handlers still pass the old name.
     """
     drift: list[str] = []
     for path, lineno, method, kwargs in _collect_db_kwargs_calls():
@@ -149,7 +149,7 @@ def test_every_db_kwarg_exists_on_repository_signature() -> None:
         pytest.fail(
             f"{len(drift)} db.<method>(...) call sites pass keyword arguments "
             f"not present on the Repository signature (signature drift from "
-            f"module refactor). Align caller or extend the method:\n{detail}"
+            f"the bot.py refactor). Align caller or extend the method:\n{detail}"
         )
 
 

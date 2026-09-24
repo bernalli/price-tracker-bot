@@ -1,8 +1,8 @@
 """Smoke tests for PlaywrightFallbackScraper.
 
-E2E rendering is not covered — these tests cover only the static
-metadata (priority, can_handle, available()) and the no-playwright code
-path that returns a clean error.
+These tests cover only the static metadata (priority, can_handle,
+available()) and the no-playwright code path that returns a clean error;
+rendering through a real browser is not exercised here.
 """
 
 from __future__ import annotations

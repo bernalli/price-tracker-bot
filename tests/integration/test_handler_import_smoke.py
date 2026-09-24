@@ -1,6 +1,6 @@
 """Handler import smoke — defense against legacy module ``ModuleNotFoundError``.
 
-The monolith split sprinkled deferred imports of legacy bare module
+Splitting the bot.py monolith sprinkled deferred imports of legacy bare module
 names inside handler functions. Those imports stayed dormant until a Telegram
 user hit the command, at which point the bot crashed with
 ``ModuleNotFoundError`` and the user received the generic

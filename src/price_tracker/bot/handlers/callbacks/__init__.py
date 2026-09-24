@@ -1,9 +1,8 @@
 """Inline-button callback dispatcher.
 
-The original `handle_callback` was a single ~700-LOC if/elif chain. The refactor
-splits it into per-domain helpers under this package and keeps the
-dispatcher itself a thin sequence of `if handled := await ...: return`
-calls.
+The original `handle_callback` was a single ~700-LOC if/elif chain, since
+split into per-domain helpers under this package. The dispatcher itself
+stays a thin sequence of `if handled := await ...: return` calls.
 """
 
 from __future__ import annotations
