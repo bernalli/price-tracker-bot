@@ -46,9 +46,9 @@ jobs:
         run: ruff format --check .
 
       - name: mypy strict
-        # Reads files = [...] from [tool.mypy] in pyproject.toml.
-        # At T24 commit time this is src/price_tracker only; T35 extends
-        # to include tests/ (no ci.yml change needed thanks to indirection).
+        # Reads files = [...] from [tool.mypy] in pyproject.toml, which lists
+        # both src/price_tracker and tests/ (no ci.yml change needed if that
+        # scope changes, thanks to the indirection).
         run: mypy --strict
 
       - name: pytest with coverage

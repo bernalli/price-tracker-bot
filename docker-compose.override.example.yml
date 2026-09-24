@@ -4,6 +4,6 @@
 services:
   price-tracker:
     volumes:
-      - ./plugins:/app/plugins:ro   # path host generico — personalizzalo nel tuo override
+      - ./plugins:/app/plugins:ro   # generic host path — customize it in your own override
     environment:
       TZ: Europe/Rome
