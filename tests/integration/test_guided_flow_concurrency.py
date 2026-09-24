@@ -1,4 +1,4 @@
-"""Concurrent Telegram updates, with deterministic service barriers (D1-D4)."""
+"""Concurrent Telegram updates, with deterministic service barriers."""
 
 from __future__ import annotations
 
@@ -56,7 +56,7 @@ async def test_older_add_must_not_replace_newer_prompt(phase: str) -> None:
 
 
 async def test_stale_insert_reports_once_without_keyboard() -> None:
-    """T2: an already committed insert stays store-only and cannot touch the target."""
+    """An already committed insert stays store-only and cannot touch the target."""
     async with concurrent_harness() as h:
         barrier = ServiceBarrier(h.services, "add_product", after=True)
         task = await start_add(h, "add_product")
@@ -127,7 +127,7 @@ async def test_current_continuation_opens_prompt(phase: str) -> None:
 
 
 async def test_claim_invalidates_pending_entry_without_another_open() -> None:
-    """T6: target answer claims while an interval entry waits for its product name."""
+    """A target answer claims while an interval entry waits for its product name."""
     async with concurrent_harness() as h:
         await h.press(PRIVATE, USER, "p:1:tg")
         barrier = ServiceBarrier(h.services, "product_name")

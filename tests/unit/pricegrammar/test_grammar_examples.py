@@ -1,6 +1,6 @@
 """Example rows of the price grammar: the normative acceptance and rejection tables.
 
-Every row is written from the price-core specification, not from the parser's output.
+Every row is written from the price grammar's normative rules, not from the parser's output.
 Invisible separators are built with ``chr`` so that the source shows which one is used.
 """
 
@@ -102,7 +102,7 @@ def test_acceptance_table(text: str, ctx: PriceContext, expected: str) -> None:
 
 
 REJECT: list[tuple[str, PriceContext]] = [
-    # the rejection table of the specification
+    # inputs the price grammar must reject
     ("1e3", PriceContext()),
     ("-5", PriceContext()),
     (f"{MINUS}5", PriceContext()),

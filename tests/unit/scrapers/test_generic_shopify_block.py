@@ -228,7 +228,7 @@ async def test_shopify_scrape_propagates_block_to_caller() -> None:
                 await ShopifyScraper().scrape(url, client)
 
 
-# ── Measured live 2026-09-02: a removed product redirects before it 404s ──
+# ── A removed product redirects before it 404s ──
 
 
 async def test_shopify_non_product_redirect_is_a_gone_listing() -> None:

@@ -1,10 +1,10 @@
 """The chart must show a time window, not the last N readings.
 
 The scheduler writes one price_history row per check, whether or not the price
-moved, so `LIMIT 100` is a window measured in samples: at the production tick
-rate it covered about four days, and in four days almost no price moves. Ten of
-twelve tracked products rendered a flat line while their 90-day history held
-between two and 134 distinct prices.
+moved, so `LIMIT 100` is a window measured in samples: at an hourly tick rate
+it covered about four days, and in four days almost no price moves. Most
+products rendered a flat line while their 90-day history held many distinct
+prices.
 """
 
 from __future__ import annotations

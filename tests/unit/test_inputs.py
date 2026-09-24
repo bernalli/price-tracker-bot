@@ -1,4 +1,4 @@
-"""The input grammar of section 11.5.
+"""Grammar of the free-text inputs accepted by the guided flows.
 
 Per-parser corpora (``tests/support/input_corpus.py``) pin accepted values and
 rejections; a property over random Unicode proves every parser is total and
@@ -132,7 +132,7 @@ def test_rejected_corpus(name: str, text: str) -> None:
 
 
 def test_single_separator_is_always_decimal() -> None:
-    """R2-3: 1.299 and 1,299 both mean 1.299; locale never changes it."""
+    """1.299 and 1,299 both mean 1.299; locale never changes it."""
     assert (
         inputs.parse_target("1.299") == inputs.parse_target("1,299") == SetTarget(Decimal("1.299"))
     )

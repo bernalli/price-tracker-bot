@@ -149,9 +149,9 @@ def test_split_message_degrades_an_unknown_tag() -> None:
 def test_split_message_degrades_an_incomplete_entity() -> None:
     """An entity-like sequence missing its trailing ``;`` must be degraded.
 
-    This is the review's exact reproduction: before the grammar guard,
-    ``split_message("x &amp")`` returned the row unchanged because its
-    unescaped visible length stayed under the limit.
+    Regression guard: before the grammar guard, ``split_message("x &amp")``
+    returned the row unchanged because its unescaped visible length stayed
+    under the limit.
     """
     chunks = split_message("x &amp")
 
