@@ -360,7 +360,7 @@ def _n1_payload(order: str) -> str:
 
 @pytest.mark.parametrize("order", ["BA", "AB", "AA"])
 def test_duplicate_identity_key_rejects_the_payload(order: str) -> None:
-    """Verbatim N1 case: requested ``/p/A``; neither key order may decide ownership."""
+    """Duplicate identity key: requested ``/p/A``; neither key order may decide ownership."""
     requested = RequestedIdentity.from_url("https://shop.example.com/p/A")
     rescue = Observation(
         "container:#buybox",
