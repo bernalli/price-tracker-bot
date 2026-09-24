@@ -874,7 +874,7 @@ class Repository:
         rows = await cursor.fetchall()
         return [(r[0], dt) for r in rows if (dt := _parse_ts(r[1])) is not None]
 
-    # ── Backward-compat aliases for legacy handler API ──
+    # ── Backward-compat aliases for the legacy handler API ──
     #
     # The pre-refactor monolith spoke to a dict-row repository with a different
     # method naming. Handlers under ``bot/handlers/`` were ported "as-is" and

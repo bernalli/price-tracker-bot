@@ -1,8 +1,8 @@
 """Per-product action callbacks (`edit_*`, `pause_*`, `remove_*`, `reset_*`,
 `reactivate_*`, `set*_*` pickers).
 
-Split out of `handlers/callbacks/_product.py` to keep each module under the
-500-LOC budget.
+Split out of `handlers/callbacks/_product.py` to keep each module under a
+500-line budget.
 """
 
 from __future__ import annotations

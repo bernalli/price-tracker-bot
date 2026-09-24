@@ -1,6 +1,6 @@
 """Admin user-management handlers: /adduser, /removeuser, /users, /nick.
 
-Ported from monolithic bot.py.
+Split out of the original monolithic bot.py module.
 """
 
 from __future__ import annotations

@@ -147,7 +147,7 @@ def test_compile_artifacts_present_smoke() -> None:
     en_mo = Path(pkg_dir) / "locale" / "en" / "LC_MESSAGES" / "messages.mo"
     it_mo = Path(pkg_dir) / "locale" / "it_IT" / "LC_MESSAGES" / "messages.mo"
     if not en_mo.exists() or not it_mo.exists():
-        pytest.skip("production catalog not yet compiled")
+        pytest.skip("compiled locale catalog not present in this checkout")
     assert en_mo.is_file()
     assert it_mo.is_file()
 

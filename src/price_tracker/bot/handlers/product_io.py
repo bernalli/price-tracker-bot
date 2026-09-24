@@ -1,6 +1,6 @@
 """CSV import/export handlers: /esporta, /importa.
 
-Split out of `handlers/product.py` to keep each module under the 500-LOC
+Split out of `handlers/product.py` to keep each module under a 500-line
 budget.
 """
 

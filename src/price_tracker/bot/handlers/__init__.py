@@ -1,8 +1,7 @@
 """Aggregator — register all per-domain handlers on the Application.
 
 Home commands (`/start`, `/menu`, `/help`) plus the global error handler
-live here; per-domain handlers are imported from
-the sibling modules.
+live here; per-domain handlers are imported from the sibling modules.
 """
 
 from __future__ import annotations

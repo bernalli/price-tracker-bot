@@ -1,8 +1,8 @@
 """Settings handler: /intervallo (admin global check interval).
 
-Ported from monolithic bot.py.
+Split out of the original monolithic bot.py module.
 
-Additions: per-user notification preference commands
+Also includes the per-user notification preference commands
 (/mute /unmute /digest_mode /quiet_hours /timezone /throttle /prefs /digest_now).
 """
 
@@ -70,7 +70,7 @@ async def cmd_set_interval(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     )
 
 
-# ── Notification preference commands ──────────────────────────────
+# ── Notification preference commands ──────────────────────────────────
 
 
 def _reschedule_periodic_check(context: ContextTypes.DEFAULT_TYPE, minutes: int) -> None:

@@ -305,7 +305,7 @@ Found during the same audit, not addressed here:
 - `/check`, `/checkall`, the menu **🔍 Check all** button and the per-product
   inline **Check now** button all crashed with `ModuleNotFoundError: No
   module named 'checker'` (and `_send_alert` would also have crashed on
-  `chart` for the photo path). The module split left **seven** deferred imports of
+  `chart` for the photo path). Splitting the bot.py monolith left **seven** deferred imports of
   the legacy bare module names (`from checker import PriceChecker, format_alert`
   in `bot/handlers/monitoring.py` ×4, `bot/handlers/callbacks/_menu.py`,
   `bot/handlers/callbacks/_product.py`; `from chart import render_price_history`
@@ -360,7 +360,7 @@ Found during the same audit, not addressed here:
   drift** on methods that *did* exist. `bot/handlers/product.py:335`
   and `bot/handlers/product_io.py:162` were still calling
   `add_product(price=..., target_price=..., threshold_value="10")`
-  against the post-refactor signature
+  against the post-split signature
   `add_product(*, initial_price=..., threshold_value: Decimal=...)`
   (no `target_price` keyword).
 - Aligned both call sites: `price` → `initial_price`,
@@ -383,7 +383,7 @@ Found during the same audit, not addressed here:
 - The `/add <url>` flow crashed in production with
   `AttributeError: 'Repository' object has no attribute
   'get_product_by_url_for_user'` whenever a user sent a Telegram link to
-  the bot. A handler-side audit revealed that the monolith
+  the bot. A handler-side audit revealed that the bot.py monolith
   split left **13 distinct `db.<method>(…)` calls** in
   `src/price_tracker/bot/**` referencing repository methods that no
   longer exist post-refactor: `get_product_by_url_for_user`,
@@ -424,7 +424,7 @@ Found during the same audit, not addressed here:
   `bot/handlers/product.py` and `bot/handlers/product_io.py`, plus the
   `/debug` command crashed with `AttributeError` because
   `ScraperRegistry` was being called like an individual scraper. The
-  monolith split left two stale deferred imports
+  bot.py monolith split left two stale deferred imports
   (`from scrapers import identify_site`) and three call sites still
   invoking `scraper.scrape(url, client)` directly on the
   ``ScraperRegistry`` instance instead of going through
@@ -446,7 +446,7 @@ Found during the same audit, not addressed here:
   `"❌ Si è verificato un errore. Riprova tra qualche istante."` to
   Telegram users on every command going through `bot.decorators._db` /
   `_scraper` (add/list/history/debug/monitoring/callbacks). Root cause:
-  the monolith split renamed the bootstrap keys to
+  the bot.py monolith split renamed the bootstrap keys to
   `bot_data["repo"]` / `["registry"]` but left the handler-side lookups
   expecting `["db"]` / `["scraper"]`. Added the two missing aliases in
   `main.post_init` and a regression test
@@ -525,11 +525,11 @@ auto-quarantine, and a plugin extension point.
 - Bug #1: infinite 429 loop on a store (HealthManager auto-quarantine).
 - Bug #2: 27+ broad `except Exception` (ruff BLE001 enforced).
 - Bug #3: zero test coverage (now at least 430 tests).
-- Bug #4: bot.py 2664 LOC monolith (split into modules).
+- Bug #4: bot.py 2664 LOC monolith (module split).
 - Bug #5: 22 inline ALTER TABLE without migration versioning
   (versioned migrations).
-- Bug #6: ad-hoc `2**attempt` retry (tenacity).
-- Bug #7: checker.py mixing concerns (split into modules).
+- Bug #6: ad-hoc `2**attempt` retry (tenacity-based retry).
+- Bug #7: checker.py mixing concerns (module split).
 - Bug #8: ECB currency cache lost on restart (persistent
   cache with TTL).
 - Bug #9: container deploy without read-only root, resource limits, or

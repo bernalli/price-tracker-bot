@@ -10,13 +10,13 @@
 #
 # Coverage scope:
 #   - bot/decorators.py + bot/handlers/{auth,monitoring,_helpers}.py and
-#     descendants under callbacks/ that were already swept.
+#     the descendants under callbacks/ that have already been swept.
 #
-# Out of scope (carry-over IT strings, scheduled for post-v0.1.0 sweep):
+# Out of scope (carry-over IT strings, scheduled for a later sweep):
 #   - bot/handlers/{product,product_io,history,settings,text_input,debug}.py
 #     and callbacks/{_actions,_admin,_menu,_product}.py — legacy handler
 #     bodies; UX-visible strings already wrapped in `_()` but msgid texts
-#     remain Italian for now (covered by it_IT catalog passthrough).
+#     remain Italian (covered by it_IT catalog passthrough).
 #   - scrapers/** — domain-specific IT/EN dual-language parsing logic
 #     (CSS selectors like .prezzo-attuale, error messages emitted to
 #     bot layer for translation upstream).

@@ -1,7 +1,7 @@
 """Product CRUD handlers + URL paste intake.
 
-Ported from monolithic bot.py. CSV export/import lives in
-`handlers/product_io.py` to keep this file under the 500-LOC budget.
+Split out of the original monolithic bot.py module. CSV export/import lives in
+`handlers/product_io.py` to keep this file under the 500-line budget.
 """
 
 from __future__ import annotations
