@@ -77,7 +77,7 @@ def test_control_payload_is_found() -> None:
     assert _outcome(result) == (AnchorState.FOUND, Money(Decimal("89.00"), EUR), "owned")
 
 
-# ------------------------------------------------------------------ duplicate keys (N1)
+# ------------------------------------------------------------------ duplicate keys at any depth
 
 
 @settings(max_examples=800, deadline=None)
