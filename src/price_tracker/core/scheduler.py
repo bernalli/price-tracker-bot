@@ -329,7 +329,7 @@ class Scheduler:
     ) -> None:
         """One scheduler tick: scrape all eligible products.
 
-        Filtering rules:
+        Filtering rules (domain quarantine):
           - skip products on LOCKED domains entirely
           - on HALF_OPEN domains send exactly one probe (first product per domain per tick)
 

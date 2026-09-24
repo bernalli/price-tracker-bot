@@ -1603,8 +1603,8 @@ async def test_scheduler_suppresses_duplicate_alert_on_flapping_price(
     """A price oscillating across the threshold must notify ONCE, not on every
     downswing.
 
-    Reproduces the production bug where one product (regular 423 ↔ sale 370.8,
-    -12.3%) fired ~20 notifications because the push path had no anti-flap
+    Reproduces a real case where a product flapping between its regular and sale
+    price (423 ↔ 370.8, -12.3%) fired ~20 notifications because the push path had no anti-flap
     dedup. Initial price 100, threshold 10%; the scraped price flaps 80 ↔ 100
     over five ticks (downswings on ticks 1, 3, 5). Only the first downswing
     should reach the user.

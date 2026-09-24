@@ -214,7 +214,7 @@ Found during the same audit, not addressed here:
   only *consumed* HealthManager state via `is_locked`/`is_half_open` but
   never *produced* it via `record_success`/`record_block`, so the
   `scraper_health` table stayed empty forever and auto-quarantine
-  (Bug #1, a store's 429 loop) never engaged in production.
+  (a store's HTTP 429 loop) never engaged.
   Each successful scrape now calls `handle_success_in_pipeline`; each
   `BlockEvent` calls `handle_block_in_pipeline`. Both skip the call when
   the eTLD+1 cannot be resolved (`domain == "unknown"`). New integration

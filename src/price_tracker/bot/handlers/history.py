@@ -99,7 +99,8 @@ async def _generate_chart(db: Any, product_id: int, product: dict[str, Any]) -> 
     """Generate a price-history chart as PNG. Returns None if data is too sparse.
 
     The window is a PERIOD, not a row count. Asking for the last 100 readings gave
-    a window of `100 x check interval` — about four days on production — and in
+    a window of `100 x check interval` — about four days at an hourly check
+    interval — and in
     four days almost nothing moves, so every product drew a flat line while its
     real history held several distinct prices.
 
