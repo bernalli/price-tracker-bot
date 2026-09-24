@@ -1,7 +1,7 @@
 """Callback codec: round trip, hostile decoding and the registry language.
 
 The oracle below is written from the action inventory of
-``bot/callbacks.py::build_registry`` (sections 8.1, 8.2, 9 and 11 plus the
+``bot/callbacks.py::build_registry`` (every registered action plus the
 flow-token shape), independently of the codec itself: it has
 its own shape list, its own token regexes and its own enum values. Tests compare
 the codec with it and never use the codec to compute an expected value.
@@ -249,9 +249,9 @@ def test_every_verb_the_spec_uses_fits_the_grammar() -> None:
 
 
 def test_currency_callback_belongs_to_the_grammar() -> None:
-    """R2-1: p:<32-hex flow token>:cur:<choice> is a registered shape."""
-    # Two literals under the secret-scanner's length threshold; fused into the
-    # same 32-char token as a single literal would be, without matching it.
+    """p:<32-hex flow token>:cur:<choice> is a registered shape."""
+    # A 32-character hex flow token, kept as two literals so secret scanners do
+    # not report this test value as a credential (a false positive).
     token = "01234567" "89abcdef" * 2  # fmt: skip
     for choice in ("USD", "type", "cancel"):
         wire = f"p:{token}:cur:{choice}"
@@ -285,7 +285,7 @@ def test_round_trip_for_every_registered_action(action: Action) -> None:
 @settings(max_examples=5000, deadline=None)
 @given(mutations())
 def test_mutations_decode_exactly_as_the_independent_oracle(data: str) -> None:
-    """R2-2: invalid mutations are rejected, valid ones decode to that action."""
+    """Invalid mutations are rejected, valid ones decode to that action."""
     expected = oracle(data)
     got = decode(data)
     if expected is None:
@@ -426,7 +426,7 @@ def test_id_and_token_positions_never_overlap() -> None:
 
 
 def test_mutated_callbacks_through_process_update() -> None:
-    """R2-2 end to end: invalid data -> zero service calls, one expiry answer, no
+    """End to end: invalid data -> zero service calls, one expiry answer, no
     other handler; valid data -> the registered handler with no write."""
     loop = asyncio.new_event_loop()
     services = FakeServices(active={10}, products={1: (10, "Kettle")})

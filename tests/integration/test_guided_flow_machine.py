@@ -546,7 +546,7 @@ class GuidedFlowMachine(RuleBasedStateMachine):
         self._model_text(key, text)
         self.expect_fallback = None  # the fallback reply itself may be the blocked call
 
-    # -- suspended service continuations: model D1-D4 ------------------------
+    # -- suspended service continuations -------------------------------------
 
     @precondition(lambda self: self.pending is None and bool(self.active))
     @rule(data=st.data(), phase=st.sampled_from(("prepare_add", "add_product")))

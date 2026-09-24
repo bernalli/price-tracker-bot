@@ -131,7 +131,7 @@ DIGEST_FLUSH_DEFAULT_MINUTES = 60
 
 
 async def digest_flush_job(context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Flush due per-user notification digests (Feature D).
+    """Flush due per-user notification digests.
 
     Without this scheduled job, enqueued digest entries were never delivered
     except via manual /digest_now — they piled up indefinitely (#25).

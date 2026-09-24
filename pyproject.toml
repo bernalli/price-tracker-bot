@@ -94,7 +94,7 @@ files = ["src/price_tracker", "tests"]
 plugins = []
 
 # Test code relaxations.
-# Pragmatic deviation from plan's 4-batch -> None annotation sweep: with 222
+# Deliberately not chasing a full `-> None` annotation sweep: with 222
 # `no-untyped-def` candidates across 53 test files, mechanical annotations
 # add maintenance noise without catching real bugs. Real type errors are
 # caught and fixed (union-attr, method-assign monkey-patches, operator

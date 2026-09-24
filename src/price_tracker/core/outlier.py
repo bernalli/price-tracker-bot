@@ -62,8 +62,8 @@ CONFIRMATION_TOLERANCE = Decimal("0.02")
 # but jittery repricing could be held forever — held reads never enter history,
 # so the median rejecting them would never move. That is exactly the deadlock
 # this release fixes on the rejection path, and it must not reappear here.
-# Set well above the worst case seen in production history (5 consecutive held
-# reads across ~50k readings), so it only fires on genuinely pathological series.
+# Set well above the worst case seen in real price histories (5 consecutive
+# held reads across ~50k readings), so it only fires on genuinely pathological series.
 MAX_HELD_READS = 8
 
 

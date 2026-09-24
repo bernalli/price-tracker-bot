@@ -6,9 +6,9 @@
   stated because the property depends on it: when the requested product is absent from
   the page, every other product is *observably* foreign (a different identifier, or a
   carousel context) — an unidentified node alone on a page is indistinguishable from
-  the page's product, and the specification accepts it as such.
-* (b) **Order and duplication invariance** (I22), over observations and documents.
-* The exhaustive outcome table of §5.2.6 (full product, not a sample).
+  the page's product, and the resolver accepts it as such.
+* (b) **Order and duplication invariance**, over observations and documents.
+* The exhaustive outcome table below (full product, not a sample).
 * Liveness: an identified, readable requested product is always found, so (a) cannot
   pass by returning nothing.
 """
@@ -274,7 +274,7 @@ def test_arbitrary_observation_sets_are_order_and_duplication_invariant(
         assert all(o.ownership is not Ownership.UNSCOPED for o in baseline.deciding)
 
 
-# ------------------------------------------------------------------ §5.2.6, exhaustively
+# ------------------------------------------------------------------ exhaustive outcome table
 
 R = Decimal("99.99")
 META_BAD = Decimal("79.99")
@@ -355,7 +355,7 @@ def _expected(
     cur: str | None,
     equal: bool,
 ) -> tuple[AnchorState, Money | None, str]:
-    """The §5.2.6 table, written from the specification's case list."""
+    """The exhaustive outcome table for anchor resolution."""
     found, none_ = AnchorState.FOUND, None
     if mode == "requested_removed":
         if meta == "agree":

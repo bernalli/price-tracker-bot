@@ -1,5 +1,5 @@
 # src/price_tracker/core/health.py
-"""Per-domain quarantine state machine (Feature B).
+"""Per-domain quarantine state machine.
 
 Tracks consecutive block events per eTLD+1, transitions through
 CLOSED → LOCKED_T1 → HALF_OPEN_T1 → CLOSED|LOCKED_T2 → ... → LOCKED_T3 (sentinel).

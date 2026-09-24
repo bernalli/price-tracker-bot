@@ -115,7 +115,7 @@ Notes:
 - `read_only: true` makes the root filesystem immutable. Writable areas: `/tmp` (tmpfs 64m) and `/home/botuser/.cache` (tmpfs 512m for Playwright).
 - `cap_drop: [ALL]` removes every Linux capability — the bot needs none.
 - `no-new-privileges:true` blocks setuid escalation.
-- `mem_limit: 768m` + `cpus: 1.0` are the verified working budgets on production.
+- `mem_limit: 768m` + `cpus: 1.0` are the recommended budgets.
 - The `/data` volume is the only writable persistent path; back up its content (see [Backup & restore](#backup--restore)).
 
 ### Bind mount instead of the named volume
