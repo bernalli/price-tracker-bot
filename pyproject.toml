@@ -147,7 +147,7 @@ markers = [
 #   strict-override) are omitted. They are tracked as technical debt and will be
 #   gated separately when their suites land. Same scope alignment as `[tool.mypy.overrides]`.
 # - main.py (entry point) and notifier/telegram.py (real Telegram I/O) are omitted —
-#   covered by integration tests instead.
+#   covered by unit and integration tests directly, just not gated on percentage here.
 [tool.coverage.run]
 source = ["src/price_tracker"]
 omit = [

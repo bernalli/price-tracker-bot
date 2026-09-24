@@ -174,9 +174,17 @@ docker compose up -d
 
 Every tagged release also publishes a multi-arch image to
 `ghcr.io/bernalli/price-tracker-bot`. To deploy from the published image instead of
-building locally, point a `docker-compose.override.yml` at it (see
-[Bind mount instead of the named volume](#bind-mount-instead-of-the-named-volume) for the
-override pattern) and pull:
+building locally, override the `image` field with the same untracked-override
+mechanism as [Bind mount instead of the named volume](#bind-mount-instead-of-the-named-volume):
+
+```yaml
+# docker-compose.override.yml — not tracked by git
+services:
+  price-tracker:
+    image: ghcr.io/bernalli/price-tracker-bot:latest
+```
+
+Then pull:
 
 ```bash
 docker compose pull
