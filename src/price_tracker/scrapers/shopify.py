@@ -218,10 +218,10 @@ class ShopifyScraper(AbstractScraper):
         # Fallback: fetch HTML and parse embedded Shopify product data
         html = await self._fetch_html(url, client)
         if html:
-            result = self._try_embedded_product_json(html)
-            if result and result.price is not None:
-                result.currency = detect_currency("")
-                return result
+            embedded = self._try_embedded_product_json(html)
+            if embedded is not None and embedded.price is not None:
+                embedded.currency = detect_currency("")
+                return embedded
 
             # A headless (Next.js/Hydrogen) storefront has no legacy embedded Shopify
             # JSON at all: its JSON-LD carries a ProductGroup/hasVariant instead. Once
@@ -237,6 +237,8 @@ class ShopifyScraper(AbstractScraper):
 
             result = self._try_cents_price(html)
             if result is not None:
+                if embedded is not None:
+                    result.name = embedded.name
                 result.currency = detect_currency("")
                 return result
 
@@ -562,7 +564,9 @@ class ShopifyScraper(AbstractScraper):
                                     return info
                 except (json.JSONDecodeError, TypeError, AttributeError):
                     continue
-        return None
+        # A product JSON whose title was read but no price parsed still hands the
+        # title on to the cents scan, as the single-method version did.
+        return info if info.name is not None else None
 
     @staticmethod
     def _try_cents_price(html: str) -> ProductInfo | None:

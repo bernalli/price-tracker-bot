@@ -850,3 +850,15 @@ async def test_shopify_headless_other_query_params_keep_identity() -> None:
         "https://shop.example.com/products/widget?ref=a%20b&variant=222", html
     )
     assert info.price == Decimal("9.99")
+
+
+@pytest.mark.asyncio
+async def test_shopify_embedded_title_survives_cents_fallback() -> None:
+    """Embedded product JSON with an unreadable price keeps its title on the cents read."""
+    html = (
+        '<script>var meta = {"product":{"title":"Widget","variants":[{"price":"n/a"}]}};'
+        '</script><script>{"price_min": 2999}</script>'
+    )
+    info = await _scrape_headless("https://shop.example.com/products/widget", html)
+    assert info.price == Decimal("29.99")
+    assert info.name == "Widget"
