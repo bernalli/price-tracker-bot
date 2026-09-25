@@ -1,0 +1,14 @@
+# legacy snapshot v1
+# scenario: add.blocked
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/add https://shop.example.com/item/9" user=10
+-> sendMessage chat=10
+   text:
+   | 🔍 Analizzo il prodotto...
+-> editMessageText chat=10 message_id=1000
+   text:
+   | 🛡 Il sito sta bloccando le richieste automatiche in questo momento.
+   | Riprova tra qualche minuto.
+## db after step 1
+~ users user_id=10 display_name: NULL -> "U10"

@@ -47,7 +47,7 @@ from telegram.ext import CommandHandler
 from price_tracker.bot import messages
 from price_tracker.bot.handlers import register_handlers
 from price_tracker.bot.handlers.debug import status_command
-from price_tracker.core.exceptions import ParseError
+from price_tracker.core.exceptions import HTTPBlockStatus, ParseError
 from price_tracker.core.scraper_base import ProductInfo
 from tests.support.fake_telegram import Call, FakeRequest, make_application
 from tests.support.legacy_harness import (
@@ -1939,6 +1939,72 @@ async def scenario_product_cmd_threshold(w: LegacyWorld) -> None:
         await w.recorder.command(OWNER, f"/soglia {args}")
     await w.recorder.command(OWNER, f"/threshold {p1} abc")
     await w.recorder.command(OWNER, "/soglia 999 5")
+
+
+# add ──────────────────────────────────────────────────────────────────
+
+
+@scenario("add.usage")
+async def scenario_add_usage(w: LegacyWorld) -> None:
+    await w.recorder.command(OWNER, "/add")
+
+
+@scenario("add.success_generic")
+async def scenario_add_success_generic(w: LegacyWorld) -> None:
+    w.scraper.script(WIDGET_URL, info("19.90", name="Widget"))
+    await w.recorder.command(OWNER, f"/add {WIDGET_URL}")
+
+
+@scenario("add.success_amazon")
+async def scenario_add_success_amazon(w: LegacyWorld) -> None:
+    w.scraper.script(AMAZON_URL, ProductInfo(name="Amazon Widget", price=Decimal("25.00")))
+    await w.recorder.command(OWNER, f"/aggiungi {AMAZON_URL}")
+
+
+@scenario("add.duplicate_active")
+async def scenario_add_duplicate_active(w: LegacyWorld) -> None:
+    await seed_p1(w)
+    await w.recorder.command(OWNER, f"/add {KETTLE_URL}")
+
+
+@scenario("add.duplicate_paused")
+async def scenario_add_duplicate_paused(w: LegacyWorld) -> None:
+    await seed_pp(w)
+    await w.recorder.command(OWNER, f"/add {PAUSED_URL}")
+
+
+@scenario("add.unsafe_url")
+async def scenario_add_unsafe_url(w: LegacyWorld) -> None:
+    await w.recorder.command(OWNER, "/add http://127.0.0.1/x")
+    await w.recorder.command(OWNER, "/add ftp://shop.example.com/x")
+
+
+@scenario("add.no_scraper")
+async def scenario_add_no_scraper(w: LegacyWorld) -> None:
+    await w.recorder.command(OWNER, "/add https://unknown.example.org/p")
+
+
+@scenario("add.blocked")
+async def scenario_add_blocked(w: LegacyWorld) -> None:
+    w.scraper.script(WIDGET_URL, HTTPBlockStatus(status=403, url=WIDGET_URL))
+    await w.recorder.command(OWNER, f"/add {WIDGET_URL}")
+
+
+@scenario("add.price_none")
+async def scenario_add_price_none(w: LegacyWorld) -> None:
+    w.scraper.script(WIDGET_URL, ProductInfo(error="Prezzo non trovato (test)"))
+    await w.recorder.command(OWNER, f"/add {WIDGET_URL}")
+
+
+@scenario("add.paste_link")
+async def scenario_add_paste_link(w: LegacyWorld) -> None:
+    w.scraper.script(WIDGET_URL, info("19.90", name="Widget"))
+    await w.recorder.text(OWNER, f"guarda {WIDGET_URL}.")
+
+
+@scenario("add.paste_link_unauthorized")
+async def scenario_add_paste_link_unauthorized(w: LegacyWorld) -> None:
+    await w.recorder.text(STRANGER, WIDGET_URL)
 
 
 # ── T-S: scenarios ───────────────────────────────────────────────────
