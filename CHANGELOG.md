@@ -243,7 +243,7 @@ Found during the same audit, not addressed here:
   only *consumed* HealthManager state via `is_locked`/`is_half_open` but
   never *produced* it via `record_success`/`record_block`, so the
   `scraper_health` table stayed empty forever and auto-quarantine
-  (the xteink.com HTTP 429 loop) never engaged.
+  (a store's HTTP 429 loop) never engaged.
   Each successful scrape now calls `handle_success_in_pipeline`; each
   `BlockEvent` calls `handle_block_in_pipeline`. Both skip the call when
   the eTLD+1 cannot be resolved (`domain == "unknown"`). New integration
@@ -257,10 +257,10 @@ Found during the same audit, not addressed here:
   advertises `Accept-Encoding: gzip, deflate, br` to mimic a real
   browser, but httpx will only decompress brotli responses when
   `brotli` (or `brotlicffi`) is importable. Without it, sites that
-  serve brotli by default (e.g. `nove25.net`) returned a 55 KB
+  serve brotli by default returned a 55 KB
   skeleton instead of the 436 KB full document, silently stripping the
   JSON-LD `Product` block, the `og:price:amount` meta tag and the
-  `itemprop="price"` microdata. Result: the new Nove25 scraper shipped
+  `itemprop="price"` microdata. Result: the new site-specific scraper shipped
   in v0.1.10 returned `price=None` against the real site even though
   every offline fixture-based test passed. Regression test
   `test_brotli_available_for_httpx_decompression` fails CI if the
@@ -269,7 +269,7 @@ Found during the same audit, not addressed here:
 ## [0.1.10] - 2026-05-17
 
 ### Added
-- New built-in scraper `nove25` (priority 75) for `nove25.net`.
+- New built-in site-specific scraper (priority 75; since removed).
   Reads price/currency from static HTML via a 4-step fallback chain:
   JSON-LD `Product.offers.price` → OpenGraph `product:price:amount` →
   microdata `itemprop=price` → CSS `.product-price`. No JavaScript
@@ -282,8 +282,7 @@ Found during the same audit, not addressed here:
   of historical bug:
   - dead product URLs that 301-redirected to the store home let the HTML
     fallback parse a random price from the home and silently save the
-    home's `og:title` as the product name (e.g. `Filling Pieces®
-    Official Webshop`);
+    home's `og:title` as the product name (a shop's own site title);
   - collection URLs (`/collections/<slug>?page=N`) on a
     `KNOWN_SHOPIFY_DOMAIN` passed `can_handle` and then leaked a price
     from one of the listed products plus the collection's `og:title`
@@ -510,7 +509,7 @@ auto-quarantine, and a plugin extension point.
   (refactored from monolith) plus walmart, target, bestbuy, etsy, newegg,
   wayfair, mediamarkt, otto, zalando, apple_store, google_store, aliexpress.
 - HealthManager with per-domain auto-quarantine and tier-based exponential
-  backoff: closes bug #1 (xteink.com infinite 429 loop).
+  backoff: closes bug #1 (a store's infinite 429 loop).
 - NotificationPrefs system with 8 commands: `/mute`, `/unmute`, `/digest_mode`,
   `/quiet_hours`, `/timezone`, `/throttle`, `/prefs`, `/digest_now`.
 - DigestService for batched alerts with periodic flush.
@@ -552,7 +551,7 @@ auto-quarantine, and a plugin extension point.
   no-new-privileges, resource limits.
 
 ### Fixed
-- Bug #1: infinite 429 loop on xteink.com (HealthManager auto-quarantine).
+- Bug #1: infinite 429 loop on a store (HealthManager auto-quarantine).
 - Bug #2: 27+ broad `except Exception` (ruff BLE001 enforced).
 - Bug #3: zero test coverage (now at least 430 tests).
 - Bug #4: bot.py 2664 LOC monolith (module split).
