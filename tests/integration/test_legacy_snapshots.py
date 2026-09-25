@@ -2538,12 +2538,13 @@ async def seed_three_drops(w: LegacyWorld) -> None:
     w.scraper.script(ITEM4_URL, info("30.00", name="Lamp"))
 
 
-async def seed_two_failing(w: LegacyWorld) -> None:
-    """P1 and a Speaker on the same domain whose pages no longer show a price."""
-    await seed_p1(w)
+async def seed_two_failing(w: LegacyWorld) -> int:
+    """P1 and a Speaker on the same domain whose pages no longer show a price; P1's id."""
+    p1 = await seed_p1(w)
     await seed_product(w, OWNER, ITEM4_URL, "Speaker", initial="40.00", current="40.00")
     w.scraper.script(KETTLE_URL, ParseError("no price"))
     w.scraper.script(ITEM4_URL, ParseError("no price"))
+    return p1
 
 
 async def seed_two_drops_in_digest(w: LegacyWorld) -> None:
@@ -2683,6 +2684,63 @@ async def scenario_alert_quarantine_entry(w: LegacyWorld) -> None:
     for url in (KETTLE_URL, ITEM4_URL, ITEM5_URL):
         w.scraper.script(url, HTTPBlockStatus(status=403, url=url))
     await w.recorder.job("run_check_all")
+
+
+# ops ──────────────────────────────────────────────────────────────────
+# Each scenario starts where alert.operational_suspended ends, reproduced by
+# seed sweeps: P1 and the Speaker suspended, the notice with its buttons sent.
+
+
+async def seed_suspended(w: LegacyWorld, *, recovered: bool = True) -> tuple[int, Call]:
+    """Suspend P1 and the Speaker with two seed sweeps; return P1's id and the notice.
+
+    With ``recovered`` both pages read a price again afterwards.
+    """
+    p1 = await seed_two_failing(w)
+    await seed_job(w)
+    await seed_job(w)
+    if recovered:
+        w.scraper.script(KETTLE_URL, ProductInfo(price=Decimal("80.00")))
+        w.scraper.script(ITEM4_URL, ProductInfo(price=Decimal("80.00")))
+    return p1, w.request.calls_of("sendMessage")[-1]
+
+
+@scenario("ops.reactivate")
+async def scenario_ops_reactivate(w: LegacyWorld) -> None:
+    p1, notice = await seed_suspended(w)
+    await w.recorder.press(OWNER, f"ops_react_{p1}", on=notice)
+
+
+@scenario("ops.reactivate_still_failing")
+async def scenario_ops_reactivate_still_failing(w: LegacyWorld) -> None:
+    p1, notice = await seed_suspended(w, recovered=False)
+    await w.recorder.press(OWNER, f"ops_react_{p1}", on=notice)
+
+
+@scenario("ops.delete_prompt")
+async def scenario_ops_delete_prompt(w: LegacyWorld) -> None:
+    p1, notice = await seed_suspended(w)
+    await w.recorder.press(OWNER, f"ops_del_{p1}", on=notice)
+
+
+@scenario("ops.delete_confirm")
+async def scenario_ops_delete_confirm(w: LegacyWorld) -> None:
+    p1, notice = await seed_suspended(w)
+    await w.recorder.press(OWNER, f"ops_del_{p1}", on=notice)
+    await w.recorder.press(OWNER, f"ops_delok_{p1}")
+
+
+@scenario("ops.nothing_to_do")
+async def scenario_ops_nothing_to_do(w: LegacyWorld) -> None:
+    p1 = await seed_p1(w)
+    await w.recorder.press(OWNER, f"ops_react_{p1}")
+
+
+@scenario("ops.invalid_id")
+async def scenario_ops_invalid_id(w: LegacyWorld) -> None:
+    p1, notice = await seed_suspended(w)
+    await w.recorder.press(OWNER, "ops_react_x", on=notice)
+    await w.recorder.press(OTHER, f"ops_react_{p1}")
 
 
 # ── T-S: scenarios ───────────────────────────────────────────────────

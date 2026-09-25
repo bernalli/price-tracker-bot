@@ -1,0 +1,11 @@
+# legacy snapshot v1
+# scenario: ops.nothing_to_do
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: press "ops_react_1" user=10 on=1 synthetic
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1
+   text:
+   | ❌ Niente da fare: nessun prodotto sospeso automaticamente su questo sito.
+## db after step 1
+(no changes)
