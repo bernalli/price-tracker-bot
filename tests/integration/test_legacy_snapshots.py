@@ -2457,6 +2457,66 @@ async def scenario_admin_cmd_debug(w: LegacyWorld) -> None:
     await w.recorder.command(ADMIN, f"/debug {KETTLE_URL}")
 
 
+# status ───────────────────────────────────────────────────────────────
+
+
+async def seed_blocks(w: LegacyWorld, domain: str, reason: str) -> None:
+    """Three block events on ``domain``, as seed steps: the domain enters quarantine."""
+    for n in range(1, 4):
+        await w.recorder.seed(f"record block {n}", w.health.record_block(domain, reason=reason))
+
+
+@scenario("status.user")
+async def scenario_status_user(w: LegacyWorld) -> None:
+    await seed_p1(w)
+    await seed_pp(w)
+    await w.recorder.command(OWNER, "/stato")
+
+
+@scenario("status.admin")
+async def scenario_status_admin(w: LegacyWorld) -> None:
+    await seed_p1(w)
+    await seed_p3(w)
+    await seed_config(w, "check_interval_minutes", "90")
+    await w.recorder.command(ADMIN, "/status")
+
+
+@scenario("status.health_empty")
+async def scenario_status_health_empty(w: LegacyWorld) -> None:
+    await w.recorder.command(ADMIN, "/health")
+
+
+@scenario("status.health_locked")
+async def scenario_status_health_locked(w: LegacyWorld) -> None:
+    await seed_blocks(w, "blocked.example.com", "http_403")
+    await w.recorder.command(ADMIN, "/health")
+
+
+@scenario("status.errori_none")
+async def scenario_status_errori_none(w: LegacyWorld) -> None:
+    await seed_p1(w)
+    await w.recorder.command(OWNER, "/errori")
+
+
+@scenario("status.errori")
+async def scenario_status_errori(w: LegacyWorld) -> None:
+    await seed_p1(
+        w, errors=3, last_error="parse_error: no price", last_error_at="2026-03-01 11:30:00"
+    )
+    await seed_p2(w, errors=1, last_error="http_error: 503", last_error_at="2026-02-28 11:00:00")
+    await seed_blocks(w, "example.com", "http_403")
+    await w.recorder.command(OWNER, "/errori")
+    await w.recorder.command(OWNER, "/errors")
+
+
+# text ─────────────────────────────────────────────────────────────────
+
+
+@scenario("text.no_pending")
+async def scenario_text_no_pending(w: LegacyWorld) -> None:
+    await w.recorder.text(OWNER, "ciao")
+
+
 # ── T-S: scenarios ───────────────────────────────────────────────────
 
 
