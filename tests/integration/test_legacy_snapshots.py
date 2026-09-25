@@ -16,7 +16,9 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import csv
 import hashlib
+import io
 import json
 import re
 import shutil
@@ -2005,6 +2007,95 @@ async def scenario_add_paste_link(w: LegacyWorld) -> None:
 @scenario("add.paste_link_unauthorized")
 async def scenario_add_paste_link_unauthorized(w: LegacyWorld) -> None:
     await w.recorder.text(STRANGER, WIDGET_URL)
+
+
+# data ─────────────────────────────────────────────────────────────────
+
+CSV_HEADER: Final = (
+    "ID",
+    "Nome",
+    "URL",
+    "Prezzo Iniziale",
+    "Prezzo Attuale",
+    "Prezzo Min",
+    "Target",
+    "Soglia",
+    "Attivo",
+    "Valuta",
+)
+"""The header ``/esporta`` writes and ``/importa`` reads."""
+
+
+def csv_document(*rows: tuple[str, str, str]) -> bytes:
+    """A CSV in the export layout; each row gives its URL, target and threshold."""
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(CSV_HEADER)
+    for url, target, threshold in rows:
+        writer.writerow(["", "", url, "", "", "", target, threshold, "Si", "EUR"])
+    return buf.getvalue().encode("utf-8")
+
+
+@scenario("data.export")
+async def scenario_data_export(w: LegacyWorld) -> None:
+    await seed_p1(w, target="70.00")
+    await seed_pp(w)
+    await w.recorder.command(OWNER, "/esporta")
+    await w.recorder.command(OWNER, "/export")
+
+
+@scenario("data.export_empty")
+async def scenario_data_export_empty(w: LegacyWorld) -> None:
+    await w.recorder.command(OWNER, "/esporta")
+
+
+@scenario("data.import_help")
+async def scenario_data_import_help(w: LegacyWorld) -> None:
+    await w.recorder.command(OWNER, "/importa")
+
+
+@scenario("data.import_csv")
+async def scenario_data_import_csv(w: LegacyWorld) -> None:
+    await seed_p1(w)
+    new_url = "https://shop.example.com/item/20"
+    w.scraper.script(new_url, ProductInfo(name="Imported", price=Decimal("12.00")))
+    content = csv_document(
+        (new_url, "9.5", "absolute:2"),
+        (KETTLE_URL, "", "percentage:10"),
+        ("http://127.0.0.1/x", "", "percentage:10"),
+    )
+    await w.recorder.document(OWNER, "prodotti.csv", content)
+
+
+@scenario("data.import_csv_malformed")
+async def scenario_data_import_csv_malformed(w: LegacyWorld) -> None:
+    await w.recorder.document(OWNER, "x.csv", b"\xff\xfe garbage")
+
+
+@scenario("data.import_csv_semicolon")
+async def scenario_data_import_csv_semicolon(w: LegacyWorld) -> None:
+    content = b"ID;Nome;URL\r\n1;X;https://shop.example.com/item/21\r\n"
+    await w.recorder.document(OWNER, "excel.csv", content)
+
+
+@scenario("data.import_csv_bad_fields")
+async def scenario_data_import_csv_bad_fields(w: LegacyWorld) -> None:
+    bad_url = "https://shop.example.com/item/22"
+    w.scraper.script(bad_url, ProductInfo(name="Bad", price=Decimal("5.00")))
+    content = b"\xef\xbb\xbf" + csv_document(
+        (bad_url, "abc", "absolute:abc"), ("", "", "percentage:10")
+    )
+    await w.recorder.document(OWNER, "bad.csv", content)
+
+
+@scenario("data.import_csv_empty")
+async def scenario_data_import_csv_empty(w: LegacyWorld) -> None:
+    await w.recorder.document(OWNER, "empty.csv", b"")
+
+
+@scenario("data.import_not_csv")
+async def scenario_data_import_not_csv(w: LegacyWorld) -> None:
+    await w.recorder.document(OWNER, "note.txt", b"x")
 
 
 # ── T-S: scenarios ───────────────────────────────────────────────────
