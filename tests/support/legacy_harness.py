@@ -16,30 +16,45 @@ offline stubs, and the clock is frozen at ``FROZEN_NOW`` for the whole scenario.
 from __future__ import annotations
 
 import enum
+import gettext
+import hashlib
+import json
+import re
+import socket
+import time
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Final, Literal
+from urllib.parse import urlparse
 
+import httpx
+from prometheus_client import CollectorRegistry
+
+from price_tracker.bot.handlers import register_handlers
+from price_tracker.bot.messages import get_translation
+from price_tracker.config import Config
+from price_tracker.core.health import HealthManager
+from price_tracker.core.registry import ScraperRegistry
+from price_tracker.core.scheduler import Scheduler, SchedulerDeps
 from price_tracker.core.scraper_base import AbstractScraper
-from tests.support.fake_telegram import FakeRequest
+from price_tracker.db.repository import Repository
+from price_tracker.main import bootstrap_database
+from price_tracker.notifier.digest import DigestService
+from price_tracker.notifier.preferences import PreferencesManager
+from price_tracker.notifier.telegram import TelegramNotifier
+from price_tracker.observability.metrics import MetricsRegistry
+from tests.support.fake_telegram import FakeRequest, make_application
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Mapping, Sequence
-    from datetime import datetime
 
     import aiosqlite
-    import httpx
     import pytest
-    from telegram.ext import Application
+    from telegram.ext import Application, CallbackContext
     from telegram.request import RequestData
 
-    from price_tracker.config import Config
-    from price_tracker.core.health import HealthManager
-    from price_tracker.core.registry import ScraperRegistry
-    from price_tracker.core.scheduler import Scheduler
     from price_tracker.core.scraper_base import ProductInfo
-    from price_tracker.db.repository import Repository
-    from price_tracker.notifier.digest import DigestService
     from tests.support.fake_telegram import Call
 
 FROZEN_NOW: Final = "2026-03-01 12:00:00"
@@ -55,6 +70,24 @@ LOCALES: Final = ("it",)
 SNAPSHOT_ROOT: Final = Path(__file__).resolve().parents[1] / "snapshots" / "legacy"
 
 JobName = Literal["run_check_all", "digest_flush_due"]
+
+FIXTURE_HTML: Final = (
+    Path(__file__).resolve().parents[1] / "fixtures" / "generic" / "sample_jsonld.html"
+)
+"""The page every GET of the world's HTTP client answers with."""
+
+NOW_TOLERANCE_SECONDS: Final = 600
+"""A database timestamp this close to the real clock was written by SQLite's ``now``."""
+
+# A known message and its translation per locale: the catalogue canary.
+_CANARY_MSGID: Final = "❌ Product not found."
+_CANARY: Final[dict[str, str]] = {"it": "❌ Prodotto non trovato."}
+
+# ASCII digits only: ``\d`` would also accept other Unicode digits.
+_DB_TIMESTAMP_RE: Final = re.compile(
+    r"([0-9]{4})-([0-9]{2})-([0-9]{2})[ T]([0-9]{2}):([0-9]{2}):([0-9]{2})"
+    r"(?:\.([0-9]+))?(Z|\+00:00)?"
+)
 
 
 class _Unset(enum.Enum):
@@ -97,19 +130,36 @@ class ScriptedScraper(AbstractScraper):
     priority: ClassVar[int] = 100
 
     def __init__(self, faults: list[HarnessFault]) -> None:
-        raise NotImplementedError
+        self._faults = faults
+        self._scripts: dict[str, list[ProductInfo | BaseException]] = {}
+        self._played: dict[str, int] = {}
 
     def script(self, url: str, *outcomes: ProductInfo | BaseException) -> None:
         """Set the outcomes of the next scrapes of ``url``, in order; the last one repeats."""
-        raise NotImplementedError
+        if not outcomes:
+            raise ValueError(f"script for {url} needs at least one outcome")
+        self._scripts[url] = list(outcomes)
+        self._played[url] = 0
 
     def can_handle(self, url: str) -> bool:
         """True for hosts ending with ``example.com`` or ``amazon.com``."""
-        raise NotImplementedError
+        host = urlparse(url).hostname or ""
+        return host.endswith(("example.com", "amazon.com"))
 
     async def scrape(self, url: str, client: httpx.AsyncClient) -> ProductInfo:
         """Play the next scripted outcome of ``url``: return it, or raise it if an exception."""
-        raise NotImplementedError
+        del client
+        outcomes = self._scripts.get(url)
+        if outcomes is None:
+            fault = HarnessFault(f"no scraper script for {url}")
+            self._faults.append(fault)
+            raise fault
+        played = self._played[url]
+        self._played[url] = played + 1
+        outcome = outcomes[min(played, len(outcomes) - 1)]
+        if isinstance(outcome, BaseException):
+            raise outcome
+        return outcome
 
 
 class RecordingRequest(FakeRequest):
@@ -146,11 +196,13 @@ class RecordingRequest(FakeRequest):
         pool_timeout: Any = None,
     ) -> tuple[int, bytes]:
         """Serve a file download for ``GET``; otherwise record the call and its uploads."""
-        raise NotImplementedError
+        return await super().do_request(
+            url, method, request_data, read_timeout, write_timeout, connect_timeout, pool_timeout
+        )
 
     def _result(self, api_method: str, params: dict[str, Any]) -> Any:
         """A ``File`` for ``getFile``; otherwise the answer of ``FakeRequest``."""
-        raise NotImplementedError
+        return super()._result(api_method, params)
 
 
 @dataclass(frozen=True)
@@ -213,12 +265,154 @@ async def build_world(
     message into that language. On any failure, closes whatever it had opened
     (application, HTTP client, database) before raising.
     """
-    raise NotImplementedError
+    _check_catalogue(locale)
+    dns_lookups: list[str] = []
+
+    def offline_getaddrinfo(host: object, *args: object, **kwargs: object) -> list[Any]:
+        del args, kwargs
+        dns_lookups.append(str(host))
+        raise socket.gaierror(socket.EAI_NONAME, "offline")
+
+    monkeypatch.setattr(socket, "getaddrinfo", offline_getaddrinfo)
+
+    conn = await bootstrap_database(":memory:")
+    http_client: httpx.AsyncClient | None = None
+    app: Application[Any, Any, Any, Any, Any, Any] | None = None
+    initialized = False
+    try:
+        repo = Repository(conn)
+        request = RecordingRequest()
+        app = make_application(request, with_job_queue=True)
+        register_handlers(app)
+        await app.initialize()
+        initialized = True
+        config = Config(
+            telegram_bot_token="123456:TEST-TOKEN",
+            admin_users=(ADMIN,),
+            check_interval_minutes=360,
+            database_path=":memory:",
+            default_threshold_type="percentage",
+            default_threshold_value="10",
+            max_consecutive_errors=2,
+            check_delay_seconds=0.0,
+            notification_cooldown_hours=24,
+            request_timeout=5,
+            log_level="WARNING",
+            lang=locale,
+        )
+        scraper = ScriptedScraper(request.faults)
+        registry = ScraperRegistry()
+        registry.register(scraper)
+        http_client = httpx.AsyncClient(transport=httpx.MockTransport(_fixture_html))
+        health = HealthManager(repo)
+        await health.load()
+        digest = DigestService(repo=repo, bot=app.bot, metrics=None, lang=locale)
+        notifier = TelegramNotifier(
+            app.bot, metrics=None, prefs=PreferencesManager(repo), digest=digest
+        )
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=http_client,
+                notifier=notifier,
+                max_consecutive_errors=2,
+                listing_gone_confirmations=3,
+                delay_between_products=0.0,
+                notification_cooldown_hours=24,
+                health_mgr=health,
+                metrics=None,
+                lang=locale,
+            )
+        )
+        bot_data = app.bot_data
+        bot_data["db"] = bot_data["repo"] = bot_data["repository"] = repo
+        bot_data["config"] = config
+        bot_data["registry"] = bot_data["scraper"] = registry
+        bot_data["http_client"] = http_client
+        bot_data["scheduler"] = scheduler
+        bot_data["digest_service"] = digest
+        bot_data["health_manager"] = health
+        bot_data["metrics"] = MetricsRegistry(registry=CollectorRegistry())
+        # The monotonic clock is frozen too, so the uptime renders as "1h 2m 5s".
+        bot_data["start_time"] = time.monotonic() - 3725.0
+        world = LegacyWorld(
+            conn=conn,
+            repo=repo,
+            request=request,
+            app=app,
+            scheduler=scheduler,
+            digest=digest,
+            health=health,
+            registry=registry,
+            scraper=scraper,
+            http_client=http_client,
+            config=config,
+            locale=locale,
+            real_now=real_now,
+            errors=[],
+            faults=request.faults,
+            dns_lookups=dns_lookups,
+        )
+
+        async def record_error(
+            update: object, context: CallbackContext[Any, Any, Any, Any]
+        ) -> None:
+            del update
+            if context.error is not None:
+                world.errors.append(context.error)
+
+        app.add_error_handler(record_error)
+        await seed_user(world, ADMIN, admin=True)
+        await seed_user(world, OWNER)
+        await seed_user(world, OTHER)
+    except BaseException:
+        if app is not None and initialized:
+            await app.shutdown()
+        if http_client is not None:
+            await http_client.aclose()
+        await conn.close()
+        raise
+    return world
+
+
+def _check_catalogue(locale: str) -> None:
+    """Refuse a locale whose catalogue does not load or does not translate the canary."""
+    translation = get_translation(locale)
+    if not isinstance(translation, gettext.GNUTranslations):
+        raise HarnessFault(
+            f"locale {locale!r}: no message catalogue loaded ({type(translation).__name__})"
+        )
+    expected = _CANARY.get(locale)
+    if expected is None:
+        raise HarnessFault(f"locale {locale!r}: no canary translation known to the harness")
+    actual = translation.gettext(_CANARY_MSGID)
+    if actual != expected:
+        raise HarnessFault(
+            f"locale {locale!r}: catalogue renders {_CANARY_MSGID!r} as {actual!r}, "
+            f"expected {expected!r}"
+        )
+
+
+def _fixture_html(request: httpx.Request) -> httpx.Response:
+    """Answer any request of the world's HTTP client with the JSON-LD fixture page."""
+    return httpx.Response(
+        200,
+        content=FIXTURE_HTML.read_bytes(),
+        headers={"content-type": "text/html; charset=utf-8"},
+        request=request,
+    )
 
 
 async def close_world(world: LegacyWorld) -> None:
     """Shut the application down and close the HTTP client and the database."""
-    raise NotImplementedError
+    try:
+        await world.app.shutdown()
+    finally:
+        try:
+            await world.http_client.aclose()
+        finally:
+            await world.conn.close()
 
 
 async def seed_user(
@@ -231,7 +425,14 @@ async def seed_user(
     active: bool = True,
 ) -> None:
     """Insert or update a user row (never captured unless run inside a step)."""
-    raise NotImplementedError
+    await world.conn.execute(
+        "INSERT INTO users(user_id, is_admin, is_active, display_name, username) "
+        "VALUES(?, ?, ?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET "
+        "is_admin = excluded.is_admin, is_active = excluded.is_active, "
+        "display_name = excluded.display_name, username = excluded.username",
+        (user_id, int(admin), int(active), display_name, username),
+    )
+    await world.conn.commit()
 
 
 async def seed_product(
@@ -291,7 +492,35 @@ def render_db_value(value: object, real_now: datetime) -> str:
     shaped as an ISO/SQLite UTC timestamp within 600 s of ``real_now`` renders as
     ``<now:SHAPE>``, SHAPE being the value with every digit replaced by ``9``.
     """
-    return ""  # contract stub: an empty rendering fails the assertions
+    if value is None:
+        return "NULL"
+    if isinstance(value, bool | int):
+        return str(int(value))
+    if isinstance(value, float):
+        return f"float:{value!r}"
+    if isinstance(value, bytes | bytearray | memoryview):
+        raw = bytes(value)
+        return f"blob:{len(raw)}:{hashlib.sha256(raw).hexdigest()[:12]}"
+    text = str(value)
+    instant = _db_timestamp(text)
+    if instant is not None and abs((instant - real_now).total_seconds()) <= NOW_TOLERANCE_SECONDS:
+        shape = "".join("9" if "0" <= ch <= "9" else ch for ch in text)
+        return f"<now:{shape}>"
+    return json.dumps(text, ensure_ascii=False)
+
+
+def _db_timestamp(text: str) -> datetime | None:
+    """The UTC instant of a timestamp written as SQLite or ISO UTC text, else ``None``."""
+    match = _DB_TIMESTAMP_RE.fullmatch(text)
+    if match is None:
+        return None
+    year, month, day, hour, minute, second = (int(part) for part in match.groups()[:6])
+    fraction = match.group(7) or ""
+    microsecond = int((fraction + "000000")[:6])
+    try:
+        return datetime(year, month, day, hour, minute, second, microsecond, tzinfo=UTC)
+    except ValueError:
+        return None
 
 
 def diff_dumps(
