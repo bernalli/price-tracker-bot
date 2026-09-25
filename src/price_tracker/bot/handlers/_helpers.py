@@ -96,19 +96,16 @@ def _safe_dec(value: object) -> Decimal | None:
 async def _get_user_product(
     ctx: ContextTypes.DEFAULT_TYPE, product_id: int, user_id: int
 ) -> dict[str, Any] | None:
-    """Get a product ensuring it belongs to the user (admin sees all)."""
+    """Get a product an active user may see: their own, or any one for an admin.
+
+    A deactivated user sees nothing, admin or not, whatever gate the caller ran.
+    """
     from price_tracker.bot.decorators import _db
 
     db = _db(ctx)
+    if not await db.is_user_allowed(user_id):
+        return None
     is_admin = await db.is_user_admin(user_id)
     if is_admin:
         return cast("dict[str, Any] | None", await db.get_product(product_id))
     return cast("dict[str, Any] | None", await db.get_product_for_user(product_id, user_id))
-
-
-async def _get_product_name(db: Any, product_id: int) -> str:
-    """Get product name by ID (truncated to 60 chars)."""
-    product = await db.get_product(product_id)
-    if product:
-        return (product.get("name") or "Sconosciuto")[:60]
-    return "Sconosciuto"
