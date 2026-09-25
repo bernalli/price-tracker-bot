@@ -1498,6 +1498,40 @@ async def scenario_home_error_handler(w: LegacyWorld) -> None:
     await w.recorder.call_error_handler(OWNER, RuntimeError("boom"))
 
 
+# lista ────────────────────────────────────────────────────────────────
+
+
+@scenario("lista.empty")
+async def scenario_lista_empty(w: LegacyWorld) -> None:
+    await w.recorder.command(OWNER, "/lista")
+
+
+@scenario("lista.rich")
+async def scenario_lista_rich(w: LegacyWorld) -> None:
+    await seed_p1(w, target="70.00", check_interval=90, errors=2)
+    await seed_p2(w)
+    await w.recorder.command(OWNER, "/lista")
+
+
+@scenario("lista.increase_and_min")
+async def scenario_lista_increase_and_min(w: LegacyWorld) -> None:
+    await seed_p1(w, initial="60.00", current="80.00", lowest="55.00")
+    await w.recorder.command(OWNER, "/lista")
+
+
+@scenario("lista.alias_list")
+async def scenario_lista_alias_list(w: LegacyWorld) -> None:
+    await seed_p1(w)
+    await w.recorder.command(OWNER, "/list")
+
+
+@scenario("lista.other_user_sees_own_only")
+async def scenario_lista_other_user_sees_own_only(w: LegacyWorld) -> None:
+    await seed_p1(w)
+    await seed_p3(w)
+    await w.recorder.command(OTHER, "/lista")
+
+
 # ── T-S: scenarios ───────────────────────────────────────────────────
 
 
