@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-09-25
+
 ### Added
 
 - `/cancel` aborts the open prompt.
@@ -28,7 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a cancel: use `/cancel` or the Cancel button.
 - Access to the product is re-checked when the answer arrives.
 
-### Fixed
+### Security
 
 - The condition, seller and "any drop" buttons of a product, and `/mute` or `/unmute` with a
   product id, now answer "not found" for a product that is not yours instead of changing or
@@ -574,7 +576,8 @@ auto-quarantine, and a plugin extension point.
 - osv-scanner dependency vulnerability scan in CI.
 - Pre-commit hooks block secrets at commit time.
 
-[Unreleased]: https://github.com/bernalli/price-tracker-bot/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/bernalli/price-tracker-bot/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/bernalli/price-tracker-bot/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/bernalli/price-tracker-bot/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/bernalli/price-tracker-bot/compare/v0.2.0...v1.0.0
 [0.2.0]: https://github.com/bernalli/price-tracker-bot/compare/v0.1.0...v0.2.0
