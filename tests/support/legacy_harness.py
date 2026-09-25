@@ -44,13 +44,19 @@ from price_tracker.notifier.digest import DigestService
 from price_tracker.notifier.preferences import PreferencesManager
 from price_tracker.notifier.telegram import TelegramNotifier
 from price_tracker.observability.metrics import MetricsRegistry
-from tests.support.fake_telegram import FakeRequest, make_application
+from tests.support.fake_telegram import (
+    FakeRequest,
+    callback_update,
+    make_application,
+    message_update,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Mapping, Sequence
 
     import aiosqlite
     import pytest
+    from telegram import Update
     from telegram.ext import Application, CallbackContext
     from telegram.request import RequestData
 
@@ -67,6 +73,7 @@ STRANGER: Final = 12
 """User ids; a private chat id equals its user id, as on Telegram."""
 
 LOCALES: Final = ("it",)
+PNG_MAGIC: Final = b"\x89PNG\r\n\x1a\n"
 SNAPSHOT_ROOT: Final = Path(__file__).resolve().parents[1] / "snapshots" / "legacy"
 
 JobName = Literal["run_check_all", "digest_flush_due"]
@@ -201,8 +208,17 @@ class RecordingRequest(FakeRequest):
         )
 
     def _result(self, api_method: str, params: dict[str, Any]) -> Any:
-        """A ``File`` for ``getFile``; otherwise the answer of ``FakeRequest``."""
-        return super()._result(api_method, params)
+        """A ``File`` for ``getFile``; otherwise the answer of ``FakeRequest``.
+
+        A sent message echoes only an inline keyboard, as Telegram does: any other
+        ``reply_markup`` is not part of the returned ``Message``.
+        """
+        result = super()._result(api_method, params)
+        if isinstance(result, dict):
+            markup = result.get("reply_markup")
+            if isinstance(markup, dict) and "inline_keyboard" not in markup:
+                del result["reply_markup"]
+        return result
 
 
 @dataclass(frozen=True)
@@ -251,6 +267,69 @@ class LegacyWorld:
         ``Recorder.document``; ``filename`` is the name the document carries.
         """
         raise NotImplementedError
+
+    async def process(self, update: Update) -> None:
+        """Process ``update`` through the application, as Telegram delivery would."""
+        await self.app.update_processor.process_update(update, self.app.process_update(update))
+
+    async def run_command(self, user: int, text: str) -> None:
+        """Send ``text`` from ``user`` without recording a step (for ``Recorder.seed``)."""
+        await self.process(
+            message_update(self.app.bot, user, user, text, language_code=self.locale)
+        )
+
+    async def run_press(self, user: int, data: str) -> None:
+        """Press ``data`` as ``user`` without recording a step (for ``Recorder.seed``).
+
+        The pressed message is resolved as ``Recorder.press`` without ``on``.
+        """
+        message_id, _ = self.pressed_message(user, data, None)
+        await self.press_message(user, data, message_id)
+
+    async def press_message(self, user: int, data: str, message_id: int) -> None:
+        """Press ``data`` as ``user`` on the bot message ``message_id`` of their chat."""
+        await self.process(
+            callback_update(
+                self.app.bot, user, user, data, message_id=message_id, language_code=self.locale
+            )
+        )
+
+    def pressed_message(self, user: int, data: str, on: Call | None) -> tuple[int, bool]:
+        """The message a press of ``data`` by ``user`` lands on, and whether it is synthetic.
+
+        ``on`` wins when given (a ``Call`` without ``message_id`` is a ``HarnessFault``);
+        otherwise the highest message id of the chat of ``user`` whose current
+        keyboard carries ``data``, else the synthetic id 1.
+        """
+        if on is not None:
+            if on.message_id is None:
+                raise HarnessFault(f"press {data!r}: the {on.method} call has no message_id")
+            return on.message_id, False
+        showing = [mid for mid, datas in self.current_keyboards(user).items() if data in datas]
+        return (max(showing), False) if showing else (1, True)
+
+    def current_keyboards(self, chat_id: int) -> dict[int, list[str]]:
+        """Message id -> callback data of its current inline keyboard, in ``chat_id``.
+
+        Replayed over every call, seeds included: ``sendMessage`` sets a keyboard,
+        an edit replaces it with its own (or removes it when it has none), and
+        ``deleteMessage`` removes it.
+        """
+        keyboards: dict[int, list[str]] = {}
+        for call in self.request.calls:
+            if call.failed or call.chat_id != chat_id:
+                continue
+            if call.method == "sendMessage" and call.message_id is not None:
+                keyboards[call.message_id] = call.callback_data()
+            elif call.method in {"editMessageText", "editMessageReplyMarkup", "deleteMessage"}:
+                target = call.params.get("message_id")
+                if target is None:
+                    continue
+                if call.method == "deleteMessage":
+                    keyboards.pop(int(target), None)
+                else:
+                    keyboards[int(target)] = call.callback_data()
+        return keyboards
 
 
 async def build_world(
@@ -537,7 +616,237 @@ def diff_dumps(
     suffixes ``#2``, ``#3``... on their name, and the key adds a line
     ``!! duplicate key <name> ×<n>`` (also next to ``(no changes)``).
     """
-    return []  # contract stub: an empty diff fails the assertions
+    changes: list[str] = []
+    duplicates: list[str] = []
+    for table in sorted(set(before) | set(after)):
+        old = before.get(table)
+        new = after.get(table)
+        reference = new if new is not None else old
+        assert reference is not None
+        old_rows, _ = _named_rows(table, old, real_now)
+        new_rows, table_duplicates = _named_rows(table, new, real_now)
+        duplicates.extend(table_duplicates)
+        old_by_name = dict(old_rows)
+        new_by_name = dict(new_rows)
+        names = [name for name, _ in new_rows]
+        names += [name for name, _ in old_rows if name not in new_by_name]
+        columns = list(reference.columns)
+        if old is not None:
+            columns += [column for column in old.columns if column not in columns]
+        for name in names:
+            old_row = old_by_name.get(name)
+            new_row = new_by_name.get(name)
+            if old_row is None:
+                assert new_row is not None
+                values = ", ".join(
+                    f"{column}={value}"
+                    for column, value in new_row.items()
+                    if column not in reference.key
+                )
+                changes.append(f"+ {name} {{{values}}}")
+            elif new_row is None:
+                changes.append(f"- {name}")
+            else:
+                for column in columns:
+                    before_value = old_row.get(column, "<absent>")
+                    after_value = new_row.get(column, "<absent>")
+                    if before_value != after_value:
+                        changes.append(f"~ {name} {column}: {before_value} -> {after_value}")
+    if not changes:
+        return ["(no changes)", *duplicates]
+    return [*changes, *duplicates]
+
+
+def _named_rows(
+    table: str, dump: TableDump | None, real_now: datetime
+) -> tuple[list[tuple[str, dict[str, str]]], list[str]]:
+    """Rows of ``dump`` rendered and named by key, plus the duplicate-key lines."""
+    if dump is None:
+        return [], []
+    key_positions = [dump.columns.index(column) for column in dump.key]
+    groups: dict[tuple[str, ...], list[tuple[str, ...]]] = {}
+    for row in dump.rows:
+        rendered = tuple(render_db_value(value, real_now) for value in row)
+        groups.setdefault(tuple(rendered[i] for i in key_positions), []).append(rendered)
+    named: list[tuple[str, dict[str, str]]] = []
+    duplicates: list[str] = []
+    for key_values, rows in groups.items():
+        base = f"{table} " + ",".join(
+            f"{column}={value}" for column, value in zip(dump.key, key_values, strict=True)
+        )
+        rows.sort()
+        for index, rendered in enumerate(rows):
+            name = base if index == 0 else f"{base}#{index + 1}"
+            named.append((name, dict(zip(dump.columns, rendered, strict=True))))
+        if len(rows) > 1:
+            duplicates.append(f"!! duplicate key {base} ×{len(rows)}")
+    return named, duplicates
+
+
+def _quote_identifier(name: str) -> str:
+    """An SQLite identifier in double quotes."""
+    return '"' + name.replace('"', '""') + '"'
+
+
+async def dump_database(conn: aiosqlite.Connection) -> dict[str, TableDump]:
+    """Every application table (not ``schema_version``, not ``sqlite_*``), read in full."""
+    cursor = await conn.execute(
+        "SELECT name FROM sqlite_master WHERE type = 'table' "
+        "AND name NOT LIKE 'sqlite\\_%' ESCAPE '\\' AND name != 'schema_version' ORDER BY name"
+    )
+    names = [str(row[0]) for row in await cursor.fetchall()]
+    dumps: dict[str, TableDump] = {}
+    for name in names:
+        quoted = _quote_identifier(name)
+        info = await (await conn.execute(f"PRAGMA table_info({quoted})")).fetchall()
+        columns = tuple(str(row[1]) for row in info)
+        primary = sorted((int(row[5]), str(row[1])) for row in info if int(row[5]) > 0)
+        if primary:
+            key = tuple(column for _, column in primary)
+            order = ", ".join(_quote_identifier(column) for column in key)
+            query = f"SELECT * FROM {quoted} ORDER BY {order}"
+        else:
+            key = ("rowid",)
+            columns = ("rowid", *columns)
+            query = f"SELECT rowid, * FROM {quoted} ORDER BY rowid"
+        rows = await (await conn.execute(query)).fetchall()
+        dumps[name] = TableDump(columns, key, tuple(tuple(row) for row in rows))
+    return dumps
+
+
+# ── rendering of Bot API calls ───────────────────────────────────────
+
+_INDENT: Final = "   "
+
+
+def _canonical(value: object) -> str:
+    """Canonical JSON of a parameter value."""
+    return json.dumps(value, sort_keys=True, ensure_ascii=False)
+
+
+def _text_block(name: str, text: str) -> list[str]:
+    """A ``name:`` block with one ``|`` line per line of ``text``."""
+    lines = [f"{_INDENT}{name}:"]
+    for line in text.split("\n"):
+        shown = line.replace("\r", "\\r")
+        lines.append(f"{_INDENT}| {shown}" if shown else f"{_INDENT}|")
+    return lines
+
+
+def _button(button: Mapping[str, Any]) -> str:
+    """One inline button as ``[<label> → <target>]``."""
+    label = button.get("text", "")
+    if "callback_data" in button:
+        target = str(button["callback_data"])
+    elif "url" in button:
+        target = f"url:{button['url']}"
+    else:
+        kinds = sorted(name for name in button if name != "text")
+        target = kinds[0] if kinds else "?"
+    return f"[{label} → {target}]"
+
+
+def _markup_block(markup: object) -> list[str]:
+    """``keyboard:`` for an inline keyboard, ``markup: <json>`` for anything else."""
+    if isinstance(markup, dict) and isinstance(markup.get("inline_keyboard"), list):
+        lines = [f"{_INDENT}keyboard:"]
+        for row in markup["inline_keyboard"]:
+            buttons = " ".join(_button(button) for button in row) if row else "[]"
+            lines.append(f"{_INDENT}| {buttons}")
+        return lines
+    return [f"{_INDENT}markup: {_canonical(markup)}"]
+
+
+def _content_lines(content: bytes) -> list[str]:
+    """A document's lines, split on CRLF or LF (the terminator itself is not kept)."""
+    text = content.decode("utf-8", errors="replace")
+    lines = re.split(r"\r?\n", text)
+    if len(lines) > 1 and lines[-1] == "":
+        lines.pop()
+    return lines
+
+
+def _upload_head(field_name: str, files: Mapping[str, tuple[str, bytes, str]]) -> str:
+    """The header suffix of an uploaded photo or document, empty if nothing was uploaded."""
+    upload = files.get(field_name)
+    if upload is None:
+        return ""
+    filename, content, _ = upload
+    if field_name == "photo":
+        kind = "png" if content.startswith(PNG_MAGIC) else "not-png"
+        return f" photo={kind} filename={filename}"
+    return f" filename={filename}"
+
+
+@dataclass(frozen=True)
+class RenderedCall:
+    """The lines of one call, and every captured text a wall-clock guard must read."""
+
+    lines: tuple[str, ...]
+    texts: tuple[str, ...]
+
+
+def render_call(call: Call, files: Mapping[str, tuple[str, bytes, str]]) -> RenderedCall:
+    """Render one Bot API call: its header, its ``param`` lines, then its blocks."""
+    params = dict(call.params)
+    params.pop("callback_query_id", None)
+    method = call.method
+    blocks: list[str] = []
+    texts: list[str] = []
+
+    def take_text(name: str) -> None:
+        value = params.pop(name, None)
+        if value is None:
+            return
+        texts.append(str(value))
+        blocks.extend(_text_block(name, str(value)))
+
+    def take_markup() -> None:
+        markup = params.pop("reply_markup", None)
+        if markup is None:
+            return
+        parsed = json.loads(markup) if isinstance(markup, str) else markup
+        if isinstance(parsed, dict):
+            for row in parsed.get("inline_keyboard") or []:
+                texts.extend(str(button.get("text", "")) for button in row)
+        blocks.extend(_markup_block(parsed))
+
+    if method in {"sendMessage", "editMessageText"}:
+        head = f"-> {method} chat={params.pop('chat_id', None)}"
+        if method == "editMessageText":
+            head += f" message_id={params.pop('message_id', None)}"
+        take_text("text")
+        take_markup()
+    elif method in {"sendPhoto", "sendDocument"}:
+        field_name = "photo" if method == "sendPhoto" else "document"
+        head = f"-> {method} chat={params.pop('chat_id', None)}" + _upload_head(field_name, files)
+        take_text("caption")
+        upload = files.get(field_name)
+        if method == "sendDocument" and upload is not None:
+            content = _content_lines(upload[1])
+            texts.extend(content)
+            blocks.append(f"{_INDENT}content:")
+            blocks.extend(f"{_INDENT}| {line}" if line else f"{_INDENT}|" for line in content)
+        take_markup()
+    elif method == "deleteMessage":
+        head = (
+            f"-> deleteMessage chat={params.pop('chat_id', None)}"
+            f" message_id={params.pop('message_id', None)}"
+        )
+    else:
+        head = f"-> {method}"
+        if isinstance(params.get("text"), str):
+            texts.append(params["text"])
+    param_lines = [f"{_INDENT}param {name}={_canonical(params[name])}" for name in sorted(params)]
+    return RenderedCall((head, *param_lines, *blocks), tuple(texts))
+
+
+# ── recorder ─────────────────────────────────────────────────────────
+
+
+def _quote(value: str) -> str:
+    """A step argument as it appears in a step header."""
+    return json.dumps(value, ensure_ascii=False)
 
 
 class Recorder:
@@ -550,14 +859,21 @@ class Recorder:
 
     def __init__(self, world: LegacyWorld) -> None:
         self._world = world
+        self._lines: list[str] = []
+        self._step = 0
+        self._errors_seen = 0
 
     async def command(self, user: int, text: str) -> None:
         """Send ``text`` (a command such as ``"/target 1 49.90"``) from ``user``."""
-        raise NotImplementedError
+        await self._captured(
+            f"command {_quote(text)} user={user}", self._world.run_command(user, text)
+        )
 
     async def text(self, user: int, text: str) -> None:
         """Send a free text, possibly containing a URL, from ``user``."""
-        raise NotImplementedError
+        await self._captured(
+            f"text {_quote(text)} user={user}", self._world.run_command(user, text)
+        )
 
     async def press(self, user: int, data: str, *, on: Call | None = None) -> None:
         """Press the button carrying ``data`` as ``user``.
@@ -567,7 +883,12 @@ class Recorder:
         highest message id, in the chat of ``user``, whose current keyboard carries
         ``data``, or the synthetic id 1 when none does.
         """
-        raise NotImplementedError
+        message_id, synthetic = self._world.pressed_message(user, data, on)
+        suffix = " synthetic" if synthetic else ""
+        await self._captured(
+            f"press {_quote(data)} user={user} on={message_id}{suffix}",
+            self._world.press_message(user, data, message_id),
+        )
 
     async def document(self, user: int, filename: str, content: bytes) -> None:
         """Send ``content`` as a CSV document named ``filename`` from ``user``."""
@@ -583,16 +904,72 @@ class Recorder:
 
     async def seed(self, label: str, coro: Awaitable[object]) -> None:
         """Run ``coro`` as a listed but uncaptured step: no calls and no diff rendered."""
-        raise NotImplementedError
+        self._step += 1
+        step = self._step
+        self._lines.append(f"## step {step}: seed {_quote(label)}")
+        try:
+            await coro
+        finally:
+            self._check_faults(step)
+        self._lines.extend(self._new_errors())
 
     async def capture(self, label: str, coro: Awaitable[object]) -> None:
         """Run ``coro`` as a captured step: its calls and database diff are rendered."""
-        raise NotImplementedError
+        await self._captured(f"capture {_quote(label)}", coro)
+
+    async def _captured(self, header: str, action: Awaitable[object]) -> None:
+        """Run a captured step: header, calls, handler errors, database diff."""
+        self._step += 1
+        step = self._step
+        world = self._world
+        before = await dump_database(world.conn)
+        first_call = len(world.request.calls)
+        try:
+            await action
+        finally:
+            self._check_faults(step)
+        body: list[str] = []
+        texts: list[str] = []
+        for index in range(first_call, len(world.request.calls)):
+            rendered = render_call(
+                world.request.calls[index], world.request.files_by_call.get(index, {})
+            )
+            body.extend(rendered.lines)
+            texts.extend(rendered.texts)
+        self._check_guards(step, texts)
+        errors = self._new_errors()
+        after = await dump_database(world.conn)
+        self._lines.append(f"## step {step}: {header}")
+        self._lines.extend(body if body else ["(no calls)"])
+        self._lines.extend(errors)
+        self._lines.append(f"## db after step {step}")
+        self._lines.extend(diff_dumps(before, after, world.real_now))
+
+    def _check_faults(self, step: int) -> None:
+        """Raise ``HarnessFault`` if a stub was used off script or a handler asserted."""
+        world = self._world
+        broken = [e for e in world.errors[self._errors_seen :] if isinstance(e, AssertionError)]
+        if world.faults or broken:
+            reasons = "; ".join(str(e) for e in [*world.faults, *broken])
+            raise HarnessFault(f"step {step}: harness fault: {reasons}")
+
+    def _check_guards(self, step: int, texts: Sequence[str]) -> None:
+        """Wall-clock guards on the captured texts (not implemented yet)."""
+        del step, texts
+
+    def _new_errors(self) -> list[str]:
+        """Render and consume the handler errors raised since the last step."""
+        world = self._world
+        new_errors = world.errors[self._errors_seen :]
+        self._errors_seen = len(world.errors)
+        return [f"{_INDENT}!! error_handler: {type(e).__name__}: {e}" for e in new_errors]
 
     def snapshot(self, scenario_id: str) -> Snapshot:
         """The rendering of every step recorded so far, as scenario ``scenario_id``."""
-        # contract stub: empty body
-        return Snapshot(scenario_id, self._world.locale, (), self._world.real_now)
+        return Snapshot(scenario_id, self._world.locale, tuple(self._lines), self._world.real_now)
+
+
+FROZEN_NOW_ISO: Final = FROZEN_NOW.replace(" ", "T") + "Z"
 
 
 @dataclass(frozen=True)
@@ -606,7 +983,13 @@ class Snapshot:
 
     def render(self) -> str:
         """The snapshot file content: the header, then every body line, newline-terminated."""
-        return ""  # contract stub: an empty rendering fails the assertions
+        header = (
+            "# legacy snapshot v1",
+            f"# scenario: {self.scenario_id}",
+            f"# locale: {self.locale}",
+            f"# frozen_now: {FROZEN_NOW_ISO}",
+        )
+        return "\n".join((*header, *self.body)) + "\n"
 
     def compare_or_update(self, path: Path, *, root: Path = SNAPSHOT_ROOT) -> None:
         """Compare the rendering with ``path``, or rewrite it when updating is requested.
