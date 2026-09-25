@@ -1,0 +1,10 @@
+# legacy snapshot v1
+# scenario: home.error_handler
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: call error_handler RuntimeError("boom") user=10
+-> sendMessage chat=10
+   text:
+   | ❌ Si è verificato un errore. Riprova tra qualche istante.
+## db after step 1
+(no changes)

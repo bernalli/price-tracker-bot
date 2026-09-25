@@ -24,8 +24,9 @@ import time
 import warnings
 from collections import Counter
 from datetime import UTC, datetime, timedelta, timezone
+from decimal import Decimal
 from io import BytesIO
-from typing import TYPE_CHECKING, Final, Literal
+from typing import TYPE_CHECKING, Any, Final, Literal
 
 import pytest
 import pytest_asyncio
@@ -46,13 +47,16 @@ from telegram.ext import CommandHandler
 from price_tracker.bot import messages
 from price_tracker.bot.handlers import register_handlers
 from price_tracker.bot.handlers.debug import status_command
+from price_tracker.core.scraper_base import ProductInfo
 from tests.support.fake_telegram import Call, FakeRequest, make_application
 from tests.support.legacy_harness import (
     ADMIN,
     FROZEN_NOW,
     LOCALES,
+    OTHER,
     OWNER,
     SNAPSHOT_ROOT,
+    STRANGER,
     HarnessFault,
     LegacySnapshotUpdated,
     NonDeterministicOutput,
@@ -74,7 +78,9 @@ if TYPE_CHECKING:
 
     from tests.support.legacy_harness import LegacyWorld
 
-SCENARIOS: dict[str, Callable[[LegacyWorld], Awaitable[None]]] = {}
+    ScenarioFn = Callable[[LegacyWorld], Awaitable[None]]
+
+SCENARIOS: dict[str, ScenarioFn] = {}
 
 COMMANDS_IN: Final = frozenset(
     {
@@ -1232,8 +1238,6 @@ async def test_h1_exchange_rates_do_not_leak_into_a_world(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A rate loaded into the process before the world is built is not seen inside it."""
-    from decimal import Decimal
-
     from price_tracker.bot import decorators
 
     monkeypatch.setitem(decorators._ECB_RATES, "USD", Decimal("2"))
@@ -1366,6 +1370,132 @@ def test_u5_only_the_value_one_enables_updating(
     with pytest.raises(Failed, match="missing snapshot"):
         sample_snapshot().compare_or_update(path, root=tmp_path)
     assert not path.exists()
+
+
+# ── scenarios ────────────────────────────────────────────────────────
+#
+# One function per scenario, registered in SCENARIOS under "<area>.<name>". A
+# scenario seeds what it needs, then drives the steps in order; it asserts
+# nothing, the snapshot file is the oracle. Product ids come from the seeds.
+
+FAN_URL: Final = "https://shop.example.com/item/2"
+LAMP_URL: Final = "https://shop.example.com/item/3"
+ITEM4_URL: Final = "https://shop.example.com/item/4"
+ITEM5_URL: Final = "https://shop.example.com/item/5"
+PAUSED_URL: Final = "https://shop.example.com/item/8"
+WIDGET_URL: Final = "https://shop.example.com/item/9"
+AMAZON_URL: Final = "https://www.amazon.com/dp/B0FIXTURE1"
+
+KETTLE_HISTORY: Final = (
+    ("2026-01-15 10:00:00", "100.00"),
+    ("2026-02-01 10:00:00", "100.00"),
+    ("2026-02-10 10:00:00", "100.00"),
+    ("2026-02-20 10:00:00", "90.00"),
+    ("2026-02-28 10:00:00", "80.00"),
+)
+"""Five points of history: the outlier filter's minimum."""
+
+
+def scenario(scenario_id: str) -> Callable[[ScenarioFn], ScenarioFn]:
+    """Register the decorated function as scenario ``scenario_id``."""
+
+    def register(fn: ScenarioFn) -> ScenarioFn:
+        assert scenario_id not in SCENARIOS, f"duplicate scenario {scenario_id}"
+        SCENARIOS[scenario_id] = fn
+        return fn
+
+    return register
+
+
+async def seed_p1(w: LegacyWorld, **state: Any) -> int:
+    """P1: OWNER's Kettle, 100.00 -> 80.00 with five points of history."""
+    defaults: dict[str, Any] = {
+        "initial": "100.00",
+        "current": "80.00",
+        "lowest": "80.00",
+        "highest": "100.00",
+        "last_checked_at": "2026-03-01 10:00:00",
+        "history": KETTLE_HISTORY,
+    }
+    return await seed_product(w, OWNER, KETTLE_URL, "Kettle", **(defaults | state))
+
+
+async def seed_p2(w: LegacyWorld, **state: Any) -> int:
+    """P2: OWNER's Fan in USD, without a current price."""
+    defaults: dict[str, Any] = {"initial": "50.00", "current": None, "currency": "USD"}
+    return await seed_product(w, OWNER, FAN_URL, "Fan", **(defaults | state))
+
+
+async def seed_p3(w: LegacyWorld) -> int:
+    """P3: OTHER's Lamp at 30.00."""
+    return await seed_product(w, OTHER, LAMP_URL, "Lamp", initial="30.00", current="30.00")
+
+
+async def seed_pp(w: LegacyWorld) -> int:
+    """PP: OWNER's paused Old Fan."""
+    return await seed_product(w, OWNER, PAUSED_URL, "Old Fan", initial="45.00", active=False)
+
+
+def info(price: str, *, name: str = "Kettle", currency: str = "EUR") -> ProductInfo:
+    """A scraped product page with a price."""
+    return ProductInfo(name=name, price=Decimal(price), currency=currency)
+
+
+def script_drop(w: LegacyWorld) -> None:
+    """DROP: P1's page now reads 64.00, a 20 % drop the outlier filter accepts."""
+    w.scraper.script(KETTLE_URL, info("64.00"))
+
+
+async def seed_command(w: LegacyWorld, user: int, text: str) -> None:
+    """Run a command as a listed, uncaptured seed step."""
+    await w.recorder.seed(json.dumps(text, ensure_ascii=False), w.run_command(user, text))
+
+
+async def seed_job(w: LegacyWorld) -> None:
+    """Run a scheduler sweep as a listed, uncaptured seed step."""
+    await w.recorder.seed("job run_check_all", w.scheduler.run_check_all())
+
+
+# home ─────────────────────────────────────────────────────────────────
+
+
+@scenario("home.start")
+async def scenario_home_start(w: LegacyWorld) -> None:
+    await w.recorder.command(OWNER, "/start")
+
+
+@scenario("home.menu_user")
+async def scenario_home_menu_user(w: LegacyWorld) -> None:
+    await w.recorder.command(OWNER, "/menu")
+
+
+@scenario("home.menu_admin")
+async def scenario_home_menu_admin(w: LegacyWorld) -> None:
+    await w.recorder.command(ADMIN, "/menu")
+
+
+@scenario("home.help_alias")
+async def scenario_home_help_alias(w: LegacyWorld) -> None:
+    await w.recorder.command(OWNER, "/help")
+
+
+@scenario("home.unauthorized")
+async def scenario_home_unauthorized(w: LegacyWorld) -> None:
+    await w.recorder.command(STRANGER, "/start")
+    await w.recorder.command(STRANGER, "/lista")
+
+
+@scenario("home.admin_only_refused")
+async def scenario_home_admin_only_refused(w: LegacyWorld) -> None:
+    await w.recorder.command(OWNER, "/adduser 99")
+    await w.recorder.command(OWNER, "/intervallo")
+    await w.recorder.command(OWNER, "/health")
+    await w.recorder.command(OWNER, "/debug x")
+
+
+@scenario("home.error_handler")
+async def scenario_home_error_handler(w: LegacyWorld) -> None:
+    await w.recorder.call_error_handler(OWNER, RuntimeError("boom"))
 
 
 # ── T-S: scenarios ───────────────────────────────────────────────────

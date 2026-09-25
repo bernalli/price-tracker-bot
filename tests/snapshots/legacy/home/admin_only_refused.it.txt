@@ -1,0 +1,28 @@
+# legacy snapshot v1
+# scenario: home.admin_only_refused
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/adduser 99" user=10
+-> sendMessage chat=10
+   text:
+   | ⛔ Solo l'amministratore può usare questo comando.
+## db after step 1
+(no changes)
+## step 2: command "/intervallo" user=10
+-> sendMessage chat=10
+   text:
+   | ⛔ Solo l'amministratore può usare questo comando.
+## db after step 2
+(no changes)
+## step 3: command "/health" user=10
+-> sendMessage chat=10
+   text:
+   | ⛔ Solo l'amministratore può usare questo comando.
+## db after step 3
+(no changes)
+## step 4: command "/debug x" user=10
+-> sendMessage chat=10
+   text:
+   | ⛔ Solo l'amministratore può usare questo comando.
+## db after step 4
+(no changes)

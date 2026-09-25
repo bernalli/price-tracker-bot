@@ -1,0 +1,26 @@
+# legacy snapshot v1
+# scenario: home.unauthorized
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/start" user=12
+-> sendMessage chat=12
+   param parse_mode="HTML"
+   text:
+   | ⛔ Non sei autorizzato.
+   | Il tuo ID Telegram è: <code>12</code>
+   |
+   | Chiedi all'amministratore di aggiungerti con:
+   | <code>/adduser 12</code>
+## db after step 1
+(no changes)
+## step 2: command "/lista" user=12
+-> sendMessage chat=12
+   param parse_mode="HTML"
+   text:
+   | ⛔ Non sei autorizzato.
+   | Il tuo ID Telegram è: <code>12</code>
+   |
+   | Chiedi all'amministratore di aggiungerti con:
+   | <code>/adduser 12</code>
+## db after step 2
+(no changes)
