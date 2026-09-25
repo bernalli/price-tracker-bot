@@ -582,11 +582,11 @@ class TestDetectBlockEvent:
         (PayPal/bot-management bootstrap) on EVERY storefront — it is not a challenge.
 
         The over-broad ``id="captcha*"`` fingerprint falsely quarantined
-        shop-b/clae/shop-a for 2+ days (LOCKED_T3). A benign bootstrap
+        three live Shopify stores for 2+ days (LOCKED_T3). A benign bootstrap
         ``<script>`` on a full HTTP-200 product page must NOT be a block.
         """
         body = (
-            "<html><head><title>Riviera Weave — Filling Pieces</title>"
+            "<html><head><title>Canvas Runner — Shop B</title>"
             '<script type="application/ld+json">'
             '{"@type":"Product","offers":{"price":"220.00","priceCurrency":"EUR"}}'
             "</script></head><body>"
@@ -598,7 +598,7 @@ class TestDetectBlockEvent:
         detect_block_event(
             status_code=200,
             body=body,
-            url="https://www.shop-b.com/products/riviera-weave",
+            url="https://www.shop-b.com/products/canvas-runner",
         )
 
     def test_real_captcha_div_container_still_blocks(self):
@@ -639,9 +639,9 @@ def test_brotli_available_for_httpx_decompression() -> None:
     httpx silently delivers garbage when a server responds with brotli and
     neither ``brotli`` nor ``brotlicffi`` is installed.
 
-    Regression: nove25.net serves brotli by default; without this package,
+    Regression: a store served brotli by default; without this package,
     its 436 KB JSON-LD+OG page came back as a 55 KB skeleton, so the
-    Nove25 scraper added in v0.1.10 silently returned ``price=None`` in
+    site-specific scraper added in v0.1.10 silently returned ``price=None`` in
     production despite passing every offline test.
     """
     import importlib.util

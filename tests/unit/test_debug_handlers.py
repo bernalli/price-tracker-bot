@@ -262,9 +262,9 @@ async def test_errori_command_lists_products_and_quarantine_state() -> None:
     now = datetime.now(UTC)
     errored = [
         ProductErrorRow(
-            id=39,
-            name="Riviera Weave",
-            url="https://www.shop-b.com/products/riviera-weave",
+            id=7,
+            name="Canvas Runner",
+            url="https://www.shop-b.com/products/canvas-runner",
             domain="shop-b.com",
             consecutive_errors=4,
             last_error="block: CAPTCHA detected (captcha-form)",
@@ -287,7 +287,7 @@ async def test_errori_command_lists_products_and_quarantine_state() -> None:
 
     update.message.reply_html.assert_awaited_once()
     rendered: str = update.message.reply_html.call_args.args[0]
-    assert "Riviera Weave" in rendered
+    assert "Canvas Runner" in rendered
     assert "shop-b.com" in rendered
     assert "CAPTCHA" in rendered
     assert "4 letture fallite" in rendered

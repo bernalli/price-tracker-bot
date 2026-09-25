@@ -98,7 +98,7 @@ async def test_chart_shows_price_changes_older_than_the_last_hundred_readings(
     db = _fake_db(rows)
     captured = _spy_on_render(monkeypatch)
 
-    buf = await history._generate_chart(db, 1, {"name": "LEGO"})
+    buf = await history._generate_chart(db, 1, {"name": "Gadget"})
 
     assert buf is not None
     assert sorted(set(captured["prices"])) == [299.0, 319.0, 329.0, 349.0]
@@ -128,7 +128,7 @@ async def test_unparsable_price_is_dropped_not_plotted_as_zero(monkeypatch) -> N
     db = _fake_db(rows)
     captured = _spy_on_render(monkeypatch)
 
-    await history._generate_chart(db, 1, {"name": "Sigma"})
+    await history._generate_chart(db, 1, {"name": "Gizmo"})
 
     assert 0.0 not in captured["prices"]
     assert sorted(captured["prices"]) == [345.0, 349.0, 352.0]
@@ -174,7 +174,7 @@ async def test_chart_drops_malformed_and_non_finite_points(monkeypatch) -> None:
     db = _fake_db(rows)
     captured = _spy_on_render(monkeypatch)
 
-    buf = await history._generate_chart(db, 1, {"name": "Sigma"})
+    buf = await history._generate_chart(db, 1, {"name": "Gizmo"})
 
     assert buf is not None
     assert captured["prices"] == [352.0, 349.0]

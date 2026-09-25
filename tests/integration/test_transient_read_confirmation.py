@@ -1,8 +1,8 @@
 """Regression tests for transient bad reads reaching the alert path.
 
-Field incident (2026-07-20/21, product 15 — LEGO Technic Ferrari Daytona SP3):
-hourly readings sat steadily at ~386 EUR, three isolated samples reported
-187.95 EUR, and each of them bounced straight back to ~386 on the next check.
+Field incident: hourly readings sat steadily at ~386 EUR, three isolated
+samples reported 187.95 EUR, and each of them bounced straight back to ~386
+on the next check.
 The price never actually moved, yet the bot pushed a "Price drop! -51.3%"
 alert off a single unconfirmed reading.
 
@@ -77,8 +77,8 @@ async def repo_with_history() -> AsyncIterator[tuple[Repository, int]]:
     await repo.ensure_user(user_id=1)
     pid = await repo.add_product(
         user_id=1,
-        url="https://www.amazon.it/dp/B09QFSCWD9/?th=1",
-        name="LEGO Technic Ferrari Daytona SP3",
+        url="https://www.amazon.it/dp/B0EXAMPLE1/?th=1",
+        name="Example Building Set",
         domain="amazon.it",
         initial_price=STEADY,
         currency="EUR",
