@@ -1,7 +1,9 @@
 """Aggregator — register all per-domain handlers on the Application.
 
 Home commands (`/start`, `/menu`, `/help`) plus the global error handler
-live here; per-domain handlers are imported from the sibling modules.
+live here; per-domain handlers are imported from the sibling modules. The
+guided-flow coordinator, which owns the threshold, target and interval prompts,
+is registered in front of them.
 """
 
 from __future__ import annotations
@@ -17,6 +19,8 @@ from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler, ContextTypes
 
 from price_tracker.bot.decorators import _db, restricted, with_locale
+from price_tracker.bot.flow_services import RepositoryFlowServices
+from price_tracker.bot.flows import FlowConfig, GuidedFlow, JobQueueTimer, register_guided_flow
 from price_tracker.bot.handlers import (
     auth,
     callbacks,
@@ -111,8 +115,11 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 # ── Aggregator ────────────────────────────────────────────────────
 
 
-def register_handlers(app: Application) -> None:
-    """Register every per-domain handler module on the application."""
+LEGACY_GROUP = 2
+
+
+def _register_legacy(app: Application) -> None:
+    """Register every per-domain handler module in group 0, in the historical order."""
     # Home commands
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("menu", cmd_menu))
@@ -131,6 +138,28 @@ def register_handlers(app: Application) -> None:
     # text_input must register AFTER all command handlers so the catch-all
     # filters don't shadow CommandHandler dispatch.
     text_input.register(app)
+
+
+def register_handlers(app: Application) -> None:
+    """Register the guided-flow coordinator, ``/cancel`` and every legacy handler.
+
+    Layout: group 0 the coordinator, group 1 ``/cancel``, group 2 the legacy
+    handlers in their historical order. Python-telegram-bot runs at most one
+    handler per group, so an update the coordinator closes and passes on (another
+    command, a legacy button) still reaches its legacy handler.
+    """
+    if app.job_queue is None:
+        raise RuntimeError("the guided-flow timeouts need a job queue")
+    _register_legacy(app)
+    for handler in list(app.handlers.get(0, ())):
+        app.remove_handler(handler, 0)
+        app.add_handler(handler, LEGACY_GROUP)
+    flow = GuidedFlow(
+        RepositoryFlowServices(lambda: app.bot_data["db"]),
+        JobQueueTimer(app.job_queue),
+        config=FlowConfig(add_entry=False),
+    )
+    register_guided_flow(app, flow, legacy_handlers_present=True)
 
     # Global error handler
     app.add_error_handler(error_handler)

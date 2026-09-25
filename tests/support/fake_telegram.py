@@ -190,8 +190,11 @@ _update_ids = itertools.count(1)
 _query_ids = itertools.count(1)
 
 
-def _user(user_id: int) -> dict[str, Any]:
-    return {"id": user_id, "is_bot": False, "first_name": f"U{user_id}", "language_code": "en"}
+def _user(user_id: int, language_code: str | None = "en") -> dict[str, Any]:
+    user: dict[str, Any] = {"id": user_id, "is_bot": False, "first_name": f"U{user_id}"}
+    if language_code is not None:
+        user["language_code"] = language_code
+    return user
 
 
 def _chat(chat_id: int, chat_type: str) -> dict[str, Any]:
@@ -209,8 +212,12 @@ def message_update(
     *,
     kind: str = "message",
     chat_type: str | None = None,
+    language_code: str | None = "en",
 ) -> Update:
-    """A text (or command) update of ``kind`` message/channel_post/edited_channel_post."""
+    """A text (or command) update of ``kind`` message/channel_post/edited_channel_post.
+
+    ``language_code`` is the sender's Telegram language; ``None`` omits the field.
+    """
     resolved_type = chat_type or ("channel" if kind != "message" else "private")
     message: dict[str, Any] = {
         "message_id": next(_update_ids) + 50_000,
@@ -219,7 +226,7 @@ def message_update(
         "text": text,
     }
     if user_id is not None:
-        message["from"] = _user(user_id)
+        message["from"] = _user(user_id, language_code)
     if kind == "edited_channel_post":
         message["edit_date"] = message["date"]
     if text.startswith("/"):
@@ -238,13 +245,17 @@ def callback_update(
     *,
     message_id: int = 1,
     chat_type: str = "private",
+    language_code: str | None = "en",
 ) -> Update:
-    """A button press on bot message ``message_id`` in ``chat_id``."""
+    """A button press on bot message ``message_id`` in ``chat_id``.
+
+    ``language_code`` is the presser's Telegram language; ``None`` omits the field.
+    """
     payload = {
         "update_id": next(_update_ids),
         "callback_query": {
             "id": str(next(_query_ids)),
-            "from": _user(user_id),
+            "from": _user(user_id, language_code),
             "chat_instance": f"ci-{chat_id}",
             "data": data,
             "message": {

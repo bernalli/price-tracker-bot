@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `/cancel` aborts the open prompt.
+- The threshold, target and check-interval prompts expire after 5 minutes.
+- Three invalid answers end these prompts without changes.
+
+### Changed
+
+- The threshold, target and check-interval prompts are tracked per chat: a prompt opened
+  in one chat no longer captures replies in another.
+- These prompts answer with a new message instead of editing the product card.
+- These prompts accept the input grammar documented in the prompt: percentages 1-99,
+  amounts with one dot or comma, intervals of 5-10080 minutes, and `0` to clear the target
+  or reset the interval.
+- A saved answer is confirmed with "Saved." instead of repeating the new value.
+- These prompts and their replies follow the language of the user's Telegram app
+  (Italian or English; other languages use the configured default).
+- The check-interval prompt no longer treats `no`, `skip`, `salta`, `-` or `annulla` as
+  a cancel: use `/cancel` or the Cancel button.
+- Access to the product is re-checked when the answer arrives.
+
 ## [1.1.0] - 2026-09-11
 
 ### Added

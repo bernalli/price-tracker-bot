@@ -106,6 +106,11 @@ def reset_locale(token: Token[gettext.NullTranslations]) -> None:
     _translation_var.reset(token)
 
 
+def N_(text: str) -> str:
+    """Mark `text` for extraction without translating it; `_()` translates it when sent."""
+    return text
+
+
 def _(text: str) -> str:
     """Translate `text` per current ContextVar locale."""
     return _translation_var.get().gettext(text)

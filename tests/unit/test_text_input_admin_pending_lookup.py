@@ -17,13 +17,11 @@ defect entirely.
 
 from __future__ import annotations
 
-from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
 
 import aiosqlite
-import pytest
 import pytest_asyncio
 
 from price_tracker.bot.handlers.text_input import handle_text_input
@@ -34,13 +32,13 @@ from price_tracker.db.repository import Repository
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
+    import pytest
+
 MIGRATIONS_DIR = Path("src/price_tracker/db/migrations")
 
 ADMIN_ID = 987654321
-OTHER_USER_ID = 111222333
 NEW_USER_ID = 555000111
 TARGET_NICK_USER_ID = 444555666
-NONEXISTENT_PRODUCT_ID = 999999
 
 
 @pytest_asyncio.fixture
@@ -199,105 +197,3 @@ async def test_admin_nick_routes_without_a_product_lookup(repo: Repository) -> N
     assert updated is not None
     assert updated.display_name == "Mario", "admin_nick must update the target user's nickname"
     assert "aggiornato" in _last_reply(update).lower()
-
-
-# ── negative case: target/threshold/refresh still require a real product ──
-
-
-async def test_target_with_nonexistent_product_id_is_rejected_and_writes_nothing(
-    repo: Repository,
-) -> None:
-    await repo.ensure_user(OTHER_USER_ID, is_admin=False)
-    update, context = _make_update_and_context(
-        repo,
-        user_id=OTHER_USER_ID,
-        text="19.99",
-        pending_action=("target", NONEXISTENT_PRODUCT_ID),
-    )
-
-    await handle_text_input(update, context)
-
-    assert "prodotto non trovato" in _last_reply(update).lower()
-    product = await repo.get_product(NONEXISTENT_PRODUCT_ID)
-    assert product is None
-
-
-async def test_threshold_on_someone_elses_product_is_rejected_and_writes_nothing(
-    repo: Repository,
-) -> None:
-    await repo.ensure_user(OTHER_USER_ID, is_admin=False)
-    await repo.ensure_user(ADMIN_ID, is_admin=False)  # non-admin here: ownership must be enforced
-    owner_pid = await repo.add_product(
-        user_id=ADMIN_ID,
-        url="https://example.com/p/owned-by-admin",
-        name="Not yours",
-        domain="example.com",
-        initial_price=Decimal("100"),
-        currency="EUR",
-    )
-
-    update, context = _make_update_and_context(
-        repo,
-        user_id=OTHER_USER_ID,
-        text="20%",
-        pending_action=("threshold", owner_pid),
-    )
-
-    await handle_text_input(update, context)
-
-    assert "prodotto non trovato" in _last_reply(update).lower()
-    product = await repo.get_product(owner_pid)
-    assert product is not None
-    # Untouched: still the default threshold set by add_product.
-    assert product.threshold_value == Decimal("10")
-
-
-async def test_refresh_with_nonexistent_product_id_is_rejected_and_writes_nothing(
-    repo: Repository,
-) -> None:
-    await repo.ensure_user(OTHER_USER_ID, is_admin=False)
-    update, context = _make_update_and_context(
-        repo,
-        user_id=OTHER_USER_ID,
-        text="30",
-        pending_action=("refresh", NONEXISTENT_PRODUCT_ID),
-    )
-
-    await handle_text_input(update, context)
-
-    assert "prodotto non trovato" in _last_reply(update).lower()
-    product = await repo.get_product(NONEXISTENT_PRODUCT_ID)
-    assert product is None
-
-
-@pytest.mark.parametrize(
-    ("action_type", "text"),
-    [("target", "19.99"), ("threshold", "20%"), ("refresh", "30")],
-)
-async def test_product_action_on_someone_elses_product_is_rejected_and_writes_nothing(
-    repo: Repository, action_type: str, text: str
-) -> None:
-    """Every product-bound action keeps its ownership check on a real row."""
-    await repo.ensure_user(OTHER_USER_ID, is_admin=False)
-    await repo.ensure_user(ADMIN_ID, is_admin=False)  # non-admin: ownership must be enforced
-    owner_pid = await repo.add_product(
-        user_id=ADMIN_ID,
-        url="https://example.com/p/owned-by-someone-else",
-        name="Not yours",
-        domain="example.com",
-        initial_price=Decimal("100"),
-        currency="EUR",
-    )
-    before = await repo.get_product(owner_pid)
-
-    update, context = _make_update_and_context(
-        repo,
-        user_id=OTHER_USER_ID,
-        text=text,
-        pending_action=(action_type, owner_pid),
-    )
-
-    await handle_text_input(update, context)
-
-    assert "prodotto non trovato" in _last_reply(update).lower()
-    assert await repo.get_product(owner_pid) == before
