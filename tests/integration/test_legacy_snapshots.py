@@ -49,7 +49,7 @@ from telegram.ext import CommandHandler
 from price_tracker.bot import messages
 from price_tracker.bot.handlers import register_handlers
 from price_tracker.bot.handlers.debug import status_command
-from price_tracker.core.exceptions import HTTPBlockStatus, ParseError
+from price_tracker.core.exceptions import HTTPBlockStatus, ListingGone, ParseError
 from price_tracker.core.scraper_base import ProductInfo
 from tests.support.fake_telegram import Call, FakeRequest, make_application
 from tests.support.legacy_harness import (
@@ -2515,6 +2515,174 @@ async def scenario_status_errori(w: LegacyWorld) -> None:
 @scenario("text.no_pending")
 async def scenario_text_no_pending(w: LegacyWorld) -> None:
     await w.recorder.text(OWNER, "ciao")
+
+
+# alert ────────────────────────────────────────────────────────────────
+# The scheduler and the notifier run for real; no Telegram update comes in,
+# except the preference commands some scenarios run as seeds.
+
+
+async def seed_quiet_rome(w: LegacyWorld) -> None:
+    """Quiet hours 12:00-15:00 in Europe/Rome: the frozen 12:00 UTC is 13:00 there."""
+    await seed_command(w, OWNER, "/timezone Europe/Rome")
+    await seed_command(w, OWNER, "/quiet_hours 12:00-15:00")
+
+
+async def seed_three_drops(w: LegacyWorld) -> None:
+    """P1 (DROP), P2 read at 40.00 USD and a second Lamp of OWNER read at 30.00."""
+    await seed_p1(w)
+    await seed_p2(w)
+    await seed_product(w, OWNER, ITEM4_URL, "Lamp", initial="40.00", current="40.00")
+    script_drop(w)
+    w.scraper.script(FAN_URL, info("40.00", name="Fan", currency="USD"))
+    w.scraper.script(ITEM4_URL, info("30.00", name="Lamp"))
+
+
+async def seed_two_failing(w: LegacyWorld) -> None:
+    """P1 and a Speaker on the same domain whose pages no longer show a price."""
+    await seed_p1(w)
+    await seed_product(w, OWNER, ITEM4_URL, "Speaker", initial="40.00", current="40.00")
+    w.scraper.script(KETTLE_URL, ParseError("no price"))
+    w.scraper.script(ITEM4_URL, ParseError("no price"))
+
+
+async def seed_two_drops_in_digest(w: LegacyWorld) -> None:
+    """P1 (DROP) and P2 read at 40.00 USD, with digest mode on."""
+    await seed_p1(w)
+    await seed_p2(w)
+    script_drop(w)
+    w.scraper.script(FAN_URL, info("40.00", name="Fan", currency="USD"))
+    await seed_command(w, OWNER, "/digest_mode on")
+
+
+@scenario("alert.price_drop")
+async def scenario_alert_price_drop(w: LegacyWorld) -> None:
+    await seed_p1(w)
+    await seed_p3(w)
+    script_drop(w)
+    w.scraper.script(LAMP_URL, info("30.00", name="Lamp"))
+    await w.recorder.job("run_check_all")
+
+
+@scenario("alert.cooldown")
+async def scenario_alert_cooldown(w: LegacyWorld) -> None:
+    await seed_p1(w)
+    w.scraper.script(KETTLE_URL, info("64.00"), info("80.00"), info("70.00"), info("56.00"))
+    for _ in range(4):
+        await w.recorder.job("run_check_all")
+
+
+@scenario("alert.target_crossing")
+async def scenario_alert_target_crossing(w: LegacyWorld) -> None:
+    await seed_p1(w, threshold=("percentage", "50"), target="70.00")
+    w.scraper.script(KETTLE_URL, info("69.00"))
+    await w.recorder.job("run_check_all")
+
+
+@scenario("alert.back_in_stock")
+async def scenario_alert_back_in_stock(w: LegacyWorld) -> None:
+    await seed_p1(w, available=False)
+    w.scraper.script(KETTLE_URL, ProductInfo(price=Decimal("80.00"), available=True))
+    await w.recorder.job("run_check_all")
+
+
+@scenario("alert.muted")
+async def scenario_alert_muted(w: LegacyWorld) -> None:
+    await seed_p1(w)
+    script_drop(w)
+    await seed_command(w, OWNER, "/mute")
+    await w.recorder.job("run_check_all")
+
+
+@scenario("alert.quiet_digest")
+async def scenario_alert_quiet_digest(w: LegacyWorld) -> None:
+    await seed_p1(w)
+    script_drop(w)
+    await seed_quiet_rome(w)
+    await seed_command(w, OWNER, "/digest_mode on")
+    await w.recorder.job("run_check_all")
+
+
+@scenario("alert.quiet_dropped")
+async def scenario_alert_quiet_dropped(w: LegacyWorld) -> None:
+    await seed_p1(w)
+    script_drop(w)
+    await seed_quiet_rome(w)
+    await w.recorder.job("run_check_all")
+
+
+@scenario("alert.throttled_digest")
+async def scenario_alert_throttled_digest(w: LegacyWorld) -> None:
+    await seed_three_drops(w)
+    await seed_command(w, OWNER, "/throttle 1")
+    await seed_command(w, OWNER, "/digest_mode on")
+    await w.recorder.job("run_check_all")
+
+
+@scenario("alert.throttled_dropped")
+async def scenario_alert_throttled_dropped(w: LegacyWorld) -> None:
+    await seed_three_drops(w)
+    await seed_command(w, OWNER, "/throttle 1")
+    await w.recorder.job("run_check_all")
+
+
+@scenario("alert.quiet_operational")
+async def scenario_alert_quiet_operational(w: LegacyWorld) -> None:
+    await seed_p1(w)
+    w.scraper.script(KETTLE_URL, ParseError("no price"))
+    w.scheduler.deps.max_consecutive_errors = 4
+    await seed_quiet_rome(w)
+    await w.recorder.job("run_check_all")
+    await w.recorder.job("run_check_all")
+    await w.recorder.command(OWNER, "/digest_now")
+
+
+@scenario("alert.digest_flush_due")
+async def scenario_alert_digest_flush_due(w: LegacyWorld) -> None:
+    await seed_two_drops_in_digest(w)
+    await w.recorder.job("run_check_all")
+    await reanchor_digest(w, "2026-03-01 10:00:00", "2026-03-01 10:00:01")
+    await w.recorder.job("digest_flush_due", interval_minutes=60)
+
+
+@scenario("alert.digest_not_due")
+async def scenario_alert_digest_not_due(w: LegacyWorld) -> None:
+    await seed_two_drops_in_digest(w)
+    await seed_job(w)
+    await reanchor_digest(w, "2026-03-01 11:30:00", "2026-03-01 11:30:01")
+    await w.recorder.job("digest_flush_due", interval_minutes=60)
+
+
+@scenario("alert.operational_warning")
+async def scenario_alert_operational_warning(w: LegacyWorld) -> None:
+    await seed_two_failing(w)
+    await w.recorder.job("run_check_all")
+
+
+@scenario("alert.operational_suspended")
+async def scenario_alert_operational_suspended(w: LegacyWorld) -> None:
+    await seed_two_failing(w)
+    await w.recorder.job("run_check_all")
+    await w.recorder.job("run_check_all")
+
+
+@scenario("alert.listing_gone")
+async def scenario_alert_listing_gone(w: LegacyWorld) -> None:
+    await seed_p1(w)
+    w.scraper.script(KETTLE_URL, ListingGone(status=404, url=KETTLE_URL))
+    w.scheduler.deps.max_consecutive_errors = 10
+    for _ in range(3):
+        await w.recorder.job("run_check_all")
+
+
+@scenario("alert.quarantine_entry")
+async def scenario_alert_quarantine_entry(w: LegacyWorld) -> None:
+    await seed_p1(w)
+    await seed_product(w, OWNER, ITEM4_URL, "Speaker", initial="40.00", current="40.00")
+    await seed_product(w, OWNER, ITEM5_URL, "Mixer", initial="60.00", current="60.00")
+    for url in (KETTLE_URL, ITEM4_URL, ITEM5_URL):
+        w.scraper.script(url, HTTPBlockStatus(status=403, url=url))
+    await w.recorder.job("run_check_all")
 
 
 # ── T-S: scenarios ───────────────────────────────────────────────────

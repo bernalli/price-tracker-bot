@@ -1,0 +1,12 @@
+# legacy snapshot v1
+# scenario: alert.digest_not_due
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: seed "\"/digest_mode on\""
+## step 2: seed "job run_check_all"
+## step 3: seed "reanchor enqueued_at"
+## step 4: seed "reanchor enqueued_at"
+## step 5: job digest_flush_due(interval_minutes=60)
+(no calls)
+## db after step 5
+(no changes)

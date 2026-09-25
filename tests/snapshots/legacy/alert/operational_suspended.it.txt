@@ -1,0 +1,54 @@
+# legacy snapshot v1
+# scenario: alert.operational_suspended
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: job run_check_all
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | ⏳ <b>Controlli in errore su example.com</b> (2)
+   |
+   | 2 prodotti hanno fallito 1/2 controlli di fila. Se continua, verranno sospesi automaticamente.
+   |
+   | • <b>Kettle</b> — prezzo non leggibile
+   | • <b>Speaker</b> — prezzo non leggibile
+   |
+   | Dettagli con /errori.
+   markup: {}
+## db after step 1
+~ products id=1 consecutive_errors: 0 -> 1
+~ products id=1 last_error: NULL -> "parse_error: no price"
+~ products id=1 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=2 consecutive_errors: 0 -> 1
+~ products id=2 last_error: NULL -> "parse_error: no price"
+~ products id=2 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+## step 2: job run_check_all
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | ⚠️ <b>Prezzo illeggibile su example.com</b> (2)
+   |
+   | Le pagine si aprono, ma il prezzo non si legge più (layout cambiato o offerta diversa).
+   |
+   | • <b>Kettle</b> — prezzo non leggibile
+   | Ultima lettura buona: 80.00 € il 2026-03-01 10:00 UTC
+   | Errore: <code>parse_error: no price</code>
+   | • <b>Speaker</b> — prezzo non leggibile
+   | Nessuna lettura riuscita finora
+   | Errore: <code>parse_error: no price</code>
+   |
+   | Riattiva per fare subito un nuovo controllo.
+   keyboard:
+   | [▶️ Riattiva e ricontrolla (2) → ops_react_1]
+   | [🗑 Elimina tutti (2) → ops_del_1]
+## db after step 2
+~ products id=1 is_active: 1 -> 0
+~ products id=1 consecutive_errors: 1 -> 2
+~ products id=1 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
+~ products id=1 suspension_kind: NULL -> "automatic"
+~ products id=1 suspension_reason: NULL -> "parse_error"
+~ products id=2 is_active: 1 -> 0
+~ products id=2 consecutive_errors: 1 -> 2
+~ products id=2 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
+~ products id=2 suspension_kind: NULL -> "automatic"
+~ products id=2 suspension_reason: NULL -> "parse_error"

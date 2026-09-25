@@ -1,0 +1,20 @@
+# legacy snapshot v1
+# scenario: alert.quiet_digest
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: seed "\"/timezone Europe/Rome\""
+## step 2: seed "\"/quiet_hours 12:00-15:00\""
+## step 3: seed "\"/digest_mode on\""
+## step 4: job run_check_all
+(no calls)
+## db after step 4
++ digest_queue id=1 {user_id=10, product_id=1, alert_payload_json="{\"kind\": \"price\", \"product_id\": 1, \"product_name\": \"Kettle\", \"url\": \"https://shop.example.com/item/1\", \"old_price\": \"80.00\", \"new_price\": \"64.00\", \"currency\": \"EUR\", \"domain\": \"example.com\", \"text\": \"\\ud83d\\udcc9 <b>Price drop!</b>\\n\\n<b>Kettle</b>\\n<a href=\\\"https://shop.example.com/item/1\\\">View product</a>\\n\\nWas: <s>80.00 \\u20ac</s>\\nNow: <b>64.00 \\u20ac</b>\\nDrop: -16.00 \\u20ac (20.0%)\"}", enqueued_at=<now:9999-99-99 99:99:99>, flushed_at=NULL}
++ price_history id=6 {product_id=1, price="64.00", checked_at=<now:9999-99-99 99:99:99>}
+~ products id=1 current_price: "80.00" -> "64.00"
+~ products id=1 last_checked_at: "2026-03-01 10:00:00" -> <now:9999-99-99 99:99:99>
+~ products id=1 last_notified_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=1 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
+~ products id=1 lowest_price: "80.00" -> "64.00"
+~ products id=1 pending_alert_price: NULL -> "64.00"
+~ products id=1 pending_alert_at: NULL -> <now:9999-99-99 99:99:99>
++ scraper_health domain="example.com" {state="CLOSED", consecutive_blocks=0, locked_until=NULL, last_block_at=NULL, last_block_reason=NULL, last_success_at="2026-03-01T12:00:00+00:00", updated_at=<now:9999-99-99 99:99:99>}
