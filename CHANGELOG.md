@@ -28,6 +28,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a cancel: use `/cancel` or the Cancel button.
 - Access to the product is re-checked when the answer arrives.
 
+### Fixed
+
+- The condition, seller and "any drop" buttons of a product, and `/mute` or `/unmute` with a
+  product id, now answer "not found" for a product that is not yours instead of changing or
+  showing it.
+
 ## [1.1.0] - 2026-09-11
 
 ### Added
