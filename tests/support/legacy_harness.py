@@ -42,6 +42,7 @@ from prometheus_client import CollectorRegistry
 from telegram import Update
 from telegram.ext import CallbackContext
 
+from price_tracker.bot import decorators
 from price_tracker.bot.handlers import error_handler, register_handlers
 from price_tracker.bot.messages import get_translation
 from price_tracker.config import Config
@@ -94,6 +95,9 @@ FIXTURE_HTML: Final = (
     Path(__file__).resolve().parents[1] / "fixtures" / "generic" / "sample_jsonld.html"
 )
 """The page every GET of the world's HTTP client answers with."""
+
+SEEDED_AT: Final = "2026-02-28 09:00:00"
+"""``created_at`` and ``updated_at`` of every seeded product."""
 
 NOW_TOLERANCE_SECONDS: Final = 600
 """A database timestamp this close to the real clock was written by SQLite's ``now``."""
@@ -448,6 +452,8 @@ async def build_world(
         raise socket.gaierror(socket.EAI_NONAME, "offline")
 
     monkeypatch.setattr(socket, "getaddrinfo", offline_getaddrinfo)
+    # Exchange rates loaded by an earlier test would change every non-EUR price.
+    monkeypatch.setattr(decorators, "_ECB_RATES", {})
 
     conn = await bootstrap_database(":memory:")
     http_client: httpx.AsyncClient | None = None
@@ -640,7 +646,9 @@ async def seed_product(
     A price left at ``UNSET`` keeps what ``add_product`` wrote (the initial price);
     a price passed as ``None`` writes NULL; every other ``None`` argument writes
     NULL. ``active=False`` goes through
-    ``Repository.pause_product`` (a manual pause, as ``/pausa``). ``history`` inserts
+    ``Repository.pause_product`` (a manual pause, as ``/pausa``) before the
+    ``UPDATE``, which also sets ``created_at`` and ``updated_at`` to ``SEEDED_AT``:
+    a later write of SQLite's ``now`` then shows as a change. ``history`` inserts
     ``price_history`` rows with an explicit ``checked_at``.
     """
     product_id = await world.repo.add_product(
@@ -671,9 +679,13 @@ async def seed_product(
         ("last_error", last_error),
         ("last_error_at", last_error_at),
         ("is_available", int(available)),
+        ("created_at", SEEDED_AT),
+        ("updated_at", SEEDED_AT),
     )
     assignments.extend(f"{column} = ?" for column, _ in state)
     values.extend(value for _, value in state)
+    if not active:
+        await world.repo.pause_product(product_id)
     await world.conn.execute(
         f"UPDATE products SET {', '.join(assignments)} WHERE id = ?", (*values, product_id)
     )
@@ -682,8 +694,6 @@ async def seed_product(
         [(product_id, price, checked_at) for checked_at, price in history],
     )
     await world.conn.commit()
-    if not active:
-        await world.repo.pause_product(product_id)
     return product_id
 
 

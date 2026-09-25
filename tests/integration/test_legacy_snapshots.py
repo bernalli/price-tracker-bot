@@ -1203,6 +1203,45 @@ async def test_h4_reanchor_refuses_anything_but_exactly_one_row(
     assert [tuple(row) for row in await cursor.fetchall()] == [("UTC",)]
 
 
+async def test_h4_seeded_product_timestamps_are_anchored(frozen_world: LegacyWorld) -> None:
+    """A seeded row carries fixed timestamps, so a later ``now`` write shows as a change."""
+    w = frozen_world
+    product = await seed_product(w, OWNER, KETTLE_URL, "Kettle", initial="100.00")
+    paused = await seed_product(
+        w, OWNER, "https://shop.example.com/item/2", "Fan", initial="5.00", active=False
+    )
+    cursor = await w.conn.execute(
+        "SELECT id, created_at, updated_at, is_active FROM products ORDER BY id"
+    )
+    assert [tuple(row) for row in await cursor.fetchall()] == [
+        (product, "2026-02-28 09:00:00", "2026-02-28 09:00:00", 1),
+        (paused, "2026-02-28 09:00:00", "2026-02-28 09:00:00", 0),
+    ]
+    await w.recorder.command(OWNER, f"/pausa {product}")
+    lines = w.recorder.snapshot("harness.anchored").render().splitlines()
+    step1_db = lines[lines.index("## db after step 1") + 1 :]
+    assert any(
+        re.fullmatch(
+            rf'~ products id={product} updated_at: "2026-02-28 09:00:00" -> <now:[9 :-]+>', line
+        )
+        for line in step1_db
+    )
+
+
+async def test_h1_exchange_rates_do_not_leak_into_a_world(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A rate loaded into the process before the world is built is not seen inside it."""
+    from decimal import Decimal
+
+    from price_tracker.bot import decorators
+
+    monkeypatch.setitem(decorators._ECB_RATES, "USD", Decimal("2"))
+    async with open_world(LOCALES[0], monkeypatch):
+        assert decorators._ECB_RATES == {}
+        assert decorators._convert_display(Decimal("10"), "USD") == "USD 10.00 (~€9.20)"
+
+
 async def test_h14_malformed_recorder_and_stub_calls_are_refused(
     frozen_world: LegacyWorld,
 ) -> None:
