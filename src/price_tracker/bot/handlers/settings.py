@@ -120,6 +120,9 @@ async def mute_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         except ValueError:
             await update.message.reply_text("Usage: /mute [product_id|all] [hours|forever]")
             return
+        if await repo.get_product_for_user(product_id, update.effective_user.id) is None:
+            await update.message.reply_text(_("❌ Prodotto non trovato."))
+            return
 
     mute_until: datetime | None
     if duration == "forever":
@@ -169,6 +172,9 @@ async def unmute_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             product_id = int(target)
         except ValueError:
             await update.message.reply_text("Usage: /unmute [product_id|all]")
+            return
+        if await repo.get_product_for_user(product_id, update.effective_user.id) is None:
+            await update.message.reply_text(_("❌ Prodotto non trovato."))
             return
     user_id = update.effective_user.id
     # Read-before-write: preserve digest_mode/timezone/throttle/quiet_hours
