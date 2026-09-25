@@ -1,0 +1,21 @@
+# legacy snapshot v1
+# scenario: admin.adduser_prompt_existing
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: press "menu_admin_adduser" user=1 on=1 synthetic
+-> answerCallbackQuery
+-> editMessageText chat=1 message_id=1
+   param parse_mode="HTML"
+   text:
+   | ➕ <b>Aggiungi utente</b>
+   |
+   | Scrivi l'ID Telegram dell'utente da aggiungere:
+## db after step 1
+(no changes)
+## step 2: text "10" user=1
+-> sendMessage chat=1
+   param parse_mode="HTML"
+   text:
+   | ℹ️ Utente <code>10</code> già autorizzato.
+## db after step 2
+~ users user_id=1 display_name: NULL -> "U1"

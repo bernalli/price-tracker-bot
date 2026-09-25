@@ -1,0 +1,16 @@
+# legacy snapshot v1
+# scenario: admin.menu_non_admin
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: press "menu_admin" user=10 on=1 synthetic
+-> answerCallbackQuery
+## db after step 1
+(no changes)
+## step 2: press "menu_admin_users" user=10 on=1 synthetic
+-> answerCallbackQuery
+## db after step 2
+(no changes)
+## step 3: press "admin_rm_11" user=10 on=1 synthetic
+-> answerCallbackQuery
+## db after step 3
+(no changes)

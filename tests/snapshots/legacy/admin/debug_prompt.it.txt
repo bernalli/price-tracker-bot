@@ -1,0 +1,67 @@
+# legacy snapshot v1
+# scenario: admin.debug_prompt
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: press "menu_admin_debug" user=1 on=1 synthetic
+-> answerCallbackQuery
+-> editMessageText chat=1 message_id=1
+   param parse_mode="HTML"
+   text:
+   | 🔧 <b>Debug scraper</b>
+   |
+   | Incolla l'URL del prodotto da analizzare:
+## db after step 1
+(no changes)
+## step 2: text "notaurl" user=1
+-> sendMessage chat=1
+   text:
+   | ❌ URL non valido.
+## db after step 2
+~ users user_id=1 display_name: NULL -> "U1"
+## step 3: press "menu_admin_debug" user=1 on=1 synthetic
+-> answerCallbackQuery
+-> editMessageText chat=1 message_id=1
+   param parse_mode="HTML"
+   text:
+   | 🔧 <b>Debug scraper</b>
+   |
+   | Incolla l'URL del prodotto da analizzare:
+## db after step 3
+(no changes)
+## step 4: text "https://shop.example.com/item/1" user=1
+-> sendMessage chat=1
+   text:
+   | 🔍 Analizzo il prodotto...
+-> editMessageText chat=1 message_id=1001
+   param link_preview_options={"is_disabled": true}
+   param parse_mode="HTML"
+   text:
+   | ✅ <b>Prodotto aggiunto!</b> (#1)
+   |
+   | 📦 Kettle
+   | 💰 Prezzo: <b>€80.00</b>
+   | 🌐 Sito: example.com
+   |
+   | <b>Come vuoi essere avvisato?</b>
+   keyboard:
+   | [🔔 Ogni ribasso → track_any_1]
+   | [📉 Soglia % o € → track_threshold_1]
+   | [💰 Prezzo target → track_target_1]
+   | [👍 Va bene -10% (default) → track_default_1]
+## db after step 4
++ products id=1 {url="https://shop.example.com/item/1", name="Kettle", initial_price="80.00", current_price="80.00", is_active=1, consecutive_errors=0, last_checked_at=NULL, last_notified_at=NULL, created_at=<now:9999-99-99 99:99:99>, updated_at=<now:9999-99-99 99:99:99>, threshold_type="percentage", threshold_value="10", target_price=NULL, domain="example.com", lowest_price="80.00", highest_price="80.00", user_id=1, currency="EUR", is_available=1, pending_alert_price=NULL, pending_alert_at=NULL, preferred_condition=NULL, preferred_seller=NULL, check_interval_minutes=NULL, last_error=NULL, last_error_at=NULL, pending_read_price=NULL, pending_read_count=0, pending_read_streak=0, gone_streak=0, suspension_kind=NULL, suspension_reason=NULL}
+## step 5: text "http:/x" user=1
+-> sendMessage chat=1
+   text:
+   | 🔍 Analisi in corso...
+-> editMessageText chat=1 message_id=1002
+   param parse_mode="HTML"
+   text:
+   | 🔍 <b>Debug scraping</b>
+   | 🔗 http:/x
+   |
+   | ❌ httpx: unknown url type: '/x'
+   |
+   | ❌ Impossibile caricare la pagina con nessun metodo.
+## db after step 5
+(no changes)

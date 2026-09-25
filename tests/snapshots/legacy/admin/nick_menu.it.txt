@@ -1,0 +1,19 @@
+# legacy snapshot v1
+# scenario: admin.nick_menu
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: press "menu_admin_nick" user=1 on=1 synthetic
+-> answerCallbackQuery
+-> editMessageText chat=1 message_id=1
+   param parse_mode="HTML"
+   text:
+   | ✏️ <b>Nickname</b>
+   |
+   | Scegli utente:
+   keyboard:
+   | [✏️ 1 → admin_nick_1]
+   | [✏️ 10 → admin_nick_10]
+   | [✏️ 11 → admin_nick_11]
+   | [◀️ Impostazioni → menu_admin]
+## db after step 1
+(no changes)

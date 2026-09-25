@@ -72,6 +72,7 @@ from tests.support.legacy_harness import (
     render_db_value,
     seed_config,
     seed_product,
+    seed_user,
     wall_clock_violation,
 )
 
@@ -2315,6 +2316,145 @@ async def scenario_settings_digest_now_flush(w: LegacyWorld) -> None:
     await w.recorder.job("run_check_all")
     await reanchor_digest(w, "2026-03-01 10:00:00", "2026-03-01 10:00:01")
     await w.recorder.command(OWNER, "/digest_now")
+
+
+# admin ────────────────────────────────────────────────────────────────
+
+
+@scenario("admin.cmd_adduser")
+async def scenario_admin_cmd_adduser(w: LegacyWorld) -> None:
+    for text in ("/adduser", "/adduser abc", "/adduser 99", f"/adduser {OWNER}"):
+        await w.recorder.command(ADMIN, text)
+
+
+@scenario("admin.cmd_removeuser")
+async def scenario_admin_cmd_removeuser(w: LegacyWorld) -> None:
+    await seed_user(w, 2, admin=True)
+    for args in ("", " abc", f" {ADMIN}", " 2", f" {OWNER}", " 12345"):
+        await w.recorder.command(ADMIN, f"/removeuser{args}")
+
+
+@scenario("admin.cmd_users")
+async def scenario_admin_cmd_users(w: LegacyWorld) -> None:
+    await seed_p1(w)
+    await seed_p3(w)
+    await seed_user(w, OTHER, display_name="Other", username="oth")
+    await w.recorder.command(ADMIN, "/users")
+    await w.recorder.command(ADMIN, "/utenti")
+
+
+@scenario("admin.cmd_nick")
+async def scenario_admin_cmd_nick(w: LegacyWorld) -> None:
+    for text in ("/nick", "/nick abc x", "/nick 12345 Bob", f"/nick {OWNER} Bob Smith"):
+        await w.recorder.command(ADMIN, text)
+
+
+@scenario("admin.menu")
+async def scenario_admin_menu(w: LegacyWorld) -> None:
+    await open_menu(w, ADMIN)
+    await w.recorder.press(ADMIN, "menu_admin")
+
+
+@scenario("admin.menu_saved_interval")
+async def scenario_admin_menu_saved_interval(w: LegacyWorld) -> None:
+    await seed_config(w, "check_interval_minutes", "90")
+    await open_menu(w, ADMIN)
+    await w.recorder.press(ADMIN, "menu_admin")
+
+
+@scenario("admin.menu_non_admin")
+async def scenario_admin_menu_non_admin(w: LegacyWorld) -> None:
+    for data in ("menu_admin", "menu_admin_users", f"admin_rm_{OTHER}"):
+        await w.recorder.press(OWNER, data)
+
+
+@scenario("admin.users")
+async def scenario_admin_users(w: LegacyWorld) -> None:
+    await seed_p1(w)
+    await seed_p3(w)
+    await open_menu(w, ADMIN)
+    await w.recorder.press(ADMIN, "menu_admin")
+    await w.recorder.press(ADMIN, "menu_admin_users")
+
+
+@scenario("admin.adduser_prompt")
+async def scenario_admin_adduser_prompt(w: LegacyWorld) -> None:
+    await open_menu(w, ADMIN)
+    await w.recorder.press(ADMIN, "menu_admin")
+    await w.recorder.press(ADMIN, "menu_admin_adduser")
+    await w.recorder.text(ADMIN, "abc")
+    await w.recorder.text(ADMIN, "99")
+
+
+@scenario("admin.adduser_prompt_existing")
+async def scenario_admin_adduser_prompt_existing(w: LegacyWorld) -> None:
+    await w.recorder.press(ADMIN, "menu_admin_adduser")
+    await w.recorder.text(ADMIN, str(OWNER))
+
+
+@scenario("admin.adduser_prompt_cancel")
+async def scenario_admin_adduser_prompt_cancel(w: LegacyWorld) -> None:
+    await w.recorder.press(ADMIN, "menu_admin_adduser")
+    await w.recorder.text(ADMIN, "annulla")
+    await w.recorder.text(ADMIN, "99")
+
+
+@scenario("admin.removeuser_menu")
+async def scenario_admin_removeuser_menu(w: LegacyWorld) -> None:
+    await open_menu(w, ADMIN)
+    await w.recorder.press(ADMIN, "menu_admin")
+    await w.recorder.press(ADMIN, "menu_admin_removeuser")
+
+
+@scenario("admin.removeuser_menu_none")
+async def scenario_admin_removeuser_menu_none(w: LegacyWorld) -> None:
+    await reanchor(w, "users", {"user_id": OWNER}, "is_admin", 1)
+    await reanchor(w, "users", {"user_id": OTHER}, "is_admin", 1)
+    await w.recorder.press(ADMIN, "menu_admin_removeuser")
+
+
+@scenario("admin.rm_user")
+async def scenario_admin_rm_user(w: LegacyWorld) -> None:
+    await w.recorder.press(ADMIN, "menu_admin_removeuser")
+    await w.recorder.press(ADMIN, f"admin_rm_{OTHER}")
+    await w.recorder.press(ADMIN, "admin_rm_x")
+
+
+@scenario("admin.nick_menu")
+async def scenario_admin_nick_menu(w: LegacyWorld) -> None:
+    await w.recorder.press(ADMIN, "menu_admin_nick")
+
+
+@scenario("admin.nick_prompt")
+async def scenario_admin_nick_prompt(w: LegacyWorld) -> None:
+    await w.recorder.press(ADMIN, "menu_admin_nick")
+    await w.recorder.press(ADMIN, f"admin_nick_{OWNER}")
+    await w.recorder.text(ADMIN, "Bob")
+    await w.recorder.press(ADMIN, "admin_nick_x")
+
+
+@scenario("admin.interval_prompt")
+async def scenario_admin_interval_prompt(w: LegacyWorld) -> None:
+    await w.recorder.press(ADMIN, "menu_admin_interval")
+    for text in ("abc", "3", "99999", "60"):
+        await w.recorder.text(ADMIN, text)
+
+
+@scenario("admin.debug_prompt")
+async def scenario_admin_debug_prompt(w: LegacyWorld) -> None:
+    w.scraper.script(KETTLE_URL, ProductInfo(name="Kettle", price=Decimal("80.00")))
+    await w.recorder.press(ADMIN, "menu_admin_debug")
+    await w.recorder.text(ADMIN, "notaurl")
+    await w.recorder.press(ADMIN, "menu_admin_debug")
+    await w.recorder.text(ADMIN, KETTLE_URL)
+    await w.recorder.text(ADMIN, "http:/x")
+
+
+@scenario("admin.cmd_debug")
+async def scenario_admin_cmd_debug(w: LegacyWorld) -> None:
+    w.scraper.script(KETTLE_URL, ProductInfo(name="Kettle", price=Decimal("80.00")))
+    await w.recorder.command(ADMIN, "/debug")
+    await w.recorder.command(ADMIN, f"/debug {KETTLE_URL}")
 
 
 # ── T-S: scenarios ───────────────────────────────────────────────────

@@ -1,0 +1,39 @@
+# legacy snapshot v1
+# scenario: admin.interval_prompt
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: press "menu_admin_interval" user=1 on=1 synthetic
+-> answerCallbackQuery
+-> editMessageText chat=1 message_id=1
+   param parse_mode="HTML"
+   text:
+   | ⏱ <b>Intervallo globale</b>
+   |
+   | Scrivi i minuti (es. <code>60</code>, <code>360</code>):
+## db after step 1
+(no changes)
+## step 2: text "abc" user=1
+-> sendMessage chat=1
+   text:
+   | ❌ Numero non valido.
+## db after step 2
+~ users user_id=1 display_name: NULL -> "U1"
+## step 3: text "3" user=1
+-> sendMessage chat=1
+   text:
+   | ❌ Minimo 5 minuti.
+## db after step 3
+(no changes)
+## step 4: text "99999" user=1
+-> sendMessage chat=1
+   text:
+   | ❌ L'intervallo massimo è 7 giorni.
+## db after step 4
+(no changes)
+## step 5: text "60" user=1
+-> sendMessage chat=1
+   param parse_mode="HTML"
+   text:
+   | ✅ Intervallo aggiornato: <b>ogni 1 ore</b>
+## db after step 5
++ bot_config key="check_interval_minutes" {value="60"}

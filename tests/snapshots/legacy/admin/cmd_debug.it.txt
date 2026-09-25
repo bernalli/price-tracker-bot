@@ -1,0 +1,35 @@
+# legacy snapshot v1
+# scenario: admin.cmd_debug
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/debug" user=1
+-> sendMessage chat=1
+   param parse_mode="HTML"
+   text:
+   | ❌ Uso: /debug <url>
+## db after step 1
+(no changes)
+## step 2: command "/debug https://shop.example.com/item/1" user=1
+-> sendMessage chat=1
+   text:
+   | 🔍 Analisi in corso...
+-> editMessageText chat=1 message_id=1001
+   param link_preview_options={"is_disabled": true}
+   param parse_mode="HTML"
+   text:
+   | 🔍 <b>Debug scraping</b>
+   | 🔗 https://shop.example.com/item/1
+   |
+   | 📡 httpx shared: <b>HTTP 200</b> (358 chars)
+   | 📦 JSON-LD #1: type=<b>Product</b> offers=✅
+   |    → price: 29.99 EUR
+   | 🏷 OG/meta price: ❌ non trovato
+   | 🔖 itemprop=price: ❌ non trovato
+   | 🎯 CSS selectors: ❌ nessun match
+   | 🔎 Regex €: ❌ nessun match
+   |
+   | 🤖 <b>Risultato scraper:</b>
+   |    Nome: Kettle
+   |    Prezzo: €80.00
+## db after step 2
+(no changes)
