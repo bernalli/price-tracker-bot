@@ -31,7 +31,7 @@ import pytest
 import pytest_asyncio
 from _pytest.outcomes import Failed
 from freezegun import freeze_time
-from hypothesis import given
+from hypothesis import example, given, settings
 from hypothesis import strategies as st
 from telegram import (
     File,
@@ -46,7 +46,7 @@ from telegram.ext import CommandHandler
 from price_tracker.bot import messages
 from price_tracker.bot.handlers import register_handlers
 from price_tracker.bot.handlers.debug import status_command
-from tests.support.fake_telegram import FakeRequest, make_application
+from tests.support.fake_telegram import Call, FakeRequest, make_application
 from tests.support.legacy_harness import (
     ADMIN,
     FROZEN_NOW,
@@ -65,6 +65,7 @@ from tests.support.legacy_harness import (
     render_db_value,
     seed_config,
     seed_product,
+    wall_clock_violation,
 )
 
 if TYPE_CHECKING:
@@ -964,6 +965,275 @@ async def test_h14_handler_errors_render_and_assertions_fail(frozen_world: Legac
     assert '## step 2: call error_handler RuntimeError("boom") user=10' in lines
     with pytest.raises(HarnessFault, match=r"\bstep 3\b"):
         await w.recorder.capture("handler assertion", handler_assertion())
+
+
+async def test_h10_line_breaks_cannot_split_or_forge_snapshot_lines(
+    frozen_world: LegacyWorld, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """CR and LF in labels, file names, document lines and errors are escaped.
+
+    The rendering then survives writing and reading the file back unchanged.
+    """
+    w = frozen_world
+    bot = w.app.bot
+    forged = '## step 9: press "menu_admin" user=1 on=1'
+
+    async def calls() -> None:
+        await bot.send_message(
+            chat_id=OWNER, text="k", reply_markup=keyboard([(f"A\n{forged}", "zz\rx")])
+        )
+        await bot.send_document(
+            chat_id=OWNER, document=InputFile(b"a\rb\r\nc\r\n", filename="x\ny.csv")
+        )
+
+    async def handler_error() -> None:
+        w.errors.append(RuntimeError(f"line one\n{forged}"))
+
+    await w.recorder.capture("breaks", calls())
+    await w.recorder.capture("error", handler_error())
+    snapshot = w.recorder.snapshot("harness.breaks")
+    rendered = snapshot.render()
+    lines = rendered.splitlines()
+    assert "\r" not in rendered
+    assert not any(line.startswith("## step 9") for line in lines)
+    assert PRESS_LINE_RE.findall(rendered) == []
+    assert f"   | [A\\n{forged} → zz\\rx]" in lines
+    assert "-> sendDocument chat=10 filename=x\\ny.csv" in lines
+    assert "   | a\\rb" in lines
+    assert "   | c" in lines
+    assert f"   !! error_handler: RuntimeError: line one\\n{forged}" in lines
+
+    path = tmp_path / "harness" / "breaks.it.txt"
+    monkeypatch.setenv("LEGACY_SNAPSHOTS_UPDATE", "1")
+    monkeypatch.delenv("CI", raising=False)
+    with pytest.warns(LegacySnapshotUpdated):
+        snapshot.compare_or_update(path, root=tmp_path)
+    monkeypatch.delenv("LEGACY_SNAPSHOTS_UPDATE")
+    snapshot.compare_or_update(path, root=tmp_path)
+
+
+async def test_h10_empty_document_differs_from_a_line_break(frozen_world: LegacyWorld) -> None:
+    """An empty document has no content line; a lone line break has one empty line."""
+    w = frozen_world
+    bot = w.app.bot
+    await w.recorder.capture(
+        "empty", bot.send_document(chat_id=OWNER, document=InputFile(b"", filename="e.csv"))
+    )
+    await w.recorder.capture(
+        "break", bot.send_document(chat_id=OWNER, document=InputFile(b"\n", filename="e.csv"))
+    )
+    lines = w.recorder.snapshot("harness.empty_document").render().splitlines()
+    first = lines.index('## step 1: capture "empty"')
+    second = lines.index('## step 2: capture "break"')
+    assert lines[first + 1 : first + 4] == [
+        "-> sendDocument chat=10 filename=e.csv",
+        "   content:",
+        "## db after step 1",
+    ]
+    assert lines[second + 1 : second + 5] == [
+        "-> sendDocument chat=10 filename=e.csv",
+        "   content:",
+        "   |",
+        "## db after step 2",
+    ]
+
+
+_GUARD_NOW: Final = datetime(2026, 9, 25, 10, 30, 30, tzinfo=UTC)
+"""A fixed stand-in for the real clock: the guard is a pure function of it, and a
+whole second at mid-minute makes the edge examples below exact."""
+_DAY: Final = timedelta(days=1)
+_OFFSET_MINUTES: Final = st.integers(min_value=-14 * 4, max_value=14 * 4).map(lambda q: q * 15)
+
+
+def _around_a_day(width: int) -> st.SearchStrategy[int]:
+    """Seconds from the real clock within ``width`` of one day, before or after it."""
+    return st.tuples(st.sampled_from((-1, 1)), st.integers(min_value=-width, max_value=width)).map(
+        lambda pair: pair[0] * (86_400 + pair[1])
+    )
+
+
+# Uniform deltas rarely land on the one-day edge: most draws are aimed at it, at
+# the widths where a wrong offset, lost seconds or a lost fraction flip G1.
+_GUARD_DELTAS: Final = st.one_of(
+    st.integers(min_value=-200_000, max_value=200_000),
+    _around_a_day(60_000),
+    _around_a_day(120),
+    _around_a_day(2),
+)
+
+
+@settings(max_examples=400)
+@example(  # the fraction counts: 86399.5 s before is within a day
+    moment=_GUARD_NOW - _DAY,
+    microsecond=500_000,
+    separator=" ",
+    precision="fraction",
+    digits=1,
+    zone=None,
+    colon=True,
+)
+@example(  # the seconds count: 86399 s before is within a day
+    moment=_GUARD_NOW - _DAY + timedelta(seconds=1),
+    microsecond=0,
+    separator=" ",
+    precision="seconds",
+    digits=1,
+    zone=None,
+    colon=True,
+)
+@example(  # exactly one day is outside
+    moment=_GUARD_NOW - _DAY,
+    microsecond=0,
+    separator="T",
+    precision="seconds",
+    digits=1,
+    zone="Z",
+    colon=True,
+)
+@example(  # the offset sign counts: 23 h ahead, written in +02:00
+    moment=_GUARD_NOW + timedelta(hours=23),
+    microsecond=0,
+    separator="T",
+    precision="minutes",
+    digits=1,
+    zone=120,
+    colon=False,
+)
+@given(
+    moment=st.one_of(
+        _GUARD_DELTAS.map(lambda s: _GUARD_NOW + timedelta(seconds=s)),
+        st.datetimes(min_value=datetime(1001, 1, 1), max_value=datetime(9998, 12, 31)).map(
+            lambda d: d.replace(tzinfo=UTC)
+        ),
+    ),
+    microsecond=st.integers(min_value=0, max_value=999_999),
+    separator=st.sampled_from((" ", "T")),
+    precision=st.sampled_from(("minutes", "seconds", "fraction")),
+    digits=st.integers(min_value=1, max_value=6),
+    zone=st.one_of(st.none(), st.just("Z"), _OFFSET_MINUTES),
+    colon=st.booleans(),
+)
+def test_h9_wall_clock_guard_fires_iff_a_timestamp_is_within_a_day(
+    moment: datetime,
+    microsecond: int,
+    separator: str,
+    precision: str,
+    digits: int,
+    zone: int | str | None,
+    colon: bool,
+) -> None:
+    """G1 fires if and only if the written instant is less than a day from the real clock.
+
+    The oracle builds the text from a known instant with ``strftime`` and never
+    reads it back with the implementation's regex.
+    """
+    moment = moment.replace(microsecond=microsecond)
+    if precision == "minutes":
+        moment = moment.replace(second=0, microsecond=0)
+    elif precision == "seconds":
+        moment = moment.replace(microsecond=0)
+    else:
+        moment = moment.replace(
+            microsecond=moment.microsecond // 10 ** (6 - digits) * 10 ** (6 - digits)
+        )
+    offset = timedelta(minutes=zone) if isinstance(zone, int) else timedelta(0)
+    local = (moment + offset).replace(tzinfo=None)
+    clock = "%H:%M" if precision == "minutes" else "%H:%M:%S"
+    written = local.strftime(f"%Y-%m-%d{separator}{clock}")
+    if precision == "fraction":
+        written += f".{local.microsecond:06d}"[: digits + 1]
+    if zone == "Z":
+        written += "Z"
+    elif isinstance(zone, int):
+        sign = "-" if zone < 0 else "+"
+        hours, minutes = divmod(abs(zone), 60)
+        written += f"{sign}{hours:02d}{':' if colon else ''}{minutes:02d}"
+    near = abs((moment - _GUARD_NOW).total_seconds()) < 86400
+    violation = wall_clock_violation(f"at {written} ok", _GUARD_NOW)
+    assert (violation is not None) == near, written
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "{date} 24:00",
+        "{date} 12:60",
+        "2026-02-30 10:00",
+        "{date} {time}+25:00",
+        "{date}",
+        "🕐 5min fa",
+        "🕐 0min fa",
+        "prezzo -5 fa",
+    ],
+)
+def test_h9_impossible_or_partial_timestamps_do_not_fire(text: str) -> None:
+    """Dates without a time, impossible times and positive relative times pass quietly."""
+    filled = text.format(date=_GUARD_NOW.date().isoformat(), time=_GUARD_NOW.strftime("%H:%M"))
+    assert wall_clock_violation(filled, _GUARD_NOW) is None
+
+
+@given(amount=st.integers(min_value=1, max_value=10**7), unit=st.sampled_from(("min", "h", "g")))
+def test_h9_negative_relative_time_always_fires(amount: int, unit: str) -> None:
+    """G2 fires on every negative relative time and on none of the positive ones."""
+    assert wall_clock_violation(f"🕐 -{amount}{unit} fa", _GUARD_NOW) is not None
+    assert wall_clock_violation(f"🕐 {amount}{unit} fa", _GUARD_NOW) is None
+
+
+async def test_h4_reanchor_refuses_anything_but_exactly_one_row(
+    frozen_world: LegacyWorld,
+) -> None:
+    """An empty key, no match or two matches fail; a NULL key part matches with ``IS``."""
+    w = frozen_world
+    history = [("2026-02-01 10:00:00", "100.00"), ("2026-02-20 10:00:00", "90.00")]
+    product = await seed_product(w, OWNER, KETTLE_URL, "Kettle", initial="100.00", history=history)
+    with pytest.raises(HarnessFault, match="empty key"):
+        await reanchor(w, "products", {}, "name", "x")
+    with pytest.raises(HarnessFault, match="0 rows matched"):
+        await reanchor(w, "products", {"id": 999}, "name", "x")
+    with pytest.raises(HarnessFault, match="2 rows matched"):
+        await reanchor(w, "price_history", {"product_id": product}, "price", "1.00")
+    await w.conn.execute("INSERT INTO notification_prefs(user_id, product_id) VALUES (10, NULL)")
+    await w.conn.commit()
+    await reanchor(
+        w, "notification_prefs", {"user_id": OWNER, "product_id": None}, "timezone", "UTC"
+    )
+    cursor = await w.conn.execute(
+        "SELECT timezone FROM notification_prefs WHERE user_id = 10 AND product_id IS NULL"
+    )
+    assert [tuple(row) for row in await cursor.fetchall()] == [("UTC",)]
+
+
+async def test_h14_malformed_recorder_and_stub_calls_are_refused(
+    frozen_world: LegacyWorld,
+) -> None:
+    """Wrong job arguments, empty scripts, unanchored presses and non-exceptions fail loudly."""
+    w = frozen_world
+    r = w.recorder
+    with pytest.raises(TypeError, match="run_check_all takes no arguments"):
+        await r.job("run_check_all", interval_minutes=60)
+    with pytest.raises(TypeError, match="takes only interval_minutes"):
+        await r.job("digest_flush_due")
+    with pytest.raises(TypeError, match="takes only interval_minutes"):
+        await r.job("digest_flush_due", interval_minutes=60, limit=1)
+    with pytest.raises(ValueError, match="unknown job"):
+        await r.job("digest_flush_all")  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="at least one outcome"):
+        w.scraper.script(KETTLE_URL)
+    with pytest.raises(HarnessFault, match="has no message_id"):
+        await r.press(OWNER, "zz", on=Call("answerCallbackQuery", {}))
+    with pytest.raises(TypeError, match="only receives exceptions"):
+        await r.call_error_handler(OWNER, KeyboardInterrupt())
+    assert r.snapshot("harness.refused").render().count("## step") == 0
+
+    async def seed_error() -> None:
+        w.errors.append(RuntimeError("seed boom"))
+
+    await r.seed("failing seed", seed_error())
+    lines = r.snapshot("harness.refused").render().splitlines()
+    assert lines[4:] == [
+        '## step 1: seed "failing seed"',
+        "   !! error_handler: RuntimeError: seed boom",
+    ]
 
 
 # ── T-U: update mechanism ────────────────────────────────────────────

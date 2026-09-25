@@ -754,6 +754,26 @@ def _text_timestamp(match: re.Match[str]) -> datetime | None:
         return None
 
 
+def wall_clock_violation(text: str, real_now: datetime) -> str | None:
+    """Why ``text`` depends on the wall clock (guards G1 and G2), or ``None``.
+
+    G1: an absolute timestamp (seconds and fraction optional, ``Z`` or any
+    ``±HH[:]MM`` offset, naive meaning UTC) less than ``WALL_CLOCK_GUARD_SECONDS``
+    from ``real_now``; an impossible date or time is ignored. G2: a negative
+    relative time such as ``-5min fa``.
+    """
+    for match in _WALL_CLOCK_RE.finditer(text):
+        instant = _text_timestamp(match)
+        if instant is None:
+            continue
+        if abs((instant - real_now).total_seconds()) < WALL_CLOCK_GUARD_SECONDS:
+            return f"timestamp {match.group(0)!r} is near the real clock"
+    relative = _NEGATIVE_RELATIVE_RE.search(text)
+    if relative is not None:
+        return f"negative relative time {relative.group(0)!r}"
+    return None
+
+
 def _db_timestamp(text: str) -> datetime | None:
     """The UTC instant of a timestamp written as SQLite or ISO UTC text, else ``None``."""
     match = _DB_TIMESTAMP_RE.fullmatch(text)
@@ -890,6 +910,16 @@ def _canonical(value: object) -> str:
     return json.dumps(value, sort_keys=True, ensure_ascii=False)
 
 
+def _one_line(value: str) -> str:
+    """``value`` with CR and LF written as ``\\r`` and ``\\n``.
+
+    A raw line break inside a label, a file name, a document line or an error
+    message would split or forge a snapshot line, and a lone CR does not survive
+    reading the file back (universal newlines turn it into LF).
+    """
+    return value.replace("\r", "\\r").replace("\n", "\\n")
+
+
 def _text_block(name: str, text: str) -> list[str]:
     """A ``name:`` block with one ``|`` line per line of ``text``."""
     lines = [f"{_INDENT}{name}:"]
@@ -901,11 +931,11 @@ def _text_block(name: str, text: str) -> list[str]:
 
 def _button(button: Mapping[str, Any]) -> str:
     """One inline button as ``[<label> → <target>]``."""
-    label = button.get("text", "")
+    label = _one_line(str(button.get("text", "")))
     if "callback_data" in button:
-        target = str(button["callback_data"])
+        target = _one_line(str(button["callback_data"]))
     elif "url" in button:
-        target = f"url:{button['url']}"
+        target = f"url:{_one_line(str(button['url']))}"
     else:
         kinds = sorted(name for name in button if name != "text")
         target = kinds[0] if kinds else "?"
@@ -924,7 +954,13 @@ def _markup_block(markup: object) -> list[str]:
 
 
 def _content_lines(content: bytes) -> list[str]:
-    """A document's lines, split on CRLF or LF (the terminator itself is not kept)."""
+    """A document's lines, split on CRLF or LF (the terminator itself is not kept).
+
+    An empty document has no line, so it differs from a document holding one
+    line break.
+    """
+    if not content:
+        return []
     text = content.decode("utf-8", errors="replace")
     lines = re.split(r"\r?\n", text)
     if len(lines) > 1 and lines[-1] == "":
@@ -938,10 +974,11 @@ def _upload_head(field_name: str, files: Mapping[str, tuple[str, bytes, str]]) -
     if upload is None:
         return ""
     filename, content, _ = upload
+    shown = _one_line(filename)
     if field_name == "photo":
         kind = "png" if content.startswith(PNG_MAGIC) else "not-png"
-        return f" photo={kind} filename={filename}"
-    return f" filename={filename}"
+        return f" photo={kind} filename={shown}"
+    return f" filename={shown}"
 
 
 @dataclass(frozen=True)
@@ -992,7 +1029,9 @@ def render_call(call: Call, files: Mapping[str, tuple[str, bytes, str]]) -> Rend
             content = _content_lines(upload[1])
             texts.extend(content)
             blocks.append(f"{_INDENT}content:")
-            blocks.extend(f"{_INDENT}| {line}" if line else f"{_INDENT}|" for line in content)
+            blocks.extend(
+                f"{_INDENT}| {_one_line(line)}" if line else f"{_INDENT}|" for line in content
+            )
         take_markup()
     elif method == "deleteMessage":
         head = (
@@ -1097,6 +1136,8 @@ class Recorder:
                 raise TypeError(f"run_check_all takes no arguments, got {sorted(kw)}")
             action = world.scheduler.run_check_all()
         elif name == "digest_flush_due":
+            if set(kw) != {"interval_minutes"}:
+                raise TypeError(f"digest_flush_due takes only interval_minutes, got {sorted(kw)}")
             action = world.digest.flush_due(interval_minutes=kw["interval_minutes"])
         else:
             raise ValueError(f"unknown job {name!r}")
@@ -1175,22 +1216,11 @@ class Recorder:
         negative relative time. Nothing in a text is normalized: such a text needs
         seeded data instead.
         """
-        real_now = self._world.real_now
         for text in texts:
-            for match in _WALL_CLOCK_RE.finditer(text):
-                instant = _text_timestamp(match)
-                if instant is None:
-                    continue
-                if abs((instant - real_now).total_seconds()) < WALL_CLOCK_GUARD_SECONDS:
-                    raise NonDeterministicOutput(
-                        f"step {step}: timestamp {match.group(0)!r} is near the real clock "
-                        f"in captured text {text[:200]!r}"
-                    )
-            relative = _NEGATIVE_RELATIVE_RE.search(text)
-            if relative is not None:
+            violation = wall_clock_violation(text, self._world.real_now)
+            if violation is not None:
                 raise NonDeterministicOutput(
-                    f"step {step}: negative relative time {relative.group(0)!r} "
-                    f"in captured text {text[:200]!r}"
+                    f"step {step}: {violation} in captured text {text[:200]!r}"
                 )
 
     def _new_errors(self) -> list[str]:
@@ -1198,7 +1228,10 @@ class Recorder:
         world = self._world
         new_errors = world.errors[self._errors_seen :]
         self._errors_seen = len(world.errors)
-        return [f"{_INDENT}!! error_handler: {type(e).__name__}: {e}" for e in new_errors]
+        return [
+            f"{_INDENT}!! error_handler: {type(e).__name__}: {_one_line(str(e))}"
+            for e in new_errors
+        ]
 
     def snapshot(self, scenario_id: str) -> Snapshot:
         """The rendering of every step recorded so far, as scenario ``scenario_id``."""
