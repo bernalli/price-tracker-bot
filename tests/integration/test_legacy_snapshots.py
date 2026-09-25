@@ -19,6 +19,7 @@ import contextlib
 import hashlib
 import json
 import re
+import shutil
 import time
 import warnings
 from collections import Counter
@@ -32,7 +33,13 @@ from _pytest.outcomes import Failed
 from freezegun import freeze_time
 from hypothesis import given
 from hypothesis import strategies as st
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, InputFile, ReplyKeyboardRemove
+from telegram import (
+    File,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    InputFile,
+    ReplyKeyboardRemove,
+)
 from telegram.error import NetworkError
 from telegram.ext import CommandHandler
 
@@ -41,6 +48,7 @@ from price_tracker.bot.handlers import register_handlers
 from price_tracker.bot.handlers.debug import status_command
 from tests.support.fake_telegram import FakeRequest, make_application
 from tests.support.legacy_harness import (
+    ADMIN,
     FROZEN_NOW,
     LOCALES,
     OWNER,
@@ -177,6 +185,25 @@ CALLBACK_OUT: Final = (
     "track_target_",
 )
 
+LEGACY_AREAS: Final = frozenset(
+    {
+        "home",
+        "lista",
+        "menu",
+        "product",
+        "add",
+        "data",
+        "monitor",
+        "history",
+        "settings",
+        "admin",
+        "status",
+        "text",
+        "alert",
+        "ops",
+    }
+)
+
 SCENARIO_ID_RE: Final = re.compile(r"^[a-z0-9_]+\.[a-z0-9_]+$")
 PRESS_LINE_RE: Final = re.compile(r'^## step \d+: press "([^"]*)"', re.MULTILINE)
 COMMAND_LINE_RE: Final = re.compile(r'^## step \d+: command "/([^\s"]+)', re.MULTILINE)
@@ -217,6 +244,7 @@ async def frozen_world(
     async with open_world(locale, monkeypatch) as world:
         yield world
         assert world.request.violations == []
+        assert world.faults == []
 
 
 def snapshot_path(root: Path, scenario_id: str, locale: str) -> Path:
@@ -252,12 +280,14 @@ def grammar_matches(kind: GrammarKind, value: str, data: str) -> bool:
     """Whether a pressed ``data`` is an instance of one callback grammar entry."""
     if kind == "exact":
         return data == value
-    return data.startswith(value) and len(data) > len(value)
+    return data.startswith(value) and data[len(value) :].isdigit()
 
 
 def sample_snapshot(body: tuple[str, ...] = ('## step 1: command "/lista" user=10',)) -> Snapshot:
     """A small snapshot for the update-mechanism tests."""
-    return Snapshot(scenario_id="harness.update", locale="it", body=body)
+    return Snapshot(
+        scenario_id="harness.update", locale="it", body=body, real_now=datetime.now(UTC)
+    )
 
 
 def keyboard(*rows: list[tuple[str, str]]) -> InlineKeyboardMarkup:
@@ -346,20 +376,48 @@ def test_h2_db_timestamp_normalization_examples() -> None:
     assert iso_near.endswith("+00:00")
     assert render_db_value(iso_near, real_now) == "<now:9999-99-99T99:99:99+99:99>"
 
+    z_form = (real_now + timedelta(seconds=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    assert render_db_value(z_form, real_now) == "<now:9999-99-99T99:99:99Z>"
+    millis = near.isoformat(sep=" ", timespec="milliseconds")
+    assert render_db_value(millis, real_now) == "<now:9999-99-99 99:99:99.999>"
+
     today = naive.date().isoformat()
+    this_minute = naive.strftime("%H:%M")
     in_rome = (real_now + timedelta(seconds=5)).astimezone(timezone(timedelta(hours=2)))
     local = in_rome.replace(microsecond=0).isoformat()
     assert local.endswith("+02:00")
     for verbatim in (
         "2026-02-30 10:00:00",
-        f"{today} 10:00:60",
+        f"{today} {this_minute}:60",
+        f"{today} 24:00:00",
         local,
         " " + sqlite_form(near),
+        sqlite_form(near) + "\n",
+        sqlite_form(near) + "x",
+        "città",
     ):
         assert render_db_value(verbatim, real_now) == json.dumps(verbatim, ensure_ascii=False)
 
+    blob = b"\x00\xff"
+    assert render_db_value(None, real_now) == "NULL"
+    assert render_db_value(7, real_now) == "7"
+    assert render_db_value("7", real_now) == '"7"'
+    assert render_db_value(1.5, real_now) == "float:1.5"
+    assert render_db_value(blob, real_now) == f"blob:2:{hashlib.sha256(blob).hexdigest()[:12]}"
+
 
 _REAL_NOW_FOR_PROPERTY: Final = datetime.now(UTC)
+_TIMESTAMP_FORMS: Final = ("sqlite", "sqlite_millis", "iso", "iso_utc", "iso_z")
+
+
+def _timestamp_text(moment: datetime, form: str) -> tuple[str, datetime]:
+    """``moment`` (naive, UTC) written in ``form``, and the instant the text denotes."""
+    if form == "sqlite_millis":
+        instant = moment.replace(microsecond=moment.microsecond // 1000 * 1000)
+        return instant.isoformat(sep=" ", timespec="milliseconds"), instant
+    instant = moment.replace(microsecond=0)
+    suffix = {"sqlite": "", "iso": "", "iso_utc": "+00:00", "iso_z": "Z"}[form]
+    return instant.isoformat(sep=" " if form == "sqlite" else "T") + suffix, instant
 
 
 @given(
@@ -368,14 +426,14 @@ _REAL_NOW_FOR_PROPERTY: Final = datetime.now(UTC)
         st.integers(min_value=-1200, max_value=1200).map(
             lambda s: _REAL_NOW_FOR_PROPERTY.replace(tzinfo=None) + timedelta(seconds=s)
         ),
-    )
+    ),
+    form=st.sampled_from(_TIMESTAMP_FORMS),
 )
-def test_h2_db_timestamp_normalization_property(moment: datetime) -> None:
+def test_h2_db_timestamp_normalization_property(moment: datetime, form: str) -> None:
     """``<now:SHAPE>`` if and only if the instant is within 600 s of the real clock."""
     real_now = _REAL_NOW_FOR_PROPERTY
-    text = moment.isoformat(sep=" ", timespec="seconds")
-    truncated = moment.replace(microsecond=0, tzinfo=UTC)
-    near = abs((truncated - real_now).total_seconds()) <= 600
+    text, instant = _timestamp_text(moment, form)
+    near = abs((instant.replace(tzinfo=UTC) - real_now).total_seconds()) <= 600
     rendered = render_db_value(text, real_now)
     shape = "".join("9" if ch.isdigit() else ch for ch in text)
     if near:
@@ -395,14 +453,18 @@ async def test_h3_same_scene_renders_identically_twice(monkeypatch: pytest.Monke
     assert renders[0] == renders[1]
 
 
+@pytest.mark.parametrize("catalogues", [(), ("en",)], ids=["none", "english_only"])
 async def test_h3b_i18n_canary_refuses_an_untranslated_catalogue(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    catalogues: tuple[str, ...], monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """A locale whose catalogue cannot be loaded stops the world before any step."""
+    """A locale without its own catalogue stops the world, even when English loads."""
+    for name in catalogues:
+        shutil.copytree(messages._LOCALE_DIR / name, tmp_path / name)
+        assert (tmp_path / name / "LC_MESSAGES" / "messages.mo").is_file()
     monkeypatch.setattr(messages, "_LOCALE_DIR", tmp_path)
     messages.get_translation.cache_clear()
     try:
-        with pytest.raises(HarnessFault, match="it"):
+        with pytest.raises(HarnessFault, match=r"\bit\b"):
             async with open_world(LOCALES[0], monkeypatch):
                 pass
     finally:
@@ -428,10 +490,36 @@ async def test_h4_db_diff_insert_update_cascade_and_seed_steps(frozen_world: Leg
     assert sum(line.startswith("+ price_history ") for line in step1.splitlines()) == 2
     assert '## step 2: seed "rename"' in lines
     assert "## db after step 2" not in lines
-    assert "~ products id=1 is_active: 1 -> 0" in lines
+    step3 = rendered.split("## db after step 3\n", 1)[1].split("## step 4", 1)[0].splitlines()
+    assert "~ products id=1 is_active: 1 -> 0" in step3
+    assert [line for line in step3 if line.startswith("~ products id=1 name:")] == []
     step4 = rendered.split("## db after step 4\n", 1)[1]
     assert "- products id=1" in step4.splitlines()
     assert sum(line.startswith("- price_history ") for line in step4.splitlines()) == 2
+
+    async def null_prices(product_id: int) -> tuple[object, ...]:
+        cursor = await w.conn.execute(
+            "SELECT current_price IS NULL, lowest_price IS NULL, highest_price IS NULL "
+            "FROM products WHERE id = ?",
+            (product_id,),
+        )
+        row = await cursor.fetchone()
+        assert row is not None
+        return tuple(row)
+
+    kept = await seed_product(w, OWNER, "https://shop.example.com/item/2", "Kept", initial="5.00")
+    nulled = await seed_product(
+        w,
+        OWNER,
+        "https://shop.example.com/item/3",
+        "Nulled",
+        initial="5.00",
+        current=None,
+        lowest=None,
+        highest=None,
+    )
+    assert await null_prices(kept) == (0, 0, 0)
+    assert await null_prices(nulled) == (1, 1, 1)
 
 
 async def test_h5_photo_and_document_uploads_and_downloads(frozen_world: LegacyWorld) -> None:
@@ -462,18 +550,29 @@ async def test_h5_photo_and_document_uploads_and_downloads(frozen_world: LegacyW
         for i in sent
     )
 
-    w.upload("doc7", b"URL\r\nhttps://shop.example.com/item/7\r\n")
-    telegram_file = await bot.get_file("doc7")
+    assert w.faults is w.request.faults
+    file_id = w.upload("urls.csv", b"URL\r\nhttps://shop.example.com/item/7\r\n")
+    assert w.upload("other.csv", b"x") != file_id
+    telegram_file = await bot.get_file(file_id)
     out = BytesIO()
     await telegram_file.download_to_memory(out)
     assert out.getvalue() == b"URL\r\nhttps://shop.example.com/item/7\r\n"
 
-    with pytest.raises((HarnessFault, NetworkError)) as raised:
+    async def get_unknown_file() -> None:
         await bot.get_file("never-uploaded")
-    fault = raised.value if isinstance(raised.value, HarnessFault) else raised.value.__cause__
-    assert isinstance(fault, HarnessFault)
-    assert w.faults
-    w.faults.clear()
+
+    async def download_unknown_file() -> None:
+        ghost = File(file_id="ghost", file_unique_id="ughost", file_path="documents/ghost")
+        ghost.set_bot(bot)
+        await ghost.download_to_memory(BytesIO())
+
+    for attempt in (get_unknown_file, download_unknown_file):
+        with pytest.raises((HarnessFault, NetworkError)) as raised:
+            await attempt()
+        fault = raised.value if isinstance(raised.value, HarnessFault) else raised.value.__cause__
+        assert isinstance(fault, HarnessFault), attempt.__name__
+        assert w.faults, attempt.__name__
+        w.faults.clear()
 
 
 async def test_h6_parameters_outside_the_known_blocks(frozen_world: LegacyWorld) -> None:
@@ -538,16 +637,54 @@ async def test_h8_scenarios_never_touch_the_network(
 
 
 async def test_h9_wall_clock_guards(frozen_world: LegacyWorld) -> None:
-    """A text near the real clock or a negative relative time fails; seeded times pass."""
+    """Captured text near the real clock or a negative relative time fails; the rest passes.
+
+    The guard covers message text, captions, button labels and document lines.
+    """
     w = frozen_world
     bot = w.app.bot
     stamp = w.real_now.strftime("%Y-%m-%d %H:%M")
-    with pytest.raises(NonDeterministicOutput):
-        await w.recorder.capture("real clock", bot.send_message(chat_id=OWNER, text=f"at {stamp}"))
-    with pytest.raises(NonDeterministicOutput):
-        await w.recorder.capture("negative", bot.send_message(chat_id=OWNER, text="🕐 -5min fa"))
+    iso_stamp = w.real_now.strftime("%Y-%m-%dT%H:%M")
+    within_a_day = (w.real_now - timedelta(hours=23)).strftime("%Y-%m-%d %H:%M")
+    over_a_day = (w.real_now - timedelta(hours=25)).strftime("%Y-%m-%d %H:%M")
+
     await w.recorder.capture("seeded", bot.send_message(chat_id=OWNER, text="at 2026-03-01 10:00"))
-    assert "   | at 2026-03-01 10:00" in w.recorder.snapshot("harness.guards").render()
+    await w.recorder.capture("day old", bot.send_message(chat_id=OWNER, text=f"at {over_a_day}"))
+    await w.recorder.capture("positive", bot.send_message(chat_id=OWNER, text="🕐 5min fa"))
+    lines = w.recorder.snapshot("harness.guards").render().splitlines()
+    assert "   | at 2026-03-01 10:00" in lines
+    assert f"   | at {over_a_day}" in lines
+    assert "   | 🕐 5min fa" in lines
+
+    photo = PNG_MAGIC + b"\0" * (2048 - len(PNG_MAGIC))
+    csv = f"created_at\r\n{stamp}:00\r\n".encode()
+    offending: list[tuple[str, Callable[[], Awaitable[object]]]] = [
+        (stamp, lambda: bot.send_message(chat_id=OWNER, text=f"at {stamp}")),
+        (iso_stamp, lambda: bot.send_message(chat_id=OWNER, text=f"at {iso_stamp}:00")),
+        (within_a_day, lambda: bot.send_message(chat_id=OWNER, text=f"at {within_a_day}")),
+        (
+            stamp,
+            lambda: bot.send_photo(chat_id=OWNER, photo=BytesIO(photo), caption=f"at {stamp}"),
+        ),
+        (
+            stamp,
+            lambda: bot.send_message(
+                chat_id=OWNER, text="k", reply_markup=keyboard([(f"at {stamp}", "zz_k")])
+            ),
+        ),
+        (
+            stamp,
+            lambda: bot.send_document(chat_id=OWNER, document=InputFile(csv, filename="x.csv")),
+        ),
+        ("-5min fa", lambda: bot.send_message(chat_id=OWNER, text="🕐 -5min fa")),
+        ("-2h fa", lambda: bot.send_message(chat_id=OWNER, text="🕐 -2h fa")),
+        ("-1g fa", lambda: bot.send_message(chat_id=OWNER, text="🕐 -1g fa")),
+    ]
+    for fragment, send in offending:
+        with pytest.raises(NonDeterministicOutput) as raised:
+            await w.recorder.capture(fragment, send())
+        raised.match(r"step \d+")
+        raised.match(re.escape(fragment))
 
 
 async def test_h10_malformed_markup_and_text_render_without_errors(
@@ -573,13 +710,20 @@ async def test_h10_malformed_markup_and_text_render_without_errors(
     await w.recorder.capture("malformed", calls())
     assert w.request.violations == ["sendMessage: text length 0"]
     w.request.violations.clear()
-    rendered = w.recorder.snapshot("harness.malformed").render()
-    assert "Plain" in rendered
-    assert "first" in rendered
-    assert "second" in rendered
-    markup_lines = [line for line in rendered.splitlines() if line.startswith("   markup: ")]
-    assert len(markup_lines) == 1
-    assert json.loads(markup_lines[0].removeprefix("   markup: ")) == {"remove_keyboard": True}
+    await w.recorder.text(OWNER, 'say "hi"\nthere')
+    lines = w.recorder.snapshot("harness.malformed").render().splitlines()
+    step1_end = lines.index("## db after step 1")
+    heads = [i for i, line in enumerate(lines[:step1_end]) if line == "-> sendMessage chat=10"]
+    ends = [*heads[1:], step1_end]
+    blocks = [lines[start + 1 : end] for start, end in zip(heads, ends, strict=True)]
+    assert blocks == [
+        ["   text:", "   | empty row", "   keyboard:", "   | []"],
+        ["   text:", "   | text only", "   keyboard:", "   | [Plain → ?]"],
+        ["   text:", "   | first\\r", "   | second"],
+        ["   text:", "   |"],
+        ["   text:", "   | gone", '   markup: {"remove_keyboard": true}'],
+    ]
+    assert '## step 2: text "say \\"hi\\"\\nthere" user=10' in lines
 
 
 async def test_h11_duplicate_keys_render_as_suffixed_inserts(frozen_world: LegacyWorld) -> None:
@@ -597,10 +741,13 @@ async def test_h11_duplicate_keys_render_as_suffixed_inserts(frozen_world: Legac
         await w.conn.commit()
 
     await w.recorder.capture("duplicates", duplicates())
-    rendered = w.recorder.snapshot("harness.duplicates").render()
-    assert "+ notification_prefs (10, NULL)#2" in rendered
-    assert "!! duplicate key" in rendered
-    assert not any(line.startswith("~ notification_prefs") for line in rendered.splitlines())
+    lines = w.recorder.snapshot("harness.duplicates").render().splitlines()
+    inserts = [line for line in lines if line.startswith("+ notification_prefs ")]
+    assert len(inserts) == 2
+    assert inserts[0].startswith("+ notification_prefs user_id=10,product_id=NULL {")
+    assert inserts[1].startswith("+ notification_prefs user_id=10,product_id=NULL#2 {")
+    assert "!! duplicate key notification_prefs user_id=10,product_id=NULL ×2" in lines
+    assert not any(line.startswith("~ notification_prefs") for line in lines)
 
 
 async def test_h11_real_and_blob_columns_render(frozen_world: LegacyWorld) -> None:
@@ -614,9 +761,9 @@ async def test_h11_real_and_blob_columns_render(frozen_world: LegacyWorld) -> No
         await w.conn.commit()
 
     await w.recorder.capture("create", create())
-    rendered = w.recorder.snapshot("harness.real_blob").render()
-    assert "float:1.5" in rendered
-    assert f"blob:2:{hashlib.sha256(blob).hexdigest()[:12]}" in rendered
+    lines = w.recorder.snapshot("harness.real_blob").render().splitlines()
+    digest = hashlib.sha256(blob).hexdigest()[:12]
+    assert f"+ extra id=1 {{r=float:1.5, b=blob:2:{digest}}}" in lines
 
 
 async def test_h11_delete_and_reinsert_is_an_update(frozen_world: LegacyWorld) -> None:
@@ -631,7 +778,7 @@ async def test_h11_delete_and_reinsert_is_an_update(frozen_world: LegacyWorld) -
 
     await w.recorder.capture("swap", swap())
     lines = w.recorder.snapshot("harness.reinsert").render().splitlines()
-    assert any(line.startswith("~ bot_config") and '"v1" -> "v2"' in line for line in lines)
+    assert '~ bot_config key="k" value: "v1" -> "v2"' in lines
     assert not any(line.startswith(("+ bot_config", "- bot_config")) for line in lines)
 
 
@@ -686,18 +833,25 @@ async def test_h13_pressed_message_follows_the_current_keyboards(frozen_world: L
     await w.recorder.seed(
         "dup 2", bot.send_message(chat_id=OWNER, text="f", reply_markup=keyboard([("w", "zz_dup")]))
     )
+    await w.recorder.seed(
+        "other chat",
+        bot.send_message(chat_id=ADMIN, text="g", reply_markup=keyboard([("w", "zz_dup")])),
+    )
+    first_send = w.request.calls_of("sendMessage")[0]
     await w.recorder.press(OWNER, "zz_old")
     await w.recorder.press(OWNER, "zz_new")
     await w.recorder.press(OWNER, "zz_rm")
     await w.recorder.press(OWNER, "zz_never")
     await w.recorder.press(OWNER, "zz_dup")
+    await w.recorder.press(OWNER, "zz_old", on=first_send)
 
     lines = w.recorder.snapshot("harness.resolver").render().splitlines()
-    assert '## step 7: press "zz_old" user=10 on=1 synthetic' in lines
-    assert '## step 8: press "zz_new" user=10 on=1000' in lines
-    assert '## step 9: press "zz_rm" user=10 on=1 synthetic' in lines
-    assert '## step 10: press "zz_never" user=10 on=1 synthetic' in lines
-    assert '## step 11: press "zz_dup" user=10 on=1003' in lines
+    assert '## step 8: press "zz_old" user=10 on=1 synthetic' in lines
+    assert '## step 9: press "zz_new" user=10 on=1000' in lines
+    assert '## step 10: press "zz_rm" user=10 on=1 synthetic' in lines
+    assert '## step 11: press "zz_never" user=10 on=1 synthetic' in lines
+    assert '## step 12: press "zz_dup" user=10 on=1003' in lines
+    assert '## step 13: press "zz_old" user=10 on=1000' in lines
 
 
 async def _unscripted_add(w: LegacyWorld) -> None:
@@ -724,9 +878,30 @@ async def test_h14_stub_used_off_script_fails_and_writes_nothing(
     """A scrape without a script is a harness fault even when the product swallows it."""
     monkeypatch.setenv("LEGACY_SNAPSHOTS_UPDATE", "1")
     monkeypatch.delenv("CI", raising=False)
-    with pytest.raises(HarnessFault):
+    with pytest.raises(HarnessFault, match=r"\bstep 1\b"):
         await run_to_disk(frozen_world, "harness.fault", scenario, tmp_path)
     assert list(tmp_path.rglob("*")) == []
+    frozen_world.faults.clear()
+
+
+async def test_h14_handler_errors_render_and_assertions_fail(frozen_world: LegacyWorld) -> None:
+    """A handler error renders as a ``!!`` line; an assertion raised in a handler is a fault."""
+    w = frozen_world
+
+    async def handler_error() -> None:
+        w.errors.append(RuntimeError("boom"))
+
+    async def handler_assertion() -> None:
+        w.errors.append(AssertionError("stub off script"))
+
+    await w.recorder.capture("handler error", handler_error())
+    await w.recorder.call_error_handler(OWNER, RuntimeError("boom"))
+    lines = w.recorder.snapshot("harness.errors").render().splitlines()
+    step1 = lines[lines.index('## step 1: capture "handler error"') :]
+    assert "   !! error_handler: RuntimeError: boom" in step1[: step1.index("## db after step 1")]
+    assert '## step 2: call error_handler RuntimeError("boom") user=10' in lines
+    with pytest.raises(HarnessFault, match=r"\bstep 3\b"):
+        await w.recorder.capture("handler assertion", handler_assertion())
 
 
 # ── T-U: update mechanism ────────────────────────────────────────────
@@ -742,7 +917,8 @@ def test_u1_missing_snapshot_fails_with_the_command_to_create_it(
     with pytest.raises(Failed) as failed:
         sample_snapshot().compare_or_update(path, root=tmp_path)
     assert str(path) in str(failed.value)
-    assert "LEGACY_SNAPSHOTS_UPDATE=1" in str(failed.value)
+    assert "LEGACY_SNAPSHOTS_UPDATE=1 pytest '" in str(failed.value)
+    assert "::test_u1_missing_snapshot_fails_with_the_command_to_create_it'" in str(failed.value)
     assert not path.exists()
 
 
@@ -765,6 +941,11 @@ def test_u2_update_creates_once_then_leaves_the_file_alone(
     assert not [w for w in caught if issubclass(w.category, LegacySnapshotUpdated)]
     assert path.stat().st_mtime_ns == first_mtime
     assert path.read_text(encoding="utf-8") == snapshot.render()
+
+    changed = sample_snapshot(('## step 1: command "/list" user=10',))
+    with pytest.warns(LegacySnapshotUpdated):
+        changed.compare_or_update(path, root=tmp_path)
+    assert path.read_text(encoding="utf-8") == changed.render()
 
 
 def test_u3_update_is_refused_under_ci(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -798,6 +979,9 @@ def test_u4_different_content_fails_with_a_unified_diff(
     assert '+## step 1: command "/list" user=10' in message
     assert "LEGACY_SNAPSHOTS_UPDATE=1" in message
     assert path.read_text(encoding="utf-8") == old.render()
+    unchanged_mtime = path.stat().st_mtime_ns
+    old.compare_or_update(path, root=tmp_path)
+    assert path.stat().st_mtime_ns == unchanged_mtime
 
 
 @pytest.mark.parametrize("value", ["0", "yes"])
@@ -860,6 +1044,7 @@ def test_c3_snapshot_files_match_the_scenario_catalogue() -> None:
     }
     assert set(committed_snapshots()) == expected
     assert [sid for sid in SCENARIOS if not SCENARIO_ID_RE.fullmatch(sid)] == []
+    assert {sid.split(".", 1)[0] for sid in SCENARIOS} == LEGACY_AREAS
     print(f"legacy snapshot scenarios: {len(SCENARIOS)}")
 
 

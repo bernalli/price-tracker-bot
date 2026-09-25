@@ -15,6 +15,7 @@ offline stubs, and the clock is frozen at ``FROZEN_NOW`` for the whole scenario.
 
 from __future__ import annotations
 
+import enum
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Final, Literal
@@ -54,6 +55,16 @@ LOCALES: Final = ("it",)
 SNAPSHOT_ROOT: Final = Path(__file__).resolve().parents[1] / "snapshots" / "legacy"
 
 JobName = Literal["run_check_all", "digest_flush_due"]
+
+
+class _Unset(enum.Enum):
+    """Type of ``UNSET``."""
+
+    UNSET = "UNSET"
+
+
+UNSET: Final = _Unset.UNSET
+"""Default of the ``seed_product`` prices: keep what ``Repository.add_product`` wrote."""
 
 
 class NonDeterministicOutput(AssertionError):
@@ -108,9 +119,10 @@ class RecordingRequest(FakeRequest):
     (index in ``calls`` -> name -> ``(filename, bytes, mimetype)``), answers
     ``getFile`` with a ``File`` ``{file_id, file_unique_id, file_size,
     file_path="documents/<file_id>"}`` and serves the download (``do_request`` with
-    ``method == "GET"``) from the bytes registered with ``upload(file_id,
-    content)``. A ``getFile`` or a download of a ``file_id`` never uploaded queues a
-    ``HarnessFault`` in ``faults`` and raises it.
+    ``method == "GET"``, the ``file_id`` being the last path segment) from the bytes
+    registered with ``upload(file_id, content)``. A ``getFile`` or a download of a
+    ``file_id`` never uploaded queues a ``HarnessFault`` in ``faults`` and raises it
+    (the bot wraps it in ``NetworkError``).
     """
 
     def __init__(self) -> None:
@@ -180,8 +192,12 @@ class LegacyWorld:
     def __post_init__(self) -> None:
         self.recorder = Recorder(self)
 
-    def upload(self, file_id: str, content: bytes) -> None:
-        """Make ``content`` downloadable as the Telegram file ``file_id``."""
+    def upload(self, filename: str, data: bytes) -> str:
+        """Make ``data`` downloadable as a new Telegram file and return its ``file_id``.
+
+        File ids are ``doc1``, ``doc2``... in upload order, a counter shared with
+        ``Recorder.document``; ``filename`` is the name the document carries.
+        """
         raise NotImplementedError
 
 
@@ -192,8 +208,10 @@ async def build_world(
 
     Must run inside the frozen clock; ``real_now`` is the wall-clock instant read
     before freezing. Seeds ``ADMIN`` (admin), ``OWNER`` and ``OTHER``; ``STRANGER``
-    is not in the database. Raises ``HarnessFault`` if the ``locale`` catalogue does
-    not translate.
+    is not in the database. Raises ``HarnessFault`` naming ``locale`` if its
+    catalogue does not load as a ``GNUTranslations`` or does not translate a known
+    message into that language. On any failure, closes whatever it had opened
+    (application, HTTP client, database) before raising.
     """
     raise NotImplementedError
 
@@ -223,9 +241,9 @@ async def seed_product(
     name: str,
     *,
     initial: str,
-    current: str | None = None,
-    lowest: str | None = None,
-    highest: str | None = None,
+    current: str | None | _Unset = UNSET,
+    lowest: str | None | _Unset = UNSET,
+    highest: str | None | _Unset = UNSET,
     target: str | None = None,
     threshold: tuple[str, str] = ("percentage", "10"),
     active: bool = True,
@@ -243,9 +261,10 @@ async def seed_product(
     Inserts with ``Repository.add_product(domain=extract_etld_plus_one(url),
     initial_price, currency, threshold_type, threshold_value)``, then rewrites with a
     single ``UPDATE`` current, lowest, highest, target, check_interval,
-    last_checked_at, consecutive_errors, last_error, last_error_at and is_available:
-    every ``None`` argument writes NULL (``add_product`` copies the initial price
-    into current/lowest/highest). ``active=False`` goes through
+    last_checked_at, consecutive_errors, last_error, last_error_at and is_available.
+    A price left at ``UNSET`` keeps what ``add_product`` wrote (the initial price);
+    a price passed as ``None`` writes NULL; every other ``None`` argument writes
+    NULL. ``active=False`` goes through
     ``Repository.pause_product`` (a manual pause, as ``/pausa``). ``history`` inserts
     ``price_history`` rows with an explicit ``checked_at``.
     """
@@ -280,14 +299,25 @@ def diff_dumps(
 ) -> list[str]:
     """The ``## db after`` block body for two dumps: ``+``/``-`` per key, ``~`` per column.
 
-    Returns ``["(no changes)"]`` when nothing changed. Rows sharing a key get the
-    suffixes ``#2``, ``#3``... and add a ``!! duplicate key`` line.
+    A row is named ``<table> <col>=<value>[,<col>=<value>...]`` over its key
+    columns, values rendered by ``render_db_value``. Lines: ``+ <name> {<col>=<value>,
+    ...}`` with every non-key column in ``columns`` order, separated by ``", "``;
+    ``- <name>``; ``~ <name> <col>: <old> -> <new>``, one per changed column in
+    ``columns`` order. Returns ``["(no changes)"]`` when nothing changed. Rows
+    sharing a key are ordered by the tuple of their rendered values, then get the
+    suffixes ``#2``, ``#3``... on their name, and the key adds a line
+    ``!! duplicate key <name> ×<n>`` (also next to ``(no changes)``).
     """
     return []  # contract stub: an empty diff fails the assertions
 
 
 class Recorder:
-    """Runs the steps of a scenario and records what each one produced."""
+    """Runs the steps of a scenario and records what each one produced.
+
+    A step header quotes its string argument with
+    ``json.dumps(value, ensure_ascii=False)``; ``call_error_handler`` renders the
+    exception as ``<TypeName>(<json.dumps(str(exc), ensure_ascii=False)>)``.
+    """
 
     def __init__(self, world: LegacyWorld) -> None:
         self._world = world
@@ -303,9 +333,10 @@ class Recorder:
     async def press(self, user: int, data: str, *, on: Call | None = None) -> None:
         """Press the button carrying ``data`` as ``user``.
 
-        ``on`` is the bot message the button belongs to; without it the pressed
-        message is the highest message id whose current keyboard carries ``data``,
-        or the synthetic id 1 when none does.
+        ``on`` is the bot message the button belongs to (a ``Call`` without a
+        ``message_id`` is a ``HarnessFault``); without it the pressed message is the
+        highest message id, in the chat of ``user``, whose current keyboard carries
+        ``data``, or the synthetic id 1 when none does.
         """
         raise NotImplementedError
 
@@ -331,7 +362,8 @@ class Recorder:
 
     def snapshot(self, scenario_id: str) -> Snapshot:
         """The rendering of every step recorded so far, as scenario ``scenario_id``."""
-        return Snapshot(scenario_id, self._world.locale, ())  # contract stub: empty body
+        # contract stub: empty body
+        return Snapshot(scenario_id, self._world.locale, (), self._world.real_now)
 
 
 @dataclass(frozen=True)
@@ -341,6 +373,7 @@ class Snapshot:
     scenario_id: str
     locale: str
     body: tuple[str, ...]
+    real_now: datetime
 
     def render(self) -> str:
         """The snapshot file content: the header, then every body line, newline-terminated."""
@@ -352,6 +385,7 @@ class Snapshot:
         ``LEGACY_SNAPSHOTS_UPDATE=1`` rewrites a missing or different file (and
         ``root/_generated_with.txt``), but is refused with ``RuntimeError`` when
         ``CI`` is set. Otherwise a missing or different file fails the test with the
-        path, the unified diff and the command that recreates it.
+        path, the unified diff and the command that recreates it, whose node id is
+        read from ``PYTEST_CURRENT_TEST`` (the part before its last space).
         """
         return None  # contract stub: neither compares nor writes
