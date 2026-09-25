@@ -101,6 +101,8 @@ async def bot() -> AsyncIterator[Bot]:
         initial_price=Decimal("100"),
         currency="EUR",
     )
+    # A value no pref button writes, so every button's write is observable.
+    await repo.set_product_preferences(wired.product, condition="used", seller="amazon")
     await wired.app.initialize()
     try:
         yield wired
