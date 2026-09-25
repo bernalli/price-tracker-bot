@@ -1,0 +1,41 @@
+# legacy snapshot v1
+# scenario: settings.quiet_hours
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/quiet_hours" user=10
+-> sendMessage chat=10
+   text:
+   | Usage: /quiet_hours HH:MM-HH:MM | off
+## db after step 1
+~ users user_id=10 display_name: NULL -> "U10"
+## step 2: command "/quiet_hours 22:00-08:00" user=10
+-> sendMessage chat=10
+   text:
+   | Quiet hours set to 22:00-08:00.
+## db after step 2
++ notification_prefs user_id=10,product_id=NULL {mute=0, mute_until=NULL, digest_mode=0, digest_interval_minutes=60, quiet_hours_start="22:00", quiet_hours_end="08:00", throttle_per_hour=NULL, timezone="Europe/Rome", throttle_state_json=NULL, updated_at=<now:9999-99-99 99:99:99>}
+## step 3: command "/quiet_hours 2200-0800" user=10
+-> sendMessage chat=10
+   text:
+   | Invalid time format. Use 24h HH:MM.
+## db after step 3
+(no changes)
+## step 4: command "/quiet_hours 25:00-08:00" user=10
+-> sendMessage chat=10
+   text:
+   | Invalid time format. Use 24h HH:MM.
+## db after step 4
+(no changes)
+## step 5: command "/quiet_hours 08:00-08:00" user=10
+-> sendMessage chat=10
+   text:
+   | Quiet hours start and end cannot be the same time
+## db after step 5
+(no changes)
+## step 6: command "/quiet_hours off" user=10
+-> sendMessage chat=10
+   text:
+   | Quiet hours disabled.
+## db after step 6
+~ notification_prefs user_id=10,product_id=NULL quiet_hours_start: "22:00" -> NULL
+~ notification_prefs user_id=10,product_id=NULL quiet_hours_end: "08:00" -> NULL

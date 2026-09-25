@@ -1,0 +1,35 @@
+# legacy snapshot v1
+# scenario: settings.mute
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/mute" user=10
+-> sendMessage chat=10
+   text:
+   | Muted all products until 2026-03-02T12:00:00+00:00.
+## db after step 1
++ notification_prefs user_id=10,product_id=NULL {mute=1, mute_until="2026-03-02T12:00:00+00:00", digest_mode=0, digest_interval_minutes=60, quiet_hours_start=NULL, quiet_hours_end=NULL, throttle_per_hour=NULL, timezone="Europe/Rome", throttle_state_json=NULL, updated_at=<now:9999-99-99 99:99:99>}
+~ users user_id=10 display_name: NULL -> "U10"
+## step 2: command "/mute 1 forever" user=10
+-> sendMessage chat=10
+   text:
+   | Muted product 1 forever.
+## db after step 2
++ notification_prefs user_id=10,product_id=1 {mute=1, mute_until=NULL, digest_mode=0, digest_interval_minutes=60, quiet_hours_start=NULL, quiet_hours_end=NULL, throttle_per_hour=NULL, timezone="Europe/Rome", throttle_state_json=NULL, updated_at=<now:9999-99-99 99:99:99>}
+## step 3: command "/mute abc" user=10
+-> sendMessage chat=10
+   text:
+   | Usage: /mute [product_id|all] [hours|forever]
+## db after step 3
+(no changes)
+## step 4: command "/mute all x" user=10
+-> sendMessage chat=10
+   text:
+   | Duration must be a number of hours or 'forever'
+## db after step 4
+(no changes)
+## step 5: command "/mute all 0" user=10
+-> sendMessage chat=10
+   text:
+   | Duration must be a positive number of hours or 'forever'
+## db after step 5
+(no changes)

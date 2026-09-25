@@ -1,0 +1,37 @@
+# legacy snapshot v1
+# scenario: settings.unmute
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/mute" user=10
+-> sendMessage chat=10
+   text:
+   | Muted all products until 2026-03-02T12:00:00+00:00.
+## db after step 1
++ notification_prefs user_id=10,product_id=NULL {mute=1, mute_until="2026-03-02T12:00:00+00:00", digest_mode=0, digest_interval_minutes=60, quiet_hours_start=NULL, quiet_hours_end=NULL, throttle_per_hour=NULL, timezone="Europe/Rome", throttle_state_json=NULL, updated_at=<now:9999-99-99 99:99:99>}
+~ users user_id=10 display_name: NULL -> "U10"
+## step 2: command "/unmute" user=10
+-> sendMessage chat=10
+   text:
+   | Unmuted.
+## db after step 2
+~ notification_prefs user_id=10,product_id=NULL mute: 1 -> 0
+~ notification_prefs user_id=10,product_id=NULL mute_until: "2026-03-02T12:00:00+00:00" -> NULL
+## step 3: command "/mute 1 2" user=10
+-> sendMessage chat=10
+   text:
+   | Muted product 1 until 2026-03-01T14:00:00+00:00.
+## db after step 3
++ notification_prefs user_id=10,product_id=1 {mute=1, mute_until="2026-03-01T14:00:00+00:00", digest_mode=0, digest_interval_minutes=60, quiet_hours_start=NULL, quiet_hours_end=NULL, throttle_per_hour=NULL, timezone="Europe/Rome", throttle_state_json=NULL, updated_at=<now:9999-99-99 99:99:99>}
+## step 4: command "/unmute 1" user=10
+-> sendMessage chat=10
+   text:
+   | Unmuted.
+## db after step 4
+~ notification_prefs user_id=10,product_id=1 mute: 1 -> 0
+~ notification_prefs user_id=10,product_id=1 mute_until: "2026-03-01T14:00:00+00:00" -> NULL
+## step 5: command "/unmute abc" user=10
+-> sendMessage chat=10
+   text:
+   | Usage: /unmute [product_id|all]
+## db after step 5
+(no changes)

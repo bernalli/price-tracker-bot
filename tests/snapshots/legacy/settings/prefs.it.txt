@@ -1,0 +1,48 @@
+# legacy snapshot v1
+# scenario: settings.prefs
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/prefs" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | <b>Effective preferences</b>
+   |   scope: global
+   |   mute: False
+   |   digest_mode: False (interval 60m)
+   |   quiet_hours: —–—
+   |   throttle_per_hour: unlimited
+   |   timezone: Europe/Rome
+## db after step 1
+~ users user_id=10 display_name: NULL -> "U10"
+## step 2: command "/mute 1 forever" user=10
+-> sendMessage chat=10
+   text:
+   | Muted product 1 forever.
+## db after step 2
++ notification_prefs user_id=10,product_id=1 {mute=1, mute_until=NULL, digest_mode=0, digest_interval_minutes=60, quiet_hours_start=NULL, quiet_hours_end=NULL, throttle_per_hour=NULL, timezone="Europe/Rome", throttle_state_json=NULL, updated_at=<now:9999-99-99 99:99:99>}
+## step 3: command "/prefs 1" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | <b>Effective preferences</b>
+   |   scope: product 1
+   |   mute: True
+   |   digest_mode: False (interval 60m)
+   |   quiet_hours: —–—
+   |   throttle_per_hour: unlimited
+   |   timezone: Europe/Rome
+## db after step 3
+(no changes)
+## step 4: command "/prefs abc" user=10
+-> sendMessage chat=10
+   text:
+   | product_id must be an integer
+## db after step 4
+(no changes)
+## step 5: command "/prefs 0" user=10
+-> sendMessage chat=10
+   text:
+   | product_id must be a positive integer
+## db after step 5
+(no changes)

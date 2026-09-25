@@ -2236,6 +2236,87 @@ async def scenario_history_reset(w: LegacyWorld) -> None:
     await w.recorder.command(OWNER, "/reset 999")
 
 
+# settings ─────────────────────────────────────────────────────────────
+
+
+async def reanchor_digest(w: LegacyWorld, *stamps: str) -> None:
+    """Re-anchor ``enqueued_at`` of digest rows 1, 2... to seeded instants (seed steps)."""
+    for row_id, stamp in enumerate(stamps, start=1):
+        await w.recorder.seed(
+            "reanchor enqueued_at",
+            reanchor(w, "digest_queue", {"id": row_id}, "enqueued_at", stamp),
+        )
+
+
+@scenario("settings.interval")
+async def scenario_settings_interval(w: LegacyWorld) -> None:
+    for text in ("/intervallo", "/intervallo 120", "/setinterval 3", "/intervallo 99999"):
+        await w.recorder.command(ADMIN, text)
+    await w.recorder.command(ADMIN, "/intervallo abc")
+
+
+@scenario("settings.mute")
+async def scenario_settings_mute(w: LegacyWorld) -> None:
+    p1 = await seed_p1(w)
+    for text in ("/mute", f"/mute {p1} forever", "/mute abc", "/mute all x", "/mute all 0"):
+        await w.recorder.command(OWNER, text)
+
+
+@scenario("settings.unmute")
+async def scenario_settings_unmute(w: LegacyWorld) -> None:
+    p1 = await seed_p1(w)
+    for text in ("/mute", "/unmute", f"/mute {p1} 2", f"/unmute {p1}", "/unmute abc"):
+        await w.recorder.command(OWNER, text)
+
+
+@scenario("settings.digest_mode")
+async def scenario_settings_digest_mode(w: LegacyWorld) -> None:
+    for args in ("", " on", " on 30", " on 0", " on abc", " off"):
+        await w.recorder.command(OWNER, f"/digest_mode{args}")
+
+
+@scenario("settings.quiet_hours")
+async def scenario_settings_quiet_hours(w: LegacyWorld) -> None:
+    for args in ("", " 22:00-08:00", " 2200-0800", " 25:00-08:00", " 08:00-08:00", " off"):
+        await w.recorder.command(OWNER, f"/quiet_hours{args}")
+
+
+@scenario("settings.timezone")
+async def scenario_settings_timezone(w: LegacyWorld) -> None:
+    for args in ("", " Europe/Rome", " Mars/Olympus"):
+        await w.recorder.command(OWNER, f"/timezone{args}")
+
+
+@scenario("settings.throttle")
+async def scenario_settings_throttle(w: LegacyWorld) -> None:
+    for args in ("", " 5", " abc", " 0", " off"):
+        await w.recorder.command(OWNER, f"/throttle{args}")
+
+
+@scenario("settings.prefs")
+async def scenario_settings_prefs(w: LegacyWorld) -> None:
+    p1 = await seed_p1(w)
+    for text in ("/prefs", f"/mute {p1} forever", f"/prefs {p1}", "/prefs abc", "/prefs 0"):
+        await w.recorder.command(OWNER, text)
+
+
+@scenario("settings.digest_now_empty")
+async def scenario_settings_digest_now_empty(w: LegacyWorld) -> None:
+    await w.recorder.command(OWNER, "/digest_now")
+
+
+@scenario("settings.digest_now_flush")
+async def scenario_settings_digest_now_flush(w: LegacyWorld) -> None:
+    await seed_p1(w)
+    await seed_p2(w)
+    script_drop(w)
+    w.scraper.script(FAN_URL, info("40.00", name="Fan", currency="USD"))
+    await seed_command(w, OWNER, "/digest_mode on")
+    await w.recorder.job("run_check_all")
+    await reanchor_digest(w, "2026-03-01 10:00:00", "2026-03-01 10:00:01")
+    await w.recorder.command(OWNER, "/digest_now")
+
+
 # ── T-S: scenarios ───────────────────────────────────────────────────
 
 

@@ -1,0 +1,10 @@
+# legacy snapshot v1
+# scenario: settings.digest_now_empty
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/digest_now" user=10
+-> sendMessage chat=10
+   text:
+   | Flushed 0 pending digest entries.
+## db after step 1
+~ users user_id=10 display_name: NULL -> "U10"
