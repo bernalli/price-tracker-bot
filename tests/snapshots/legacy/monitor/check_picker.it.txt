@@ -1,0 +1,14 @@
+# legacy snapshot v1
+# scenario: monitor.check_picker
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/check" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | 📦 <b>Scegli prodotto da controllare:</b>
+   keyboard:
+   | [#1 Kettle €80.00 → check_1]
+   | [#2 Fan → check_2]
+## db after step 1
+~ users user_id=10 display_name: NULL -> "U10"

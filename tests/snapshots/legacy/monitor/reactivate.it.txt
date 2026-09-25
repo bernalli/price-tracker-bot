@@ -1,0 +1,33 @@
+# legacy snapshot v1
+# scenario: monitor.reactivate
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/riattiva" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | ⏸ <b>Prodotti in pausa — scegli da riattivare:</b>
+   keyboard:
+   | [#1 Old Fan → reactivate_1]
+## db after step 1
+~ users user_id=10 display_name: NULL -> "U10"
+## step 2: command "/riattiva 1" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | ✅ Riattivato: <b>Old Fan</b>
+## db after step 2
+~ products id=1 is_active: 0 -> 1
+~ products id=1 suspension_kind: "manual" -> NULL
+## step 3: command "/reactivate abc" user=10
+-> sendMessage chat=10
+   text:
+   | ❌ ID non valido.
+## db after step 3
+(no changes)
+## step 4: command "/reactivate 999" user=10
+-> sendMessage chat=10
+   text:
+   | ❌ Prodotto non trovato.
+## db after step 4
+(no changes)

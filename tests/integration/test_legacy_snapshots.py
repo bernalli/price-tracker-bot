@@ -2098,6 +2098,99 @@ async def scenario_data_import_not_csv(w: LegacyWorld) -> None:
     await w.recorder.document(OWNER, "note.txt", b"x")
 
 
+# monitor ──────────────────────────────────────────────────────────────
+
+
+@scenario("monitor.check_picker")
+async def scenario_monitor_check_picker(w: LegacyWorld) -> None:
+    await seed_p1(w)
+    await seed_p2(w)
+    await w.recorder.command(OWNER, "/check")
+
+
+@scenario("monitor.check_no_change")
+async def scenario_monitor_check_no_change(w: LegacyWorld) -> None:
+    p1 = await seed_p1(w)
+    w.scraper.script(KETTLE_URL, info("80.00"))
+    await w.recorder.command(OWNER, f"/check {p1}")
+
+
+@scenario("monitor.check_drop_photo")
+async def scenario_monitor_check_drop_photo(w: LegacyWorld) -> None:
+    p1 = await seed_p1(w)
+    script_drop(w)
+    await w.recorder.command(OWNER, f"/controlla {p1}")
+
+
+@scenario("monitor.check_drop_text")
+async def scenario_monitor_check_drop_text(w: LegacyWorld) -> None:
+    p1 = await seed_p1(w, history=())
+    script_drop(w)
+    await w.recorder.command(OWNER, f"/check {p1}")
+
+
+@scenario("monitor.check_paused")
+async def scenario_monitor_check_paused(w: LegacyWorld) -> None:
+    pp = await seed_pp(w)
+    await w.recorder.command(OWNER, f"/check {pp}")
+
+
+@scenario("monitor.check_errors")
+async def scenario_monitor_check_errors(w: LegacyWorld) -> None:
+    await seed_p1(w)
+    await w.recorder.command(OWNER, "/check abc")
+    await w.recorder.command(OWNER, "/check 999")
+
+
+@scenario("monitor.checkall")
+async def scenario_monitor_checkall(w: LegacyWorld) -> None:
+    await seed_p1(w)
+    await seed_p2(w)
+    script_drop(w)
+    w.scraper.script(FAN_URL, info("50.00", name="Fan", currency="USD"))
+    await w.recorder.command(OWNER, "/checkall")
+
+
+@scenario("monitor.checkall_empty")
+async def scenario_monitor_checkall_empty(w: LegacyWorld) -> None:
+    await w.recorder.command(OWNER, "/checkall")
+
+
+@scenario("monitor.refresh")
+async def scenario_monitor_refresh(w: LegacyWorld) -> None:
+    p1 = await seed_p1(w)
+    await w.recorder.command(OWNER, "/refresh")
+    for minutes in ("", " 30", " 90", " 120", " 0", " 3", " 99999", " abc"):
+        await w.recorder.command(OWNER, f"/refresh {p1}{minutes}")
+    await w.recorder.command(OWNER, "/refresh 999 30")
+
+
+@scenario("monitor.pause")
+async def scenario_monitor_pause(w: LegacyWorld) -> None:
+    p1 = await seed_p1(w)
+    await seed_p2(w)
+    await w.recorder.command(OWNER, "/pausa")
+    await w.recorder.command(OWNER, f"/pausa {p1}")
+    await w.recorder.command(OWNER, "/pause abc")
+    await w.recorder.command(OWNER, "/pause 999")
+
+
+@scenario("monitor.reactivate")
+async def scenario_monitor_reactivate(w: LegacyWorld) -> None:
+    pp = await seed_pp(w)
+    await seed_p2(w)
+    await w.recorder.command(OWNER, "/riattiva")
+    await w.recorder.command(OWNER, f"/riattiva {pp}")
+    await w.recorder.command(OWNER, "/reactivate abc")
+    await w.recorder.command(OWNER, "/reactivate 999")
+
+
+@scenario("monitor.reactivate_none_paused")
+async def scenario_monitor_reactivate_none_paused(w: LegacyWorld) -> None:
+    await seed_p1(w)
+    await w.recorder.command(OWNER, "/riattiva")
+
+
 # ── T-S: scenarios ───────────────────────────────────────────────────
 
 
