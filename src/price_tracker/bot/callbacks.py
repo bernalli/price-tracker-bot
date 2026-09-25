@@ -430,6 +430,40 @@ def build_registry() -> ActionRegistry:
 REGISTRY: Final = build_registry()
 
 
+LEGACY_ENTRY_PREFIXES: Final = {
+    "setsoglia": "product.threshold",
+    "track_threshold": "product.threshold",
+    "settarget": "product.target",
+    "track_target": "product.target",
+    "setrefresh": "product.interval",
+}
+
+
+_LEGACY_ENTRY_RE: Final = re.compile(r"([a-z]+(?:_[a-z]+)?)_([0-9]+)")
+
+
+def decode_legacy_entry(data: object) -> Action | None:
+    """Map a pre-registry entry button to its registry action; never raises.
+
+    Accepts exactly ``<prefix>_<id>`` with a prefix of :data:`LEGACY_ENTRY_PREFIXES`
+    and an id in the canonical form of an id argument (no sign, no leading zero,
+    at most :data:`ID_MAX`). These strings stay outside the registry: none of them
+    decodes there, and no registry encoding is accepted here.
+    """
+    if not isinstance(data, str) or not data or not data.isascii():
+        return None
+    if len(data) > MAX_CALLBACK_BYTES:
+        return None
+    match = _LEGACY_ENTRY_RE.fullmatch(data)
+    if match is None:
+        return None
+    name = LEGACY_ENTRY_PREFIXES.get(match.group(1))
+    product_id = _parse_id(match.group(2))
+    if name is None or product_id is None:
+        return None
+    return Action(name, (product_id,))
+
+
 def encode(action: Action) -> str:
     """Encode with the module registry."""
     return REGISTRY.encode(action)

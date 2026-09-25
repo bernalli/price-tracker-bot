@@ -27,17 +27,12 @@ CASES: list[tuple[Any, str]] = [
     (_actions.handle_remove_button, "remove_\U0001f4a5"),
     (_actions.handle_reset_button, "reset_abc"),
     (_actions.handle_reactivate_button, "reactivate_abc"),
-    (_actions.handle_picker, "settarget_abc"),
-    (_actions.handle_picker, "setsoglia_NaN"),
-    (_actions.handle_picker, "setrefresh_abc"),
     # callbacks/_product.py
     (_product.handle_delete_flow, "confirm_delete_abc"),
     (_product.handle_check_button, "check_NaN"),
     (_product.handle_chart_button, "chart_abc"),
     (_product.handle_amazon_pref, "pref_new_abc"),
     (_product.handle_track_choice, "track_any_abc"),
-    (_product.handle_track_choice, "track_threshold_NaN"),
-    (_product.handle_track_choice, "track_target_abc"),
     (_product.handle_track_choice, "track_default_abc"),
     # callbacks/_admin.py
     (_admin.handle_admin_menu, "admin_rm_\U0001f4a5"),

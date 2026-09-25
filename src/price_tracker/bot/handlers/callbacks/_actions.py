@@ -1,5 +1,5 @@
 """Per-product action callbacks (`edit_*`, `pause_*`, `remove_*`, `reset_*`,
-`reactivate_*`, `set*_*` pickers).
+`reactivate_*`).
 
 Split out of `handlers/callbacks/_product.py` to keep each module under a
 500-line budget.
@@ -191,67 +191,3 @@ async def handle_reactivate_button(
         parse_mode=ParseMode.HTML,
     )
     return True
-
-
-async def handle_picker(
-    query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, data: str
-) -> bool:
-    """Handle inline pickers that need a follow-up text reply (`set*_<id>`)."""
-    if data.startswith("settarget_"):
-        product_id = _parse_id(data.replace("settarget_", ""))
-        if product_id is None:
-            await query.edit_message_text("❌ ID non valido.")
-            return True
-        product = await _get_user_product(context, product_id, user_id)
-        if not product:
-            await query.edit_message_text("❌ Prodotto non trovato.")
-            return True
-        name = (product.get("name") or "Sconosciuto")[:50]
-        current = _safe_dec(product.get("current_price"))
-        price_info = f" (attuale: €{current:.2f})" if current else ""
-        context.user_data["pending_action"] = ("target", product_id)
-        await query.edit_message_text(
-            f"🎯 <b>{_escape_html(name)}</b>{price_info}\n\n"
-            f"Scrivi il prezzo target (es. <code>29.99</code>):",
-            parse_mode=ParseMode.HTML,
-        )
-        return True
-
-    if data.startswith("setsoglia_"):
-        product_id = _parse_id(data.replace("setsoglia_", ""))
-        if product_id is None:
-            await query.edit_message_text("❌ ID non valido.")
-            return True
-        product = await _get_user_product(context, product_id, user_id)
-        if not product:
-            await query.edit_message_text("❌ Prodotto non trovato.")
-            return True
-        name = (product.get("name") or "Sconosciuto")[:50]
-        context.user_data["pending_action"] = ("threshold", product_id)
-        await query.edit_message_text(
-            f"🎯 <b>{_escape_html(name)}</b>\n\n"
-            f"Scrivi la soglia (es. <code>20%</code> o <code>50</code>):",
-            parse_mode=ParseMode.HTML,
-        )
-        return True
-
-    if data.startswith("setrefresh_"):
-        product_id = _parse_id(data.replace("setrefresh_", ""))
-        if product_id is None:
-            await query.edit_message_text("❌ ID non valido.")
-            return True
-        product = await _get_user_product(context, product_id, user_id)
-        if not product:
-            await query.edit_message_text("❌ Prodotto non trovato.")
-            return True
-        name = (product.get("name") or "Sconosciuto")[:50]
-        context.user_data["pending_action"] = ("refresh", product_id)
-        await query.edit_message_text(
-            f"🔄 <b>{_escape_html(name)}</b>\n\n"
-            f"Scrivi l'intervallo in minuti (es. <code>30</code>, "
-            f"<code>720</code> per 12h):",
-            parse_mode=ParseMode.HTML,
-        )
-        return True
-
-    return False

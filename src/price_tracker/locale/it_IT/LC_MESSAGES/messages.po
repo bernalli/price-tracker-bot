@@ -655,3 +655,189 @@ msgstr[1] "📊 <b>Riepilogo — {n} variazioni di prezzo</b>"
 #: src/price_tracker/notifier/digest.py
 msgid "Use /lista for full state."
 msgstr "Usa /lista per lo stato completo."
+
+#: src/price_tracker/bot/flows.py:389
+msgid "This button has expired."
+msgstr "Questo pulsante è scaduto."
+
+#: src/price_tracker/bot/flows.py:390
+msgid "Not authorised."
+msgstr "Non autorizzato."
+
+#: src/price_tracker/bot/flows.py:391
+msgid "Product not found."
+msgstr "Prodotto non trovato."
+
+#: src/price_tracker/bot/flows.py:392
+msgid "Replaced by a newer prompt."
+msgstr "Sostituita da una richiesta più recente."
+
+#: src/price_tracker/bot/flows.py:393
+msgid "No open prompt - use the buttons or /menu."
+msgstr ""
+
+#: src/price_tracker/bot/flows.py:394
+msgid "Nothing to cancel."
+msgstr "Niente da annullare."
+
+#: src/price_tracker/bot/flows.py:395
+msgid "Too many invalid answers - cancelled, nothing changed."
+msgstr "Troppe risposte non valide - annullato, nessuna modifica."
+
+#: src/price_tracker/bot/flows.py:396
+msgid "Saved."
+msgstr "Salvato."
+
+#: src/price_tracker/bot/flows.py:397
+msgid "Added."
+msgstr ""
+
+#: src/price_tracker/bot/flows.py:398
+msgid "Added - other stores will be followed too."
+msgstr ""
+
+#: src/price_tracker/bot/flows.py:399
+msgid "Could not read this page. Nothing was added."
+msgstr ""
+
+#: src/price_tracker/bot/flows.py:400
+msgid "Already tracked."
+msgstr ""
+
+#: src/price_tracker/bot/flows.py:401
+msgid "Tracking resumed."
+msgstr ""
+
+#: src/price_tracker/bot/flows.py:402
+msgid "Type a three-letter currency code, for example USD."
+msgstr ""
+
+#: src/price_tracker/bot/flows.py:403
+msgid "Cancelled - nothing changed."
+msgstr "Annullato - nessuna modifica."
+
+#: src/price_tracker/bot/flows.py:404
+msgid "Cancelled - no product was added."
+msgstr ""
+
+#: src/price_tracker/bot/flows.py:405
+msgid "Expired - nothing changed."
+msgstr "Scaduto - nessuna modifica."
+
+#: src/price_tracker/bot/flows.py:406
+msgid "Expired - no product was added."
+msgstr ""
+
+#: src/price_tracker/bot/flows.py:407
+msgid "Other stores will be followed at this level from a later version."
+msgstr ""
+
+#: src/price_tracker/bot/flows.py:408
+msgid "Which currency is this price in?"
+msgstr ""
+
+#: src/price_tracker/bot/flows.py:409
+msgid "Where should the price be followed?"
+msgstr ""
+
+#: src/price_tracker/bot/flows.py:410
+msgid "Choose a level:"
+msgstr ""
+
+#: src/price_tracker/bot/flows.py:411
+#, python-brace-format
+msgid "Currency: {code}"
+msgstr ""
+
+#: src/price_tracker/bot/flows.py:412
+msgid "Cancel"
+msgstr "Annulla"
+
+#: src/price_tracker/bot/flows.py:413
+msgid "Type a code"
+msgstr ""
+
+#: src/price_tracker/bot/flows.py:414
+msgid "Other stores too"
+msgstr ""
+
+#: src/price_tracker/bot/flows.py:415
+#, python-brace-format
+msgid "Only on {store}"
+msgstr ""
+
+#: src/price_tracker/bot/flows.py:417
+msgid "My country"
+msgstr ""
+
+#: src/price_tracker/bot/flows.py:418
+msgid "My customs area"
+msgstr ""
+
+#: src/price_tracker/bot/flows.py:419
+msgid "Worldwide"
+msgstr ""
+
+#: src/price_tracker/bot/flows.py:423
+#, python-format
+msgid "Send the drop threshold: 20% or 5.50 (one dot or comma)."
+msgstr "Invia la soglia di ribasso: 20% oppure 5,50 (un punto o una virgola)."
+
+#: src/price_tracker/bot/flows.py:424
+msgid "Send the target price, e.g. 49.90 (0 clears it)."
+msgstr "Invia il prezzo obiettivo, per esempio 49,90 (0 lo rimuove)."
+
+#: src/price_tracker/bot/flows.py:425
+msgid "Send the check interval in minutes (5-10080, 0 resets)."
+msgstr ""
+"Invia l'intervallo di controllo in minuti (5-10080, 0 ripristina quello "
+"globale)."
+
+#: src/price_tracker/bot/flows.py:429
+msgid "Please send a value."
+msgstr "Invia un valore."
+
+#: src/price_tracker/bot/flows.py:430
+msgid "That is too long."
+msgstr "Troppo lungo."
+
+#: src/price_tracker/bot/flows.py:431
+msgid "That contains invisible characters."
+msgstr "Contiene caratteri invisibili."
+
+#: src/price_tracker/bot/flows.py:432
+msgid "Use digits with one dot or comma, e.g. 1299.99."
+msgstr "Usa cifre con un punto o una virgola, per esempio 1299,99."
+
+#: src/price_tracker/bot/flows.py:433
+msgid "That value is out of range."
+msgstr "Valore fuori intervallo."
+
+#: src/price_tracker/bot/flows.py:434
+msgid "Unknown currency code."
+msgstr ""
+
+#: src/price_tracker/bot/flows.py:435
+msgid "Unknown time zone."
+msgstr ""
+
+#: src/price_tracker/bot/flows.py:436
+msgid "Use HH:MM-HH:MM."
+msgstr ""
+
+#: src/price_tracker/bot/flows.py:437
+msgid "That is not a link."
+msgstr ""
+
+#: src/price_tracker/bot/flows.py:438
+msgid "That link is not allowed."
+msgstr ""
+
+#: src/price_tracker/bot/flows.py:443
+#, python-brace-format
+msgid "Kept: only on {store}."
+msgstr ""
+
+#: src/price_tracker/bot/flows.py:442
+msgid "Use whole minutes, e.g. 30."
+msgstr "Usa minuti interi, per esempio 30."
