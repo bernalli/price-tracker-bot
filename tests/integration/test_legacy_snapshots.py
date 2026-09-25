@@ -2191,6 +2191,51 @@ async def scenario_monitor_reactivate_none_paused(w: LegacyWorld) -> None:
     await w.recorder.command(OWNER, "/riattiva")
 
 
+# history ──────────────────────────────────────────────────────────────
+
+
+@scenario("history.picker")
+async def scenario_history_picker(w: LegacyWorld) -> None:
+    await seed_p1(w)
+    await seed_p2(w)
+    await w.recorder.command(OWNER, "/storia")
+
+
+@scenario("history.picker_empty")
+async def scenario_history_picker_empty(w: LegacyWorld) -> None:
+    await w.recorder.command(OWNER, "/storia")
+
+
+@scenario("history.chart")
+async def scenario_history_chart(w: LegacyWorld) -> None:
+    p1 = await seed_p1(w)
+    await w.recorder.command(OWNER, f"/history {p1}")
+
+
+@scenario("history.insufficient")
+async def scenario_history_insufficient(w: LegacyWorld) -> None:
+    p2 = await seed_p2(w, history=[("2026-02-01 10:00:00", "50.00")])
+    await w.recorder.command(OWNER, f"/storia {p2}")
+
+
+@scenario("history.errors")
+async def scenario_history_errors(w: LegacyWorld) -> None:
+    await seed_p1(w)
+    await w.recorder.command(OWNER, "/storia abc")
+    await w.recorder.command(OWNER, "/storia 999")
+
+
+@scenario("history.reset")
+async def scenario_history_reset(w: LegacyWorld) -> None:
+    p1 = await seed_p1(w)
+    p2 = await seed_p2(w)
+    await w.recorder.command(OWNER, "/reset")
+    await w.recorder.command(OWNER, f"/reset {p1}")
+    await w.recorder.command(OWNER, f"/azzera {p2}")
+    await w.recorder.command(OWNER, "/reset abc")
+    await w.recorder.command(OWNER, "/reset 999")
+
+
 # ── T-S: scenarios ───────────────────────────────────────────────────
 
 
