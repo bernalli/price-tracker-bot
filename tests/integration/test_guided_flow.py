@@ -662,15 +662,17 @@ def _legacy_db() -> AsyncMock:
     return db
 
 
-async def _legacy_track_threshold(
+LEGACY_PROMPT_BUTTON = "legacy_admin_interval"
+
+
+async def _legacy_admin_interval(
     update: Update, context: CallbackContext[Any, Any, Any, Any]
 ) -> None:
-    """Stand-in for the legacy `track_threshold_<id>` button: sets pending_action."""
+    """Stand-in for a legacy prompt button: arms the admin interval pending_action."""
     query = update.callback_query
     assert query is not None
-    assert query.data is not None
     assert context.user_data is not None
-    context.user_data["pending_action"] = ("threshold", int(query.data.rsplit("_", 1)[1]))
+    context.user_data["pending_action"] = ("admin_interval", 0)
     await query.answer()
 
 
@@ -681,7 +683,7 @@ async def legacy_h() -> AsyncIterator[tuple[Harness, AsyncMock]]:
     harness.app.bot_data["db"] = db
     text_input.register(harness.app)
     harness.app.add_handler(
-        CallbackQueryHandler(_legacy_track_threshold, pattern=r"^track_threshold_\d+$"), group=2
+        CallbackQueryHandler(_legacy_admin_interval, pattern=f"^{LEGACY_PROMPT_BUTTON}$"), group=2
     )
     await harness.start()
     yield harness, db
@@ -692,29 +694,31 @@ async def test_new_flow_supersedes_legacy_pending_action(
     legacy_h: tuple[Harness, AsyncMock],
 ) -> None:
     h, db = legacy_h
-    await h.press(PRIVATE, USER, "track_threshold_1")
-    assert h.app.user_data[USER]["pending_action"] == ("threshold", 1)
+    await h.press(PRIVATE, USER, LEGACY_PROMPT_BUTTON)
+    assert h.app.user_data[USER]["pending_action"] == ("admin_interval", 0)
 
     await _open_value(h, PRIVATE, USER, 1, "tg")
     await h.text(PRIVATE, USER, "12")
 
     assert "pending_action" not in h.app.user_data[USER]
     assert h.services.writes == [("value", USER, FlowKind.TARGET, 1, SetTarget(Decimal("12")))]
-    db.set_threshold.assert_not_awaited()
+    db.set_config.assert_not_awaited()
 
 
+# The legacy interval reply looks up the job queue, which this harness does not build.
+@pytest.mark.filterwarnings("ignore:No `JobQueue` set up:UserWarning")
 async def test_legacy_button_ends_new_flow_and_legacy_consumes_next_text(
     legacy_h: tuple[Harness, AsyncMock],
 ) -> None:
     h, db = legacy_h
     _, message_id = await _open_value(h, PRIVATE, USER, 1, "tg")
 
-    await h.press(PRIVATE, USER, "track_threshold_1")
+    await h.press(PRIVATE, USER, LEGACY_PROMPT_BUTTON)
     await h.text(PRIVATE, USER, "20")
 
     assert h.edits_of(message_id) == [TEXT_CANCELLED]
     assert h.services.writes == []
-    db.set_threshold.assert_awaited_once()
+    db.set_config.assert_awaited_once_with("check_interval_minutes", "20")
     assert TEXT_NO_OPEN_PROMPT not in h.texts_to(PRIVATE)
     answered = [c.params["callback_query_id"] for c in h.request.calls_of("answerCallbackQuery")]
     assert len(answered) == len(set(answered))

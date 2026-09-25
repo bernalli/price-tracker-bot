@@ -61,7 +61,14 @@ from price_tracker.app.inputs import (
     parse_target,
     parse_threshold,
 )
-from price_tracker.bot.callbacks import REGISTRY, Action, ActionRegistry, InvalidCallback
+from price_tracker.bot.callbacks import (
+    REGISTRY,
+    Action,
+    ActionRegistry,
+    InvalidCallback,
+    decode_legacy_entry,
+)
+from price_tracker.bot.messages import N_, _, reset_locale, set_locale
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -144,6 +151,7 @@ class ActiveFlow:
     payload: PreparedProduct | None = None
     store: str = ""
     started_at: float = 0.0
+    language_code: str | None = None
 
     def snapshot(self, key: FlowKey) -> FlowSnapshot:
         """The immutable ``(key, token)`` pair of this prompt."""
@@ -342,6 +350,7 @@ class FlowConfig:
     timeout_seconds: float = 300.0
     max_attempts: int = 3
     add_scope_step: bool = True
+    add_entry: bool = True
 
 
 # --- routing ----------------------------------------------------------------
@@ -369,61 +378,81 @@ class Route:
     action: Action | None = None
     url: str | None = None
     text: str | None = None
+    language_code: str | None = None
 
 
-# --- texts (English; catalogues are out of scope for this module) ----------
+# --- texts ------------------------------------------------------------------
+#
+# Every text is an English msgid marked with ``N_`` and translated with ``_`` at
+# the moment it is sent, in the language chosen for the update or the timeout.
 
-TEXT_EXPIRED: Final = "This button has expired."
-TEXT_NOT_AUTHORISED: Final = "Not authorised."
-TEXT_NOT_FOUND: Final = "Product not found."
-TEXT_SUPERSEDED: Final = "Replaced by a newer prompt."
-TEXT_NO_OPEN_PROMPT: Final = "No open prompt - use the buttons or /menu."
-TEXT_NOTHING_TO_CANCEL: Final = "Nothing to cancel."
-TEXT_TOO_MANY: Final = "Too many invalid answers - cancelled, nothing changed."
-TEXT_SAVED: Final = "Saved."
-TEXT_ADDED: Final = "Added."
-TEXT_ADDED_OTHER_STORES: Final = "Added - other stores will be followed too."
-TEXT_SCRAPE_FAILED: Final = "Could not read this page. Nothing was added."
-TEXT_ALREADY_TRACKED: Final = "Already tracked."
-TEXT_RESUMED: Final = "Tracking resumed."
-TEXT_TYPE_CODE: Final = "Type a three-letter currency code, for example USD."
-TEXT_CANCELLED: Final = "Cancelled - nothing changed."
-TEXT_NO_PRODUCT: Final = "Cancelled - no product was added."
-TEXT_EXPIRED_VALUE: Final = "Expired - nothing changed."
-TEXT_EXPIRED_ADD: Final = "Expired - no product was added."
-TEXT_SCOPE_NOTICE: Final = "Other stores will be followed at this level from a later version."
+TEXT_EXPIRED: Final = N_("This button has expired.")
+TEXT_NOT_AUTHORISED: Final = N_("Not authorised.")
+TEXT_NOT_FOUND: Final = N_("Product not found.")
+TEXT_SUPERSEDED: Final = N_("Replaced by a newer prompt.")
+TEXT_NO_OPEN_PROMPT: Final = N_("No open prompt - use the buttons or /menu.")
+TEXT_NOTHING_TO_CANCEL: Final = N_("Nothing to cancel.")
+TEXT_TOO_MANY: Final = N_("Too many invalid answers - cancelled, nothing changed.")
+TEXT_SAVED: Final = N_("Saved.")
+TEXT_ADDED: Final = N_("Added.")
+TEXT_ADDED_OTHER_STORES: Final = N_("Added - other stores will be followed too.")
+TEXT_SCRAPE_FAILED: Final = N_("Could not read this page. Nothing was added.")
+TEXT_ALREADY_TRACKED: Final = N_("Already tracked.")
+TEXT_RESUMED: Final = N_("Tracking resumed.")
+TEXT_TYPE_CODE: Final = N_("Type a three-letter currency code, for example USD.")
+TEXT_CANCELLED: Final = N_("Cancelled - nothing changed.")
+TEXT_NO_PRODUCT: Final = N_("Cancelled - no product was added.")
+TEXT_EXPIRED_VALUE: Final = N_("Expired - nothing changed.")
+TEXT_EXPIRED_ADD: Final = N_("Expired - no product was added.")
+TEXT_SCOPE_NOTICE: Final = N_("Other stores will be followed at this level from a later version.")
+TEXT_WHICH_CURRENCY: Final = N_("Which currency is this price in?")
+TEXT_WHERE_FOLLOWED: Final = N_("Where should the price be followed?")
+TEXT_CHOOSE_LEVEL: Final = N_("Choose a level:")
+TEXT_CURRENCY_CHOSEN: Final = N_("Currency: {code}")
+LABEL_CANCEL: Final = N_("Cancel")
+LABEL_TYPE_CODE: Final = N_("Type a code")
+LABEL_OTHER_STORES: Final = N_("Other stores too")
+LABEL_ONLY_ON: Final = N_("Only on {store}")
+_SCOPE_LEVEL_LABELS: Final = (
+    ("own_country", N_("My country")),
+    ("customs_area", N_("My customs area")),
+    ("world", N_("Worldwide")),
+)
 
 _PROMPTS: Final = {
-    FlowKind.THRESHOLD: "Send the drop threshold: 20% or 5.50 (one dot or comma).",
-    FlowKind.TARGET: "Send the target price, e.g. 49.90 (0 clears it).",
-    FlowKind.INTERVAL: "Send the check interval in minutes (5-10080, 0 resets).",
+    FlowKind.THRESHOLD: N_("Send the drop threshold: 20% or 5.50 (one dot or comma)."),
+    FlowKind.TARGET: N_("Send the target price, e.g. 49.90 (0 clears it)."),
+    FlowKind.INTERVAL: N_("Send the check interval in minutes (5-10080, 0 resets)."),
 }
 
 _HINTS: Final = {
-    InputErrorCode.EMPTY: "Please send a value.",
-    InputErrorCode.TOO_LONG: "That is too long.",
-    InputErrorCode.CONTROL_CHARACTER: "That contains invisible characters.",
-    InputErrorCode.NOT_A_NUMBER: "Use digits with one dot or comma, e.g. 1299.99.",
-    InputErrorCode.OUT_OF_RANGE: "That value is out of range.",
-    InputErrorCode.NOT_A_CURRENCY: "Unknown currency code.",
-    InputErrorCode.NOT_A_TIMEZONE: "Unknown time zone.",
-    InputErrorCode.NOT_A_TIME_RANGE: "Use HH:MM-HH:MM.",
-    InputErrorCode.NOT_A_URL: "That is not a link.",
-    InputErrorCode.UNSAFE_URL: "That link is not allowed.",
+    InputErrorCode.EMPTY: N_("Please send a value."),
+    InputErrorCode.TOO_LONG: N_("That is too long."),
+    InputErrorCode.CONTROL_CHARACTER: N_("That contains invisible characters."),
+    InputErrorCode.NOT_A_NUMBER: N_("Use digits with one dot or comma, e.g. 1299.99."),
+    InputErrorCode.OUT_OF_RANGE: N_("That value is out of range."),
+    InputErrorCode.NOT_A_CURRENCY: N_("Unknown currency code."),
+    InputErrorCode.NOT_A_TIMEZONE: N_("Unknown time zone."),
+    InputErrorCode.NOT_A_TIME_RANGE: N_("Use HH:MM-HH:MM."),
+    InputErrorCode.NOT_A_URL: N_("That is not a link."),
+    InputErrorCode.UNSAFE_URL: N_("That link is not allowed."),
 }
+# The interval prompt takes whole minutes only: the generic number hint (one dot
+# or comma, e.g. 1299.99) would steer the user to another rejected answer.
+TEXT_WHOLE_MINUTES: Final = N_("Use whole minutes, e.g. 30.")
 
 
 def _kept_text(store: str) -> str:
-    return f"Kept: only on {store}."
+    return _("Kept: only on {store}.").format(store=store)
 
 
 def closing_text(flow: ActiveFlow, *, expired: bool = False) -> str:
-    """The text a prompt is edited to when its flow ends without an answer."""
+    """The text a prompt is edited to when its flow ends without an answer, translated."""
     if flow.state is FlowState.AWAIT_SCOPE:
         return _kept_text(flow.store)
     if flow.state is FlowState.AWAIT_CURRENCY:
-        return TEXT_EXPIRED_ADD if expired else TEXT_NO_PRODUCT
-    return TEXT_EXPIRED_VALUE if expired else TEXT_CANCELLED
+        return _(TEXT_EXPIRED_ADD if expired else TEXT_NO_PRODUCT)
+    return _(TEXT_EXPIRED_VALUE if expired else TEXT_CANCELLED)
 
 
 class _Transport:
@@ -509,6 +538,13 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
         """Decide whether and how this update belongs to a guided flow."""
         if not isinstance(update, Update):
             return None
+        route = self._route(update)
+        if route is None:
+            return None
+        user = update.effective_user
+        return replace(route, language_code=None if user is None else user.language_code)
+
+    def _route(self, update: Update) -> Route | None:
         if update.callback_query is not None:
             return self._route_callback(update)
         if not _MESSAGE_ONLY.check_update(update):
@@ -524,6 +560,8 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
             return self._route_command(key, snapshot, text)
         url = URL_PATTERN.search(text)
         if url is not None:
+            if not self.config.add_entry:
+                return None if snapshot is None else Route(RouteKind.OTHER_COMMAND, key, snapshot)
             return Route(RouteKind.ADD_ENTRY, key, snapshot, url=url.group(0).rstrip(".,;:!?)"))
         if flow is None:
             return None
@@ -546,7 +584,7 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
             if not bot_username or recipient.lower() != bot_username.lower():
                 return None
         name = name.lower()
-        if name in ADD_COMMANDS and len(parts) > 1:
+        if self.config.add_entry and name in ADD_COMMANDS and len(parts) > 1:
             url = URL_PATTERN.fullmatch(parts[1])
             if url is not None:
                 return Route(RouteKind.ADD_ENTRY, key, snapshot, url=url.group(0))
@@ -563,7 +601,9 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
         key = (query.message.chat.id, query.from_user.id)
         flow = self.registry.get(key)
         snapshot = None if flow is None else flow.snapshot(key)
-        decoded = self.codec.decode(query.data)
+        decoded: Action | InvalidCallback | None = self.codec.decode(query.data)
+        if isinstance(decoded, InvalidCallback):
+            decoded = decode_legacy_entry(query.data)
         if isinstance(decoded, Action):
             if self.codec.is_flow_action(decoded):
                 return Route(RouteKind.FLOW_CALLBACK, key, snapshot, action=decoded)
@@ -585,10 +625,16 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
         """Run the route; raise ``ApplicationHandlerStop`` iff the update was consumed."""
         if not isinstance(check_result, Route):  # pragma: no cover - PTB contract
             return
-        if self._bot is None:
-            self._bot = application.bot
-        transport = _Transport(application.bot)
-        consumed = await self._dispatch(update, check_result, context, transport)
+        # The language is chosen synchronously, before the first await, so that
+        # every ticket the route takes is taken before anything else can run.
+        locale = set_locale(check_result.language_code)
+        try:
+            if self._bot is None:
+                self._bot = application.bot
+            transport = _Transport(application.bot)
+            consumed = await self._dispatch(update, check_result, context, transport)
+        finally:
+            reset_locale(locale)
         if consumed:
             raise ApplicationHandlerStop
 
@@ -616,13 +662,13 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
         return InlineKeyboardButton(label, callback_data=self.codec.encode(action))
 
     def _cancel_row(self, token: str) -> list[InlineKeyboardButton]:
-        return [self._button("Cancel", Action("flow.cancel", (token,)))]
+        return [self._button(_(LABEL_CANCEL), Action("flow.cancel", (token,)))]
 
     async def _close_superseded(
         self, key: FlowKey, flow: ActiveFlow, transport: _Transport
     ) -> None:
         self.timer.disarm(flow.snapshot(key))
-        await transport.edit(flow.prompt_chat_id, flow.prompt_message_id, TEXT_SUPERSEDED)
+        await transport.edit(flow.prompt_chat_id, flow.prompt_message_id, _(TEXT_SUPERSEDED))
 
     def _supersede_legacy(self, context: AnyContext) -> None:
         user_data = context.user_data
@@ -677,15 +723,19 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
         ticket = self.registry.generation(route.key)
         active = await self.services.is_active(user_id)
         if not self.registry.is_current(route.key, ticket):
+            # Superseded while waiting: open nothing, but still dismiss the
+            # button's loading state (every callback query gets one answer).
+            await transport.answer(query.id)
             return True
         if not active:
-            await transport.answer(query.id, TEXT_NOT_AUTHORISED)
+            await transport.answer(query.id, _(TEXT_NOT_AUTHORISED))
             return True
         name = await self.services.product_name(user_id, product_id)
         if not self.registry.is_current(route.key, ticket):
+            await transport.answer(query.id)
             return True
         if name is None:
-            await transport.answer(query.id, TEXT_NOT_FOUND)
+            await transport.answer(query.id, _(TEXT_NOT_FOUND))
             return True
         kind = ENTRY_ACTIONS[action.name]
         token = self._new_token()
@@ -696,12 +746,13 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
             product_id=product_id,
             prompt_chat_id=route.key[0],
             started_at=time.monotonic(),
+            language_code=route.language_code,
         )
         self._supersede_legacy(context)
         await transport.answer(query.id)
         markup = InlineKeyboardMarkup([self._cancel_row(token)])
         await self._show_prompt(
-            route.key, flow, f"{name}\n{_PROMPTS[kind]}", markup, transport, ticket
+            route.key, flow, f"{name}\n{_(_PROMPTS[kind])}", markup, transport, ticket
         )
         return True
 
@@ -715,7 +766,7 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
         if not self.registry.is_current(key, ticket):
             return True
         if not active:
-            await transport.send(key[0], TEXT_NOT_AUTHORISED)
+            await transport.send(key[0], _(TEXT_NOT_AUTHORISED))
             return True
         superseded = self.registry.discard(key)
         ticket = self.registry.generation(key)
@@ -728,9 +779,9 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
         if result.status is not PrepareStatus.READY or result.product is None:
             if not self.registry.is_current(key, ticket):
                 if result.status is PrepareStatus.DUPLICATE_REACTIVATED:
-                    await transport.send(key[0], TEXT_RESUMED)
+                    await transport.send(key[0], _(TEXT_RESUMED))
                 return True
-            await transport.send(key[0], _PREPARE_TEXTS.get(result.status, TEXT_SCRAPE_FAILED))
+            await transport.send(key[0], _(_PREPARE_TEXTS.get(result.status, TEXT_SCRAPE_FAILED)))
             return True
         product = result.product
         if product.currency is not None:
@@ -750,7 +801,7 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
         await self._show_prompt(
             key,
             flow,
-            f"{product.name}\nWhich currency is this price in?",
+            f"{product.name}\n{_(TEXT_WHICH_CURRENCY)}",
             self._currency_markup(token),
             transport,
             ticket,
@@ -764,24 +815,21 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
         return InlineKeyboardMarkup(
             [
                 codes,
-                [self._button("Type a code", Action("flow.currency", (token, "type")))],
-                [self._button("Cancel", Action("flow.currency", (token, "cancel")))],
+                [self._button(_(LABEL_TYPE_CODE), Action("flow.currency", (token, "type")))],
+                [self._button(_(LABEL_CANCEL), Action("flow.currency", (token, "cancel")))],
             ]
         )
 
     def _scope_markup(self, token: str, store: str, *, picker: bool) -> InlineKeyboardMarkup:
-        only = self._button(f"Only on {store}"[:60], Action("flow.scope", (token, "store")))
+        only = self._button(
+            _(LABEL_ONLY_ON).format(store=store)[:60], Action("flow.scope", (token, "store"))
+        )
         if not picker:
-            return InlineKeyboardMarkup(
-                [[only], [self._button("Other stores too", Action("flow.scope_picker", (token,)))]]
-            )
+            other = self._button(_(LABEL_OTHER_STORES), Action("flow.scope_picker", (token,)))
+            return InlineKeyboardMarkup([[only], [other]])
         levels = [
-            [self._button(label, Action("flow.scope", (token, level)))]
-            for level, label in (
-                ("own_country", "My country"),
-                ("customs_area", "My customs area"),
-                ("world", "Worldwide"),
-            )
+            [self._button(_(label), Action("flow.scope", (token, level)))]
+            for level, label in _SCOPE_LEVEL_LABELS
         ]
         return InlineKeyboardMarkup([*levels, [only]])
 
@@ -801,36 +849,36 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
         if added.status is not ApplyStatus.OK or added.product_id is None:
             if not self.registry.is_current(key, ticket):
                 return
-            await transport.send(key[0], _APPLY_TEXTS[added.status])
+            await transport.send(key[0], _(_APPLY_TEXTS[added.status]))
             return
         product_id = added.product_id
         if not self.config.add_scope_step:
             text = (
-                TEXT_ADDED
+                _(TEXT_ADDED)
                 if self.registry.is_current(key, ticket)
-                else f"{TEXT_ADDED} {_kept_text(product.store)}"
+                else f"{_(TEXT_ADDED)} {_kept_text(product.store)}"
             )
             await transport.send(key[0], text)
             return
         default = await self.services.add_scope_default(user_id)
         if default == "store_only":
             text = (
-                TEXT_ADDED
+                _(TEXT_ADDED)
                 if self.registry.is_current(key, ticket)
-                else f"{TEXT_ADDED} {_kept_text(product.store)}"
+                else f"{_(TEXT_ADDED)} {_kept_text(product.store)}"
             )
             await transport.send(key[0], text)
             return
         if default == "other_stores":
             if not self.registry.is_current(key, ticket):
-                await transport.send(key[0], f"{TEXT_ADDED} {_kept_text(product.store)}")
+                await transport.send(key[0], f"{_(TEXT_ADDED)} {_kept_text(product.store)}")
                 return
             status = await self.services.set_product_scope(
                 user_id, product_id, cross_store=True, scope_override=None
             )
-            text = TEXT_ADDED_OTHER_STORES if status is ApplyStatus.OK else _APPLY_TEXTS[status]
+            text = _(TEXT_ADDED_OTHER_STORES if status is ApplyStatus.OK else _APPLY_TEXTS[status])
             if status is not ApplyStatus.OK and not self.registry.is_current(key, ticket):
-                text = f"{TEXT_ADDED} {_kept_text(product.store)}"
+                text = f"{_(TEXT_ADDED)} {_kept_text(product.store)}"
             await transport.send(key[0], text)
             return
         token = self._new_token()
@@ -846,13 +894,13 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
         shown = await self._show_prompt(
             key,
             flow,
-            f"{product.name}\nWhere should the price be followed?",
+            f"{product.name}\n{_(TEXT_WHERE_FOLLOWED)}",
             self._scope_markup(token, product.store, picker=False),
             transport,
             ticket,
         )
         if not shown:
-            await transport.send(key[0], f"{TEXT_ADDED} {_kept_text(product.store)}")
+            await transport.send(key[0], f"{_(TEXT_ADDED)} {_kept_text(product.store)}")
 
     async def _on_flow_callback(self, update: Update, route: Route, transport: _Transport) -> bool:
         query = update.callback_query
@@ -862,7 +910,7 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
         token = action.args[0]
         flow = self.registry.get(route.key)
         if flow is None or flow.token != token or not _action_fits(action, flow):
-            await transport.answer(query.id, TEXT_EXPIRED)
+            await transport.answer(query.id, _(TEXT_EXPIRED))
             return True
         snapshot = flow.snapshot(route.key)
         choice = action.args[1] if len(action.args) > 1 else None
@@ -877,7 +925,7 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
                     return True
                 markup = InlineKeyboardMarkup([self._cancel_row(flow.token)])
                 await transport.edit(
-                    flow.prompt_chat_id, flow.prompt_message_id, TEXT_TYPE_CODE, markup
+                    flow.prompt_chat_id, flow.prompt_message_id, _(TEXT_TYPE_CODE), markup
                 )
             return True
         if action.name == "flow.currency" and isinstance(choice, str):
@@ -890,7 +938,7 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
                     return True
                 markup = self._scope_markup(flow.token, flow.store, picker=True)
                 await transport.edit(
-                    flow.prompt_chat_id, flow.prompt_message_id, "Choose a level:", markup
+                    flow.prompt_chat_id, flow.prompt_message_id, _(TEXT_CHOOSE_LEVEL), markup
                 )
             return True
         if isinstance(choice, str):
@@ -902,7 +950,7 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
     ) -> None:
         claimed = self.registry.claim(snapshot)
         if claimed is None:
-            await transport.answer(query_id, TEXT_EXPIRED)
+            await transport.answer(query_id, _(TEXT_EXPIRED))
             return
         ticket = self.registry.generation(snapshot.key)
         self.timer.disarm(snapshot)
@@ -918,14 +966,18 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
     ) -> bool:
         claimed = self.registry.claim(snapshot)
         if claimed is None or claimed.payload is None:
-            await transport.answer(query_id, TEXT_EXPIRED)
+            await transport.answer(query_id, _(TEXT_EXPIRED))
             return True
         ticket = self.registry.generation(snapshot.key)
         self.timer.disarm(snapshot)
         await transport.answer(query_id)
         if not self.registry.is_current(snapshot.key, ticket):
             return True
-        await transport.edit(claimed.prompt_chat_id, claimed.prompt_message_id, f"Currency: {code}")
+        await transport.edit(
+            claimed.prompt_chat_id,
+            claimed.prompt_message_id,
+            _(TEXT_CURRENCY_CHOSEN).format(code=code),
+        )
         await self._insert_and_branch(snapshot.key, claimed.payload, code, transport, ticket)
         return True
 
@@ -934,7 +986,7 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
     ) -> bool:
         claimed = self.registry.claim(snapshot)
         if claimed is None or claimed.product_id is None:
-            await transport.answer(query_id, TEXT_EXPIRED)
+            await transport.answer(query_id, _(TEXT_EXPIRED))
             return True
         ticket = self.registry.generation(snapshot.key)
         self.timer.disarm(snapshot)
@@ -947,7 +999,7 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
             status = await self.services.set_product_scope(
                 snapshot.key[1], claimed.product_id, cross_store=True, scope_override=choice
             )
-            text = TEXT_SCOPE_NOTICE if status is ApplyStatus.OK else _APPLY_TEXTS[status]
+            text = _(TEXT_SCOPE_NOTICE if status is ApplyStatus.OK else _APPLY_TEXTS[status])
         if self.registry.is_current(snapshot.key, ticket):
             await transport.edit(claimed.prompt_chat_id, claimed.prompt_message_id, text)
         elif choice != "store" and status is ApplyStatus.OK:
@@ -987,16 +1039,14 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
         self.timer.disarm(snapshot)
         ticket = self.registry.generation(snapshot.key)
         if isinstance(value, Cancel):
-            await transport.send(chat_id, TEXT_CANCELLED)
+            await transport.send(chat_id, _(TEXT_CANCELLED))
             return True
         status = await self.services.apply_value(
             snapshot.key[1], claimed.kind, claimed.product_id, value
         )
         if status is not ApplyStatus.OK and not self.registry.is_current(snapshot.key, ticket):
             return True
-        await transport.send(
-            chat_id, TEXT_SAVED if status is ApplyStatus.OK else _APPLY_TEXTS[status]
-        )
+        await transport.send(chat_id, _(_APPLY_TEXTS[status]))
         return True
 
     async def _reject(
@@ -1006,10 +1056,13 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
         if attempts >= self.config.max_attempts:
             if self.registry.claim(snapshot) is not None:
                 self.timer.disarm(snapshot)
-            await transport.send(snapshot.key[0], TEXT_TOO_MANY)
+            await transport.send(snapshot.key[0], _(TEXT_TOO_MANY))
             return
         self.registry.replace(snapshot, replace(flow, attempts=attempts))
-        await transport.send(snapshot.key[0], _HINTS[error.code])
+        hint = _HINTS[error.code]
+        if flow.kind is FlowKind.INTERVAL and error.code is InputErrorCode.NOT_A_NUMBER:
+            hint = TEXT_WHOLE_MINUTES
+        await transport.send(snapshot.key[0], _(hint))
 
     async def _end_by_user(self, route: Route, transport: _Transport, *, consume: bool) -> bool:
         """``/cancel`` (consumed), another command or a foreign callback (passed on)."""
@@ -1030,10 +1083,16 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
         claimed = self.registry.claim(snapshot)
         if claimed is None or self._bot is None:
             return
-        transport = _Transport(self._bot)
-        await transport.edit(
-            claimed.prompt_chat_id, claimed.prompt_message_id, closing_text(claimed, expired=True)
-        )
+        locale = set_locale(claimed.language_code)
+        try:
+            transport = _Transport(self._bot)
+            await transport.edit(
+                claimed.prompt_chat_id,
+                claimed.prompt_message_id,
+                closing_text(claimed, expired=True),
+            )
+        finally:
+            reset_locale(locale)
 
 
 def _action_fits(action: Action, flow: ActiveFlow) -> bool:
@@ -1074,24 +1133,38 @@ _PREPARE_TEXTS: Final = {
 
 
 async def nothing_to_cancel(update: Update, context: AnyContext) -> None:
-    """Group 1: ``/cancel`` outside a flow."""
-    del context
-    if update.message is not None:
-        await update.message.reply_text(TEXT_NOTHING_TO_CANCEL)
+    """Group 1: ``/cancel`` outside a guided flow.
+
+    A prompt still armed by a legacy handler (``pending_action``) is disarmed and
+    reported as cancelled; otherwise there is nothing to cancel.
+    """
+    user = update.effective_user
+    locale = set_locale(None if user is None else user.language_code)
+    try:
+        if update.message is None:
+            return
+        user_data = context.user_data
+        if isinstance(user_data, dict) and LEGACY_PENDING_KEY in user_data:
+            del user_data[LEGACY_PENDING_KEY]
+            await update.message.reply_text(_(TEXT_CANCELLED))
+            return
+        await update.message.reply_text(_(TEXT_NOTHING_TO_CANCEL))
+    finally:
+        reset_locale(locale)
 
 
 async def no_open_prompt(update: Update, context: AnyContext) -> None:
     """Group 3: free text that no flow asked for."""
     del context
     if update.message is not None:
-        await update.message.reply_text(TEXT_NO_OPEN_PROMPT)
+        await update.message.reply_text(_(TEXT_NO_OPEN_PROMPT))
 
 
 async def expired_callback(update: Update, context: AnyContext) -> None:
     """Group 3 catch-all: callback data outside the registry gets the expiry toast."""
     del context
     if update.callback_query is not None:
-        await update.callback_query.answer(TEXT_EXPIRED)
+        await update.callback_query.answer(_(TEXT_EXPIRED))
 
 
 FLOW_GROUP: Final = 0

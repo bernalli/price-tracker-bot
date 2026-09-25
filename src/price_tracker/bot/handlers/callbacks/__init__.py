@@ -63,8 +63,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return
     if await _admin.handle_admin_menu(query, context, db, user_id, data):
         return
-    if await _actions.handle_picker(query, context, db, user_id, data):
-        return
 
     logger.info("Unhandled callback data: %s", data)
 

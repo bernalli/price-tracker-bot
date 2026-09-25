@@ -140,7 +140,9 @@ async def test_claim_invalidates_pending_entry_without_another_open() -> None:
             before = len(h.request.calls)
             barrier.release.set()
             await task
-            assert h.request.calls[before:] == []
+            calls = h.request.calls[before:]
+            assert [c.method for c in calls] == ["answerCallbackQuery"]
+            assert calls[0].params.get("text") is None
             assert h.flow.registry.get((PRIVATE, USER)) is None
             assert len(h.services.writes) == 1
         finally:

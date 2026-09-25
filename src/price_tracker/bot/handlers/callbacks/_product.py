@@ -247,44 +247,6 @@ async def handle_track_choice(
         )
         return True
 
-    if data.startswith("track_threshold_"):
-        product_id = _parse_id(data.replace("track_threshold_", ""))
-        if product_id is None:
-            await query.edit_message_text("❌ ID non valido.")
-            return True
-        name = await _get_product_name(db, product_id)
-        context.user_data["pending_action"] = ("threshold", product_id)
-        await query.edit_message_text(
-            f"📉 <b>Imposta soglia per #{product_id}</b>\n"
-            f"📦 {_escape_html(name)}\n\n"
-            f"Scrivi la soglia desiderata:\n"
-            f"• <code>20%</code> — avvisami se scende del 20%\n"
-            f"• <code>50</code> — avvisami se scende di €50",
-            parse_mode=ParseMode.HTML,
-        )
-        return True
-
-    if data.startswith("track_target_"):
-        product_id = _parse_id(data.replace("track_target_", ""))
-        if product_id is None:
-            await query.edit_message_text("❌ ID non valido.")
-            return True
-        name = await _get_product_name(db, product_id)
-        product = await db.get_product(product_id)
-        current = _safe_dec(product.get("current_price")) if product else None
-        currency = product.get("currency", "EUR") if product else "EUR"
-        price_hint = (
-            f"\n💰 Prezzo attuale: {_convert_display(current, currency)}" if current else ""
-        )
-        context.user_data["pending_action"] = ("target", product_id)
-        await query.edit_message_text(
-            f"💰 <b>Imposta prezzo target per #{product_id}</b>\n"
-            f"📦 {_escape_html(name)}{price_hint}\n\n"
-            f"Scrivi il prezzo obiettivo (es. <code>100</code>):",
-            parse_mode=ParseMode.HTML,
-        )
-        return True
-
     if data.startswith("track_default_"):
         product_id = _parse_id(data.replace("track_default_", ""))
         if product_id is None:
