@@ -1,0 +1,40 @@
+# legacy snapshot v1
+# scenario: menu.prodotti_overflow
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/menu" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | 📋 <b>Menu</b>
+   |
+   | Cosa vuoi fare?
+   keyboard:
+   | [📦 Prodotti → menu_prodotti] [🔍 Prezzi → menu_prezzi]
+   | [🔔 Notifiche → menu_notifiche] [💾 Dati → menu_dati]
+   | [📊 Stato e info → menu_info]
+## db after step 1
+~ users user_id=10 display_name: NULL -> "U10"
+## step 2: press "menu_prodotti" user=10 on=1000
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1000
+   param parse_mode="HTML"
+   text:
+   | 📦 <b>I tuoi prodotti</b> (12 attivi)
+   |
+   | Tocca un prodotto per modificarlo.
+   keyboard:
+   | [#1 Item 01 €10.00 → edit_1]
+   | [#2 Item 02 €11.00 → edit_2]
+   | [#3 Item 03 €12.00 → edit_3]
+   | [#4 Item 04 €13.00 → edit_4]
+   | [#5 Item 05 €14.00 → edit_5]
+   | [#6 Item 06 €15.00 → edit_6]
+   | [#7 Item 07 €16.00 → edit_7]
+   | [#8 Item 08 €17.00 → edit_8]
+   | [#9 Item 09 €18.00 → edit_9]
+   | [#10 Item 10 €19.00 → edit_10]
+   | [... altri 2 → /lista → cmd_lista]
+   | [◀️ Menu → menu_main]
+## db after step 2
+(no changes)

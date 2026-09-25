@@ -1451,6 +1451,12 @@ async def seed_command(w: LegacyWorld, user: int, text: str) -> None:
     await w.recorder.seed(json.dumps(text, ensure_ascii=False), w.run_command(user, text))
 
 
+async def open_menu(w: LegacyWorld, user: int) -> Call:
+    """Send ``/menu`` as ``user`` and return the menu message, to press buttons on it."""
+    await w.recorder.command(user, "/menu")
+    return w.request.calls_of("sendMessage")[-1]
+
+
 async def seed_job(w: LegacyWorld) -> None:
     """Run a scheduler sweep as a listed, uncaptured seed step."""
     await w.recorder.seed("job run_check_all", w.scheduler.run_check_all())
@@ -1530,6 +1536,187 @@ async def scenario_lista_other_user_sees_own_only(w: LegacyWorld) -> None:
     await seed_p1(w)
     await seed_p3(w)
     await w.recorder.command(OTHER, "/lista")
+
+
+# menu ─────────────────────────────────────────────────────────────────
+# Every scenario opens the menu with a command and presses on its messages.
+
+
+@scenario("menu.main")
+async def scenario_menu_main(w: LegacyWorld) -> None:
+    await seed_p1(w)
+    menu = await open_menu(w, OWNER)
+    await w.recorder.press(OWNER, "menu_main", on=menu)
+
+
+@scenario("menu.main_admin")
+async def scenario_menu_main_admin(w: LegacyWorld) -> None:
+    menu = await open_menu(w, ADMIN)
+    await w.recorder.press(ADMIN, "menu_main", on=menu)
+
+
+@scenario("menu.prodotti")
+async def scenario_menu_prodotti(w: LegacyWorld) -> None:
+    await seed_p1(w)
+    await seed_p2(w)
+    await seed_pp(w)
+    await w.recorder.command(OWNER, "/menu")
+    await w.recorder.press(OWNER, "menu_prodotti")
+
+
+@scenario("menu.prodotti_empty")
+async def scenario_menu_prodotti_empty(w: LegacyWorld) -> None:
+    await w.recorder.command(OWNER, "/menu")
+    await w.recorder.press(OWNER, "menu_prodotti")
+
+
+@scenario("menu.prodotti_overflow")
+async def scenario_menu_prodotti_overflow(w: LegacyWorld) -> None:
+    for n in range(1, 13):
+        price = f"{9 + n}.00"
+        await seed_product(
+            w,
+            OWNER,
+            f"https://shop.example.com/item/{n}",
+            f"Item {n:02d}",
+            initial=price,
+            current=price,
+        )
+    await w.recorder.command(OWNER, "/menu")
+    await w.recorder.press(OWNER, "menu_prodotti")
+
+
+@scenario("menu.cmd_lista")
+async def scenario_menu_cmd_lista(w: LegacyWorld) -> None:
+    await seed_p1(w)
+    await seed_p2(w)
+    menu = await open_menu(w, OWNER)
+    await w.recorder.press(OWNER, "menu_prodotti")
+    await w.recorder.press(OWNER, "cmd_lista", on=menu)
+
+
+@scenario("menu.cmd_lista_empty")
+async def scenario_menu_cmd_lista_empty(w: LegacyWorld) -> None:
+    menu = await open_menu(w, OWNER)
+    await w.recorder.press(OWNER, "cmd_lista", on=menu)
+
+
+@scenario("menu.paused")
+async def scenario_menu_paused(w: LegacyWorld) -> None:
+    await seed_p1(w)
+    await seed_pp(w)
+    await w.recorder.command(OWNER, "/menu")
+    await w.recorder.press(OWNER, "menu_prodotti")
+    await w.recorder.press(OWNER, "menu_paused")
+
+
+@scenario("menu.prezzi")
+async def scenario_menu_prezzi(w: LegacyWorld) -> None:
+    await seed_p1(w)
+    await seed_p2(w)
+    await w.recorder.command(OWNER, "/menu")
+    await w.recorder.press(OWNER, "menu_prezzi")
+
+
+@scenario("menu.prezzi_empty")
+async def scenario_menu_prezzi_empty(w: LegacyWorld) -> None:
+    await w.recorder.command(OWNER, "/menu")
+    await w.recorder.press(OWNER, "menu_prezzi")
+
+
+@scenario("menu.checkall")
+async def scenario_menu_checkall(w: LegacyWorld) -> None:
+    await seed_p1(w)
+    await seed_p2(w)
+    script_drop(w)
+    w.scraper.script(FAN_URL, info("50.00", name="Fan", currency="USD"))
+    await w.recorder.command(OWNER, "/menu")
+    await w.recorder.press(OWNER, "menu_prezzi")
+    await w.recorder.press(OWNER, "menu_checkall")
+
+
+@scenario("menu.checkall_empty")
+async def scenario_menu_checkall_empty(w: LegacyWorld) -> None:
+    await w.recorder.command(OWNER, "/menu")
+    await w.recorder.press(OWNER, "menu_prezzi")
+    await w.recorder.press(OWNER, "menu_checkall")
+
+
+@scenario("menu.storia")
+async def scenario_menu_storia(w: LegacyWorld) -> None:
+    await seed_p1(w)
+    await seed_p2(w)
+    await w.recorder.command(OWNER, "/menu")
+    await w.recorder.press(OWNER, "menu_prezzi")
+    await w.recorder.press(OWNER, "menu_storia")
+
+
+@scenario("menu.notifiche")
+async def scenario_menu_notifiche(w: LegacyWorld) -> None:
+    await seed_p1(w, target="70.00")
+    await seed_p2(w, threshold=("absolute", "5"))
+    await seed_product(w, OWNER, ITEM4_URL, "Speaker", initial="20.00", threshold=("any_drop", "0"))
+    await w.recorder.command(OWNER, "/menu")
+    await w.recorder.press(OWNER, "menu_notifiche")
+
+
+@scenario("menu.dati")
+async def scenario_menu_dati(w: LegacyWorld) -> None:
+    await seed_p1(w)
+    await seed_pp(w)
+    await w.recorder.command(OWNER, "/menu")
+    await w.recorder.press(OWNER, "menu_dati")
+
+
+@scenario("menu.esporta")
+async def scenario_menu_esporta(w: LegacyWorld) -> None:
+    await seed_p1(w, target="70.00")
+    await seed_pp(w)
+    await w.recorder.command(OWNER, "/menu")
+    await w.recorder.press(OWNER, "menu_dati")
+    await w.recorder.press(OWNER, "menu_esporta")
+
+
+@scenario("menu.esporta_empty")
+async def scenario_menu_esporta_empty(w: LegacyWorld) -> None:
+    await w.recorder.command(OWNER, "/menu")
+    await w.recorder.press(OWNER, "menu_dati")
+    await w.recorder.press(OWNER, "menu_esporta")
+
+
+@scenario("menu.importa_info")
+async def scenario_menu_importa_info(w: LegacyWorld) -> None:
+    await w.recorder.command(OWNER, "/menu")
+    await w.recorder.press(OWNER, "menu_dati")
+    await w.recorder.press(OWNER, "menu_importa_info")
+
+
+@scenario("menu.info_user")
+async def scenario_menu_info_user(w: LegacyWorld) -> None:
+    await seed_p1(w)
+    await seed_pp(w)
+    await w.recorder.command(OWNER, "/menu")
+    await w.recorder.press(OWNER, "menu_info")
+
+
+@scenario("menu.info_admin_saved_interval")
+async def scenario_menu_info_admin_saved_interval(w: LegacyWorld) -> None:
+    await seed_p1(w)
+    await seed_p3(w)
+    await seed_config(w, "check_interval_minutes", "90")
+    await w.recorder.command(ADMIN, "/menu")
+    await w.recorder.press(ADMIN, "menu_info")
+
+
+@scenario("menu.unknown_callback")
+async def scenario_menu_unknown_callback(w: LegacyWorld) -> None:
+    menu = await open_menu(w, OWNER)
+    await w.recorder.press(OWNER, "does_not_exist", on=menu)
+
+
+@scenario("menu.not_allowed_user")
+async def scenario_menu_not_allowed_user(w: LegacyWorld) -> None:
+    await w.recorder.press(STRANGER, "menu_main")
 
 
 # ── T-S: scenarios ───────────────────────────────────────────────────
