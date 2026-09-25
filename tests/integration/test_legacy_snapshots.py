@@ -854,6 +854,68 @@ async def test_h13_pressed_message_follows_the_current_keyboards(frozen_world: L
     assert '## step 13: press "zz_old" user=10 on=1000' in lines
 
 
+async def test_h13_deleted_message_loses_its_keyboard(frozen_world: LegacyWorld) -> None:
+    """A deleted message can no longer be pressed without naming it."""
+    w = frozen_world
+    bot = w.app.bot
+    await w.recorder.capture(
+        "keyboard",
+        bot.send_message(chat_id=OWNER, text="a", reply_markup=keyboard([("x", "zz_del")])),
+    )
+    await w.recorder.capture("delete", bot.delete_message(chat_id=OWNER, message_id=1000))
+    await w.recorder.press(OWNER, "zz_del")
+    lines = w.recorder.snapshot("harness.deleted").render().splitlines()
+    assert "-> deleteMessage chat=10 message_id=1000" in lines
+    assert '## step 3: press "zz_del" user=10 on=1 synthetic' in lines
+
+
+async def test_h13_seed_commands_are_listed_but_not_captured(frozen_world: LegacyWorld) -> None:
+    """A command run as a seed shows only its step line, yet its keyboard stays pressable."""
+    w = frozen_world
+    await w.recorder.seed('"/digest_mode on"', w.run_command(OWNER, "/digest_mode on"))
+    await w.recorder.seed('"/menu"', w.run_command(OWNER, "/menu"))
+    menu = w.request.calls_of("sendMessage")[-1]
+    assert "menu_prodotti" in menu.callback_data()
+    await w.recorder.seed('press "menu_dati"', w.run_press(OWNER, "menu_dati"))
+    await w.recorder.press(OWNER, "menu_importa_info")
+
+    rendered = w.recorder.snapshot("harness.seed_commands").render()
+    lines = rendered.splitlines()
+    assert lines[4:7] == [
+        '## step 1: seed "\\"/digest_mode on\\""',
+        '## step 2: seed "\\"/menu\\""',
+        '## step 3: seed "press \\"menu_dati\\""',
+    ]
+    assert "-> sendMessage chat=10" not in lines
+    assert "Digest mode on" not in rendered
+    assert f'## step 4: press "menu_importa_info" user=10 on={menu.message_id}' in lines
+    step4_db = rendered.split("## db after step 4\n", 1)[1].splitlines()
+    assert not any("notification_prefs" in line for line in step4_db)
+
+
+async def test_h5_photo_size_out_of_bounds_is_a_violation(frozen_world: LegacyWorld) -> None:
+    """A photo under 1 KiB or over 2 MiB is recorded as a violation, never raised."""
+    w = frozen_world
+    bot = w.app.bot
+
+    def png(size: int) -> BytesIO:
+        return BytesIO(PNG_MAGIC + b"\0" * (size - len(PNG_MAGIC)))
+
+    async def photos() -> None:
+        for size in (1023, 1024, 2 * 1024 * 1024, 2 * 1024 * 1024 + 1):
+            await bot.send_photo(chat_id=OWNER, photo=png(size))
+
+    await w.recorder.capture("photo sizes", photos())
+    assert w.request.violations == [
+        "sendPhoto: photo size 1023 bytes out of 1024..2097152",
+        "sendPhoto: photo size 2097153 bytes out of 1024..2097152",
+    ]
+    w.request.violations.clear()
+    lines = w.recorder.snapshot("harness.photo_sizes").render().splitlines()
+    heads = "-> sendPhoto chat=10 photo=png filename=application.octet-stream"
+    assert lines.count(heads) == 4
+
+
 async def _unscripted_add(w: LegacyWorld) -> None:
     await w.recorder.command(OWNER, "/add https://shop.example.com/item/77")
 

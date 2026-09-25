@@ -15,29 +15,41 @@ offline stubs, and the clock is frozen at ``FROZEN_NOW`` for the whole scenario.
 
 from __future__ import annotations
 
+import difflib
 import enum
 import gettext
 import hashlib
+import importlib.metadata
+import itertools
 import json
+import os
+import platform
 import re
 import socket
+import sqlite3
 import time
+import warnings
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
+from decimal import Decimal
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar, Final, Literal
+from typing import IO, TYPE_CHECKING, Any, ClassVar, Final, Literal
 from urllib.parse import urlparse
 
 import httpx
+import pytest
 from prometheus_client import CollectorRegistry
+from telegram import Update
+from telegram.ext import CallbackContext
 
-from price_tracker.bot.handlers import register_handlers
+from price_tracker.bot.handlers import error_handler, register_handlers
 from price_tracker.bot.messages import get_translation
 from price_tracker.config import Config
 from price_tracker.core.health import HealthManager
 from price_tracker.core.registry import ScraperRegistry
 from price_tracker.core.scheduler import Scheduler, SchedulerDeps
 from price_tracker.core.scraper_base import AbstractScraper
+from price_tracker.core.url_utils import extract_etld_plus_one
 from price_tracker.db.repository import Repository
 from price_tracker.main import bootstrap_database
 from price_tracker.notifier.digest import DigestService
@@ -55,9 +67,7 @@ if TYPE_CHECKING:
     from collections.abc import Awaitable, Mapping, Sequence
 
     import aiosqlite
-    import pytest
-    from telegram import Update
-    from telegram.ext import Application, CallbackContext
+    from telegram.ext import Application
     from telegram.request import RequestData
 
     from price_tracker.core.scraper_base import ProductInfo
@@ -74,6 +84,8 @@ STRANGER: Final = 12
 
 LOCALES: Final = ("it",)
 PNG_MAGIC: Final = b"\x89PNG\r\n\x1a\n"
+PHOTO_BYTES: Final = (1024, 2 * 1024 * 1024)
+"""Inclusive size bounds of an uploaded photo; outside them is a ``violations`` entry."""
 SNAPSHOT_ROOT: Final = Path(__file__).resolve().parents[1] / "snapshots" / "legacy"
 
 JobName = Literal["run_check_all", "digest_flush_due"]
@@ -86,6 +98,23 @@ FIXTURE_HTML: Final = (
 NOW_TOLERANCE_SECONDS: Final = 600
 """A database timestamp this close to the real clock was written by SQLite's ``now``."""
 
+WALL_CLOCK_GUARD_SECONDS: Final = 86400
+"""A timestamp in captured text closer than this to the real clock fails the step."""
+
+GENERATED_WITH: Final = "_generated_with.txt"
+"""Bookkeeping file, under the snapshot root, naming the environment of the last update."""
+
+RENDERING_DISTRIBUTIONS: Final = (
+    "python-telegram-bot",
+    "aiosqlite",
+    "httpx",
+    "freezegun",
+    "matplotlib",
+    "tldextract",
+    "babel",
+)
+"""Libraries whose version can change a rendering, recorded in ``GENERATED_WITH``."""
+
 # A known message and its translation per locale: the catalogue canary.
 _CANARY_MSGID: Final = "❌ Product not found."
 _CANARY: Final[dict[str, str]] = {"it": "❌ Prodotto non trovato."}
@@ -95,6 +124,14 @@ _DB_TIMESTAMP_RE: Final = re.compile(
     r"([0-9]{4})-([0-9]{2})-([0-9]{2})[ T]([0-9]{2}):([0-9]{2}):([0-9]{2})"
     r"(?:\.([0-9]+))?(Z|\+00:00)?"
 )
+# A timestamp inside captured text: seconds optional, any UTC offset.
+_WALL_CLOCK_RE: Final = re.compile(
+    r"(?<![0-9])([0-9]{4})-([0-9]{2})-([0-9]{2})[ T]([0-9]{2}):([0-9]{2})"
+    r"(?::([0-9]{2})(?:\.([0-9]+))?)?(Z|[+-][0-9]{2}:?[0-9]{2})?"
+)
+_NEGATIVE_RELATIVE_RE: Final = re.compile(r"-[0-9]+(?:min|h|g) fa")
+# Update and message ids of documents; like the fake's own counters, never rendered.
+_update_ids = itertools.count(900_000)
 
 
 class _Unset(enum.Enum):
@@ -190,7 +227,16 @@ class RecordingRequest(FakeRequest):
 
     def upload(self, file_id: str, content: bytes) -> None:
         """Register ``content`` as the bytes of the Telegram file ``file_id``."""
-        raise NotImplementedError
+        self._uploads[file_id] = bytes(content)
+
+    def _uploaded(self, file_id: str) -> bytes:
+        """The bytes registered for ``file_id``; a never-uploaded id is a harness fault."""
+        content = self._uploads.get(file_id)
+        if content is None:
+            fault = HarnessFault(f"file {file_id!r} was never uploaded with world.upload")
+            self.faults.append(fault)
+            raise fault
+        return content
 
     async def do_request(
         self,
@@ -203,9 +249,35 @@ class RecordingRequest(FakeRequest):
         pool_timeout: Any = None,
     ) -> tuple[int, bytes]:
         """Serve a file download for ``GET``; otherwise record the call and its uploads."""
-        return await super().do_request(
+        if method == "GET":
+            return 200, self._uploaded(url.rstrip("/").rsplit("/", 1)[-1])
+        first_call = len(self.calls)
+        answer = await super().do_request(
             url, method, request_data, read_timeout, write_timeout, connect_timeout, pool_timeout
         )
+        if request_data is not None and len(self.calls) > first_call:
+            files = {
+                name: (filename, _read_content(content), mimetype)
+                for name, (filename, content, mimetype) in request_data.multipart_data.items()
+            }
+            if files:
+                index = len(self.calls) - 1
+                self.files_by_call[index] = files
+                self._check_photo_size(self.calls[index].method, files)
+        return answer
+
+    def _check_photo_size(
+        self, api_method: str, files: Mapping[str, tuple[str, bytes, str]]
+    ) -> None:
+        """Record a photo outside ``PHOTO_BYTES`` as a violation (never raised here)."""
+        photo = files.get("photo")
+        if api_method != "sendPhoto" or photo is None:
+            return
+        size = len(photo[1])
+        if not PHOTO_BYTES[0] <= size <= PHOTO_BYTES[1]:
+            self.violations.append(
+                f"sendPhoto: photo size {size} bytes out of {PHOTO_BYTES[0]}..{PHOTO_BYTES[1]}"
+            )
 
     def _result(self, api_method: str, params: dict[str, Any]) -> Any:
         """A ``File`` for ``getFile``; otherwise the answer of ``FakeRequest``.
@@ -213,12 +285,30 @@ class RecordingRequest(FakeRequest):
         A sent message echoes only an inline keyboard, as Telegram does: any other
         ``reply_markup`` is not part of the returned ``Message``.
         """
+        if api_method == "getFile":
+            file_id = str(params["file_id"])
+            return {
+                "file_id": file_id,
+                "file_unique_id": f"u{file_id}",
+                "file_size": len(self._uploaded(file_id)),
+                "file_path": f"documents/{file_id}",
+            }
         result = super()._result(api_method, params)
         if isinstance(result, dict):
             markup = result.get("reply_markup")
             if isinstance(markup, dict) and "inline_keyboard" not in markup:
                 del result["reply_markup"]
         return result
+
+
+def _read_content(content: bytes | IO[bytes]) -> bytes:
+    """The bytes of a multipart part; a file handle is read and rewound."""
+    if isinstance(content, bytes):
+        return content
+    position = content.tell()
+    data = content.read()
+    content.seek(position)
+    return data
 
 
 @dataclass(frozen=True)
@@ -256,6 +346,7 @@ class LegacyWorld:
     faults: list[HarnessFault]
     dns_lookups: list[str]
     recorder: Recorder = field(init=False)
+    _uploads_made: int = field(default=0, init=False)
 
     def __post_init__(self) -> None:
         self.recorder = Recorder(self)
@@ -266,7 +357,11 @@ class LegacyWorld:
         File ids are ``doc1``, ``doc2``... in upload order, a counter shared with
         ``Recorder.document``; ``filename`` is the name the document carries.
         """
-        raise NotImplementedError
+        del filename
+        self._uploads_made += 1
+        file_id = f"doc{self._uploads_made}"
+        self.request.upload(file_id, data)
+        return file_id
 
     async def process(self, update: Update) -> None:
         """Process ``update`` through the application, as Telegram delivery would."""
@@ -548,19 +643,73 @@ async def seed_product(
     ``Repository.pause_product`` (a manual pause, as ``/pausa``). ``history`` inserts
     ``price_history`` rows with an explicit ``checked_at``.
     """
-    raise NotImplementedError
+    product_id = await world.repo.add_product(
+        user_id=owner,
+        url=url,
+        name=name,
+        domain=extract_etld_plus_one(url),
+        initial_price=Decimal(initial),
+        currency=currency,
+        threshold_type=threshold[0],
+        threshold_value=Decimal(threshold[1]),
+    )
+    assignments: list[str] = []
+    values: list[object] = []
+    for column, price in (
+        ("current_price", current),
+        ("lowest_price", lowest),
+        ("highest_price", highest),
+    ):
+        if price is not UNSET:
+            assignments.append(f"{column} = ?")
+            values.append(price)
+    state: tuple[tuple[str, object], ...] = (
+        ("target_price", target),
+        ("check_interval_minutes", check_interval),
+        ("last_checked_at", last_checked_at),
+        ("consecutive_errors", errors),
+        ("last_error", last_error),
+        ("last_error_at", last_error_at),
+        ("is_available", int(available)),
+    )
+    assignments.extend(f"{column} = ?" for column, _ in state)
+    values.extend(value for _, value in state)
+    await world.conn.execute(
+        f"UPDATE products SET {', '.join(assignments)} WHERE id = ?", (*values, product_id)
+    )
+    await world.conn.executemany(
+        "INSERT INTO price_history(product_id, price, checked_at) VALUES(?, ?, ?)",
+        [(product_id, price, checked_at) for checked_at, price in history],
+    )
+    await world.conn.commit()
+    if not active:
+        await world.repo.pause_product(product_id)
+    return product_id
 
 
 async def reanchor(
     world: LegacyWorld, table: str, pk: dict[str, object], column: str, value: object
 ) -> None:
-    """Seed ``UPDATE``: set ``column`` to ``value`` on the row of ``table`` matching ``pk``."""
-    raise NotImplementedError
+    """Seed ``UPDATE``: set ``column`` to ``value`` on the row of ``table`` matching ``pk``.
+
+    Exactly one row must match (``IS`` comparison, so a NULL key part matches NULL);
+    anything else is a ``HarnessFault``.
+    """
+    if not pk:
+        raise HarnessFault(f"reanchor {table}.{column}: empty key")
+    where = " AND ".join(f"{_quote_identifier(name)} IS ?" for name in pk)
+    cursor = await world.conn.execute(
+        f"UPDATE {_quote_identifier(table)} SET {_quote_identifier(column)} = ? WHERE {where}",
+        (value, *pk.values()),
+    )
+    await world.conn.commit()
+    if cursor.rowcount != 1:
+        raise HarnessFault(f"reanchor {table} {pk}: {cursor.rowcount} rows matched, expected 1")
 
 
 async def seed_config(world: LegacyWorld, key: str, value: str) -> None:
     """Seed a ``bot_config`` entry."""
-    raise NotImplementedError
+    await world.repo.set_config(key, value)
 
 
 def render_db_value(value: object, real_now: datetime) -> str:
@@ -586,6 +735,23 @@ def render_db_value(value: object, real_now: datetime) -> str:
         shape = "".join("9" if "0" <= ch <= "9" else ch for ch in text)
         return f"<now:{shape}>"
     return json.dumps(text, ensure_ascii=False)
+
+
+def _text_timestamp(match: re.Match[str]) -> datetime | None:
+    """The instant of a ``_WALL_CLOCK_RE`` match (naive means UTC), else ``None``."""
+    year, month, day, hour, minute = (int(part) for part in match.groups()[:5])
+    second = int(match.group(6) or 0)
+    microsecond = int(((match.group(7) or "") + "000000")[:6])
+    offset = match.group(8)
+    try:
+        zone = UTC
+        if offset and offset != "Z":
+            digits = offset[1:].replace(":", "")
+            delta = timedelta(hours=int(digits[:2]), minutes=int(digits[2:]))
+            zone = timezone(-delta if offset[0] == "-" else delta)
+        return datetime(year, month, day, hour, minute, second, microsecond, tzinfo=zone)
+    except ValueError:
+        return None
 
 
 def _db_timestamp(text: str) -> datetime | None:
@@ -892,15 +1058,64 @@ class Recorder:
 
     async def document(self, user: int, filename: str, content: bytes) -> None:
         """Send ``content`` as a CSV document named ``filename`` from ``user``."""
-        raise NotImplementedError
+        world = self._world
+        file_id = world.upload(filename, content)
+        payload = {
+            "update_id": next(_update_ids),
+            "message": {
+                "message_id": next(_update_ids),
+                "date": int(datetime.now(tz=UTC).timestamp()),
+                "chat": {"id": user, "type": "private"},
+                "from": {
+                    "id": user,
+                    "is_bot": False,
+                    "first_name": f"U{user}",
+                    "language_code": world.locale,
+                },
+                "document": {
+                    "file_id": file_id,
+                    "file_unique_id": f"u{file_id}",
+                    "file_name": filename,
+                    "mime_type": "text/csv",
+                    "file_size": len(content),
+                },
+            },
+        }
+        update = Update.de_json(payload, world.app.bot)
+        assert update is not None
+        await self._captured(
+            f"document {_quote(filename)} ({len(content)} bytes) user={user}",
+            world.process(update),
+        )
 
     async def job(self, name: JobName, **kw: int) -> None:
         """Run a scheduler job directly (``run_check_all`` or ``digest_flush_due``)."""
-        raise NotImplementedError
+        world = self._world
+        action: Awaitable[object]
+        if name == "run_check_all":
+            if kw:
+                raise TypeError(f"run_check_all takes no arguments, got {sorted(kw)}")
+            action = world.scheduler.run_check_all()
+        elif name == "digest_flush_due":
+            action = world.digest.flush_due(interval_minutes=kw["interval_minutes"])
+        else:
+            raise ValueError(f"unknown job {name!r}")
+        arguments = ", ".join(f"{key}={value}" for key, value in sorted(kw.items()))
+        await self._captured(f"job {name}({arguments})" if kw else f"job {name}", action)
 
     async def call_error_handler(self, user: int, exc: BaseException) -> None:
         """Call the application's error handler with ``exc`` for an update from ``user``."""
-        raise NotImplementedError
+        if not isinstance(exc, Exception):
+            raise TypeError(f"the error handler only receives exceptions, not {exc!r}")
+        world = self._world
+        update = message_update(world.app.bot, user, user, "error", language_code=world.locale)
+        context: CallbackContext[Any, Any, Any, Any] = CallbackContext.from_error(
+            update, exc, world.app
+        )
+        await self._captured(
+            f"call error_handler {type(exc).__name__}({_quote(str(exc))}) user={user}",
+            error_handler(update, context),
+        )
 
     async def seed(self, label: str, coro: Awaitable[object]) -> None:
         """Run ``coro`` as a listed but uncaptured step: no calls and no diff rendered."""
@@ -954,8 +1169,29 @@ class Recorder:
             raise HarnessFault(f"step {step}: harness fault: {reasons}")
 
     def _check_guards(self, step: int, texts: Sequence[str]) -> None:
-        """Wall-clock guards on the captured texts (not implemented yet)."""
-        del step, texts
+        """Refuse captured text that depends on the wall clock (guards G1 and G2).
+
+        G1: an absolute timestamp less than a day from the real clock; G2: a
+        negative relative time. Nothing in a text is normalized: such a text needs
+        seeded data instead.
+        """
+        real_now = self._world.real_now
+        for text in texts:
+            for match in _WALL_CLOCK_RE.finditer(text):
+                instant = _text_timestamp(match)
+                if instant is None:
+                    continue
+                if abs((instant - real_now).total_seconds()) < WALL_CLOCK_GUARD_SECONDS:
+                    raise NonDeterministicOutput(
+                        f"step {step}: timestamp {match.group(0)!r} is near the real clock "
+                        f"in captured text {text[:200]!r}"
+                    )
+            relative = _NEGATIVE_RELATIVE_RE.search(text)
+            if relative is not None:
+                raise NonDeterministicOutput(
+                    f"step {step}: negative relative time {relative.group(0)!r} "
+                    f"in captured text {text[:200]!r}"
+                )
 
     def _new_errors(self) -> list[str]:
         """Render and consume the handler errors raised since the last step."""
@@ -1000,4 +1236,80 @@ class Snapshot:
         path, the unified diff and the command that recreates it, whose node id is
         read from ``PYTEST_CURRENT_TEST`` (the part before its last space).
         """
-        return None  # contract stub: neither compares nor writes
+        update = os.environ.get("LEGACY_SNAPSHOTS_UPDATE") == "1"
+        if update and os.environ.get("CI"):
+            raise RuntimeError("refusing to rewrite legacy snapshots under CI (CI is set)")
+        actual = self.render()
+        expected = path.read_text(encoding="utf-8") if path.is_file() else None
+        if update:
+            if expected != actual:
+                _write_if_changed(path, actual)
+                warnings.warn(LegacySnapshotUpdated(path), stacklevel=2)
+            _write_if_changed(root / GENERATED_WITH, _generated_with())
+            return
+        command = f"LEGACY_SNAPSHOTS_UPDATE=1 pytest '{_current_test_node()}'"
+        if expected is None:
+            pytest.fail(f"missing snapshot {path}\nrun: {command} to create it")
+        if expected != actual:
+            diff = "".join(
+                difflib.unified_diff(
+                    expected.splitlines(keepends=True),
+                    actual.splitlines(keepends=True),
+                    fromfile=str(path),
+                    tofile="actual",
+                )
+            )
+            pytest.fail(
+                f"snapshot differs: {path}\n{diff}{_version_drift(root)}run: {command} to update it"
+            )
+
+
+def _write_if_changed(path: Path, content: str) -> None:
+    """Write ``content`` to ``path`` (UTF-8, LF) unless it already holds exactly that."""
+    if path.is_file() and path.read_text(encoding="utf-8") == content:
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8", newline="\n")
+
+
+def _current_test_node() -> str:
+    """The node id of the running test, from ``PYTEST_CURRENT_TEST``."""
+    current = os.environ.get("PYTEST_CURRENT_TEST", "")
+    return current.rsplit(" ", 1)[0] if current else "tests/integration/test_legacy_snapshots.py"
+
+
+def _environment() -> dict[str, str]:
+    """Versions of Python, SQLite and every library that shapes a rendering."""
+    versions = {"python": platform.python_version(), "sqlite": sqlite3.sqlite_version}
+    for distribution in RENDERING_DISTRIBUTIONS:
+        try:
+            versions[distribution] = importlib.metadata.version(distribution)
+        except importlib.metadata.PackageNotFoundError:
+            versions[distribution] = "absent"
+    return versions
+
+
+def _generated_with() -> str:
+    """The content of ``_generated_with.txt``: one ``name==version`` line each."""
+    return "".join(f"{name}=={version}\n" for name, version in _environment().items())
+
+
+def _version_drift(root: Path) -> str:
+    """The versions that differ from the ones the snapshots were generated with."""
+    recorded_file = root / GENERATED_WITH
+    if not recorded_file.is_file():
+        return ""
+    recorded: dict[str, str] = {}
+    for line in recorded_file.read_text(encoding="utf-8").splitlines():
+        name, separator, version = line.partition("==")
+        if separator:
+            recorded[name] = version
+    drift = [
+        f"  {name}: generated with {recorded.get(name, 'unknown')}, running {version}"
+        for name, version in _environment().items()
+        if recorded.get(name) != version
+    ]
+    if not drift:
+        return ""
+    lines = "\n".join(drift)
+    return f"environment differs from the one that generated the snapshots:\n{lines}\n"
