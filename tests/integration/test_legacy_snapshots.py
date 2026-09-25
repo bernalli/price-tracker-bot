@@ -47,6 +47,7 @@ from telegram.ext import CommandHandler
 from price_tracker.bot import messages
 from price_tracker.bot.handlers import register_handlers
 from price_tracker.bot.handlers.debug import status_command
+from price_tracker.core.exceptions import ParseError
 from price_tracker.core.scraper_base import ProductInfo
 from tests.support.fake_telegram import Call, FakeRequest, make_application
 from tests.support.legacy_harness import (
@@ -1717,6 +1718,227 @@ async def scenario_menu_unknown_callback(w: LegacyWorld) -> None:
 @scenario("menu.not_allowed_user")
 async def scenario_menu_not_allowed_user(w: LegacyWorld) -> None:
     await w.recorder.press(STRANGER, "menu_main")
+
+
+# product ──────────────────────────────────────────────────────────────
+
+
+@scenario("product.edit")
+async def scenario_product_edit(w: LegacyWorld) -> None:
+    p1 = await seed_p1(w)
+    await w.recorder.command(OWNER, "/lista")
+    await w.recorder.press(OWNER, f"edit_{p1}")
+
+
+@scenario("product.edit_no_reset")
+async def scenario_product_edit_no_reset(w: LegacyWorld) -> None:
+    p1 = await seed_p1(w, current="100.00")
+    await w.recorder.command(OWNER, "/lista")
+    await w.recorder.press(OWNER, f"edit_{p1}")
+
+
+@scenario("product.edit_not_found")
+async def scenario_product_edit_not_found(w: LegacyWorld) -> None:
+    await seed_p1(w)
+    await w.recorder.command(OWNER, "/lista")
+    await w.recorder.press(OWNER, "edit_999")
+    await w.recorder.press(OWNER, "edit_abc")
+
+
+@scenario("product.ownership")
+async def scenario_product_ownership(w: LegacyWorld) -> None:
+    await seed_p1(w)
+    p3 = await seed_p3(w)
+    await w.recorder.press(OWNER, f"edit_{p3}")
+    await w.recorder.press(ADMIN, f"edit_{p3}")
+
+
+@scenario("product.pause_button")
+async def scenario_product_pause_button(w: LegacyWorld) -> None:
+    p1 = await seed_p1(w)
+    await w.recorder.command(OWNER, "/lista")
+    await w.recorder.press(OWNER, f"pause_{p1}")
+
+
+@scenario("product.remove_button")
+async def scenario_product_remove_button(w: LegacyWorld) -> None:
+    p1 = await seed_p1(w)
+    await w.recorder.command(OWNER, "/lista")
+    await w.recorder.press(OWNER, f"remove_{p1}")
+
+
+@scenario("product.confirm_delete")
+async def scenario_product_confirm_delete(w: LegacyWorld) -> None:
+    p1 = await seed_p1(w)
+    await w.recorder.command(OWNER, "/lista")
+    await w.recorder.press(OWNER, f"remove_{p1}")
+    await w.recorder.press(OWNER, f"confirm_delete_{p1}")
+
+
+@scenario("product.confirm_delete_not_found")
+async def scenario_product_confirm_delete_not_found(w: LegacyWorld) -> None:
+    await seed_p1(w)
+    await w.recorder.press(OWNER, "confirm_delete_999")
+    await w.recorder.press(OWNER, "confirm_delete_x")
+
+
+@scenario("product.cancel_delete")
+async def scenario_product_cancel_delete(w: LegacyWorld) -> None:
+    p1 = await seed_p1(w)
+    await w.recorder.command(OWNER, "/lista")
+    await w.recorder.press(OWNER, f"remove_{p1}")
+    await w.recorder.press(OWNER, "cancel_delete")
+
+
+@scenario("product.delete_all_prompt")
+async def scenario_product_delete_all_prompt(w: LegacyWorld) -> None:
+    await seed_p1(w)
+    await seed_p2(w)
+    await w.recorder.command(OWNER, "/lista")
+    await w.recorder.press(OWNER, "delete_all")
+
+
+@scenario("product.delete_all_empty")
+async def scenario_product_delete_all_empty(w: LegacyWorld) -> None:
+    await w.recorder.press(OWNER, "delete_all")
+
+
+@scenario("product.confirmdeleteall")
+async def scenario_product_confirmdeleteall(w: LegacyWorld) -> None:
+    await seed_p1(w)
+    await seed_p2(w)
+    await seed_pp(w)
+    await w.recorder.command(OWNER, "/lista")
+    await w.recorder.press(OWNER, "delete_all")
+    await w.recorder.press(OWNER, "confirmdeleteall")
+
+
+@scenario("product.reset_button")
+async def scenario_product_reset_button(w: LegacyWorld) -> None:
+    p1 = await seed_p1(w)
+    await w.recorder.command(OWNER, "/lista")
+    await w.recorder.press(OWNER, f"edit_{p1}")
+    await w.recorder.press(OWNER, f"reset_{p1}")
+
+
+@scenario("product.reset_button_no_current")
+async def scenario_product_reset_button_no_current(w: LegacyWorld) -> None:
+    p2 = await seed_p2(w)
+    await w.recorder.press(OWNER, f"reset_{p2}")
+
+
+@scenario("product.reactivate_button")
+async def scenario_product_reactivate_button(w: LegacyWorld) -> None:
+    pp = await seed_pp(w)
+    await w.recorder.command(OWNER, "/riattiva")
+    await w.recorder.press(OWNER, f"reactivate_{pp}")
+
+
+@scenario("product.check_button_drop")
+async def scenario_product_check_button_drop(w: LegacyWorld) -> None:
+    p1 = await seed_p1(w)
+    script_drop(w)
+    await w.recorder.command(OWNER, "/lista")
+    await w.recorder.press(OWNER, f"check_{p1}")
+
+
+@scenario("product.check_button_no_change")
+async def scenario_product_check_button_no_change(w: LegacyWorld) -> None:
+    p1 = await seed_p1(w)
+    w.scraper.script(KETTLE_URL, info("80.00"))
+    await w.recorder.command(OWNER, "/lista")
+    await w.recorder.press(OWNER, f"check_{p1}")
+
+
+@scenario("product.check_button_scrape_error")
+async def scenario_product_check_button_scrape_error(w: LegacyWorld) -> None:
+    p1 = await seed_p1(w)
+    w.scraper.script(KETTLE_URL, ParseError("no price"))
+    await w.recorder.command(OWNER, "/lista")
+    await w.recorder.press(OWNER, f"check_{p1}")
+
+
+@scenario("product.check_button_not_found")
+async def scenario_product_check_button_not_found(w: LegacyWorld) -> None:
+    await seed_p1(w)
+    await w.recorder.press(OWNER, "check_999")
+    await w.recorder.press(OWNER, "check_x")
+
+
+@scenario("product.chart_button")
+async def scenario_product_chart_button(w: LegacyWorld) -> None:
+    p1 = await seed_p1(w)
+    await w.recorder.command(OWNER, "/lista")
+    await w.recorder.press(OWNER, f"chart_{p1}")
+
+
+@scenario("product.chart_insufficient")
+async def scenario_product_chart_insufficient(w: LegacyWorld) -> None:
+    p2 = await seed_p2(w, history=[("2026-02-01 10:00:00", "50.00")])
+    await w.recorder.press(OWNER, f"chart_{p2}")
+
+
+@scenario("product.pref_buttons")
+async def scenario_product_pref_buttons(w: LegacyWorld) -> None:
+    p1 = await seed_p1(w)
+    for prefix in ("pref_new_", "pref_used_", "pref_amazon_", "pref_anyseller_", "pref_default_"):
+        await w.recorder.press(OWNER, f"{prefix}{p1}")
+
+
+@scenario("product.pref_invalid_id")
+async def scenario_product_pref_invalid_id(w: LegacyWorld) -> None:
+    p1 = await seed_p1(w)
+    await w.recorder.press(OWNER, "pref_new_x")
+    await w.recorder.press(OTHER, f"pref_new_{p1}")
+
+
+@scenario("product.track_any")
+async def scenario_product_track_any(w: LegacyWorld) -> None:
+    p1 = await seed_p1(w)
+    await w.recorder.press(OWNER, f"track_any_{p1}")
+    await w.recorder.press(OTHER, f"track_any_{p1}")
+    await w.recorder.press(OWNER, "track_any_999")
+
+
+@scenario("product.track_default")
+async def scenario_product_track_default(w: LegacyWorld) -> None:
+    p1 = await seed_p1(w, threshold=("absolute", "5"))
+    await w.recorder.press(OWNER, f"track_default_{p1}")
+    await w.recorder.press(OTHER, f"track_default_{p1}")
+
+
+@scenario("product.cmd_delete")
+async def scenario_product_cmd_delete(w: LegacyWorld) -> None:
+    p1 = await seed_p1(w)
+    p2 = await seed_p2(w)
+    await w.recorder.command(OWNER, "/elimina")
+    await w.recorder.command(OWNER, f"/elimina {p1}")
+    await w.recorder.command(OWNER, "/elimina abc")
+    await w.recorder.command(OWNER, "/elimina 999")
+    await w.recorder.command(OWNER, f"/delete {p2}")
+
+
+@scenario("product.cmd_delete_empty")
+async def scenario_product_cmd_delete_empty(w: LegacyWorld) -> None:
+    await w.recorder.command(OWNER, "/elimina")
+
+
+@scenario("product.cmd_target")
+async def scenario_product_cmd_target(w: LegacyWorld) -> None:
+    p1 = await seed_p1(w)
+    await w.recorder.command(OWNER, "/target")
+    for args in (f"{p1}", f"{p1} 49,90", f"{p1} 90", f"{p1} 0", f"{p1} abc", "abc 1", "999 1"):
+        await w.recorder.command(OWNER, f"/target {args}")
+
+
+@scenario("product.cmd_threshold")
+async def scenario_product_cmd_threshold(w: LegacyWorld) -> None:
+    p1 = await seed_p1(w)
+    await w.recorder.command(OWNER, "/soglia")
+    for args in (f"{p1}", f"{p1} 20%", f"{p1} 50", f"{p1} ogni"):
+        await w.recorder.command(OWNER, f"/soglia {args}")
+    await w.recorder.command(OWNER, f"/threshold {p1} abc")
+    await w.recorder.command(OWNER, "/soglia 999 5")
 
 
 # ── T-S: scenarios ───────────────────────────────────────────────────

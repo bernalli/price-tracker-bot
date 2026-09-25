@@ -1,0 +1,11 @@
+# legacy snapshot v1
+# scenario: product.chart_insufficient
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: press "chart_1" user=10 on=1 synthetic
+-> answerCallbackQuery
+-> sendMessage chat=10
+   text:
+   | 📭 Dati insufficienti per generare il grafico (servono almeno 2 punti).
+## db after step 1
+(no changes)

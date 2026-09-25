@@ -1,0 +1,11 @@
+# legacy snapshot v1
+# scenario: product.reset_button_no_current
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: press "reset_1" user=10 on=1 synthetic
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1
+   text:
+   | ❌ Impossibile aggiornare.
+## db after step 1
+(no changes)
