@@ -1,0 +1,14 @@
+# legacy snapshot v1
+# scenario: alert.digest_flush_quiet
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: seed "\"/digest_mode on\""
+## step 2: seed "\"/timezone Europe/Rome\""
+## step 3: seed "\"/quiet_hours 12:00-15:00\""
+## step 4: seed "job run_check_all"
+## step 5: seed "reanchor enqueued_at"
+## step 6: seed "reanchor enqueued_at"
+## step 7: job digest_flush_due(interval_minutes=60)
+(no calls)
+## db after step 7
+(no changes)

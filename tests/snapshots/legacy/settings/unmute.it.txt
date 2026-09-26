@@ -35,3 +35,9 @@
    | Usage: /unmute [product_id|all]
 ## db after step 5
 (no changes)
+## step 6: command "/unmute 999" user=10
+-> sendMessage chat=10
+   text:
+   | ❌ Prodotto non trovato.
+## db after step 6
+(no changes)

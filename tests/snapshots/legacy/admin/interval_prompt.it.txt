@@ -37,3 +37,20 @@
    | ✅ Intervallo aggiornato: <b>ogni 1 ore</b>
 ## db after step 5
 + bot_config key="check_interval_minutes" {value="60"}
+## step 6: press "menu_admin_interval" user=1 on=1 synthetic
+-> answerCallbackQuery
+-> editMessageText chat=1 message_id=1
+   param parse_mode="HTML"
+   text:
+   | ⏱ <b>Intervallo globale</b>
+   |
+   | Scrivi i minuti (es. <code>60</code>, <code>360</code>):
+## db after step 6
+(no changes)
+## step 7: text "30" user=1
+-> sendMessage chat=1
+   param parse_mode="HTML"
+   text:
+   | ✅ Intervallo aggiornato: <b>ogni 30 minuti</b>
+## db after step 7
+~ bot_config key="check_interval_minutes" value: "60" -> "30"

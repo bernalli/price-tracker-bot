@@ -37,3 +37,10 @@
    | ❌ Valore non valido.
 ## db after step 5
 (no changes)
+## step 6: command "/intervallo 30" user=1
+-> sendMessage chat=1
+   param parse_mode="HTML"
+   text:
+   | ✅ Intervallo aggiornato: <b>ogni 30 minuti</b>
+## db after step 6
+~ bot_config key="check_interval_minutes" value: "120" -> "30"

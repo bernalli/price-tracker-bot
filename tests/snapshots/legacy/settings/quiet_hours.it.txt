@@ -39,3 +39,15 @@
 ## db after step 6
 ~ notification_prefs user_id=10,product_id=NULL quiet_hours_start: "22:00" -> NULL
 ~ notification_prefs user_id=10,product_id=NULL quiet_hours_end: "08:00" -> NULL
+## step 7: command "/quiet_hours 2200" user=10
+-> sendMessage chat=10
+   text:
+   | Format: HH:MM-HH:MM (e.g. 22:00-08:00)
+## db after step 7
+(no changes)
+## step 8: command "/quiet_hours ab:cd-08:00" user=10
+-> sendMessage chat=10
+   text:
+   | Invalid time format. Use 24h HH:MM.
+## db after step 8
+(no changes)

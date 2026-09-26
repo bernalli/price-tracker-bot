@@ -61,3 +61,15 @@
    | ❌ Prodotto non trovato.
 ## db after step 7
 (no changes)
+## step 8: command "/soglia abc 5" user=10
+-> sendMessage chat=10
+   text:
+   | ❌ ID non valido.
+## db after step 8
+(no changes)
+## step 9: command "/soglia 1 abc%" user=10
+-> sendMessage chat=10
+   text:
+   | ❌ Valore non valido: abc
+## db after step 9
+(no changes)

@@ -79,3 +79,9 @@
    | ❌ Prodotto non trovato.
 ## db after step 10
 (no changes)
+## step 11: command "/refresh abc 30" user=10
+-> sendMessage chat=10
+   text:
+   | ❌ ID non valido.
+## db after step 11
+(no changes)

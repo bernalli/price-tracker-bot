@@ -43,3 +43,20 @@
    | ❌ ID non valido.
 ## db after step 4
 (no changes)
+## step 5: press "admin_nick_10" user=1 on=1 synthetic
+-> answerCallbackQuery
+-> editMessageText chat=1 message_id=1
+   param parse_mode="HTML"
+   text:
+   | ✏️ <b>Nickname per 10</b>
+   | Attuale: Bob
+   |
+   | Scrivi il nuovo nickname:
+## db after step 5
+(no changes)
+## step 6: text "   " user=1
+-> sendMessage chat=1
+   text:
+   | ❌ Nickname vuoto.
+## db after step 6
+(no changes)

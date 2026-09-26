@@ -33,3 +33,15 @@
    | Duration must be a positive number of hours or 'forever'
 ## db after step 5
 (no changes)
+## step 6: command "/mute 999" user=10
+-> sendMessage chat=10
+   text:
+   | ❌ Prodotto non trovato.
+## db after step 6
+(no changes)
+## step 7: command "/mute all 48" user=10
+-> sendMessage chat=10
+   text:
+   | Muted all products until 2026-03-03T12:00:00+00:00.
+## db after step 7
+~ notification_prefs user_id=10,product_id=NULL mute_until: "2026-03-02T12:00:00+00:00" -> "2026-03-03T12:00:00+00:00"

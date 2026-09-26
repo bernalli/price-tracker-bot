@@ -1,0 +1,127 @@
+# legacy snapshot v1
+# scenario: alert.suspicious_drop
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: job run_check_all
+(no calls)
+## db after step 1
+~ products id=1 pending_read_price: NULL -> "40.00"
+~ products id=1 pending_read_count: 0 -> 1
+~ products id=1 pending_read_streak: 0 -> 1
+~ products id=2 pending_read_price: NULL -> "40.00"
+~ products id=2 pending_read_count: 0 -> 1
+~ products id=2 pending_read_streak: 0 -> 1
+~ products id=3 pending_read_price: NULL -> "40.00"
+~ products id=3 pending_read_count: 0 -> 1
+~ products id=3 pending_read_streak: 0 -> 1
++ scraper_health domain="example.com" {state="CLOSED", consecutive_blocks=0, locked_until=NULL, last_block_at=NULL, last_block_reason=NULL, last_success_at="2026-03-01T12:00:00+00:00", updated_at=<now:9999-99-99 99:99:99>}
+## step 2: job run_check_all
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | ⏳ <b>Controlli in errore su example.com</b> (1)
+   |
+   | 1 prodotti hanno fallito 1/2 controlli di fila. Se continua, verranno sospesi automaticamente.
+   |
+   | • <b>Kettle</b> — prezzo non leggibile
+   |
+   | Dettagli con /errori.
+   markup: {}
+## db after step 2
+~ products id=1 consecutive_errors: 0 -> 1
+~ products id=1 last_error: NULL -> "parse_error: no price"
+~ products id=1 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=1 pending_read_price: "40.00" -> NULL
+~ products id=1 pending_read_count: 1 -> 0
+~ products id=1 pending_read_streak: 1 -> 0
+~ products id=2 pending_read_price: "40.00" -> "30.00"
+~ products id=2 pending_read_streak: 1 -> 2
+~ products id=3 pending_read_price: "40.00" -> NULL
+~ products id=3 pending_read_count: 1 -> 0
+~ products id=3 pending_read_streak: 1 -> 0
+## step 3: job run_check_all
+(no calls)
+## db after step 3
+~ products id=1 consecutive_errors: 1 -> 0
+~ products id=1 pending_read_price: NULL -> "40.00"
+~ products id=1 pending_read_count: 0 -> 1
+~ products id=1 pending_read_streak: 0 -> 1
+~ products id=2 pending_read_price: "30.00" -> "40.00"
+~ products id=2 pending_read_streak: 2 -> 3
+## step 4: job run_check_all
+(no calls)
+## db after step 4
+~ products id=1 pending_read_price: "40.00" -> "40.50"
+~ products id=1 pending_read_count: 1 -> 2
+~ products id=1 pending_read_streak: 1 -> 2
+~ products id=2 pending_read_price: "40.00" -> "30.00"
+~ products id=2 pending_read_streak: 3 -> 4
+## step 5: job run_check_all
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | 📉 <b>Price drop!</b>
+   |
+   | <b>Kettle</b>
+   | <a href="https://shop.example.com/item/1">View product</a>
+   |
+   | Was: <s>80.00 €</s>
+   | Now: <b>40.00 €</b>
+   | Drop: -40.00 € (50.0%)
+## db after step 5
++ price_history id=16 {product_id=1, price="40.00", checked_at=<now:9999-99-99 99:99:99>}
+~ products id=1 current_price: "80.00" -> "40.00"
+~ products id=1 last_checked_at: "2026-03-01 10:00:00" -> <now:9999-99-99 99:99:99>
+~ products id=1 last_notified_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=1 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
+~ products id=1 lowest_price: "80.00" -> "40.00"
+~ products id=1 pending_alert_price: NULL -> "40.00"
+~ products id=1 pending_alert_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=1 pending_read_price: "40.50" -> NULL
+~ products id=1 pending_read_count: 2 -> 0
+~ products id=1 pending_read_streak: 2 -> 0
+~ products id=2 pending_read_price: "30.00" -> "40.00"
+~ products id=2 pending_read_streak: 4 -> 5
+## step 6: job run_check_all
+(no calls)
+## db after step 6
+~ products id=1 pending_read_price: NULL -> "40.00"
+~ products id=1 pending_read_count: 0 -> 1
+~ products id=1 pending_read_streak: 0 -> 1
+~ products id=2 pending_read_price: "40.00" -> "30.00"
+~ products id=2 pending_read_streak: 5 -> 6
+## step 7: job run_check_all
+(no calls)
+## db after step 7
+~ products id=1 pending_read_count: 1 -> 2
+~ products id=1 pending_read_streak: 1 -> 2
+~ products id=2 pending_read_price: "30.00" -> "40.00"
+~ products id=2 pending_read_streak: 6 -> 7
+## step 8: job run_check_all
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | 📉 <b>Price drop!</b>
+   |
+   | <b>Swinging</b>
+   | <a href="https://shop.example.com/item/4">View product</a>
+   |
+   | Was: <s>80.00 €</s>
+   | Now: <b>30.00 €</b>
+   | Drop: -50.00 € (62.5%)
+## db after step 8
++ price_history id=17 {product_id=1, price="40.00", checked_at=<now:9999-99-99 99:99:99>}
++ price_history id=18 {product_id=2, price="30.00", checked_at=<now:9999-99-99 99:99:99>}
+~ products id=1 pending_read_price: "40.00" -> NULL
+~ products id=1 pending_read_count: 2 -> 0
+~ products id=1 pending_read_streak: 2 -> 0
+~ products id=2 current_price: "80.00" -> "30.00"
+~ products id=2 last_checked_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=2 last_notified_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=2 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
+~ products id=2 lowest_price: "100.00" -> "30.00"
+~ products id=2 pending_alert_price: NULL -> "30.00"
+~ products id=2 pending_alert_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=2 pending_read_price: "40.00" -> NULL
+~ products id=2 pending_read_count: 1 -> 0
+~ products id=2 pending_read_streak: 7 -> 0

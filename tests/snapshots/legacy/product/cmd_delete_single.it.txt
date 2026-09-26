@@ -1,0 +1,13 @@
+# legacy snapshot v1
+# scenario: product.cmd_delete_single
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/elimina" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | 📦 <b>Scegli prodotto da eliminare:</b>
+   keyboard:
+   | [#1 Kettle €80.00 → remove_1]
+## db after step 1
+~ users user_id=10 display_name: NULL -> "U10"
