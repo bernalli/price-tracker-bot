@@ -20,7 +20,6 @@ if TYPE_CHECKING:
 from price_tracker.core.scraper_base import ProductInfo, jsonld_offer_availability
 from price_tracker.scrapers.aliexpress import AliexpressScraper
 from price_tracker.scrapers.ebay import EbayScraper
-from price_tracker.scrapers.nove25 import Nove25Scraper
 from price_tracker.scrapers.shopify import ShopifyScraper
 
 # ── jsonld_offer_availability helper ──────────────────────────────
@@ -138,7 +137,7 @@ async def test_shopify_no_availability_key_keeps_default_true() -> None:
     assert info.available is True
 
 
-# ── JSON-LD availability wiring (ebay / nove25 / aliexpress, #33c) ─
+# ── JSON-LD availability wiring (ebay / aliexpress, #33c) ─
 
 
 def _jsonld_html(availability: str | None, price: str = "120.00") -> str:
@@ -169,28 +168,6 @@ async def test_ebay_jsonld_without_availability_keeps_default_true() -> None:
         router.get("https://www.ebay.it/itm/124").respond(200, text=_jsonld_html(None))
         async with httpx.AsyncClient() as client:
             info = await EbayScraper().scrape("https://www.ebay.it/itm/124", client)
-    assert info.price == Decimal("120.00")
-    assert info.available is True
-
-
-@pytest.mark.asyncio
-async def test_nove25_jsonld_out_of_stock_marks_unavailable() -> None:
-    with respx.mock(assert_all_called=False) as router:
-        router.get("https://nove25.net/products/ring").respond(
-            200, text=_jsonld_html("https://schema.org/OutOfStock")
-        )
-        async with httpx.AsyncClient() as client:
-            info = await Nove25Scraper().scrape("https://nove25.net/products/ring", client)
-    assert info.price == Decimal("120.00")
-    assert info.available is False
-
-
-@pytest.mark.asyncio
-async def test_nove25_jsonld_without_availability_keeps_default_true() -> None:
-    with respx.mock(assert_all_called=False) as router:
-        router.get("https://nove25.net/products/ring2").respond(200, text=_jsonld_html(None))
-        async with httpx.AsyncClient() as client:
-            info = await Nove25Scraper().scrape("https://nove25.net/products/ring2", client)
     assert info.price == Decimal("120.00")
     assert info.available is True
 
