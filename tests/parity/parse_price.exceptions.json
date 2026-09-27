@@ -1,0 +1,2328 @@
+{
+ "schema": 1,
+ "function": "parse_price",
+ "subject": "price_tracker.core.pricegrammar:parse_price_text",
+ "count": 290,
+ "rows": [
+  {
+   "input": "$0.00",
+   "old": "0.00",
+   "new": null,
+   "kind": "loss",
+   "class": "zero",
+   "note": ""
+  },
+  {
+   "input": "$1,234",
+   "old": "1234",
+   "new": null,
+   "kind": "loss",
+   "class": "three_digit_ambiguity",
+   "note": ""
+  },
+  {
+   "input": "$12.345",
+   "old": "12345",
+   "new": null,
+   "kind": "loss",
+   "class": "three_digit_ambiguity",
+   "note": ""
+  },
+  {
+   "input": "(5)",
+   "old": "5",
+   "new": null,
+   "kind": "loss",
+   "class": "sign_or_exponent",
+   "note": ""
+  },
+  {
+   "input": "*12.99",
+   "old": "12.99",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "+5",
+   "old": "5",
+   "new": null,
+   "kind": "loss",
+   "class": "sign_or_exponent",
+   "note": ""
+  },
+  {
+   "input": ",99",
+   "old": "0.99",
+   "new": null,
+   "kind": "loss",
+   "class": "dangling_separator",
+   "note": ""
+  },
+  {
+   "input": "-12,50 €",
+   "old": "12.50",
+   "new": null,
+   "kind": "loss",
+   "class": "sign_or_exponent",
+   "note": ""
+  },
+  {
+   "input": "-5",
+   "old": "5",
+   "new": null,
+   "kind": "loss",
+   "class": "sign_or_exponent",
+   "note": ""
+  },
+  {
+   "input": ".12",
+   "old": "0.12",
+   "new": null,
+   "kind": "loss",
+   "class": "dangling_separator",
+   "note": ""
+  },
+  {
+   "input": "0",
+   "old": "0",
+   "new": null,
+   "kind": "loss",
+   "class": "zero",
+   "note": ""
+  },
+  {
+   "input": "0,00",
+   "old": "0.00",
+   "new": null,
+   "kind": "loss",
+   "class": "zero",
+   "note": ""
+  },
+  {
+   "input": "0,00 €",
+   "old": "0.00",
+   "new": null,
+   "kind": "loss",
+   "class": "zero",
+   "note": ""
+  },
+  {
+   "input": "0,219kr",
+   "old": "0.219",
+   "new": null,
+   "kind": "loss",
+   "class": "three_digit_ambiguity",
+   "note": ""
+  },
+  {
+   "input": "0.0",
+   "old": "0.0",
+   "new": null,
+   "kind": "loss",
+   "class": "zero",
+   "note": ""
+  },
+  {
+   "input": "0.00",
+   "old": "0.00",
+   "new": null,
+   "kind": "loss",
+   "class": "zero",
+   "note": ""
+  },
+  {
+   "input": "0.422,24 – 24,99",
+   "old": "4222424.99",
+   "new": null,
+   "kind": "loss",
+   "class": "second_number",
+   "note": ""
+  },
+  {
+   "input": "0.534",
+   "old": "0.534",
+   "new": null,
+   "kind": "loss",
+   "class": "three_digit_ambiguity",
+   "note": ""
+  },
+  {
+   "input": "0.810\u00a0DKK",
+   "old": "0.810",
+   "new": "810",
+   "kind": "value",
+   "class": "three_decimals",
+   "note": ""
+  },
+  {
+   "input": "0.999",
+   "old": "0.999",
+   "new": null,
+   "kind": "loss",
+   "class": "three_digit_ambiguity",
+   "note": ""
+  },
+  {
+   "input": "00",
+   "old": "0",
+   "new": null,
+   "kind": "loss",
+   "class": "zero",
+   "note": ""
+  },
+  {
+   "input": "0\u00a0406\u00a0025,08kr.",
+   "old": "40602508",
+   "new": "406025.08",
+   "kind": "value",
+   "class": "token_with_dot",
+   "note": ""
+  },
+  {
+   "input": "0\u00a0zł",
+   "old": "0",
+   "new": null,
+   "kind": "loss",
+   "class": "zero",
+   "note": ""
+  },
+  {
+   "input": "1 2 3",
+   "old": "123",
+   "new": null,
+   "kind": "loss",
+   "class": "second_number",
+   "note": ""
+  },
+  {
+   "input": "1 234\u00a0567",
+   "old": "1234567",
+   "new": null,
+   "kind": "loss",
+   "class": "second_number",
+   "note": ""
+  },
+  {
+   "input": "1 USD = 0.9 EUR",
+   "old": "10.9",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "1'234,567.89",
+   "old": "1234567.89",
+   "new": null,
+   "kind": "loss",
+   "class": "invalid_grouping",
+   "note": ""
+  },
+  {
+   "input": "1,",
+   "old": "1",
+   "new": null,
+   "kind": "loss",
+   "class": "dangling_separator",
+   "note": ""
+  },
+  {
+   "input": "1,164,921\u00a0CHF – 24,99",
+   "old": "116492124.99",
+   "new": null,
+   "kind": "loss",
+   "class": "second_number",
+   "note": ""
+  },
+  {
+   "input": "1,23,45",
+   "old": "123.45",
+   "new": null,
+   "kind": "loss",
+   "class": "invalid_grouping",
+   "note": ""
+  },
+  {
+   "input": "1,234,567,890.12",
+   "old": "1234567890.12",
+   "new": null,
+   "kind": "loss",
+   "class": "over_bound",
+   "note": ""
+  },
+  {
+   "input": "1.0e3",
+   "old": "1.03",
+   "new": null,
+   "kind": "loss",
+   "class": "sign_or_exponent",
+   "note": ""
+  },
+  {
+   "input": "1.234",
+   "old": "1234",
+   "new": null,
+   "kind": "loss",
+   "class": "three_digit_ambiguity",
+   "note": ""
+  },
+  {
+   "input": "1.234,567,890",
+   "old": "1234567.890",
+   "new": null,
+   "kind": "loss",
+   "class": "three_decimals_rejected",
+   "note": ""
+  },
+  {
+   "input": "1.234.567.890",
+   "old": "1234567890",
+   "new": null,
+   "kind": "loss",
+   "class": "over_bound",
+   "note": ""
+  },
+  {
+   "input": "1.299",
+   "old": "1299",
+   "new": null,
+   "kind": "loss",
+   "class": "three_digit_ambiguity",
+   "note": ""
+  },
+  {
+   "input": "1.5 R$ *",
+   "old": "1.5",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "10 KR",
+   "old": "10",
+   "new": null,
+   "kind": "loss",
+   "class": "token_case",
+   "note": ""
+  },
+  {
+   "input": "10 Kr",
+   "old": "10",
+   "new": null,
+   "kind": "loss",
+   "class": "token_case",
+   "note": ""
+  },
+  {
+   "input": "10 nok",
+   "old": "10",
+   "new": null,
+   "kind": "loss",
+   "class": "token_case",
+   "note": ""
+  },
+  {
+   "input": "10 €/kg",
+   "old": "10",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "1000000001",
+   "old": "1000000001",
+   "new": null,
+   "kind": "loss",
+   "class": "over_bound",
+   "note": ""
+  },
+  {
+   "input": "1111111111111111",
+   "old": "1111111111111111",
+   "new": null,
+   "kind": "loss",
+   "class": "over_bound",
+   "note": ""
+  },
+  {
+   "input": "11111111111111111111111111111111111111111111111111111111111111111",
+   "old": "11111111111111111111111111111111111111111111111111111111111111111",
+   "new": null,
+   "kind": "loss",
+   "class": "over_length",
+   "note": ""
+  },
+  {
+   "input": "12 34",
+   "old": "1234",
+   "new": null,
+   "kind": "loss",
+   "class": "second_number",
+   "note": ""
+  },
+  {
+   "input": "12 34 56",
+   "old": "123456",
+   "new": null,
+   "kind": "loss",
+   "class": "second_number",
+   "note": ""
+  },
+  {
+   "input": "12,",
+   "old": "12",
+   "new": null,
+   "kind": "loss",
+   "class": "dangling_separator",
+   "note": ""
+  },
+  {
+   "input": "12,345",
+   "old": "12345",
+   "new": null,
+   "kind": "loss",
+   "class": "three_digit_ambiguity",
+   "note": ""
+  },
+  {
+   "input": "12,99 – 24,99",
+   "old": "129924.99",
+   "new": null,
+   "kind": "loss",
+   "class": "second_number",
+   "note": ""
+  },
+  {
+   "input": "12,99 €/Stk.",
+   "old": "1299",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "12.",
+   "old": "12",
+   "new": null,
+   "kind": "loss",
+   "class": "dangling_separator",
+   "note": ""
+  },
+  {
+   "input": "12.345",
+   "old": "12345",
+   "new": null,
+   "kind": "loss",
+   "class": "three_digit_ambiguity",
+   "note": ""
+  },
+  {
+   "input": "12.99*",
+   "old": "12.99",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "12.999",
+   "old": "12999",
+   "new": null,
+   "kind": "loss",
+   "class": "three_digit_ambiguity",
+   "note": ""
+  },
+  {
+   "input": "1234.567",
+   "old": "1234567",
+   "new": "1234.567",
+   "kind": "value",
+   "class": "three_decimals",
+   "note": ""
+  },
+  {
+   "input": "126.798,2 Fr.",
+   "old": null,
+   "new": "126798.2",
+   "kind": "gain",
+   "class": "token_with_dot",
+   "note": ""
+  },
+  {
+   "input": "1299.99 usd",
+   "old": "1299.99",
+   "new": null,
+   "kind": "loss",
+   "class": "token_case",
+   "note": ""
+  },
+  {
+   "input": "12٫50",
+   "old": "1250",
+   "new": null,
+   "kind": "loss",
+   "class": "loss_other",
+   "note": "the old parser drops the Arabic decimal separator and reads the digits as one run; the grammar accepts it only under `digits=\"arab\"`"
+  },
+  {
+   "input": "14,692",
+   "old": "14692",
+   "new": null,
+   "kind": "loss",
+   "class": "three_digit_ambiguity",
+   "note": ""
+  },
+  {
+   "input": "15,015",
+   "old": "15015",
+   "new": null,
+   "kind": "loss",
+   "class": "three_digit_ambiguity",
+   "note": ""
+  },
+  {
+   "input": "1E+3",
+   "old": "13",
+   "new": null,
+   "kind": "loss",
+   "class": "sign_or_exponent",
+   "note": ""
+  },
+  {
+   "input": "1_000",
+   "old": "1000",
+   "new": null,
+   "kind": "loss",
+   "class": "sign_or_exponent",
+   "note": ""
+  },
+  {
+   "input": "1e+16",
+   "old": "116",
+   "new": null,
+   "kind": "loss",
+   "class": "sign_or_exponent",
+   "note": ""
+  },
+  {
+   "input": "1e-05",
+   "old": "105",
+   "new": null,
+   "kind": "loss",
+   "class": "sign_or_exponent",
+   "note": ""
+  },
+  {
+   "input": "1e-3",
+   "old": "13",
+   "new": null,
+   "kind": "loss",
+   "class": "sign_or_exponent",
+   "note": ""
+  },
+  {
+   "input": "1e3",
+   "old": "13",
+   "new": null,
+   "kind": "loss",
+   "class": "sign_or_exponent",
+   "note": ""
+  },
+  {
+   "input": "1\u200b299,00",
+   "old": "1299.00",
+   "new": null,
+   "kind": "loss",
+   "class": "control_or_format_char",
+   "note": ""
+  },
+  {
+   "input": "2,85 JPY",
+   "old": "2.85",
+   "new": null,
+   "kind": "loss",
+   "class": "precision_exceeded",
+   "note": ""
+  },
+  {
+   "input": "2.499",
+   "old": "2499",
+   "new": null,
+   "kind": "loss",
+   "class": "three_digit_ambiguity",
+   "note": ""
+  },
+  {
+   "input": "207\u00a0764\u00a0671,856",
+   "old": "207764671856",
+   "new": "207764671.856",
+   "kind": "value",
+   "class": "three_decimals",
+   "note": ""
+  },
+  {
+   "input": "218.664",
+   "old": "218664",
+   "new": null,
+   "kind": "loss",
+   "class": "three_digit_ambiguity",
+   "note": ""
+  },
+  {
+   "input": "24491242 incl. VAT",
+   "old": "24491242",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "246\u00a0342\u00a0333,098\u00a0€",
+   "old": "246342333098",
+   "new": null,
+   "kind": "loss",
+   "class": "over_bound",
+   "note": ""
+  },
+  {
+   "input": "256,04Fr.",
+   "old": "25604",
+   "new": "256.04",
+   "kind": "value",
+   "class": "token_with_dot",
+   "note": ""
+  },
+  {
+   "input": "257605.1 – 24,99",
+   "old": "257605124.99",
+   "new": null,
+   "kind": "loss",
+   "class": "second_number",
+   "note": ""
+  },
+  {
+   "input": "26'305'971.664",
+   "old": "26305971664",
+   "new": "26305971.664",
+   "kind": "value",
+   "class": "three_decimals",
+   "note": ""
+  },
+  {
+   "input": "26,72 kr.",
+   "old": "2672",
+   "new": "26.72",
+   "kind": "value",
+   "class": "token_with_dot",
+   "note": ""
+  },
+  {
+   "input": "26,72\u00a0kr.",
+   "old": "2672",
+   "new": "26.72",
+   "kind": "value",
+   "class": "token_with_dot",
+   "note": ""
+  },
+  {
+   "input": "26,818",
+   "old": "26818",
+   "new": null,
+   "kind": "loss",
+   "class": "three_digit_ambiguity",
+   "note": ""
+  },
+  {
+   "input": "2655298.564",
+   "old": "2655298564",
+   "new": "2655298.564",
+   "kind": "value",
+   "class": "three_decimals",
+   "note": ""
+  },
+  {
+   "input": "28,340,633.458 R$",
+   "old": "28340633.458",
+   "new": null,
+   "kind": "loss",
+   "class": "three_decimals_rejected",
+   "note": ""
+  },
+  {
+   "input": "29,629.46 *",
+   "old": "29629.46",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "2\u00a0576\u00a0535,913 Fr.",
+   "old": "2576535913",
+   "new": null,
+   "kind": "loss",
+   "class": "over_bound",
+   "note": ""
+  },
+  {
+   "input": "3.56 Fr.",
+   "old": null,
+   "new": "3.56",
+   "kind": "gain",
+   "class": "token_with_dot",
+   "note": ""
+  },
+  {
+   "input": "3.580kr",
+   "old": "3580",
+   "new": null,
+   "kind": "loss",
+   "class": "three_digit_ambiguity",
+   "note": ""
+  },
+  {
+   "input": "3.987",
+   "old": "3987",
+   "new": null,
+   "kind": "loss",
+   "class": "three_digit_ambiguity",
+   "note": ""
+  },
+  {
+   "input": "32 *",
+   "old": "32",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "32 370,618",
+   "old": "32370618",
+   "new": "32370.618",
+   "kind": "value",
+   "class": "three_decimals",
+   "note": ""
+  },
+  {
+   "input": "32'453.003 kr.",
+   "old": null,
+   "new": "32453.003",
+   "kind": "gain",
+   "class": "token_with_dot",
+   "note": ""
+  },
+  {
+   "input": "32\u00a0547,725 NOK",
+   "old": "32547725",
+   "new": null,
+   "kind": "loss",
+   "class": "precision_exceeded",
+   "note": ""
+  },
+  {
+   "input": "3365626.741Kč",
+   "old": "3365626741",
+   "new": null,
+   "kind": "loss",
+   "class": "over_bound",
+   "note": ""
+  },
+  {
+   "input": "347.529.044,490\u00a0€",
+   "old": "347529044.490",
+   "new": null,
+   "kind": "loss",
+   "class": "three_decimals_rejected",
+   "note": ""
+  },
+  {
+   "input": "351,490,061.668\u00a0Kč",
+   "old": "351490061.668",
+   "new": null,
+   "kind": "loss",
+   "class": "three_decimals_rejected",
+   "note": ""
+  },
+  {
+   "input": "369025006.293\u00a0kr.",
+   "old": null,
+   "new": "369025006.293",
+   "kind": "gain",
+   "class": "token_with_dot",
+   "note": ""
+  },
+  {
+   "input": "377855512.476 EUR",
+   "old": "377855512476",
+   "new": null,
+   "kind": "loss",
+   "class": "over_bound",
+   "note": ""
+  },
+  {
+   "input": "38\u00a0613\u00a0783,013",
+   "old": "38613783013",
+   "new": "38613783.013",
+   "kind": "value",
+   "class": "three_decimals",
+   "note": ""
+  },
+  {
+   "input": "391 465 952,356SEK",
+   "old": "391465952356",
+   "new": null,
+   "kind": "loss",
+   "class": "over_bound",
+   "note": ""
+  },
+  {
+   "input": "399,589.645 R$",
+   "old": "399589.645",
+   "new": null,
+   "kind": "loss",
+   "class": "three_decimals_rejected",
+   "note": ""
+  },
+  {
+   "input": "3\u00a0378\u00a0£ each",
+   "old": "3378",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "42'777.018",
+   "old": "42777018",
+   "new": "42777.018",
+   "kind": "value",
+   "class": "three_decimals",
+   "note": ""
+  },
+  {
+   "input": "43.65JPY",
+   "old": "43.65",
+   "new": null,
+   "kind": "loss",
+   "class": "precision_exceeded",
+   "note": ""
+  },
+  {
+   "input": "447\u00a0901\u00a0380,981\u00a0USD",
+   "old": "447901380981",
+   "new": null,
+   "kind": "loss",
+   "class": "over_bound",
+   "note": ""
+  },
+  {
+   "input": "448184.382\u00a0EUR",
+   "old": "448184382",
+   "new": null,
+   "kind": "loss",
+   "class": "precision_exceeded",
+   "note": ""
+  },
+  {
+   "input": "458707\u00a0PLN each",
+   "old": "458707",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "477,744\u00a0NOK *",
+   "old": "477744",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "490 215 551,415\u00a0USD",
+   "old": "490215551415",
+   "new": null,
+   "kind": "loss",
+   "class": "over_bound",
+   "note": ""
+  },
+  {
+   "input": "5-",
+   "old": "5",
+   "new": null,
+   "kind": "loss",
+   "class": "sign_or_exponent",
+   "note": ""
+  },
+  {
+   "input": "50,433,506$ /kg",
+   "old": "50433506",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "50,84 Fr.",
+   "old": "5084",
+   "new": "50.84",
+   "kind": "value",
+   "class": "token_with_dot",
+   "note": ""
+  },
+  {
+   "input": "51,615",
+   "old": "51615",
+   "new": null,
+   "kind": "loss",
+   "class": "three_digit_ambiguity",
+   "note": ""
+  },
+  {
+   "input": "519.979",
+   "old": "519979",
+   "new": null,
+   "kind": "loss",
+   "class": "three_digit_ambiguity",
+   "note": ""
+  },
+  {
+   "input": "539'491'426.176",
+   "old": "539491426176",
+   "new": "539491426.176",
+   "kind": "value",
+   "class": "three_decimals",
+   "note": ""
+  },
+  {
+   "input": "539\u00a0014\u00a0690,27Fr.",
+   "old": "53901469027",
+   "new": "539014690.27",
+   "kind": "value",
+   "class": "token_with_dot",
+   "note": ""
+  },
+  {
+   "input": "54 414 817,2JPY",
+   "old": "54414817.2",
+   "new": null,
+   "kind": "loss",
+   "class": "precision_exceeded",
+   "note": ""
+  },
+  {
+   "input": "55.280",
+   "old": "55280",
+   "new": null,
+   "kind": "loss",
+   "class": "three_digit_ambiguity",
+   "note": ""
+  },
+  {
+   "input": "553,142",
+   "old": "553142",
+   "new": null,
+   "kind": "loss",
+   "class": "three_digit_ambiguity",
+   "note": ""
+  },
+  {
+   "input": "558.539$",
+   "old": "558539",
+   "new": null,
+   "kind": "loss",
+   "class": "three_digit_ambiguity",
+   "note": ""
+  },
+  {
+   "input": "568.019",
+   "old": "568019",
+   "new": null,
+   "kind": "loss",
+   "class": "three_digit_ambiguity",
+   "note": ""
+  },
+  {
+   "input": "6,649",
+   "old": "6649",
+   "new": null,
+   "kind": "loss",
+   "class": "three_digit_ambiguity",
+   "note": ""
+  },
+  {
+   "input": "6,738,976.09\u00a0PLN *",
+   "old": "6738976.09",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "6.423.274,32\u00a0Fr.",
+   "old": null,
+   "new": "6423274.32",
+   "kind": "gain",
+   "class": "token_with_dot",
+   "note": ""
+  },
+  {
+   "input": "6.874.205,317Kč",
+   "old": "6874205.317",
+   "new": null,
+   "kind": "loss",
+   "class": "three_decimals_rejected",
+   "note": ""
+  },
+  {
+   "input": "61\u00a0343,711",
+   "old": "61343711",
+   "new": "61343.711",
+   "kind": "value",
+   "class": "three_decimals",
+   "note": ""
+  },
+  {
+   "input": "63\u00a0146\u00a0109,182",
+   "old": "63146109182",
+   "new": "63146109.182",
+   "kind": "value",
+   "class": "three_decimals",
+   "note": ""
+  },
+  {
+   "input": "6578005.667",
+   "old": "6578005667",
+   "new": "6578005.667",
+   "kind": "value",
+   "class": "three_decimals",
+   "note": ""
+  },
+  {
+   "input": "662,748",
+   "old": "662748",
+   "new": null,
+   "kind": "loss",
+   "class": "three_digit_ambiguity",
+   "note": ""
+  },
+  {
+   "input": "685,492\u00a0Kč incl. VAT",
+   "old": "685492",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "688.893.811,21\u00a0Fr.",
+   "old": null,
+   "new": "688893811.21",
+   "kind": "gain",
+   "class": "token_with_dot",
+   "note": ""
+  },
+  {
+   "input": "69,406",
+   "old": "69406",
+   "new": null,
+   "kind": "loss",
+   "class": "three_digit_ambiguity",
+   "note": ""
+  },
+  {
+   "input": "70431415.3Fr.",
+   "old": null,
+   "new": "70431415.3",
+   "kind": "gain",
+   "class": "token_with_dot",
+   "note": ""
+  },
+  {
+   "input": "708 229,695\u00a0€",
+   "old": "708229695",
+   "new": null,
+   "kind": "loss",
+   "class": "three_decimals_rejected",
+   "note": ""
+  },
+  {
+   "input": "718.548",
+   "old": "718548",
+   "new": null,
+   "kind": "loss",
+   "class": "three_digit_ambiguity",
+   "note": ""
+  },
+  {
+   "input": "73\u00a0339\u00a0637,170\u00a0NOK",
+   "old": "73339637170",
+   "new": null,
+   "kind": "loss",
+   "class": "over_bound",
+   "note": ""
+  },
+  {
+   "input": "74'029.620\u00a0USD",
+   "old": "74029620",
+   "new": null,
+   "kind": "loss",
+   "class": "precision_exceeded",
+   "note": ""
+  },
+  {
+   "input": "758'601'652.096",
+   "old": "758601652096",
+   "new": "758601652.096",
+   "kind": "value",
+   "class": "three_decimals",
+   "note": ""
+  },
+  {
+   "input": "784\u00a0863,340\u00a0R$",
+   "old": "784863340",
+   "new": null,
+   "kind": "loss",
+   "class": "three_decimals_rejected",
+   "note": ""
+  },
+  {
+   "input": "8 189,97JPY",
+   "old": "8189.97",
+   "new": null,
+   "kind": "loss",
+   "class": "precision_exceeded",
+   "note": ""
+  },
+  {
+   "input": "82,752",
+   "old": "82752",
+   "new": null,
+   "kind": "loss",
+   "class": "three_digit_ambiguity",
+   "note": ""
+  },
+  {
+   "input": "82.957,15 £ /mo",
+   "old": "82957.15",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "83,872.083USD",
+   "old": "83872.083",
+   "new": null,
+   "kind": "loss",
+   "class": "precision_exceeded",
+   "note": ""
+  },
+  {
+   "input": "844,2SEK each",
+   "old": "844.2",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "84974.776PLN",
+   "old": "84974776",
+   "new": null,
+   "kind": "loss",
+   "class": "precision_exceeded",
+   "note": ""
+  },
+  {
+   "input": "864,967",
+   "old": "864967",
+   "new": null,
+   "kind": "loss",
+   "class": "three_digit_ambiguity",
+   "note": ""
+  },
+  {
+   "input": "87,31kr.",
+   "old": "8731",
+   "new": "87.31",
+   "kind": "value",
+   "class": "token_with_dot",
+   "note": ""
+  },
+  {
+   "input": "9 379 978,368 Kč",
+   "old": "9379978368",
+   "new": null,
+   "kind": "loss",
+   "class": "over_bound",
+   "note": ""
+  },
+  {
+   "input": "9 452 306,28\u00a0Fr. /kg",
+   "old": "945230628",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "9 726 003,727",
+   "old": "9726003727",
+   "new": "9726003.727",
+   "kind": "value",
+   "class": "three_decimals",
+   "note": ""
+  },
+  {
+   "input": "9,894",
+   "old": "9894",
+   "new": null,
+   "kind": "loss",
+   "class": "three_digit_ambiguity",
+   "note": ""
+  },
+  {
+   "input": "9.537.800,81Fr.",
+   "old": null,
+   "new": "9537800.81",
+   "kind": "gain",
+   "class": "token_with_dot",
+   "note": ""
+  },
+  {
+   "input": "90 033 554,460 DKK",
+   "old": "90033554460",
+   "new": null,
+   "kind": "loss",
+   "class": "over_bound",
+   "note": ""
+  },
+  {
+   "input": "9050471.509 kr",
+   "old": "9050471509",
+   "new": "9050471.509",
+   "kind": "value",
+   "class": "three_decimals",
+   "note": ""
+  },
+  {
+   "input": "91,0\u00a0JPY",
+   "old": "91.0",
+   "new": null,
+   "kind": "loss",
+   "class": "precision_exceeded",
+   "note": ""
+  },
+  {
+   "input": "91\u00a0081,508$",
+   "old": "91081508",
+   "new": "91081.508",
+   "kind": "value",
+   "class": "three_decimals",
+   "note": ""
+  },
+  {
+   "input": "921'899'435.193 PLN",
+   "old": "921899435193",
+   "new": null,
+   "kind": "loss",
+   "class": "over_bound",
+   "note": ""
+  },
+  {
+   "input": "96,9\u00a0kr.",
+   "old": "969",
+   "new": "96.9",
+   "kind": "value",
+   "class": "token_with_dot",
+   "note": ""
+  },
+  {
+   "input": "96.061 ¥",
+   "old": "96061",
+   "new": null,
+   "kind": "loss",
+   "class": "three_digit_ambiguity",
+   "note": ""
+  },
+  {
+   "input": "984\u00a0453\u00a0155,19\u00a0Fr.",
+   "old": "98445315519",
+   "new": "984453155.19",
+   "kind": "value",
+   "class": "token_with_dot",
+   "note": ""
+  },
+  {
+   "input": "988,405,816.977 CHF",
+   "old": "988405816.977",
+   "new": null,
+   "kind": "loss",
+   "class": "precision_exceeded",
+   "note": ""
+  },
+  {
+   "input": "989 552,3Fr.",
+   "old": "9895523",
+   "new": "989552.3",
+   "kind": "value",
+   "class": "token_with_dot",
+   "note": ""
+  },
+  {
+   "input": "999,999",
+   "old": "999999",
+   "new": null,
+   "kind": "loss",
+   "class": "three_digit_ambiguity",
+   "note": ""
+  },
+  {
+   "input": "9\u00a0803\u00a0105,990€",
+   "old": "9803105990",
+   "new": null,
+   "kind": "loss",
+   "class": "over_bound",
+   "note": ""
+  },
+  {
+   "input": "BHD 1.234",
+   "old": "1234",
+   "new": "1.234",
+   "kind": "value",
+   "class": "three_decimals",
+   "note": ""
+  },
+  {
+   "input": "CHF 5,250,00",
+   "old": "5250.00",
+   "new": null,
+   "kind": "loss",
+   "class": "invalid_grouping",
+   "note": ""
+  },
+  {
+   "input": "CHF 813'288'474.619",
+   "old": "813288474619",
+   "new": null,
+   "kind": "loss",
+   "class": "over_bound",
+   "note": ""
+  },
+  {
+   "input": "CHF 861\u00a0097,800",
+   "old": "861097800",
+   "new": null,
+   "kind": "loss",
+   "class": "precision_exceeded",
+   "note": ""
+  },
+  {
+   "input": "CHF63\u00a0902\u00a0923,7 /mo",
+   "old": "63902923.7",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "CHF\u00a032\u00a0964,896",
+   "old": "32964896",
+   "new": null,
+   "kind": "loss",
+   "class": "precision_exceeded",
+   "note": ""
+  },
+  {
+   "input": "DKK 7\u00a0008\u00a0624,174",
+   "old": "7008624174",
+   "new": null,
+   "kind": "loss",
+   "class": "over_bound",
+   "note": ""
+  },
+  {
+   "input": "DKK4254.9 – 24,99",
+   "old": "4254924.99",
+   "new": null,
+   "kind": "loss",
+   "class": "second_number",
+   "note": ""
+  },
+  {
+   "input": "DKK47'234'675.611 /kg",
+   "old": "47234675611",
+   "new": null,
+   "kind": "loss",
+   "class": "over_bound",
+   "note": ""
+  },
+  {
+   "input": "DKK67 034 745,608",
+   "old": "67034745608",
+   "new": null,
+   "kind": "loss",
+   "class": "over_bound",
+   "note": ""
+  },
+  {
+   "input": "DKK792 315 225,80 *",
+   "old": "792315225.80",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "EUR 10 USD",
+   "old": "10",
+   "new": null,
+   "kind": "loss",
+   "class": "two_tokens",
+   "note": ""
+  },
+  {
+   "input": "EUR 10–20",
+   "old": "1020",
+   "new": null,
+   "kind": "loss",
+   "class": "second_number",
+   "note": ""
+  },
+  {
+   "input": "EURO 10",
+   "old": "10",
+   "new": null,
+   "kind": "loss",
+   "class": "loss_other",
+   "note": "the old parser strips every letter and reads 10; the grammar treats `EURO` as a residual word, not a currency token"
+  },
+  {
+   "input": "EUR\u00a0388\u00a0136,444",
+   "old": "388136444",
+   "new": null,
+   "kind": "loss",
+   "class": "precision_exceeded",
+   "note": ""
+  },
+  {
+   "input": "Fr. 0,020.73",
+   "old": null,
+   "new": "20.73",
+   "kind": "gain",
+   "class": "token_with_dot",
+   "note": ""
+  },
+  {
+   "input": "Fr. 2364826",
+   "old": null,
+   "new": "2364826",
+   "kind": "gain",
+   "class": "token_with_dot",
+   "note": ""
+  },
+  {
+   "input": "Fr. 503 333,658",
+   "old": "503333.658",
+   "new": null,
+   "kind": "loss",
+   "class": "three_decimals_rejected",
+   "note": ""
+  },
+  {
+   "input": "Fr. 70,205,780",
+   "old": "70205.780",
+   "new": "70205780",
+   "kind": "value",
+   "class": "token_with_dot",
+   "note": ""
+  },
+  {
+   "input": "Fr.4.389.195,122",
+   "old": "4389195.122",
+   "new": null,
+   "kind": "loss",
+   "class": "three_decimals_rejected",
+   "note": ""
+  },
+  {
+   "input": "Fr.\u00a03,205,780",
+   "old": "3205.780",
+   "new": "3205780",
+   "kind": "value",
+   "class": "token_with_dot",
+   "note": ""
+  },
+  {
+   "input": "Fr.\u00a0438'296'947.40",
+   "old": null,
+   "new": "438296947.40",
+   "kind": "gain",
+   "class": "token_with_dot",
+   "note": ""
+  },
+  {
+   "input": "GBP 73.112 – 24,99",
+   "old": "7311224.99",
+   "new": null,
+   "kind": "loss",
+   "class": "second_number",
+   "note": ""
+  },
+  {
+   "input": "GBP20\u00a0238,109",
+   "old": "20238109",
+   "new": null,
+   "kind": "loss",
+   "class": "precision_exceeded",
+   "note": ""
+  },
+  {
+   "input": "GBP\u00a01581043.069",
+   "old": "1581043069",
+   "new": null,
+   "kind": "loss",
+   "class": "over_bound",
+   "note": ""
+  },
+  {
+   "input": "JPY 4.78",
+   "old": "4.78",
+   "new": null,
+   "kind": "loss",
+   "class": "precision_exceeded",
+   "note": ""
+  },
+  {
+   "input": "JPY0",
+   "old": "0",
+   "new": null,
+   "kind": "loss",
+   "class": "zero",
+   "note": ""
+  },
+  {
+   "input": "JPY1 897 888,88",
+   "old": "1897888.88",
+   "new": null,
+   "kind": "loss",
+   "class": "precision_exceeded",
+   "note": ""
+  },
+  {
+   "input": "JPY9\u00a0577,6",
+   "old": "9577.6",
+   "new": null,
+   "kind": "loss",
+   "class": "precision_exceeded",
+   "note": ""
+  },
+  {
+   "input": "JPY\u00a022.57",
+   "old": "22.57",
+   "new": null,
+   "kind": "loss",
+   "class": "precision_exceeded",
+   "note": ""
+  },
+  {
+   "input": "JPY\u00a040\u00a0707,492",
+   "old": "40707492",
+   "new": null,
+   "kind": "loss",
+   "class": "precision_exceeded",
+   "note": ""
+  },
+  {
+   "input": "JPY\u00a070.811.275,75",
+   "old": "70811275.75",
+   "new": null,
+   "kind": "loss",
+   "class": "precision_exceeded",
+   "note": ""
+  },
+  {
+   "input": "JPY\u00a08149181.07",
+   "old": "8149181.07",
+   "new": null,
+   "kind": "loss",
+   "class": "precision_exceeded",
+   "note": ""
+  },
+  {
+   "input": "JPY\u00a0856'277'461.677",
+   "old": "856277461677",
+   "new": null,
+   "kind": "loss",
+   "class": "over_bound",
+   "note": ""
+  },
+  {
+   "input": "JPY\u00a0990\u00a0109,13",
+   "old": "990109.13",
+   "new": null,
+   "kind": "loss",
+   "class": "precision_exceeded",
+   "note": ""
+  },
+  {
+   "input": "KWD 12.345",
+   "old": "12345",
+   "new": "12.345",
+   "kind": "value",
+   "class": "three_decimals",
+   "note": ""
+  },
+  {
+   "input": "Kr 10",
+   "old": "10",
+   "new": null,
+   "kind": "loss",
+   "class": "token_case",
+   "note": ""
+  },
+  {
+   "input": "Kč642782856.505",
+   "old": "642782856505",
+   "new": null,
+   "kind": "loss",
+   "class": "over_bound",
+   "note": ""
+  },
+  {
+   "input": "Kč\u00a06'661'770.773",
+   "old": "6661770773",
+   "new": null,
+   "kind": "loss",
+   "class": "over_bound",
+   "note": ""
+  },
+  {
+   "input": "Kč\u00a0898883574.387",
+   "old": "898883574387",
+   "new": null,
+   "kind": "loss",
+   "class": "over_bound",
+   "note": ""
+  },
+  {
+   "input": "NOK 49 851 461,72 incl. VAT",
+   "old": "4985146172",
+   "new": null,
+   "kind": "loss",
+   "class": "over_bound",
+   "note": ""
+  },
+  {
+   "input": "NOK40,792,232.25 each",
+   "old": "40792232.25",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "NOK\u00a04\u00a0164,985",
+   "old": "4164985",
+   "new": null,
+   "kind": "loss",
+   "class": "precision_exceeded",
+   "note": ""
+  },
+  {
+   "input": "NOK\u00a051 623 510,771",
+   "old": "51623510771",
+   "new": null,
+   "kind": "loss",
+   "class": "over_bound",
+   "note": ""
+  },
+  {
+   "input": "NOK\u00a08,069.692",
+   "old": "8069.692",
+   "new": null,
+   "kind": "loss",
+   "class": "precision_exceeded",
+   "note": ""
+  },
+  {
+   "input": "NUL\u0000 12",
+   "old": "12",
+   "new": null,
+   "kind": "loss",
+   "class": "control_or_format_char",
+   "note": ""
+  },
+  {
+   "input": "R$ 197,931,557.014",
+   "old": "197931557.014",
+   "new": null,
+   "kind": "loss",
+   "class": "three_decimals_rejected",
+   "note": ""
+  },
+  {
+   "input": "R$ 6106919.376",
+   "old": "6106919376",
+   "new": null,
+   "kind": "loss",
+   "class": "over_bound",
+   "note": ""
+  },
+  {
+   "input": "R$ 652'124.649",
+   "old": "652124649",
+   "new": null,
+   "kind": "loss",
+   "class": "three_decimals_rejected",
+   "note": ""
+  },
+  {
+   "input": "R$\u00a0592353601.497",
+   "old": "592353601497",
+   "new": null,
+   "kind": "loss",
+   "class": "over_bound",
+   "note": ""
+  },
+  {
+   "input": "SEK 0",
+   "old": "0",
+   "new": null,
+   "kind": "loss",
+   "class": "zero",
+   "note": ""
+  },
+  {
+   "input": "SEK0.842",
+   "old": "0.842",
+   "new": "842",
+   "kind": "value",
+   "class": "three_decimals",
+   "note": ""
+  },
+  {
+   "input": "SEK20 842,765",
+   "old": "20842765",
+   "new": null,
+   "kind": "loss",
+   "class": "precision_exceeded",
+   "note": ""
+  },
+  {
+   "input": "UVP 5.909,5R$",
+   "old": "5909.5",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "UVP 529'685.99",
+   "old": "529685.99",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "UVP 7 809 446,977£",
+   "old": "7809446977",
+   "new": null,
+   "kind": "loss",
+   "class": "over_bound",
+   "note": ""
+  },
+  {
+   "input": "UVP 858,924€",
+   "old": "858924",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "UVP 969155663.61 ¥",
+   "old": "969155663.61",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "UVP Kč10,3",
+   "old": "10.3",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "UVP £\u00a0831.9",
+   "old": "831.9",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "UVP ¥42.301",
+   "old": "42301",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "Was 10'646.8JPY",
+   "old": "10646.8",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "Was 101'099'284.9",
+   "old": "101099284.9",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "Was 20 now 10",
+   "old": "2010",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "Was 3'771'524.0 zł",
+   "old": "3771524.0",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "Was 40,169.82SEK",
+   "old": "40169.82",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "Was 642,7\u00a0£",
+   "old": "642.7",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "Was 847\u00a0676\u00a0833 NOK",
+   "old": "847676833",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "Was 928848439NOK",
+   "old": "928848439",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "Was Kč476,317,904.1",
+   "old": "476317904.1",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "Was NOK\u00a033.07",
+   "old": "33.07",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "Was PLN1,179,263.97",
+   "old": "1179263.97",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "ab 12,99 €",
+   "old": "12.99",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "ab 3.014,639",
+   "old": "3014.639",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "ab 857.5\u00a0£",
+   "old": "857.5",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "ab NOK\u00a0691'466.3",
+   "old": "691466.3",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "ab USD1,32",
+   "old": "1.32",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "dkk 10",
+   "old": "10",
+   "new": null,
+   "kind": "loss",
+   "class": "token_case",
+   "note": ""
+  },
+  {
+   "input": "from 12,99",
+   "old": "12.99",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "from 123,428,273R$",
+   "old": "123428273",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "from 399924185",
+   "old": "399924185",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "from 547\u00a0623\u00a0946,010 ¥",
+   "old": "547623946010",
+   "new": null,
+   "kind": "loss",
+   "class": "over_bound",
+   "note": ""
+  },
+  {
+   "input": "from 8088.18",
+   "old": "8088.18",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "from GBP940.36",
+   "old": "940.36",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "from kr311714.39",
+   "old": "311714.39",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "http://example.test/p/1",
+   "old": "0.1",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "https://example.com/gbp/1",
+   "old": "0.1",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "https://example.invalid/p/1",
+   "old": "0.1",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "https://example.net/eur/1",
+   "old": "0.1",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "https://example.org/p/1?currency=usd",
+   "old": "0.1",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "https://shop.example/kr/1",
+   "old": "0.1",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "https://shop.example/p/1",
+   "old": "0.1",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "kr 1.234",
+   "old": "1234",
+   "new": null,
+   "kind": "loss",
+   "class": "three_digit_ambiguity",
+   "note": ""
+  },
+  {
+   "input": "kr. 17",
+   "old": "0.17",
+   "new": "17",
+   "kind": "value",
+   "class": "token_with_dot",
+   "note": ""
+  },
+  {
+   "input": "kr. 2,777",
+   "old": "2.777",
+   "new": null,
+   "kind": "loss",
+   "class": "three_digit_ambiguity",
+   "note": ""
+  },
+  {
+   "input": "kr. 4.109,354 *",
+   "old": "4109.354",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "kr. 89",
+   "old": "0.89",
+   "new": "89",
+   "kind": "value",
+   "class": "token_with_dot",
+   "note": ""
+  },
+  {
+   "input": "kr.\u00a01",
+   "old": "0.1",
+   "new": "1",
+   "kind": "value",
+   "class": "token_with_dot",
+   "note": ""
+  },
+  {
+   "input": "kr.\u00a014'305.0",
+   "old": null,
+   "new": "14305.0",
+   "kind": "gain",
+   "class": "token_with_dot",
+   "note": ""
+  },
+  {
+   "input": "kr.\u00a028",
+   "old": "0.28",
+   "new": "28",
+   "kind": "value",
+   "class": "token_with_dot",
+   "note": ""
+  },
+  {
+   "input": "krone 10",
+   "old": "10",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "nur 518\u00a0654,16 PLN",
+   "old": "518654.16",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "nur CZK 451.494.270",
+   "old": "451494270",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "nur kr41'641.4",
+   "old": "41641.4",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "nur £\u00a00.617",
+   "old": "0.617",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "nur €\u00a0608.174",
+   "old": "608174",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "sek 10",
+   "old": "10",
+   "new": null,
+   "kind": "loss",
+   "class": "token_case",
+   "note": ""
+  },
+  {
+   "input": "solo 33'144'664.78",
+   "old": "33144664.78",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "solo 4.124 GBP",
+   "old": "4124",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "solo 431'907'905.95DKK",
+   "old": "431907905.95",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "solo 519,97",
+   "old": "519.97",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "solo 53.778",
+   "old": "53778",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "solo 562.07 NOK",
+   "old": "562.07",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "solo 627\u00a0655\u00a0876,0 CZK",
+   "old": "627655876.0",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "solo 837'427'508",
+   "old": "837427508",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "solo GBP\u00a01,-",
+   "old": "1",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "solo Kč75'783'413",
+   "old": "75783413",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "solo R$ 450.225,11",
+   "old": "450225.11",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "solo €\u00a0538,5",
+   "old": "538.5",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "£ 665286.038",
+   "old": "665286038",
+   "new": null,
+   "kind": "loss",
+   "class": "three_decimals_rejected",
+   "note": ""
+  },
+  {
+   "input": "£235'819'512.882",
+   "old": "235819512882",
+   "new": null,
+   "kind": "loss",
+   "class": "over_bound",
+   "note": ""
+  },
+  {
+   "input": "¥1,234",
+   "old": "1234",
+   "new": null,
+   "kind": "loss",
+   "class": "three_digit_ambiguity",
+   "note": ""
+  },
+  {
+   "input": "١٢٣٤",
+   "old": "1234",
+   "new": null,
+   "kind": "loss",
+   "class": "non_latin_digits",
+   "note": ""
+  },
+  {
+   "input": "१२३४",
+   "old": "1234",
+   "new": null,
+   "kind": "loss",
+   "class": "non_latin_digits",
+   "note": ""
+  },
+  {
+   "input": "\u202e1299",
+   "old": "1299",
+   "new": null,
+   "kind": "loss",
+   "class": "control_or_format_char",
+   "note": ""
+  },
+  {
+   "input": "€ -5",
+   "old": "5",
+   "new": null,
+   "kind": "loss",
+   "class": "sign_or_exponent",
+   "note": ""
+  },
+  {
+   "input": "€ 10 USD",
+   "old": "10",
+   "new": null,
+   "kind": "loss",
+   "class": "two_tokens",
+   "note": ""
+  },
+  {
+   "input": "−5",
+   "old": "5",
+   "new": null,
+   "kind": "loss",
+   "class": "sign_or_exponent",
+   "note": ""
+  },
+  {
+   "input": "１２３４",
+   "old": "1234",
+   "new": null,
+   "kind": "loss",
+   "class": "non_latin_digits",
+   "note": ""
+  }
+ ]
+}
