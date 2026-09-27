@@ -201,3 +201,108 @@ def test_discover_dropin_scrapers_swallows_duplicate(tmp_path):
     # Second call: same class definition reloaded → duplicate name → swallowed
     discover_dropin_scrapers(r, tmp_path)
     assert len(r) == 1
+
+
+def test_discover_dropin_scrapers_skips_plugin_that_raises_on_import(tmp_path, caplog):
+    """A plugin that raises at module level is skipped; other plugins still load."""
+    from price_tracker.core.registry import discover_dropin_scrapers
+
+    (tmp_path / "broken_import.py").write_text("raise RuntimeError('boom')\n")
+    (tmp_path / "goodone.py").write_text(
+        "from decimal import Decimal\n"
+        "from price_tracker.core.scraper_base import AbstractScraper, ProductInfo\n"
+        "\n"
+        "class GoodOne(AbstractScraper):\n"
+        "    name = 'goodone'\n"
+        "    priority = 1\n"
+        "    domain_patterns = []\n"
+        "    def can_handle(self, url):\n"
+        "        return False\n"
+        "    async def scrape(self, url, client):\n"
+        "        return ProductInfo(price=Decimal('1'))\n"
+    )
+
+    r = ScraperRegistry()
+    with caplog.at_level("ERROR"):
+        discover_dropin_scrapers(r, tmp_path)
+
+    assert len(r) == 1
+    assert r.resolve("https://random.example.com/x") is None
+    names = {s.name for s in r}
+    assert "goodone" in names
+    assert any("broken_import.py" in record.getMessage() for record in caplog.records)
+    assert any(record.levelname == "ERROR" for record in caplog.records)
+
+
+def test_discover_dropin_scrapers_skips_plugin_with_syntax_error(tmp_path, caplog):
+    """A plugin with a syntax error is skipped; other plugins still load."""
+    from price_tracker.core.registry import discover_dropin_scrapers
+
+    (tmp_path / "broken_syntax.py").write_text("def broken(:\n    pass\n")
+    (tmp_path / "goodtwo.py").write_text(
+        "from decimal import Decimal\n"
+        "from price_tracker.core.scraper_base import AbstractScraper, ProductInfo\n"
+        "\n"
+        "class GoodTwo(AbstractScraper):\n"
+        "    name = 'goodtwo'\n"
+        "    priority = 1\n"
+        "    domain_patterns = []\n"
+        "    def can_handle(self, url):\n"
+        "        return False\n"
+        "    async def scrape(self, url, client):\n"
+        "        return ProductInfo(price=Decimal('1'))\n"
+    )
+
+    r = ScraperRegistry()
+    with caplog.at_level("ERROR"):
+        discover_dropin_scrapers(r, tmp_path)
+
+    assert len(r) == 1
+    names = {s.name for s in r}
+    assert "goodtwo" in names
+    assert any("broken_syntax.py" in record.getMessage() for record in caplog.records)
+    assert any(record.levelname == "ERROR" for record in caplog.records)
+
+
+def test_discover_dropin_scrapers_skips_scraper_whose_constructor_raises(tmp_path, caplog):
+    """A scraper class whose constructor raises is skipped; siblings in the same file load."""
+    from price_tracker.core.registry import discover_dropin_scrapers
+
+    (tmp_path / "mixed.py").write_text(
+        "from decimal import Decimal\n"
+        "from price_tracker.core.scraper_base import AbstractScraper, ProductInfo\n"
+        "\n"
+        "class BrokenCtor(AbstractScraper):\n"
+        "    name = 'brokenctor'\n"
+        "    priority = 1\n"
+        "    domain_patterns = []\n"
+        "    def __init__(self):\n"
+        "        raise RuntimeError('ctor boom')\n"
+        "    def can_handle(self, url):\n"
+        "        return False\n"
+        "    async def scrape(self, url, client):\n"
+        "        return ProductInfo(price=Decimal('1'))\n"
+        "\n"
+        "class WorksFine(AbstractScraper):\n"
+        "    name = 'worksfine'\n"
+        "    priority = 1\n"
+        "    domain_patterns = []\n"
+        "    def can_handle(self, url):\n"
+        "        return False\n"
+        "    async def scrape(self, url, client):\n"
+        "        return ProductInfo(price=Decimal('2'))\n"
+    )
+
+    r = ScraperRegistry()
+    with caplog.at_level("ERROR"):
+        discover_dropin_scrapers(r, tmp_path)
+
+    assert len(r) == 1
+    names = {s.name for s in r}
+    assert "worksfine" in names
+    assert "brokenctor" not in names
+    assert any(
+        "BrokenCtor" in record.getMessage() or "mixed.py" in record.getMessage()
+        for record in caplog.records
+    )
+    assert any(record.levelname == "ERROR" for record in caplog.records)
