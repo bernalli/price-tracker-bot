@@ -84,7 +84,11 @@ def discover_dropin_scrapers(registry: ScraperRegistry, plugin_dir: Path) -> Non
         if spec is None or spec.loader is None:
             continue
         module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
+        try:
+            spec.loader.exec_module(module)
+        except Exception:
+            logger.exception("Failed to load drop-in plugin %s; skipping it", file)
+            continue
         for attr_name in dir(module):
             attr = getattr(module, attr_name)
             if (
@@ -93,7 +97,16 @@ def discover_dropin_scrapers(registry: ScraperRegistry, plugin_dir: Path) -> Non
                 and attr is not AbstractScraper
             ):
                 try:
-                    registry.register(attr())
+                    scraper = attr()
+                except Exception:
+                    logger.exception(
+                        "Failed to instantiate drop-in scraper %s from %s; skipping it",
+                        attr_name,
+                        file,
+                    )
+                    continue
+                try:
+                    registry.register(scraper)
                     logger.info("Registered drop-in scraper: %s (from %s)", attr.name, file)
                 except ValueError:
                     pass
