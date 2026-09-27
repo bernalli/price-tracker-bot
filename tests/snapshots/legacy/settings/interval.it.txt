@@ -44,3 +44,23 @@
    | ✅ Intervallo aggiornato: <b>ogni 30 minuti</b>
 ## db after step 6
 ~ bot_config key="check_interval_minutes" value: "120" -> "30"
+## step 7: command "/intervallo 5" user=1
+-> sendMessage chat=1
+   param parse_mode="HTML"
+   text:
+   | ✅ Intervallo aggiornato: <b>ogni 5 minuti</b>
+## db after step 7
+~ bot_config key="check_interval_minutes" value: "30" -> "5"
+## step 8: command "/intervallo 60" user=1
+-> sendMessage chat=1
+   param parse_mode="HTML"
+   text:
+   | ✅ Intervallo aggiornato: <b>ogni 1 ore</b>
+## db after step 8
+~ bot_config key="check_interval_minutes" value: "5" -> "60"
+## step 9: command "/intervallo 10081" user=1
+-> sendMessage chat=1
+   text:
+   | ❌ L'intervallo massimo è 7 giorni.
+## db after step 9
+(no changes)

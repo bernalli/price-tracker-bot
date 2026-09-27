@@ -8,3 +8,10 @@
    | Flushed 0 pending digest entries.
 ## db after step 1
 ~ users user_id=10 display_name: NULL -> "U10"
+## step 2: seed "enqueue unparseable row"
+## step 3: command "/digest_now" user=10
+-> sendMessage chat=10
+   text:
+   | Flushed 1 pending digest entries.
+## db after step 3
+~ digest_queue id=1 flushed_at: NULL -> <now:9999-99-99 99:99:99>

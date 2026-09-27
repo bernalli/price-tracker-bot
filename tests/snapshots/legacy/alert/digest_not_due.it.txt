@@ -10,3 +10,24 @@
 (no calls)
 ## db after step 5
 (no changes)
+## step 6: seed "\"/digest_mode on 30\""
+## step 7: seed "enqueue for OTHER"
+## step 8: seed "reanchor enqueued_at"
+## step 9: job digest_flush_due(interval_minutes=60)
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | 📊 <b>Riepilogo — 2 variazioni di prezzo</b>
+   | 🔻 Kettle — EUR80.00 → EUR64.00 — example.com
+   | 🔻 Fan — USD50.00 → USD40.00 — example.com
+   | Usa /lista per lo stato completo.
+-> sendMessage chat=11
+   param parse_mode="HTML"
+   text:
+   | 📊 <b>Riepilogo — 1 variazione di prezzo</b>
+   | 🔻 Lamp — EUR30.00 → EUR25.00 — example.com
+   | Usa /lista per lo stato completo.
+## db after step 9
+~ digest_queue id=1 flushed_at: NULL -> <now:9999-99-99 99:99:99>
+~ digest_queue id=2 flushed_at: NULL -> <now:9999-99-99 99:99:99>
+~ digest_queue id=3 flushed_at: NULL -> <now:9999-99-99 99:99:99>

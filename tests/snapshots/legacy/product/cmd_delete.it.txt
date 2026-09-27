@@ -51,3 +51,28 @@
    | [🗑 Sì, elimina → confirm_delete_2] [❌ Annulla → cancel_delete]
 ## db after step 5
 (no changes)
+## step 6: command "/elimina" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | 📦 <b>Scegli prodotto da eliminare:</b>
+   keyboard:
+   | [#1 Kettle €80.00 → remove_1]
+   | [#2 Fan → remove_2]
+   | [#3 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNN €80.00 → remove_3]
+   | [🗑 Elimina tutti i prodotti → delete_all]
+## db after step 6
+(no changes)
+## step 7: command "/elimina 3" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | ⚠️ Vuoi eliminare <b>definitivamente</b> questo prodotto?
+   |
+   | 📦 #3 — Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
+   |
+   | Verrà cancellato anche tutto lo storico prezzi.
+   keyboard:
+   | [🗑 Sì, elimina → confirm_delete_3] [❌ Annulla → cancel_delete]
+## db after step 7
+(no changes)

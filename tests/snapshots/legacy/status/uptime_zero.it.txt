@@ -1,0 +1,20 @@
+# legacy snapshot v1
+# scenario: status.uptime_zero
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/stato" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | 📊 <b>Le tue statistiche</b>
+   |
+   | 📦 Prodotti attivi: 0
+   | 📁 Prodotti totali: 0
+   | 🔍 Controlli effettuati: 0
+   | ⏱ Intervallo check: ogni 6h
+   |
+   | <b>📡 Bot Status</b>
+   | Uptime: 0m 0s
+   | Products tracked: 0
+## db after step 1
+~ users user_id=10 display_name: NULL -> "U10"

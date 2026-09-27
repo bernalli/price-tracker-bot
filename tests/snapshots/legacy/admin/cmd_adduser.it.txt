@@ -36,3 +36,15 @@
    | ℹ️ L'utente <code>10</code> è già autorizzato.
 ## db after step 4
 (no changes)
+## step 5: command "/adduser 98" user=1
+-> sendMessage chat=1
+   param parse_mode="HTML"
+   text:
+   | ✅ Utente <code>98</code> aggiunto!
+   | Ora può usare il bot inviando /start.
+-> sendMessage chat=98
+   text:
+   | 🎉 Sei stato autorizzato a usare il Price Tracker Bot!
+   | Invia /start per iniziare.
+## db after step 5
++ users user_id=98 {is_admin=0, is_active=1, created_at=<now:9999-99-99 99:99:99>, display_name=NULL, username=NULL}

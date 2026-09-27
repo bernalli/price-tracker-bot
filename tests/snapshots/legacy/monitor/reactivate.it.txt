@@ -31,3 +31,20 @@
    | ❌ Prodotto non trovato.
 ## db after step 4
 (no changes)
+## step 5: command "/riattiva" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | ⏸ <b>Prodotti in pausa — scegli da riattivare:</b>
+   keyboard:
+   | [#3 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNN → reactivate_3]
+## db after step 5
+(no changes)
+## step 6: command "/riattiva 3" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | ✅ Riattivato: <b>Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN</b>
+## db after step 6
+~ products id=3 is_active: 0 -> 1
+~ products id=3 suspension_kind: "manual" -> NULL

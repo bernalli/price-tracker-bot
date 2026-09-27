@@ -1402,6 +1402,28 @@ KETTLE_HISTORY: Final = (
 )
 """Five points of history: the outlier filter's minimum."""
 
+LN81: Final = "Long " + "N" * 76
+"""An 81-character name: every truncation of a displayed name falls on an ``N``."""
+LN61: Final = "Long " + "N" * 56
+"""A 61-character name, one past the ``> 60`` boundary of ``/lista``."""
+
+
+def item_url(n: int) -> str:
+    """The example-shop URL of item ``n``."""
+    return f"https://shop.example.com/item/{n}"
+
+
+async def seed_cheap_and_near(w: LegacyWorld) -> tuple[int, int]:
+    """Cheap (0.80 -> 0.64, under one euro) and Near (100.00 -> 99.50, under 1 %).
+
+    Both pages read their current price again; returns their ids.
+    """
+    cheap = await seed_product(w, OWNER, item_url(72), "Cheap", initial="0.80", current="0.64")
+    w.scraper.script(item_url(72), info("0.64", name="Cheap"))
+    near = await seed_product(w, OWNER, item_url(73), "Near", initial="100.00", current="99.50")
+    w.scraper.script(item_url(73), info("99.50", name="Near"))
+    return cheap, near
+
 
 def scenario(scenario_id: str) -> Callable[[ScenarioFn], ScenarioFn]:
     """Register the decorated function as scenario ``scenario_id``."""
@@ -1425,6 +1447,24 @@ async def seed_p1(w: LegacyWorld, **state: Any) -> int:
         "history": KETTLE_HISTORY,
     }
     return await seed_product(w, OWNER, KETTLE_URL, "Kettle", **(defaults | state))
+
+
+async def seed_long_p1(w: LegacyWorld) -> int:
+    """P1's state and history under the 81-character name, read again at 80.00."""
+    product = await seed_product(
+        w,
+        OWNER,
+        KETTLE_URL,
+        LN81,
+        initial="100.00",
+        current="80.00",
+        lowest="80.00",
+        highest="100.00",
+        last_checked_at="2026-03-01 10:00:00",
+        history=KETTLE_HISTORY,
+    )
+    w.scraper.script(KETTLE_URL, info("80.00", name=LN81))
+    return product
 
 
 async def seed_p2(w: LegacyWorld, **state: Any) -> int:
@@ -1536,6 +1576,13 @@ async def scenario_home_admin_only_refused(w: LegacyWorld) -> None:
 @scenario("home.error_handler")
 async def scenario_home_error_handler(w: LegacyWorld) -> None:
     await w.recorder.call_error_handler(OWNER, RuntimeError("boom"))
+    # A handler whose reply is refused (the user blocked the bot) reaches the
+    # error handler, which apologizes; when the apology is refused too, it is
+    # swallowed instead of escaping the error handler.
+    w.request.fail_next_call_to(OWNER)
+    await w.recorder.command(OWNER, "/start")
+    w.request.fail_next_call_to(OWNER)
+    await w.recorder.call_error_handler(OWNER, RuntimeError("boom"))
 
 
 # lista ────────────────────────────────────────────────────────────────
@@ -1575,6 +1622,24 @@ async def scenario_lista_other_user_sees_own_only(w: LegacyWorld) -> None:
 @scenario("lista.short_interval")
 async def scenario_lista_short_interval(w: LegacyWorld) -> None:
     await seed_p1(w, check_interval=30)
+    await w.recorder.command(OWNER, "/lista")
+
+
+@scenario("lista.edges")
+async def scenario_lista_edges(w: LegacyWorld) -> None:
+    # A 61-character name, a drop under 1 %, a whole-hour interval, one error;
+    # and a product under one euro.
+    await seed_product(
+        w,
+        OWNER,
+        item_url(74),
+        LN61,
+        initial="100.00",
+        current="99.50",
+        check_interval=60,
+        errors=1,
+    )
+    await seed_product(w, OWNER, item_url(75), "Sticker", initial="0.90", current="0.80")
     await w.recorder.command(OWNER, "/lista")
 
 
@@ -1624,6 +1689,14 @@ async def scenario_menu_prodotti_overflow(w: LegacyWorld) -> None:
         )
     await w.recorder.command(OWNER, "/menu")
     await w.recorder.press(OWNER, "menu_prodotti")
+    # Every list view has its own page size; each one overflows here.
+    for data in ("menu_prezzi", "menu_storia", "menu_notifiche"):
+        menu = await open_menu(w, OWNER)
+        await w.recorder.press(OWNER, data, on=menu)
+    # One product fewer: the product view shows exactly one overflow row.
+    await seed_command(w, OWNER, "/pausa 12")
+    menu = await open_menu(w, OWNER)
+    await w.recorder.press(OWNER, "menu_prodotti", on=menu)
 
 
 @scenario("menu.cmd_lista")
@@ -1648,6 +1721,12 @@ async def scenario_menu_paused(w: LegacyWorld) -> None:
     await w.recorder.command(OWNER, "/menu")
     await w.recorder.press(OWNER, "menu_prodotti")
     await w.recorder.press(OWNER, "menu_paused")
+    # Eleven paused products: the paused view shows ten.
+    for n in range(80, 90):
+        await seed_product(w, OWNER, item_url(n), f"Paused {n}", initial="5.00", active=False)
+    menu = await open_menu(w, OWNER)
+    await w.recorder.press(OWNER, "menu_prodotti", on=menu)
+    await w.recorder.press(OWNER, "menu_paused", on=menu)
 
 
 @scenario("menu.prezzi")
@@ -1766,6 +1845,24 @@ async def scenario_menu_checkall_no_change(w: LegacyWorld) -> None:
     await open_menu(w, OWNER)
     await w.recorder.press(OWNER, "menu_prezzi")
     await w.recorder.press(OWNER, "menu_checkall")
+    await seed_cheap_and_near(w)
+    menu = await open_menu(w, OWNER)
+    await w.recorder.press(OWNER, "menu_prezzi", on=menu)
+    await w.recorder.press(OWNER, "menu_checkall", on=menu)
+
+
+@scenario("menu.long_names")
+async def scenario_menu_long_names(w: LegacyWorld) -> None:
+    # Every menu list cuts the name at its own width.
+    await seed_long_p1(w)
+    await seed_product(w, OWNER, item_url(74), LN81, initial="45.00", active=False)
+    for data in ("menu_prodotti", "menu_prezzi", "menu_storia", "menu_notifiche"):
+        menu = await open_menu(w, OWNER)
+        await w.recorder.press(OWNER, data, on=menu)
+        if data == "menu_prodotti":
+            await w.recorder.press(OWNER, "menu_paused", on=menu)
+        elif data == "menu_prezzi":
+            await w.recorder.press(OWNER, "menu_checkall", on=menu)
 
 
 # product ──────────────────────────────────────────────────────────────
@@ -1896,6 +1993,15 @@ async def scenario_product_check_button_no_change(w: LegacyWorld) -> None:
     w.scraper.script(KETTLE_URL, info("80.00"))
     await w.recorder.command(OWNER, "/lista")
     await w.recorder.press(OWNER, f"check_{p1}")
+    cheap, near = await seed_cheap_and_near(w)
+    # The press above wrote SQLite's real clock; the card below prints its age.
+    await w.recorder.seed(
+        "reanchor last_checked_at",
+        reanchor(w, "products", {"id": p1}, "last_checked_at", "2026-03-01 11:00:00"),
+    )
+    await w.recorder.command(OWNER, "/lista")
+    await w.recorder.press(OWNER, f"check_{cheap}")
+    await w.recorder.press(OWNER, f"check_{near}")
 
 
 @scenario("product.check_button_scrape_error")
@@ -1964,6 +2070,9 @@ async def scenario_product_cmd_delete(w: LegacyWorld) -> None:
     await w.recorder.command(OWNER, "/elimina abc")
     await w.recorder.command(OWNER, "/elimina 999")
     await w.recorder.command(OWNER, f"/delete {p2}")
+    long_id = await seed_product(w, OWNER, item_url(71), LN81, initial="80.00")
+    await w.recorder.command(OWNER, "/elimina")
+    await w.recorder.command(OWNER, f"/elimina {long_id}")
 
 
 @scenario("product.cmd_delete_empty")
@@ -1977,6 +2086,11 @@ async def scenario_product_cmd_target(w: LegacyWorld) -> None:
     await w.recorder.command(OWNER, "/target")
     for args in (f"{p1}", f"{p1} 49,90", f"{p1} 90", f"{p1} 0", f"{p1} abc", "abc 1", "999 1"):
         await w.recorder.command(OWNER, f"/target {args}")
+    # The smallest positive target, then a long name in the picker and the reply.
+    await w.recorder.command(OWNER, f"/target {p1} 1")
+    long_id = await seed_product(w, OWNER, item_url(70), LN81, initial="80.00", current="80.00")
+    await w.recorder.command(OWNER, "/target")
+    await w.recorder.command(OWNER, f"/target {long_id} 50")
 
 
 @scenario("product.cmd_threshold")
@@ -1989,6 +2103,10 @@ async def scenario_product_cmd_threshold(w: LegacyWorld) -> None:
     await w.recorder.command(OWNER, "/soglia 999 5")
     await w.recorder.command(OWNER, "/soglia abc 5")
     await w.recorder.command(OWNER, f"/soglia {p1} abc%")
+    # A signed percentage is stored without its sign; a long name is cut at 80.
+    await w.recorder.command(OWNER, f"/soglia {p1} -20%")
+    long_id = await seed_product(w, OWNER, item_url(62), LN81, initial="80.00")
+    await w.recorder.command(OWNER, f"/soglia {long_id} 20%")
 
 
 @scenario("product.buttons_bad_ids")
@@ -2021,6 +2139,27 @@ async def scenario_product_cmd_delete_single(w: LegacyWorld) -> None:
 async def scenario_product_cmd_target_no_current(w: LegacyWorld) -> None:
     p2 = await seed_p2(w)
     await w.recorder.command(OWNER, f"/target {p2} 30")
+
+
+@scenario("product.long_name")
+async def scenario_product_long_name(w: LegacyWorld) -> None:
+    # Every product button that names the product, on one 81-character name;
+    # the delete confirmation last.
+    product = await seed_long_p1(w)
+    for prefix in (
+        "edit_",
+        "reset_",
+        "pause_",
+        "reactivate_",
+        "remove_",
+        "check_",
+        "chart_",
+        "pref_new_",
+        "track_any_",
+        "track_default_",
+        "confirm_delete_",
+    ):
+        await w.recorder.press(OWNER, f"{prefix}{product}")
 
 
 # add ──────────────────────────────────────────────────────────────────
@@ -2075,6 +2214,13 @@ async def scenario_add_blocked(w: LegacyWorld) -> None:
 @scenario("add.price_none")
 async def scenario_add_price_none(w: LegacyWorld) -> None:
     w.scraper.script(WIDGET_URL, ProductInfo(error="Prezzo non trovato (test)"))
+    await w.recorder.command(OWNER, f"/add {WIDGET_URL}")
+
+
+@scenario("add.success_long_name")
+async def scenario_add_success_long_name(w: LegacyWorld) -> None:
+    # 81 characters: one past the 80 the confirmation shows before "...".
+    w.scraper.script(WIDGET_URL, ProductInfo(name=LN81, price=Decimal("19.90"), currency="EUR"))
     await w.recorder.command(OWNER, f"/add {WIDGET_URL}")
 
 
@@ -2174,6 +2320,15 @@ async def scenario_data_import_csv_bad_fields(w: LegacyWorld) -> None:
     await w.recorder.document(OWNER, "bad.csv", content)
 
 
+@scenario("data.import_csv_threshold_colon")
+async def scenario_data_import_csv_threshold_colon(w: LegacyWorld) -> None:
+    # A threshold with two colons: its value "15:5" is not a number.
+    url = item_url(25)
+    w.scraper.script(url, ProductInfo(name="Colon", price=Decimal("7.00")))
+    content = b"\xef\xbb\xbf" + csv_document((url, "", "percentage:15:5"))
+    await w.recorder.document(OWNER, "colon.csv", content)
+
+
 @scenario("data.import_csv_empty")
 async def scenario_data_import_csv_empty(w: LegacyWorld) -> None:
     await w.recorder.document(OWNER, "empty.csv", b"")
@@ -2207,6 +2362,8 @@ async def scenario_monitor_check_picker(w: LegacyWorld) -> None:
     await seed_p1(w)
     await seed_p2(w)
     await w.recorder.command(OWNER, "/check")
+    await seed_product(w, OWNER, item_url(65), LN81, initial="80.00", current="80.00")
+    await w.recorder.command(OWNER, "/check")
 
 
 @scenario("monitor.check_no_change")
@@ -2214,6 +2371,10 @@ async def scenario_monitor_check_no_change(w: LegacyWorld) -> None:
     p1 = await seed_p1(w)
     w.scraper.script(KETTLE_URL, info("80.00"))
     await w.recorder.command(OWNER, f"/check {p1}")
+    # A rise on a long name: the fresh price is shown, the name cut at 80.
+    long_id = await seed_product(w, OWNER, item_url(64), LN81, initial="100.00", current="80.00")
+    w.scraper.script(item_url(64), info("85.00", name=LN81))
+    await w.recorder.command(OWNER, f"/check {long_id}")
 
 
 @scenario("monitor.check_drop_photo")
@@ -2265,6 +2426,12 @@ async def scenario_monitor_refresh(w: LegacyWorld) -> None:
         await w.recorder.command(OWNER, f"/refresh {p1}{minutes}")
     await w.recorder.command(OWNER, "/refresh 999 30")
     await w.recorder.command(OWNER, "/refresh abc 30")
+    # Each bound of the per-product interval, and a whole hour.
+    for minutes in (" 1", " 5", " 10081", " 60"):
+        await w.recorder.command(OWNER, f"/refresh {p1}{minutes}")
+    long_id = await seed_product(w, OWNER, item_url(63), LN81, initial="80.00")
+    for minutes in (" 0", " 30"):
+        await w.recorder.command(OWNER, f"/refresh {long_id}{minutes}")
 
 
 @scenario("monitor.pause")
@@ -2275,6 +2442,8 @@ async def scenario_monitor_pause(w: LegacyWorld) -> None:
     await w.recorder.command(OWNER, f"/pausa {p1}")
     await w.recorder.command(OWNER, "/pause abc")
     await w.recorder.command(OWNER, "/pause 999")
+    long_id = await seed_product(w, OWNER, item_url(67), LN81, initial="80.00")
+    await w.recorder.command(OWNER, f"/pausa {long_id}")
 
 
 @scenario("monitor.reactivate")
@@ -2285,6 +2454,9 @@ async def scenario_monitor_reactivate(w: LegacyWorld) -> None:
     await w.recorder.command(OWNER, f"/riattiva {pp}")
     await w.recorder.command(OWNER, "/reactivate abc")
     await w.recorder.command(OWNER, "/reactivate 999")
+    long_id = await seed_product(w, OWNER, item_url(66), LN81, initial="80.00", active=False)
+    await w.recorder.command(OWNER, "/riattiva")
+    await w.recorder.command(OWNER, f"/riattiva {long_id}")
 
 
 @scenario("monitor.reactivate_none_paused")
@@ -2328,6 +2500,48 @@ async def scenario_monitor_checkall_failures(w: LegacyWorld) -> None:
     await w.recorder.command(OWNER, "/checkall")
 
 
+@scenario("monitor.checkall_edges")
+async def scenario_monitor_checkall_edges(w: LegacyWorld) -> None:
+    # A long name with a drop under 1 %, and a product under one euro.
+    await seed_product(w, OWNER, item_url(74), LN61, initial="100.00", current="99.50")
+    w.scraper.script(item_url(74), info("99.50", name=LN61))
+    await seed_product(w, OWNER, item_url(75), "Sticker", initial="0.90", current="0.80")
+    w.scraper.script(item_url(75), info("0.80", name="Sticker"))
+    await w.recorder.command(OWNER, "/checkall")
+
+
+async def seed_drop_with_history(w: LegacyWorld, url: str, name: str) -> int:
+    """A product at 80.00 with P1's history whose page now reads 64.00; its id."""
+    product = await seed_product(
+        w,
+        OWNER,
+        url,
+        name,
+        initial="100.00",
+        current="80.00",
+        lowest="80.00",
+        highest="100.00",
+        history=KETTLE_HISTORY,
+    )
+    w.scraper.script(url, info("64.00", name=name))
+    return product
+
+
+@scenario("monitor.check_drop_chart_error")
+async def scenario_monitor_check_drop_chart_error(w: LegacyWorld) -> None:
+    # A dollar pair in the name is read as mathtext by the chart title, which
+    # fails; the alert falls back to plain text.
+    product = await seed_drop_with_history(w, item_url(90), r"Cable $\zz$")
+    await w.recorder.command(OWNER, f"/check {product}")
+
+
+@scenario("monitor.check_drop_long_caption")
+async def scenario_monitor_check_drop_long_caption(w: LegacyWorld) -> None:
+    # A caption over Telegram's 1024-character limit is cut to it.
+    product = await seed_drop_with_history(w, item_url(91), "K" * 1100)
+    await w.recorder.command(OWNER, f"/check {product}")
+
+
 # history ──────────────────────────────────────────────────────────────
 
 
@@ -2335,6 +2549,8 @@ async def scenario_monitor_checkall_failures(w: LegacyWorld) -> None:
 async def scenario_history_picker(w: LegacyWorld) -> None:
     await seed_p1(w)
     await seed_p2(w)
+    await w.recorder.command(OWNER, "/storia")
+    await seed_product(w, OWNER, item_url(68), LN81, initial="80.00")
     await w.recorder.command(OWNER, "/storia")
 
 
@@ -2371,6 +2587,41 @@ async def scenario_history_reset(w: LegacyWorld) -> None:
     await w.recorder.command(OWNER, f"/azzera {p2}")
     await w.recorder.command(OWNER, "/reset abc")
     await w.recorder.command(OWNER, "/reset 999")
+    long_id = await seed_product(w, OWNER, item_url(69), LN81, initial="100.00", current="80.00")
+    await w.recorder.command(OWNER, f"/reset {long_id}")
+
+
+@scenario("history.chart_edges")
+async def scenario_history_chart_edges(w: LegacyWorld) -> None:
+    in_window = ("2026-02-01 10:00:00", "2026-02-20 10:00:00")
+    # HA: 51 characters whose only closing dollar is the 51st, so the title and
+    # the caption (both cut at 50) hold a single dollar; two change points.
+    ha_name = r"Cable $\zz " + "x" * 39 + "$"
+    # HB: two points under one euro. HC: two points, both outside the window.
+    # HD: a dollar pair in the title, which the chart cannot render (a known defect).
+    charts = (
+        (item_url(92), ha_name, (("50.00", "40.00"), in_window)),
+        (item_url(93), "Sticker", (("0.90", "0.80"), in_window)),
+        (
+            item_url(94),
+            "Old Points",
+            (("60.00", "55.00"), ("2025-10-01 10:00:00", "2025-11-01 10:00:00")),
+        ),
+        (item_url(95), r"Cable $\zz$", (("50.00", "40.00"), in_window)),
+    )
+    for url, name, (prices, stamps) in charts:
+        product = await seed_product(
+            w,
+            OWNER,
+            url,
+            name,
+            initial=prices[0],
+            current=prices[1],
+            lowest=prices[1],
+            highest=prices[0],
+            history=tuple(zip(stamps, prices, strict=True)),
+        )
+        await w.recorder.command(OWNER, f"/storia {product}")
 
 
 # settings ─────────────────────────────────────────────────────────────
@@ -2391,6 +2642,9 @@ async def scenario_settings_interval(w: LegacyWorld) -> None:
         await w.recorder.command(ADMIN, text)
     await w.recorder.command(ADMIN, "/intervallo abc")
     await w.recorder.command(ADMIN, "/intervallo 30")
+    # The minimum, a whole hour, and one past the maximum.
+    for text in ("/intervallo 5", "/intervallo 60", "/intervallo 10081"):
+        await w.recorder.command(ADMIN, text)
 
 
 @scenario("settings.mute")
@@ -2400,6 +2654,7 @@ async def scenario_settings_mute(w: LegacyWorld) -> None:
         await w.recorder.command(OWNER, text)
     await w.recorder.command(OWNER, "/mute 999")
     await w.recorder.command(OWNER, "/mute all 48")
+    await w.recorder.command(OWNER, "/mute all 1")
 
 
 @scenario("settings.unmute")
@@ -2414,6 +2669,7 @@ async def scenario_settings_unmute(w: LegacyWorld) -> None:
 async def scenario_settings_digest_mode(w: LegacyWorld) -> None:
     for args in ("", " on", " on 30", " on 0", " on abc", " off"):
         await w.recorder.command(OWNER, f"/digest_mode{args}")
+    await w.recorder.command(OWNER, "/digest_mode on 1")
 
 
 @scenario("settings.quiet_hours")
@@ -2422,6 +2678,10 @@ async def scenario_settings_quiet_hours(w: LegacyWorld) -> None:
         await w.recorder.command(OWNER, f"/quiet_hours{args}")
     await w.recorder.command(OWNER, "/quiet_hours 2200")
     await w.recorder.command(OWNER, "/quiet_hours ab:cd-08:00")
+    # Out-of-range minutes and hours at each bound, a zero hour, and three times.
+    for args in (" 22:75-08:00", " 00:30-08:00", " 24:00-08:00", " 22:60-08:00"):
+        await w.recorder.command(OWNER, f"/quiet_hours{args}")
+    await w.recorder.command(OWNER, "/quiet_hours 22:00-08:00-09:00")
 
 
 @scenario("settings.timezone")
@@ -2441,22 +2701,81 @@ async def scenario_settings_prefs(w: LegacyWorld) -> None:
     p1 = await seed_p1(w)
     for text in ("/prefs", f"/mute {p1} forever", f"/prefs {p1}", "/prefs abc", "/prefs 0"):
         await w.recorder.command(OWNER, text)
+    # The global view after a per-product row exists, then a global and a
+    # per-product row that disagree on every field the view prints.
+    await w.recorder.command(OWNER, "/prefs")
+    await seed_command(w, OWNER, "/digest_mode on 30")
+    await seed_command(w, OWNER, "/timezone America/New_York")
+    per_product: dict[str, object] = {"user_id": OWNER, "product_id": p1}
+    for column, value in (
+        ("quiet_hours_start", "22:00"),
+        ("quiet_hours_end", "08:00"),
+        ("throttle_per_hour", 3),
+    ):
+        await w.recorder.seed(
+            f"per-product {column}", reanchor(w, "notification_prefs", per_product, column, value)
+        )
+    await w.recorder.command(OWNER, "/prefs")
+    await w.recorder.command(OWNER, f"/prefs {p1}")
 
 
 @scenario("settings.digest_now_empty")
 async def scenario_settings_digest_now_empty(w: LegacyWorld) -> None:
     await w.recorder.command(OWNER, "/digest_now")
+    # A pending row that no longer parses is flushed (quarantined), never kept.
+    await w.recorder.seed(
+        "enqueue unparseable row",
+        w.repo.enqueue_digest(user_id=OWNER, product_id=None, payload="{not json"),
+    )
+    await w.recorder.command(OWNER, "/digest_now")
 
 
 @scenario("settings.digest_now_flush")
 async def scenario_settings_digest_now_flush(w: LegacyWorld) -> None:
-    await seed_p1(w)
+    p1 = await seed_p1(w)
     await seed_p2(w)
     script_drop(w)
     w.scraper.script(FAN_URL, info("40.00", name="Fan", currency="USD"))
+    # A 73-character name: over the digest row's 60-character budget.
+    long_name = "Ultra Quiet Stainless Steel Electric Kettle With Temperature Control 1.7L"
+    await seed_product(w, OWNER, ITEM4_URL, long_name, initial="40.00", current="40.00")
+    w.scraper.script(ITEM4_URL, info("30.00", name=long_name))
     await seed_command(w, OWNER, "/digest_mode on")
     await w.recorder.job("run_check_all")
     await reanchor_digest(w, "2026-03-01 10:00:00", "2026-03-01 10:00:01")
+    # Sparse rows: a price row without a product name, a warning and a suspension
+    # without counts, and a row that no longer parses.
+    sparse: tuple[tuple[int | None, dict[str, object]], ...] = (
+        (
+            p1,
+            {
+                "kind": "price",
+                "old_price": "80.00",
+                "new_price": "64.00",
+                "currency": "EUR",
+                "domain": "example.com",
+            },
+        ),
+        (None, {"kind": "operational", "event": "warning", "domain": "example.com"}),
+        (
+            None,
+            {
+                "kind": "operational",
+                "event": "suspended",
+                "domain": "example.com",
+                "reason": "parse_error",
+            },
+        ),
+    )
+    for product_id, payload in sparse:
+        await w.recorder.seed(
+            "enqueue sparse row",
+            w.digest.enqueue(user_id=OWNER, product_id=product_id, payload=payload),
+        )
+    await w.recorder.seed(
+        "enqueue unparseable row",
+        w.repo.enqueue_digest(user_id=OWNER, product_id=None, payload="{not json"),
+    )
     await w.recorder.command(OWNER, "/digest_now")
 
 
@@ -2476,6 +2795,9 @@ async def scenario_settings_first_and_repeat(w: LegacyWorld) -> None:
 async def scenario_admin_cmd_adduser(w: LegacyWorld) -> None:
     for text in ("/adduser", "/adduser abc", "/adduser 99", f"/adduser {OWNER}"):
         await w.recorder.command(ADMIN, text)
+    # The new user has blocked the bot: the welcome is lost, the user is added.
+    w.request.fail_next_call_to(98)
+    await w.recorder.command(ADMIN, "/adduser 98")
 
 
 @scenario("admin.cmd_removeuser")
@@ -2535,6 +2857,10 @@ async def scenario_admin_adduser_prompt(w: LegacyWorld) -> None:
     await w.recorder.press(ADMIN, "menu_admin_adduser")
     await w.recorder.text(ADMIN, "abc")
     await w.recorder.text(ADMIN, "99")
+    # Re-armed prompt, the new user has blocked the bot: still added.
+    await w.recorder.press(ADMIN, "menu_admin_adduser")
+    w.request.fail_next_call_to(98)
+    await w.recorder.text(ADMIN, "98")
 
 
 @scenario("admin.adduser_prompt_existing")
@@ -2593,6 +2919,15 @@ async def scenario_admin_interval_prompt(w: LegacyWorld) -> None:
         await w.recorder.text(ADMIN, text)
     await w.recorder.press(ADMIN, "menu_admin_interval")
     await w.recorder.text(ADMIN, "30")
+    # One past the maximum is refused and keeps the prompt; the minimum is taken.
+    await w.recorder.press(ADMIN, "menu_admin_interval")
+    await w.recorder.text(ADMIN, "10081")
+    await w.recorder.text(ADMIN, "5")
+    # A whole hour, then the info screen that reads the saved interval back.
+    await w.recorder.press(ADMIN, "menu_admin_interval")
+    await w.recorder.text(ADMIN, "60")
+    await w.recorder.command(ADMIN, "/menu")
+    await w.recorder.press(ADMIN, "menu_info")
 
 
 @scenario("admin.debug_prompt")
@@ -2611,6 +2946,11 @@ async def scenario_admin_cmd_debug(w: LegacyWorld) -> None:
     await w.recorder.command(ADMIN, "/debug")
     await w.recorder.command(ADMIN, f"/debug {KETTLE_URL}")
     await w.recorder.command(ADMIN, "/debug https://unknown.example.org/p")
+    # A long URL cut in the header and in the error line, and a long scraped name.
+    await w.recorder.command(ADMIN, "/debug http:/" + "x" * 90)
+    long_url = "https://shop.example.com/item/44"
+    w.scraper.script(long_url, ProductInfo(name=LN81, price=Decimal("80.00")))
+    await w.recorder.command(ADMIN, f"/debug {long_url}")
 
 
 @scenario("admin.submenus_non_admin")
@@ -2676,6 +3016,28 @@ async def scenario_status_errori(w: LegacyWorld) -> None:
     await seed_blocks(w, "example.com", "http_403")
     await w.recorder.command(OWNER, "/errori")
     await w.recorder.command(OWNER, "/errors")
+    # A long name with a long error an hour old, and an error exactly a day old.
+    await seed_product(
+        w,
+        OWNER,
+        item_url(60),
+        LN81,
+        initial="80.00",
+        errors=1,
+        last_error="parse_error: " + "e" * 140,
+        last_error_at="2026-03-01 11:00:00",
+    )
+    await seed_product(
+        w,
+        OWNER,
+        item_url(61),
+        "P4",
+        initial="50.00",
+        errors=1,
+        last_error="x",
+        last_error_at="2026-02-28 12:00:00",
+    )
+    await w.recorder.command(OWNER, "/errori")
 
 
 @scenario("status.user_short_interval")
@@ -2696,6 +3058,45 @@ async def scenario_status_health_half_open(w: LegacyWorld) -> None:
     await seed_lock_until(w, "blocked.example.com", "2026-03-01T12:30:00+00:00")
     await w.recorder.command(ADMIN, "/health")
     await w.recorder.command(OWNER, "/errori")
+
+
+@scenario("status.user_hour_interval")
+async def scenario_status_user_hour_interval(w: LegacyWorld) -> None:
+    await seed_config(w, "check_interval_minutes", "60")
+    await w.recorder.command(OWNER, "/stato")
+
+
+@scenario("status.health_many_domains")
+async def scenario_status_health_many_domains(w: LegacyWorld) -> None:
+    # Seven domains with a block: six single blocks a minute apart, and one domain
+    # locked for one more second. The list of recent blocks keeps the newest five.
+    for n in range(1, 7):
+        domain = f"d{n}.example.net"
+        await w.recorder.seed(
+            f"record block {domain}", w.health.record_block(domain, reason="http_403")
+        )
+        await w.recorder.seed(
+            f"reanchor {domain}",
+            reanchor(
+                w,
+                "scraper_health",
+                {"domain": domain},
+                "last_block_at",
+                f"2026-03-01T11:0{n}:00+00:00",
+            ),
+        )
+    await w.recorder.seed("reload domain health", w.health.load())
+    await seed_blocks(w, "edge.example.net", "http_403")
+    await seed_lock_until(w, "edge.example.net", "2026-03-01T12:00:01+00:00")
+    await w.recorder.command(ADMIN, "/health")
+
+
+@scenario("status.uptime_zero")
+async def scenario_status_uptime_zero(w: LegacyWorld) -> None:
+    # Started at this very instant (production sets the start before polling, so
+    # it never reads zero): the frozen monotonic clock gives an uptime of 0.
+    w.app.bot_data["start_time"] = time.monotonic()
+    await w.recorder.command(OWNER, "/stato")
 
 
 # text ─────────────────────────────────────────────────────────────────
@@ -2747,7 +3148,8 @@ async def seed_two_drops_in_digest(w: LegacyWorld) -> None:
 
 @scenario("alert.price_drop")
 async def scenario_alert_price_drop(w: LegacyWorld) -> None:
-    await seed_p1(w)
+    # One earlier failure, so the reset of the error count on a good read shows.
+    await seed_p1(w, errors=1)
     await seed_p3(w)
     script_drop(w)
     w.scraper.script(LAMP_URL, info("30.00", name="Lamp"))
@@ -2773,6 +3175,12 @@ async def scenario_alert_target_crossing(w: LegacyWorld) -> None:
 async def scenario_alert_back_in_stock(w: LegacyWorld) -> None:
     await seed_p1(w, available=False)
     w.scraper.script(KETTLE_URL, ProductInfo(price=Decimal("80.00"), available=True))
+    await w.recorder.job("run_check_all")
+    # Back in stock again with digest mode on: the queued payload keeps the old price.
+    await seed_command(w, OWNER, "/digest_mode on")
+    await w.recorder.seed(
+        "out of stock again", reanchor(w, "products", {"id": 1}, "is_available", 0)
+    )
     await w.recorder.job("run_check_all")
 
 
@@ -2806,6 +3214,17 @@ async def scenario_alert_throttled_digest(w: LegacyWorld) -> None:
     await seed_three_drops(w)
     await seed_command(w, OWNER, "/throttle 1")
     await seed_command(w, OWNER, "/digest_mode on")
+    # A send 90 minutes ago, outside the hour: evicted, so it does not count.
+    await w.recorder.seed(
+        "stale throttle timestamp",
+        reanchor(
+            w,
+            "notification_prefs",
+            {"user_id": OWNER, "product_id": None},
+            "throttle_state_json",
+            '{"ts": [1772361000.0]}',
+        ),
+    )
     await w.recorder.job("run_check_all")
 
 
@@ -2825,6 +3244,12 @@ async def scenario_alert_quiet_operational(w: LegacyWorld) -> None:
     await w.recorder.job("run_check_all")
     await w.recorder.job("run_check_all")
     await w.recorder.command(OWNER, "/digest_now")
+    # A good read, then the same failures again: the repeated warning carries the
+    # same event id under the frozen clock, and a queued event is not queued twice.
+    w.scraper.script(KETTLE_URL, info("80.00"), ParseError("no price"))
+    for _ in range(3):
+        await w.recorder.job("run_check_all")
+    await w.recorder.command(OWNER, "/digest_now")
 
 
 @scenario("alert.digest_flush_due")
@@ -2841,6 +3266,25 @@ async def scenario_alert_digest_not_due(w: LegacyWorld) -> None:
     await seed_job(w)
     await reanchor_digest(w, "2026-03-01 11:30:00", "2026-03-01 11:30:01")
     await w.recorder.job("digest_flush_due", interval_minutes=60)
+    # OWNER's own 30-minute interval makes the same rows due; OTHER has no
+    # preference row, so the job's 60-minute fallback applies to a 2-hour-old row.
+    await seed_command(w, OWNER, "/digest_mode on 30")
+    lamp = {
+        "kind": "price",
+        "product_name": "Lamp",
+        "old_price": "30.00",
+        "new_price": "25.00",
+        "currency": "EUR",
+        "domain": "example.com",
+    }
+    await w.recorder.seed(
+        "enqueue for OTHER", w.digest.enqueue(user_id=OTHER, product_id=None, payload=lamp)
+    )
+    await w.recorder.seed(
+        "reanchor enqueued_at",
+        reanchor(w, "digest_queue", {"id": 3}, "enqueued_at", "2026-03-01 10:00:00"),
+    )
+    await w.recorder.job("digest_flush_due", interval_minutes=60)
 
 
 @scenario("alert.operational_warning")
@@ -2852,6 +3296,19 @@ async def scenario_alert_operational_warning(w: LegacyWorld) -> None:
 @scenario("alert.operational_suspended")
 async def scenario_alert_operational_suspended(w: LegacyWorld) -> None:
     await seed_two_failing(w)
+    # A third failing product whose last good read is too wide for the notice's
+    # budget, so its currency code is shortened.
+    await seed_product(
+        w,
+        OWNER,
+        ITEM5_URL,
+        "Vault",
+        initial="100.00",
+        current="123456789012345678.00",
+        currency="CHF",
+        last_checked_at="2026-03-01 10:00:00",
+    )
+    w.scraper.script(ITEM5_URL, ParseError("no price"))
     await w.recorder.job("run_check_all")
     await w.recorder.job("run_check_all")
 
@@ -2931,6 +3388,26 @@ async def scenario_alert_suspicious_drop(w: LegacyWorld) -> None:
         w, OWNER, ITEM5_URL, "Mixed", initial="100.00", current="80.00", history=KETTLE_HISTORY
     )
     w.scraper.script(ITEM5_URL, info("40.00", name="Mixed"), info("50.00", currency="USD"))
+    # 51 points: the 26 oldest at 10.00, the 25 newest at 100.00. The filter reads
+    # the newest 50, whose median (55.00) makes a read of 20.00 suspicious.
+    start = datetime(2026, 1, 1, 10, 0, 0)
+    long_history = tuple(
+        ((start + timedelta(days=n)).strftime("%Y-%m-%d %H:%M:%S"), "10.00" if n < 26 else "100.00")
+        for n in range(51)
+    )
+    await seed_product(
+        w,
+        OWNER,
+        item_url(35),
+        "Long History",
+        initial="100.00",
+        current="100.00",
+        history=long_history,
+    )
+    # Read once at 20.00, then back at 100.00, so the held read is never confirmed.
+    w.scraper.script(
+        item_url(35), info("20.00", name="Long History"), info("100.00", name="Long History")
+    )
     for _ in range(8):
         await w.recorder.job("run_check_all")
 
@@ -2947,6 +3424,47 @@ async def scenario_alert_threshold_kinds(w: LegacyWorld) -> None:
     for url, name, threshold, price in kinds:
         await seed_product(w, OWNER, url, name, initial="60.00", threshold=threshold)
         w.scraper.script(url, info(price, name=name))
+    # An any-drop read at the same price, an HTML-escaped name with a 50 % drop
+    # from 1.00, a drop just short of 10 %, and a new offer with and without a
+    # pinned condition.
+    edges = (
+        (item_url(30), "Steady", ("any_drop", "0"), "60.00", info("60.00", name="Steady")),
+        (
+            item_url(31),
+            'Chef\'s "Penny" Pan',
+            ("percentage", "10"),
+            "1.00",
+            info("0.50", name='Chef\'s "Penny" Pan'),
+        ),
+        (
+            item_url(32),
+            "Near Miss",
+            ("percentage", "10"),
+            "100.00",
+            info("90.05", name="Near Miss"),
+        ),
+        (
+            item_url(33),
+            "Pinned New",
+            ("percentage", "10"),
+            "60.00",
+            ProductInfo(price=Decimal("59.00"), condition="new"),
+        ),
+        (
+            item_url(34),
+            "Unpinned",
+            ("percentage", "10"),
+            "60.00",
+            ProductInfo(price=Decimal("59.00"), condition="new"),
+        ),
+    )
+    for url, name, threshold, price, page in edges:
+        product = await seed_product(
+            w, OWNER, url, name, initial=price, current=price, threshold=threshold
+        )
+        w.scraper.script(url, page)
+        if name == "Pinned New":
+            await reanchor(w, "products", {"id": product}, "preferred_condition", "new")
     await w.recorder.job("run_check_all")
 
 
@@ -2963,6 +3481,13 @@ async def scenario_alert_many_failing(w: LegacyWorld) -> None:
 @scenario("alert.quarantine_skip")
 async def scenario_alert_quarantine_skip(w: LegacyWorld) -> None:
     await seed_locked_and_half_open(w)
+    # Neither may take the half-open probe: ADMIN's product is paused, and OTHER
+    # is swept after OWNER (users in row order), whose probe already happened.
+    await seed_product(w, ADMIN, AMAZON_URLS[2], "Amazon Paused", initial="25.00", active=False)
+    w.scraper.script(AMAZON_URLS[2], info("20.00", name="Amazon Paused"))
+    other_url = "https://www.amazon.com/dp/B0FIXTURE4"
+    await seed_product(w, OTHER, other_url, "Amazon Other", initial="25.00", current="25.00")
+    w.scraper.script(other_url, info("20.00", name="Amazon Other"))
     await w.recorder.job("run_check_all")
 
 
@@ -3010,6 +3535,61 @@ async def scenario_alert_digest_flush_quiet(w: LegacyWorld) -> None:
     await seed_job(w)
     await reanchor_digest(w, "2026-03-01 10:00:00", "2026-03-01 10:00:01")
     await w.recorder.job("digest_flush_due", interval_minutes=60)
+
+
+@scenario("alert.prefs_expiry")
+async def scenario_alert_prefs_expiry(w: LegacyWorld) -> None:
+    p1 = await seed_p1(w)
+    script_drop(w)
+    await seed_product(w, OWNER, ITEM4_URL, "Lamp", initial="40.00")
+    w.scraper.script(ITEM4_URL, info("30.00", name="Lamp"))
+    await seed_command(w, OWNER, "/timezone Europe/Rome")
+    await w.recorder.job("run_check_all")
+    # A window that does not wrap and does not contain 13:00 in Rome.
+    await seed_command(w, OWNER, "/quiet_hours 14:00-16:00")
+    # A per-product mute that expired an hour ago: the Kettle's new low is sent.
+    await seed_command(w, OWNER, f"/mute {p1} 2")
+    await w.recorder.seed(
+        "expire the per-product mute",
+        reanchor(
+            w,
+            "notification_prefs",
+            {"user_id": OWNER, "product_id": p1},
+            "mute_until",
+            "2026-03-01T11:00:00+00:00",
+        ),
+    )
+    # 57.50 is a 10 % drop from 64.00 that the outlier filter still accepts (at
+    # least 0.6 x the history median of 95.00); 56.00 would be held as suspicious.
+    w.scraper.script(KETTLE_URL, info("57.50"))
+    await w.recorder.job("run_check_all")
+    # A global mute that expired an hour ago: the Lamp's new low is sent.
+    await seed_command(w, OWNER, "/mute all 2")
+    await w.recorder.seed(
+        "expire the global mute",
+        reanchor(
+            w,
+            "notification_prefs",
+            {"user_id": OWNER, "product_id": None},
+            "mute_until",
+            "2026-03-01T11:00:00+00:00",
+        ),
+    )
+    w.scraper.script(ITEM4_URL, info("20.00", name="Lamp"))
+    await w.recorder.job("run_check_all")
+
+
+@scenario("alert.read_failures_domains")
+async def scenario_alert_read_failures_domains(w: LegacyWorld) -> None:
+    # Each domain's only read is skipped (another currency, a used offer when new
+    # is pinned), yet the domain is seen reachable. The Dollar has no errors, so a
+    # reset of its error count cannot show.
+    await seed_product(w, OWNER, ITEM5_URL, "Dollar", initial="40.00", errors=0)
+    w.scraper.script(ITEM5_URL, info("50.00", name="Dollar", currency="USD"))
+    used = await seed_product(w, OWNER, AMAZON_URLS[2], "Used Offer", initial="40.00")
+    w.scraper.script(AMAZON_URLS[2], ProductInfo(price=Decimal("40.00"), condition="used"))
+    await reanchor(w, "products", {"id": used}, "preferred_condition", "new")
+    await w.recorder.job("run_check_all")
 
 
 # ops ──────────────────────────────────────────────────────────────────
@@ -3074,6 +3654,41 @@ async def scenario_ops_invalid_id_delete(w: LegacyWorld) -> None:
     _, notice = await seed_suspended(w)
     await w.recorder.press(OWNER, "ops_del_x", on=notice)
     await w.recorder.press(OWNER, "ops_delok_x")
+
+
+@scenario("ops.reactivate_failure_kinds")
+async def scenario_ops_reactivate_failure_kinds(w: LegacyWorld) -> None:
+    # Four products suspended together, then each fails the recheck differently.
+    p1 = await seed_p1(w)
+    group = (
+        (ITEM4_URL, "Speaker", "40.00", ListingGone(status=404, url=ITEM4_URL)),
+        (ITEM5_URL, "Mixer", "60.00", httpx.ConnectError("connection refused")),
+        (ITEM7_URL, "Heater", "40.00", RuntimeError("scraper crashed")),
+    )
+    w.scraper.script(KETTLE_URL, ParseError("no price"))
+    for url, name, price, _ in group:
+        await seed_product(w, OWNER, url, name, initial=price, current=price)
+        w.scraper.script(url, ParseError("no price"))
+    await seed_job(w)
+    await seed_job(w)
+    w.scraper.script(KETTLE_URL, HTTPBlockStatus(status=403, url=KETTLE_URL))
+    for url, _, _, failure in group:
+        w.scraper.script(url, failure)
+    await w.recorder.press(OWNER, f"ops_react_{p1}")
+
+
+@scenario("ops.reactivate_name_edges")
+async def scenario_ops_reactivate_name_edges(w: LegacyWorld) -> None:
+    # A product without a name shows its URL; a long name is cut at 60.
+    nameless = await seed_product(w, OWNER, item_url(75), "", initial="80.00", current="80.00")
+    await seed_product(w, OWNER, item_url(76), LN81, initial="80.00", current="80.00")
+    for n in (75, 76):
+        w.scraper.script(item_url(n), ParseError("no price"))
+    await seed_job(w)
+    await seed_job(w)
+    for n in (75, 76):
+        w.scraper.script(item_url(n), ProductInfo(price=Decimal("80.00")))
+    await w.recorder.press(OWNER, f"ops_react_{nameless}")
 
 
 # ── T-S: scenarios ───────────────────────────────────────────────────

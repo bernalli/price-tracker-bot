@@ -39,3 +39,10 @@
 ## db after step 6
 ~ notification_prefs user_id=10,product_id=NULL digest_mode: 1 -> 0
 ~ notification_prefs user_id=10,product_id=NULL digest_interval_minutes: 30 -> 60
+## step 7: command "/digest_mode on 1" user=10
+-> sendMessage chat=10
+   text:
+   | Digest mode on (interval 1m).
+## db after step 7
+~ notification_prefs user_id=10,product_id=NULL digest_mode: 0 -> 1
+~ notification_prefs user_id=10,product_id=NULL digest_interval_minutes: 60 -> 1

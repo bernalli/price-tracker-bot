@@ -12,3 +12,14 @@
    | [#2 Fan → check_2]
 ## db after step 1
 ~ users user_id=10 display_name: NULL -> "U10"
+## step 2: command "/check" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | 📦 <b>Scegli prodotto da controllare:</b>
+   keyboard:
+   | [#1 Kettle €80.00 → check_1]
+   | [#2 Fan → check_2]
+   | [#3 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNN €80.00 → check_3]
+## db after step 2
+(no changes)

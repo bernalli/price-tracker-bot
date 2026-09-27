@@ -85,3 +85,47 @@
    | ❌ ID non valido.
 ## db after step 11
 (no changes)
+## step 12: command "/refresh 1 1" user=10
+-> sendMessage chat=10
+   text:
+   | ❌ L'intervallo minimo è 5 minuti.
+## db after step 12
+(no changes)
+## step 13: command "/refresh 1 5" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | 🔄 Intervallo check: <b>ogni 5 minuti</b>
+   | 📦 #1 — Kettle
+## db after step 13
+~ products id=1 check_interval_minutes: NULL -> 5
+## step 14: command "/refresh 1 10081" user=10
+-> sendMessage chat=10
+   text:
+   | ❌ L'intervallo massimo è 7 giorni.
+## db after step 14
+(no changes)
+## step 15: command "/refresh 1 60" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | 🔄 Intervallo check: <b>ogni 1 hour</b>
+   | 📦 #1 — Kettle
+## db after step 15
+~ products id=1 check_interval_minutes: 5 -> 60
+## step 16: command "/refresh 2 0" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | 🔄 Intervallo ripristinato a quello globale (ogni 360 min)
+   | 📦 #2 — Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
+## db after step 16
+(no changes)
+## step 17: command "/refresh 2 30" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | 🔄 Intervallo check: <b>ogni 30 minuti</b>
+   | 📦 #2 — Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
+## db after step 17
+~ products id=2 check_interval_minutes: NULL -> 30

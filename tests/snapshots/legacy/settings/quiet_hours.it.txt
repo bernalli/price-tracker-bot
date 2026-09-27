@@ -51,3 +51,34 @@
    | Invalid time format. Use 24h HH:MM.
 ## db after step 8
 (no changes)
+## step 9: command "/quiet_hours 22:75-08:00" user=10
+-> sendMessage chat=10
+   text:
+   | Invalid time format. Use 24h HH:MM.
+## db after step 9
+(no changes)
+## step 10: command "/quiet_hours 00:30-08:00" user=10
+-> sendMessage chat=10
+   text:
+   | Quiet hours set to 00:30-08:00.
+## db after step 10
+~ notification_prefs user_id=10,product_id=NULL quiet_hours_start: NULL -> "00:30"
+~ notification_prefs user_id=10,product_id=NULL quiet_hours_end: NULL -> "08:00"
+## step 11: command "/quiet_hours 24:00-08:00" user=10
+-> sendMessage chat=10
+   text:
+   | Invalid time format. Use 24h HH:MM.
+## db after step 11
+(no changes)
+## step 12: command "/quiet_hours 22:60-08:00" user=10
+-> sendMessage chat=10
+   text:
+   | Invalid time format. Use 24h HH:MM.
+## db after step 12
+(no changes)
+## step 13: command "/quiet_hours 22:00-08:00-09:00" user=10
+-> sendMessage chat=10
+   text:
+   | Invalid time format. Use 24h HH:MM.
+## db after step 13
+(no changes)

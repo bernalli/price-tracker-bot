@@ -18,3 +18,19 @@
 ~ products id=1 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
 + scraper_health domain="example.com" {state="CLOSED", consecutive_blocks=0, locked_until=NULL, last_block_at=NULL, last_block_reason=NULL, last_success_at="2026-03-01T12:00:00+00:00", updated_at=<now:9999-99-99 99:99:99>}
 ~ users user_id=10 display_name: NULL -> "U10"
+## step 2: command "/check 2" user=10
+-> sendMessage chat=10
+   text:
+   | 🔍 Controllo in corso...
+-> editMessageText chat=10 message_id=1001
+   param parse_mode="HTML"
+   text:
+   | ✅ <b>Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN</b>
+   | 💰 Prezzo: €85.00
+   | 📊 Nessuna variazione significativa.
+## db after step 2
++ price_history id=7 {product_id=2, price="85.00", checked_at=<now:9999-99-99 99:99:99>}
+~ products id=2 current_price: "80.00" -> "85.00"
+~ products id=2 last_checked_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=2 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
+~ products id=2 lowest_price: "100.00" -> "85.00"

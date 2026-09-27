@@ -38,3 +38,146 @@
    | [◀️ Menu → menu_main]
 ## db after step 2
 (no changes)
+## step 3: command "/menu" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | 📋 <b>Menu</b>
+   |
+   | Cosa vuoi fare?
+   keyboard:
+   | [📦 Prodotti → menu_prodotti] [🔍 Prezzi → menu_prezzi]
+   | [🔔 Notifiche → menu_notifiche] [💾 Dati → menu_dati]
+   | [📊 Stato e info → menu_info]
+## db after step 3
+(no changes)
+## step 4: press "menu_prezzi" user=10 on=1001
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1001
+   param parse_mode="HTML"
+   text:
+   | 🔍 <b>Controllo prezzi</b>
+   |
+   | Tocca un prodotto per controllarlo.
+   keyboard:
+   | [🔄 Controlla tutti i prezzi → menu_checkall]
+   | [🔍 #1 Item 01 → check_1]
+   | [🔍 #2 Item 02 → check_2]
+   | [🔍 #3 Item 03 → check_3]
+   | [🔍 #4 Item 04 → check_4]
+   | [🔍 #5 Item 05 → check_5]
+   | [🔍 #6 Item 06 → check_6]
+   | [🔍 #7 Item 07 → check_7]
+   | [🔍 #8 Item 08 → check_8]
+   | [📊 Storico prezzo → menu_storia]
+   | [◀️ Menu → menu_main]
+## db after step 4
+(no changes)
+## step 5: command "/menu" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | 📋 <b>Menu</b>
+   |
+   | Cosa vuoi fare?
+   keyboard:
+   | [📦 Prodotti → menu_prodotti] [🔍 Prezzi → menu_prezzi]
+   | [🔔 Notifiche → menu_notifiche] [💾 Dati → menu_dati]
+   | [📊 Stato e info → menu_info]
+## db after step 5
+(no changes)
+## step 6: press "menu_storia" user=10 on=1002
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1002
+   param parse_mode="HTML"
+   text:
+   | 📊 <b>Storico prezzi</b>
+   |
+   | Tocca un prodotto per il grafico.
+   keyboard:
+   | [📊 #1 Item 01 → chart_1]
+   | [📊 #2 Item 02 → chart_2]
+   | [📊 #3 Item 03 → chart_3]
+   | [📊 #4 Item 04 → chart_4]
+   | [📊 #5 Item 05 → chart_5]
+   | [📊 #6 Item 06 → chart_6]
+   | [📊 #7 Item 07 → chart_7]
+   | [📊 #8 Item 08 → chart_8]
+   | [📊 #9 Item 09 → chart_9]
+   | [📊 #10 Item 10 → chart_10]
+   | [◀️ Menu → menu_main]
+## db after step 6
+(no changes)
+## step 7: command "/menu" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | 📋 <b>Menu</b>
+   |
+   | Cosa vuoi fare?
+   keyboard:
+   | [📦 Prodotti → menu_prodotti] [🔍 Prezzi → menu_prezzi]
+   | [🔔 Notifiche → menu_notifiche] [💾 Dati → menu_dati]
+   | [📊 Stato e info → menu_info]
+## db after step 7
+(no changes)
+## step 8: press "menu_notifiche" user=10 on=1003
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1003
+   param parse_mode="HTML"
+   text:
+   | 🔔 <b>Notifiche</b>
+   |
+   | Tocca un prodotto per cambiare soglia o target.
+   keyboard:
+   | [#1 Item 01 [-10%] → edit_1]
+   | [#2 Item 02 [-10%] → edit_2]
+   | [#3 Item 03 [-10%] → edit_3]
+   | [#4 Item 04 [-10%] → edit_4]
+   | [#5 Item 05 [-10%] → edit_5]
+   | [#6 Item 06 [-10%] → edit_6]
+   | [#7 Item 07 [-10%] → edit_7]
+   | [#8 Item 08 [-10%] → edit_8]
+   | [#9 Item 09 [-10%] → edit_9]
+   | [#10 Item 10 [-10%] → edit_10]
+   | [◀️ Menu → menu_main]
+## db after step 8
+(no changes)
+## step 9: seed "\"/pausa 12\""
+## step 10: command "/menu" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | 📋 <b>Menu</b>
+   |
+   | Cosa vuoi fare?
+   keyboard:
+   | [📦 Prodotti → menu_prodotti] [🔍 Prezzi → menu_prezzi]
+   | [🔔 Notifiche → menu_notifiche] [💾 Dati → menu_dati]
+   | [📊 Stato e info → menu_info]
+## db after step 10
+(no changes)
+## step 11: press "menu_prodotti" user=10 on=1005
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1005
+   param parse_mode="HTML"
+   text:
+   | 📦 <b>I tuoi prodotti</b> (11 attivi)
+   |
+   | Tocca un prodotto per modificarlo.
+   keyboard:
+   | [#1 Item 01 €10.00 → edit_1]
+   | [#2 Item 02 €11.00 → edit_2]
+   | [#3 Item 03 €12.00 → edit_3]
+   | [#4 Item 04 €13.00 → edit_4]
+   | [#5 Item 05 €14.00 → edit_5]
+   | [#6 Item 06 €15.00 → edit_6]
+   | [#7 Item 07 €16.00 → edit_7]
+   | [#8 Item 08 €17.00 → edit_8]
+   | [#9 Item 09 €18.00 → edit_9]
+   | [#10 Item 10 €19.00 → edit_10]
+   | [... altri 1 → /lista → cmd_lista]
+   | [⏸ 1 in pausa → riattiva → menu_paused]
+   | [◀️ Menu → menu_main]
+## db after step 11
+(no changes)

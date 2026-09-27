@@ -73,3 +73,20 @@
    | ❌ Valore non valido: abc
 ## db after step 9
 (no changes)
+## step 10: command "/soglia 1 -20%" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | 🎯 Soglia impostata: <b>-20%</b>
+   | 📦 #1 — Kettle
+## db after step 10
+~ products id=1 threshold_type: "any_drop" -> "percentage"
+~ products id=1 threshold_value: "0" -> "20"
+## step 11: command "/soglia 2 20%" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | 🎯 Soglia impostata: <b>-20%</b>
+   | 📦 #2 — Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
+## db after step 11
+~ products id=2 threshold_value: "10" -> "20"

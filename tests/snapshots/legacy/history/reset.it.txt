@@ -41,3 +41,14 @@
    | ❌ Prodotto non trovato.
 ## db after step 5
 (no changes)
+## step 6: command "/reset 3" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | ✅ Prezzo iniziale aggiornato!
+   |
+   | 📦 <b>#3</b> Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
+   | 💰 Nuovo prezzo base: <b>€80.00</b>
+## db after step 6
+~ products id=3 initial_price: "100.00" -> "80.00"
+~ products id=3 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>

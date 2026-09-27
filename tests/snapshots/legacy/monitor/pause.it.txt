@@ -34,3 +34,13 @@
    | ❌ Prodotto non trovato.
 ## db after step 4
 (no changes)
+## step 5: command "/pausa 3" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | ⏸ Tracking in pausa: <b>Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN</b>
+   | Usa /riattiva 3 per riprendere.
+## db after step 5
+~ products id=3 is_active: 1 -> 0
+~ products id=3 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
+~ products id=3 suspension_kind: NULL -> "manual"

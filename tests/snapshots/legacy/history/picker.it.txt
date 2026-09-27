@@ -12,3 +12,14 @@
    | [#2 Fan → chart_2]
 ## db after step 1
 ~ users user_id=10 display_name: NULL -> "U10"
+## step 2: command "/storia" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | 📊 <b>Scegli un prodotto per lo storico:</b>
+   keyboard:
+   | [#1 Kettle → chart_1]
+   | [#2 Fan → chart_2]
+   | [#3 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNN → chart_3]
+## db after step 2
+(no changes)
