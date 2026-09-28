@@ -128,6 +128,20 @@ def test_initial_zero_has_no_change_suffix() -> None:
     assert "·" not in start_line
 
 
+def test_initial_none_has_no_start_row() -> None:
+    view = VARIANTS["base"]
+    from price_tracker.app.views import ProductView
+
+    no_initial_view = ProductView(
+        **{
+            **{f: getattr(view, f) for f in view.__dataclass_fields__},
+            "initial": None,
+        }
+    )
+    screen = product_card(no_initial_view, actions_for(no_initial_view), now=NOW)
+    assert not any(line.startswith("📌") for line in screen.text.split("\n"))
+
+
 # --- property 1 ----------------------------------------------------------
 
 
