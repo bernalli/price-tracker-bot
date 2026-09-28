@@ -1,0 +1,20 @@
+# ui snapshot v1
+# screen: card.base
+# locale: it
+# now: 2026-03-01T12:00:00Z
+text:
+   | 📦 <b>⁨Wireless Headphones X200 Pro Edition with Active Noise Canc…⁩</b>
+   | ⁨shop.example.com⁩ · #42 · attivo
+   | 
+   | 💰 Ora: 1.299,99 €
+   | 📌 Inizio: 1.499,99 € · ▼ 13,3%
+   | 📉 Minimo: 1.249,00 €
+   | 🎯 Obiettivo: 1.199,00 €
+   | 🔔 Avviso: ribasso del 10% dall'inizio
+   | 🔄 Controlli: ogni 6 h · ultimo 6 ore fa
+keyboard:
+   [🔍 Controlla ora](cb:p:42:ck)  [📊 Storico](cb:p:42:ch:30d)
+   [⏸ Pausa](cb:p:42:pa)  [🗑 Elimina](cb:p:42:rm)
+   [🔔 Regola avviso](cb:p:42:th)  [🔄 Intervallo](cb:p:42:iv)
+   [🔗 Apri](url:https://shop.example.com/item/42)
+   [◀️ Lista](cb:l:a:1)
