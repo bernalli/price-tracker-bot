@@ -12,6 +12,8 @@ import hashlib
 import inspect
 import json
 import re
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -35,9 +37,10 @@ FROZEN_SHA256 = {
     "parse_price": "db6292be7cb50da6b5bdeb09e64bca659f66003d1e9e39a85464b37b2064772e",
     "detect_currency": "a3692cee466f4c86e9dc12bd8a4bc6ef58b66418a863b880e279c9d674914732",
 }
-EXCEPTIONS_COUNT = {"parse_price": 290}
+EXCEPTIONS_COUNT = {"parse_price": 290, "detect_currency": 225}
 EXCEPTIONS_SHA256 = {
-    "parse_price": "cb94e2c1863bf2b3b0fd620475c424d2f8238bf0fe8d73e6508fa9c0b6508839",
+    "parse_price": "c014f9b13c7defa3804b4c57f45f3d5e4e9405b0864ead662b60db70b3945d33",
+    "detect_currency": "0e40ee13a8823858781e4d819923179aff68ec5dbcd72782a85b21867d5be712",
 }
 
 
@@ -114,8 +117,8 @@ def test_frozen_callable_is_unchanged_or_declared_wired(fn: str) -> None:
         assert set(diffs) == expected
 
 
-def test_exceptions_equal_the_live_diff() -> None:
-    fn = "parse_price"
+@pytest.mark.parametrize("fn", rp.KNOWN_FUNCTIONS)
+def test_exceptions_equal_the_live_diff(fn: str) -> None:
     manifest = rp.load_manifest(MANIFEST_PATH)
     frozen = rp.load_frozen(FROZEN_PATHS[fn], manifest=manifest)
     exceptions = rp.load_exceptions(EXCEPTIONS_PATHS[fn], manifest=manifest, frozen=frozen)
@@ -129,7 +132,7 @@ def test_exceptions_equal_the_live_diff() -> None:
         new = None if s is None else rp.serialize(rp._call_subject(subject, s))  # noqa: SLF001
         if new == old:
             continue
-        kind, cls = rp.classify(s, old, new)
+        kind, cls = rp.classify(s, old, new, function=fn)
         computed.append({"input": s, "old": old, "new": new, "kind": kind, "class": cls})
 
     actual = [
@@ -196,6 +199,7 @@ def test_corpus_has_no_urls_hostnames_or_names() -> None:
 @pytest.mark.parametrize("fn", rp.KNOWN_FUNCTIONS)
 def test_frozen_values_are_canonical(fn: str) -> None:
     manifest = rp.load_manifest(MANIFEST_PATH)
+    assert manifest["functions"][fn]["wired"] is True
     frozen = rp.load_frozen(FROZEN_PATHS[fn], manifest=manifest)
     if fn == "parse_price":
         for row in frozen["rows"]:
@@ -203,23 +207,22 @@ def test_frozen_values_are_canonical(fn: str) -> None:
                 assert rp.value_ok_for_function("parse_price", row["old"])
         return
 
-    wired = manifest["functions"][fn]["wired"]
-    if not wired:
-        known_codes = {code for _, code in sb._CURRENCY_SIGNS}  # noqa: SLF001 - reads the live table
-        for row in frozen["rows"]:
-            if row["old"] is not None:
-                assert row["old"] in known_codes
-    else:
-        for row in frozen["rows"]:
-            if row["old"] is not None:
-                assert re.fullmatch(r"[A-Z]{3}", row["old"])
+    for row in frozen["rows"]:
+        if row["old"] is not None:
+            assert re.fullmatch(r"[A-Z]{3}", row["old"])
 
 
-def test_classifier_is_total_on_examples() -> None:
+def test_classifier_is_total_on_examples(monkeypatch: pytest.MonkeyPatch) -> None:
+    manifest = rp.load_manifest(MANIFEST_PATH)
+    frozen_pp = rp.load_frozen(FROZEN_PATHS["parse_price"], manifest=manifest)
+    old_pp = {row["input"]: row["old"] for row in frozen_pp["rows"]}
+    frozen_dc = rp.load_frozen(FROZEN_PATHS["detect_currency"], manifest=manifest)
+    old_dc = {row["input"]: row["old"] for row in frozen_dc["rows"]}
+
     cases: list[tuple[str, str | None, str | None, str, str]] = []
 
     def loss(s: str, cls: str) -> None:
-        old = rp.serialize(sb.parse_price(s))
+        old = old_pp[s]
         assert old is not None, s
         cases.append((s, old, None, "loss", cls))
 
@@ -246,7 +249,7 @@ def test_classifier_is_total_on_examples() -> None:
     cases.append(("Fr. 2364826", None, "2364826", "gain", "token_with_dot"))
 
     for s, old, new, kind, cls in cases:
-        got = rp.classify(s, old, new)
+        got = rp.classify(s, old, new, function="parse_price")
         assert got == (kind, cls), (s, got, (kind, cls))
 
     well_formed = [
@@ -260,16 +263,112 @@ def test_classifier_is_total_on_examples() -> None:
         "1.234,-",
     ]
     for s in well_formed:
-        assert rp.classify(s, "1", None) == ("loss", "loss_other")
+        assert rp.classify(s, "1", None, function="parse_price") == ("loss", "loss_other")
 
-    manifest = rp.load_manifest(MANIFEST_PATH)
-    frozen = rp.load_frozen(FROZEN_PATHS["parse_price"], manifest=manifest)
-    subject = manifest["functions"]["parse_price"]["subject"]
-    assert subject is not None
-    for row in frozen["rows"]:
+    with pytest.raises(ValueError, match="nope"):
+        rp.classify("x", "USD", None, function="nope")
+
+    currency_cases: list[tuple[str, str, str]] = [
+        ("https://example.com/gbp/1", "loss", "url_shaped"),
+        ("EUR 10 USD", "loss", "two_tokens"),
+        ("EURO 10", "loss", "token_glued_to_word"),
+        ("10 nok", "loss", "token_case"),
+        ("10 €/kg", "loss", "residual_words"),
+        ("$29.99", "loss", "shared_symbol"),
+        ("1,164,921\xa0CHF – 24,99", "loss", "token_inside"),
+        ("R$ 47,57", "value", "symbol_superseded"),
+        ("1 Fr.", "gain", "symbol_added"),
+        ("BHD 1.234", "gain", "iso_code_added"),
+    ]
+    for s, kind, cls in currency_cases:
+        old = old_dc[s]
+        new = None if kind == "loss" else sb.detect_currency(s)
+        got = rp.classify(s, old, new, function="detect_currency")
+        assert got == (kind, cls), (s, got, (kind, cls))
+
+    # Negative property: a currency engine that reads nothing at the edges never invents
+    # a class from a predicate that depends on it, except the one it demonstrably breaks.
+    monkeypatch.setattr(rp, "_edge_tokens", lambda s: [])
+    no_edge_cases = [
+        ("129,00 zł", "PLN"),
+        ("12,99 €", "EUR"),
+        ("€29.99", "EUR"),
+        ("12.50 USD", "USD"),
+        ("CHF 25.00", "CHF"),
+    ]
+    for s, old in no_edge_cases:
+        assert rp.classify(s, old, None, function="detect_currency") == ("loss", "loss_other")
+    assert rp.classify("1,164,921 CHF – 24,99", "CHF", None, function="detect_currency") == (
+        "loss",
+        "token_inside",
+    )
+    monkeypatch.undo()
+
+    subject_pp = manifest["functions"]["parse_price"]["subject"]
+    assert subject_pp is not None
+    for row in frozen_pp["rows"]:
         s, old = row["input"], row["old"]
-        new = None if s is None else rp.serialize(rp._call_subject(subject, s))  # noqa: SLF001
+        new = None if s is None else rp.serialize(rp._call_subject(subject_pp, s))  # noqa: SLF001
         if new == old:
             continue
-        kind, cls = rp.classify(s, old, new)
-        assert cls in rp.ALL_CLASSES[kind]
+        kind, cls = rp.classify(s, old, new, function="parse_price")
+        assert cls in rp.ALL_CLASSES["parse_price"][kind]
+
+    subject_dc = manifest["functions"]["detect_currency"]["subject"]
+    assert subject_dc is not None
+    for row in frozen_dc["rows"]:
+        s, old = row["input"], row["old"]
+        new = None if s is None else rp.serialize(rp._call_subject(subject_dc, s))  # noqa: SLF001
+        if new == old:
+            continue
+        kind, cls = rp.classify(s, old, new, function="detect_currency")
+        assert cls in rp.ALL_CLASSES["detect_currency"][kind]
+
+
+def test_scraper_base_import_does_not_load_the_price_core() -> None:
+    """``core/fetch.py`` imports ``scraper_base`` for block detection (D3): it must stay clean."""
+    before = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import sys; import price_tracker.core.scraper_base; print(sorted(sys.modules))",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+        cwd=ROOT,
+    )
+    before_modules = before.stdout
+    assert "price_tracker.core.pricegrammar" not in before_modules
+    assert "price_tracker.core.currencies" not in before_modules
+    assert "price_tracker.core.money" not in before_modules
+
+    after = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import sys; import price_tracker.core.scraper_base as sb; "
+            "sb.parse_price('1'); print(sorted(sys.modules))",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+        cwd=ROOT,
+    )
+    assert "price_tracker.core.pricegrammar" in after.stdout
+
+
+def test_not_well_formed_fixture_old_values_match_the_frozen_oracle() -> None:
+    """The literal ``old`` values of the not-well-formed fixture are the ``83a91f6`` oracle."""
+    from tests.parity.test_record_parity_not_well_formed import OLD_DETECT, OLD_PARSE
+
+    manifest = rp.load_manifest(MANIFEST_PATH)
+    frozen_pp = rp.load_frozen(FROZEN_PATHS["parse_price"], manifest=manifest)
+    oracle_pp = {row["input"]: row["old"] for row in frozen_pp["rows"]}
+    frozen_dc = rp.load_frozen(FROZEN_PATHS["detect_currency"], manifest=manifest)
+    oracle_dc = {row["input"]: row["old"] for row in frozen_dc["rows"]}
+
+    for s, old in OLD_PARSE.items():
+        assert old == oracle_pp[s], s
+    for s, old in OLD_DETECT.items():
+        assert old == oracle_dc[s], s

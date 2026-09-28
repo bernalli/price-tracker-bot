@@ -215,6 +215,23 @@ def test_mediamarkt_dom_joins_whole_and_decimal_spans() -> None:
     assert round_price["price"] == Decimal("1299")
 
 
+def test_mediamarkt_round_price_without_currency_span_is_not_read() -> None:
+    """Fail-closed (invariant 4): without the currency span, "1.299" stays ambiguous.
+
+    Same page as ``test_mediamarkt_dom_joins_whole_and_decimal_spans``, minus the
+    ``branded-price-currency`` span: the grammar has no currency to anchor the
+    thousands reading against, so it rejects rather than guess. No exception either.
+    """
+    scraper = MediamarktScraper()
+    html = (
+        "<html><body><div>"
+        '<span data-test="branded-price-whole-value">1.299,</span>'
+        '<div><span data-test="branded-price-decimal-value">–</span></div>'
+        "</div></body></html>"
+    )
+    assert scraper._try_dom(BeautifulSoup(html, "lxml")) is None
+
+
 # ── Both page shapes must keep working ────────────────────────────────────
 
 

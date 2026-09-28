@@ -5,14 +5,14 @@
   "parse_price": {
    "frozen": "price_tracker.core.scraper_base:parse_price",
    "source_sha256": "a6a5db5bbe05fd5bc9b5c7e31ce59c2a859930ed1a13575cb5977aad9ba199b2",
-   "subject": "price_tracker.core.pricegrammar:parse_price_text",
-   "wired": false
+   "subject": "price_tracker.core.scraper_base:parse_price",
+   "wired": true
   },
   "detect_currency": {
    "frozen": "price_tracker.core.scraper_base:detect_currency",
    "source_sha256": "765a31126186fb539906480a251c2f6e38ad4562eeb4f992118bf2aab660cd8d",
-   "subject": null,
-   "wired": false
+   "subject": "price_tracker.core.scraper_base:detect_currency",
+   "wired": true
   }
  }
 }

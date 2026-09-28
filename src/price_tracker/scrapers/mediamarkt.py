@@ -199,14 +199,17 @@ class MediamarktScraper(AbstractScraper):
         else:
             text = text.rstrip(",.")
 
-        parsed = parse_price(text)
-        if parsed is None:
-            return None
-        result: StrategyResult = {"price": parsed}
-
+        # The currency sits in a sibling span: read it first, so that the grammar can
+        # tell "1.299" (thousands under EUR) from a three-decimal fraction.
+        currency: str | None = None
         currency_el = scope.select_one('[data-test="branded-price-currency"]')
         if isinstance(currency_el, Tag):
             currency = detect_currency(currency_el.get_text(strip=True))
-            if currency:
-                result["currency"] = currency
+
+        parsed = parse_price(text, currency=currency)
+        if parsed is None:
+            return None
+        result: StrategyResult = {"price": parsed}
+        if currency:
+            result["currency"] = currency
         return result

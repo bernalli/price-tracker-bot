@@ -1,0 +1,1808 @@
+{
+ "schema": 1,
+ "function": "detect_currency",
+ "subject": "price_tracker.core.scraper_base:detect_currency",
+ "count": 225,
+ "rows": [
+  {
+   "input": "$",
+   "old": "USD",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "$ 16 280,-",
+   "old": "USD",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "$ 210,627.55",
+   "old": "USD",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "$ 8789556",
+   "old": "USD",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "$0.00",
+   "old": "USD",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "$1,234",
+   "old": "USD",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "$1,299.00",
+   "old": "USD",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "$1,29999",
+   "old": "USD",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "$12,345,678",
+   "old": "USD",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "$12.345",
+   "old": "USD",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "$199.99",
+   "old": "USD",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "$2.612.758",
+   "old": "USD",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "$24.99",
+   "old": "USD",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "$29.99",
+   "old": "USD",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "$49.99",
+   "old": "USD",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "$8.50",
+   "old": "USD",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "$87'644'514.4",
+   "old": "USD",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "$\u00a00,668,185.064",
+   "old": "USD",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "$\u00a036",
+   "old": "USD",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "$\u00a0494\u00a0559,64",
+   "old": "USD",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "$\u00a06",
+   "old": "USD",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "0'060'757 Kč",
+   "old": null,
+   "new": "CZK",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "0'793'386.114 kr",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "0,219kr",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "0,23\u00a0¥",
+   "old": "JPY",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "0.91¥",
+   "old": "JPY",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "0\u00a0406\u00a0025,08kr.",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "1 299 Kč",
+   "old": null,
+   "new": "CZK",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "1 299,00 kr",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "1 Fr.",
+   "old": null,
+   "new": "CHF",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "1 kr",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "1,164,921\u00a0CHF – 24,99",
+   "old": "CHF",
+   "new": null,
+   "kind": "loss",
+   "class": "token_inside",
+   "note": ""
+  },
+  {
+   "input": "1.205.356,39 $",
+   "old": "USD",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "1.5 R$ *",
+   "old": "USD",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "10 KR",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "token_case",
+   "note": ""
+  },
+  {
+   "input": "10 Kr",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "token_case",
+   "note": ""
+  },
+  {
+   "input": "10 kr",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "10 nok",
+   "old": "NOK",
+   "new": null,
+   "kind": "loss",
+   "class": "token_case",
+   "note": ""
+  },
+  {
+   "input": "10 €/kg",
+   "old": "EUR",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "119.26 ¥",
+   "old": "JPY",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "12,99 €/Stk.",
+   "old": "EUR",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "126.798,2 Fr.",
+   "old": null,
+   "new": "CHF",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "1299.99 usd",
+   "old": "USD",
+   "new": null,
+   "kind": "loss",
+   "class": "token_case",
+   "note": ""
+  },
+  {
+   "input": "131 309,77\u00a0¥",
+   "old": "JPY",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "15$",
+   "old": "USD",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "15.161R$",
+   "old": "USD",
+   "new": "BRL",
+   "kind": "value",
+   "class": "symbol_superseded",
+   "note": ""
+  },
+  {
+   "input": "179,80 ¥",
+   "old": "JPY",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "2.384 kr.",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "21,17 Kč",
+   "old": null,
+   "new": "CZK",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "224.57\u00a0¥",
+   "old": "JPY",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "256,04Fr.",
+   "old": null,
+   "new": "CHF",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "26,72 kr.",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "26,72\u00a0kr.",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "28,340,633.458 R$",
+   "old": "USD",
+   "new": "BRL",
+   "kind": "value",
+   "class": "symbol_superseded",
+   "note": ""
+  },
+  {
+   "input": "28,629.2R$",
+   "old": "USD",
+   "new": "BRL",
+   "kind": "value",
+   "class": "symbol_superseded",
+   "note": ""
+  },
+  {
+   "input": "2\u00a0576\u00a0535,913 Fr.",
+   "old": null,
+   "new": "CHF",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "3.56 Fr.",
+   "old": null,
+   "new": "CHF",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "3.580kr",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "301,946.31\u00a0$",
+   "old": "USD",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "32'453.003 kr.",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "3365626.741Kč",
+   "old": null,
+   "new": "CZK",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "34,6 Kč",
+   "old": null,
+   "new": "CZK",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "351,490,061.668\u00a0Kč",
+   "old": null,
+   "new": "CZK",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "35\u00a0605,1 Kč",
+   "old": null,
+   "new": "CZK",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "360,204,685.389kr",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "3662.20Kč",
+   "old": null,
+   "new": "CZK",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "369025006.293\u00a0kr.",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "399,589.645 R$",
+   "old": "USD",
+   "new": "BRL",
+   "kind": "value",
+   "class": "symbol_superseded",
+   "note": ""
+  },
+  {
+   "input": "3\u00a0378\u00a0£ each",
+   "old": "GBP",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "4'229'770 Fr.",
+   "old": null,
+   "new": "CHF",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "4,908,555\u00a0Kč",
+   "old": null,
+   "new": "CZK",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "458707\u00a0PLN each",
+   "old": "PLN",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "477,744\u00a0NOK *",
+   "old": "NOK",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "48 kr.",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "4\u00a0210\u00a0057,- kr",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "50,433,506$ /kg",
+   "old": "USD",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "50,84 Fr.",
+   "old": null,
+   "new": "CHF",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "52.1\u00a0Kč",
+   "old": null,
+   "new": "CZK",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "539\u00a0014\u00a0690,27Fr.",
+   "old": null,
+   "new": "CHF",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "558.539$",
+   "old": "USD",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "55\u00a0kr.",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "6 576,-Fr.",
+   "old": null,
+   "new": "CHF",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "6 Fr.",
+   "old": null,
+   "new": "CHF",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "6,738,976.09\u00a0PLN *",
+   "old": "PLN",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "6,743,378.59 R$",
+   "old": "USD",
+   "new": "BRL",
+   "kind": "value",
+   "class": "symbol_superseded",
+   "note": ""
+  },
+  {
+   "input": "6.063\u00a0R$",
+   "old": "USD",
+   "new": "BRL",
+   "kind": "value",
+   "class": "symbol_superseded",
+   "note": ""
+  },
+  {
+   "input": "6.423.274,32\u00a0Fr.",
+   "old": null,
+   "new": "CHF",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "6.874.205,317Kč",
+   "old": null,
+   "new": "CZK",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "60\u00a0Kč",
+   "old": null,
+   "new": "CZK",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "62\u00a0R$",
+   "old": "USD",
+   "new": "BRL",
+   "kind": "value",
+   "class": "symbol_superseded",
+   "note": ""
+  },
+  {
+   "input": "688.893.811,21\u00a0Fr.",
+   "old": null,
+   "new": "CHF",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "692'456kr",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "7,-\u00a0kr",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "70431415.3Fr.",
+   "old": null,
+   "new": "CHF",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "71.833 £ incl. VAT",
+   "old": "GBP",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "76\u00a0kr",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "77.713,63 $",
+   "old": "USD",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "7810 Kč",
+   "old": null,
+   "new": "CZK",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "782,26\u00a0¥",
+   "old": "JPY",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "784\u00a0863,340\u00a0R$",
+   "old": "USD",
+   "new": "BRL",
+   "kind": "value",
+   "class": "symbol_superseded",
+   "note": ""
+  },
+  {
+   "input": "788.3\u00a0R$",
+   "old": "USD",
+   "new": "BRL",
+   "kind": "value",
+   "class": "symbol_superseded",
+   "note": ""
+  },
+  {
+   "input": "797R$",
+   "old": "USD",
+   "new": "BRL",
+   "kind": "value",
+   "class": "symbol_superseded",
+   "note": ""
+  },
+  {
+   "input": "7\u00a0R$",
+   "old": "USD",
+   "new": "BRL",
+   "kind": "value",
+   "class": "symbol_superseded",
+   "note": ""
+  },
+  {
+   "input": "8,410,749\u00a0Fr.",
+   "old": null,
+   "new": "CHF",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "8.5\u00a0¥",
+   "old": "JPY",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "80318.06 Kč",
+   "old": null,
+   "new": "CZK",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "812'871.9\u00a0¥",
+   "old": "JPY",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "82.957,15 £ /mo",
+   "old": "GBP",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "844,2SEK each",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "87,31kr.",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "877958.04 R$",
+   "old": "USD",
+   "new": "BRL",
+   "kind": "value",
+   "class": "symbol_superseded",
+   "note": ""
+  },
+  {
+   "input": "89\u00a0657Fr.",
+   "old": null,
+   "new": "CHF",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "9 379 978,368 Kč",
+   "old": null,
+   "new": "CZK",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "9,528.7 $",
+   "old": "USD",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "9.09\u00a0¥",
+   "old": "JPY",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "9.109\u00a0R$",
+   "old": "USD",
+   "new": "BRL",
+   "kind": "value",
+   "class": "symbol_superseded",
+   "note": ""
+  },
+  {
+   "input": "9.398.873 kr",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "9.537.800,81Fr.",
+   "old": null,
+   "new": "CHF",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "9050471.509 kr",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "91\u00a0081,508$",
+   "old": "USD",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "927 663,64kr",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "96,9\u00a0kr.",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "96.061 ¥",
+   "old": "JPY",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "974 689 572,4 kr",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "984\u00a0453\u00a0155,19\u00a0Fr.",
+   "old": null,
+   "new": "CHF",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "989 552,3Fr.",
+   "old": null,
+   "new": "CHF",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "99.99 EUR incl. VAT",
+   "old": "EUR",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "BHD 1.234",
+   "old": null,
+   "new": "BHD",
+   "kind": "gain",
+   "class": "iso_code_added",
+   "note": ""
+  },
+  {
+   "input": "EUR 10 USD",
+   "old": "EUR",
+   "new": null,
+   "kind": "loss",
+   "class": "two_tokens",
+   "note": ""
+  },
+  {
+   "input": "EURO 10",
+   "old": "EUR",
+   "new": null,
+   "kind": "loss",
+   "class": "token_glued_to_word",
+   "note": ""
+  },
+  {
+   "input": "Fr. 0,020.73",
+   "old": null,
+   "new": "CHF",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "Fr. 2364826",
+   "old": null,
+   "new": "CHF",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "Fr. 503 333,658",
+   "old": null,
+   "new": "CHF",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "Fr. 70,205,780",
+   "old": null,
+   "new": "CHF",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "Fr. 75,225.390",
+   "old": null,
+   "new": "CHF",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "Fr. 8347633.101",
+   "old": null,
+   "new": "CHF",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "Fr. 948\u00a0422,5",
+   "old": null,
+   "new": "CHF",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "Fr.4.389.195,122",
+   "old": null,
+   "new": "CHF",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "Fr.75,188,070.981 each",
+   "old": null,
+   "new": "CHF",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "Fr.\u00a03,205,780",
+   "old": null,
+   "new": "CHF",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "Fr.\u00a043,531.814",
+   "old": null,
+   "new": "CHF",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "Fr.\u00a0438'296'947.40",
+   "old": null,
+   "new": "CHF",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "Fr.\u00a0725,4",
+   "old": null,
+   "new": "CHF",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "KWD 12.345",
+   "old": null,
+   "new": "KWD",
+   "kind": "gain",
+   "class": "iso_code_added",
+   "note": ""
+  },
+  {
+   "input": "Kr 10",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "token_case",
+   "note": ""
+  },
+  {
+   "input": "Kč 5",
+   "old": null,
+   "new": "CZK",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "Kč 8\u00a0130\u00a0036,99",
+   "old": null,
+   "new": "CZK",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "Kč0,117.1",
+   "old": null,
+   "new": "CZK",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "Kč642782856.505",
+   "old": null,
+   "new": "CZK",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "Kč\u00a06'661'770.773",
+   "old": null,
+   "new": "CZK",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "Kč\u00a0898883574.387",
+   "old": null,
+   "new": "CZK",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "R$ 1.234,56",
+   "old": "USD",
+   "new": "BRL",
+   "kind": "value",
+   "class": "symbol_superseded",
+   "note": ""
+  },
+  {
+   "input": "R$ 15'182.01",
+   "old": "USD",
+   "new": "BRL",
+   "kind": "value",
+   "class": "symbol_superseded",
+   "note": ""
+  },
+  {
+   "input": "R$ 197,931,557.014",
+   "old": "USD",
+   "new": "BRL",
+   "kind": "value",
+   "class": "symbol_superseded",
+   "note": ""
+  },
+  {
+   "input": "R$ 3.446.303",
+   "old": "USD",
+   "new": "BRL",
+   "kind": "value",
+   "class": "symbol_superseded",
+   "note": ""
+  },
+  {
+   "input": "R$ 47,57",
+   "old": "USD",
+   "new": "BRL",
+   "kind": "value",
+   "class": "symbol_superseded",
+   "note": ""
+  },
+  {
+   "input": "R$ 6106919.376",
+   "old": "USD",
+   "new": "BRL",
+   "kind": "value",
+   "class": "symbol_superseded",
+   "note": ""
+  },
+  {
+   "input": "R$ 619",
+   "old": "USD",
+   "new": "BRL",
+   "kind": "value",
+   "class": "symbol_superseded",
+   "note": ""
+  },
+  {
+   "input": "R$ 65,923,388.19",
+   "old": "USD",
+   "new": "BRL",
+   "kind": "value",
+   "class": "symbol_superseded",
+   "note": ""
+  },
+  {
+   "input": "R$ 652'124.649",
+   "old": "USD",
+   "new": "BRL",
+   "kind": "value",
+   "class": "symbol_superseded",
+   "note": ""
+  },
+  {
+   "input": "R$ 987 572 900,9",
+   "old": "USD",
+   "new": "BRL",
+   "kind": "value",
+   "class": "symbol_superseded",
+   "note": ""
+  },
+  {
+   "input": "R$4 922 986",
+   "old": "USD",
+   "new": "BRL",
+   "kind": "value",
+   "class": "symbol_superseded",
+   "note": ""
+  },
+  {
+   "input": "R$84.89",
+   "old": "USD",
+   "new": "BRL",
+   "kind": "value",
+   "class": "symbol_superseded",
+   "note": ""
+  },
+  {
+   "input": "R$\u00a054078048",
+   "old": "USD",
+   "new": "BRL",
+   "kind": "value",
+   "class": "symbol_superseded",
+   "note": ""
+  },
+  {
+   "input": "R$\u00a0592353601.497",
+   "old": "USD",
+   "new": "BRL",
+   "kind": "value",
+   "class": "symbol_superseded",
+   "note": ""
+  },
+  {
+   "input": "UVP 25531757.085Fr.",
+   "old": null,
+   "new": "CHF",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  },
+  {
+   "input": "UVP 5.909,5R$",
+   "old": "USD",
+   "new": "BRL",
+   "kind": "value",
+   "class": "symbol_superseded",
+   "note": ""
+  },
+  {
+   "input": "UVP 969155663.61 ¥",
+   "old": "JPY",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "UVP £\u00a0831.9",
+   "old": "GBP",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "UVP ¥42.301",
+   "old": "JPY",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "Was NOK\u00a033.07",
+   "old": "NOK",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "Was PLN1,179,263.97",
+   "old": "PLN",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "ab NOK\u00a0691'466.3",
+   "old": "NOK",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "ab USD1,32",
+   "old": "USD",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "dkk 10",
+   "old": "DKK",
+   "new": null,
+   "kind": "loss",
+   "class": "token_case",
+   "note": ""
+  },
+  {
+   "input": "from 123,428,273R$",
+   "old": "USD",
+   "new": "BRL",
+   "kind": "value",
+   "class": "symbol_superseded",
+   "note": ""
+  },
+  {
+   "input": "from 547\u00a0623\u00a0946,010 ¥",
+   "old": "JPY",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "from GBP940.36",
+   "old": "GBP",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "from kr311714.39",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "https://example.com/gbp/1",
+   "old": "GBP",
+   "new": null,
+   "kind": "loss",
+   "class": "url_shaped",
+   "note": ""
+  },
+  {
+   "input": "https://example.net/eur/1",
+   "old": "EUR",
+   "new": null,
+   "kind": "loss",
+   "class": "url_shaped",
+   "note": ""
+  },
+  {
+   "input": "https://example.org/p/1?currency=usd",
+   "old": "USD",
+   "new": null,
+   "kind": "loss",
+   "class": "url_shaped",
+   "note": ""
+  },
+  {
+   "input": "https://shop.example/kr/1",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "url_shaped",
+   "note": ""
+  },
+  {
+   "input": "https://www.example.com/products/sekret-1",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "url_shaped",
+   "note": ""
+  },
+  {
+   "input": "https://www.example.org/kreditkarte/1",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "url_shaped",
+   "note": ""
+  },
+  {
+   "input": "kr",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "kr 1.234",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "kr 10",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "kr 4,00",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "kr 9,227,220.99",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "kr 90",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "kr. 17",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "kr. 2,777",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "kr. 4.109,354 *",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "kr. 89",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "kr.\u00a01",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "kr.\u00a014'305.0",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "kr.\u00a028",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "kr0,52",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "krone 10",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "token_glued_to_word",
+   "note": ""
+  },
+  {
+   "input": "kr\u00a022,702,165.2",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "kr\u00a023 514,79",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "kr\u00a03",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "kr\u00a06.7",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "kr\u00a08.803,8",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "nur CZK 451.494.270",
+   "old": "CZK",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "nur kr41'641.4",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "nur £\u00a00.617",
+   "old": "GBP",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "nur €\u00a0608.174",
+   "old": "EUR",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "sek 10",
+   "old": "SEK",
+   "new": null,
+   "kind": "loss",
+   "class": "token_case",
+   "note": ""
+  },
+  {
+   "input": "solo GBP\u00a01,-",
+   "old": "GBP",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "solo R$ 450.225,11",
+   "old": "USD",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "solo €\u00a0538,5",
+   "old": "EUR",
+   "new": null,
+   "kind": "loss",
+   "class": "residual_words",
+   "note": ""
+  },
+  {
+   "input": "¥ 694 851 966,96",
+   "old": "JPY",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "¥ 9.294.453,41",
+   "old": "JPY",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "¥1,234",
+   "old": "JPY",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "¥1000",
+   "old": "JPY",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "¥40 067 932,25",
+   "old": "JPY",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "¥6969666.33",
+   "old": "JPY",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "¥\u00a00 587",
+   "old": "JPY",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "¥\u00a051 652 415,37",
+   "old": "JPY",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "¥\u00a06",
+   "old": "JPY",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "¥\u00a0852,-",
+   "old": "JPY",
+   "new": null,
+   "kind": "loss",
+   "class": "shared_symbol",
+   "note": ""
+  },
+  {
+   "input": "€ 10 USD",
+   "old": "USD",
+   "new": null,
+   "kind": "loss",
+   "class": "two_tokens",
+   "note": ""
+  },
+  {
+   "input": "₹10",
+   "old": null,
+   "new": "INR",
+   "kind": "gain",
+   "class": "symbol_added",
+   "note": ""
+  }
+ ]
+}

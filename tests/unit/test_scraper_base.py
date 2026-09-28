@@ -89,8 +89,6 @@ def test_block_detection_precedes_listing_gone_on_403() -> None:
         ("1.299,99", Decimal("1299.99")),
         ("1,299.99", Decimal("1299.99")),
         ("5'250.00", Decimal("5250.00")),
-        ("CHF 5,250,00", Decimal("5250.00")),
-        ("$1,234", Decimal("1234")),
         ("EUR 29,99", Decimal("29.99")),
     ],
 )
@@ -102,10 +100,6 @@ def test_parse_price_returns_decimal(raw, expected):
     ("raw", "expected"),
     [
         # EU dot-thousands with NO decimal part (was parsed 1000x too low) — bug #3
-        ("1.299", Decimal("1299")),
-        ("2.499", Decimal("2499")),
-        ("12.999", Decimal("12999")),
-        ("1.234", Decimal("1234")),
         ("1.299 €", Decimal("1299")),
         # EU multi-dot integer thousands (was returning None) — bug #22
         ("1.234.567", Decimal("1234567")),
@@ -123,7 +117,6 @@ def test_parse_price_returns_decimal(raw, expected):
         ("1 299 Kč", Decimal("1299")),
         ("1 299,00 kr", Decimal("1299.00")),
         # Leading-zero decimals must stay decimals, NOT become thousands
-        ("0.999", Decimal("0.999")),
         ("0,99", Decimal("0.99")),
         # Space/thin-space thousands (French/Polish) with decimal
         ("1 234,56", Decimal("1234.56")),
@@ -400,6 +393,19 @@ def test_select_jsonld_offer_normalizes_symbol_currency():
     assert select_jsonld_offer(offers) == (Decimal("29.99"), "EUR")
 
 
+def test_select_jsonld_offer_currency_field():
+    """``priceCurrency`` is a field, read with the field reader, not the text detector."""
+    assert select_jsonld_offer({"price": "29,99", "priceCurrency": "usd"}) == (
+        Decimal("29.99"),
+        "USD",
+    )
+    # A symbol shared by several currencies stays unresolved, never a default.
+    assert select_jsonld_offer({"price": "29,99", "priceCurrency": "$"}) == (
+        Decimal("29.99"),
+        None,
+    )
+
+
 def test_select_jsonld_offer_handles_empty_and_invalid():
     assert select_jsonld_offer([]) is None
     assert select_jsonld_offer(None) is None
@@ -464,14 +470,94 @@ def test_parse_price_returns_none_on_garbage():
     ("text", "expected"),
     [
         ("29,99 €", "EUR"),
-        ("$29.99", "USD"),
+        ("$29.99", None),
         ("£29.99", "GBP"),
-        ("¥1000", "JPY"),
+        ("¥1000", None),
         ("CHF 25.00", "CHF"),
+        ("R$ 47,57", "BRL"),
+        ("1 Fr.", "CHF"),
+        ("usd", "USD"),
+        ("CHF ", "CHF"),
+        ("10 kr", None),
+        ("kr. 89", None),
+        ("99.99 EUR incl. VAT", None),
+        ("EUR 10 USD", None),
+        ("EURO 10", None),
+        ("https://www.example.com/products/sekret-1", None),
+        ("", None),
+        (None, None),
     ],
 )
 def test_detect_currency(text, expected):
     assert detect_currency(text) == expected
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        pytest.param("CHF 5,250,00", id="dangling_separator"),
+        pytest.param("$1,234", id="three_digit_ambiguity"),
+        pytest.param("1.299", id="three_digit_ambiguity"),
+        pytest.param("2.499", id="three_digit_ambiguity"),
+        pytest.param("12.999", id="three_digit_ambiguity"),
+        pytest.param("1.234", id="three_digit_ambiguity"),
+        pytest.param("0.999", id="three_digit_ambiguity"),
+        pytest.param("$0.00", id="zero"),
+        pytest.param("0", id="zero"),
+        pytest.param("-5", id="sign_or_exponent"),
+        pytest.param("1e+16", id="sign_or_exponent"),
+        pytest.param("Was 20 now 10", id="residual_words"),
+        pytest.param("12 34", id="second_number"),
+        pytest.param("EUR 10 USD", id="two_tokens"),
+        pytest.param("10 nok", id="token_case"),
+        pytest.param(",99", id="dangling_separator"),
+        pytest.param("1" * 65, id="over_length"),
+        pytest.param("12.99*", id="residual_words_markup"),
+        pytest.param("12,99 €/Stk.", id="residual_words_markup"),
+        pytest.param("1​299,00", id="control_or_format_char"),
+    ],
+)
+def test_parse_price_rejects_ambiguous_or_malformed_text(raw):
+    """Every row is a member of ``tests/parity/corpus.json`` (``harvest`` measures it)."""
+    assert parse_price(raw) is None
+
+
+def test_parse_price_token_with_dot_is_not_a_decimal_point():
+    """Roadmap item 188: the ``.`` of ``kr.``/``Fr.`` is not a decimal separator."""
+    assert parse_price("kr. 89") == Decimal("89")
+    assert parse_price("26,72 kr.") == Decimal("26.72")
+    assert parse_price("Fr. 70,205,780") == Decimal("70205780")
+    assert parse_price("50,84 Fr.") == Decimal("50.84")
+
+
+def test_parse_price_with_known_currency():
+    assert parse_price("1.299", currency="EUR") == Decimal("1299")
+    assert parse_price("$1,234", currency="USD") == Decimal("1234")
+    assert parse_price("12.345", currency="BHD") == Decimal("12.345")
+    assert parse_price("12.345", currency="EUR") == Decimal("12345")
+    # A token in the text that contradicts the known currency is unreadable.
+    assert parse_price("12,99 €", currency="JPY") is None
+    # Positive control: the known currency matches the token in the text.
+    assert parse_price("12,99 €", currency="EUR") == Decimal("12.99")
+    # A value that is not an accepted code is ignored, so the text stays ambiguous.
+    assert parse_price("1.299", currency="XXX") is None
+    assert parse_price("1.299", currency="") is None
+    assert parse_price("1.299", currency="eur") is None
+    # Negative control: no currency at all.
+    assert parse_price("1.299") is None
+
+
+def test_parse_price_currency_keyword_does_not_change_the_frozen_surface():
+    """The new keyword is additive: every corpus input parses the same without it."""
+    from scripts import record_parity as rp
+
+    corpus = rp.load_corpus(rp._corpus_path(rp.DEFAULT_ROOT))  # noqa: SLF001 - test-only
+    full_inputs = sorted(
+        set(corpus["harvested"]) | set(corpus["curated"]) | set(corpus["generated"]["inputs"]),
+        key=rp.sort_key,
+    )
+    for s in full_inputs:
+        assert parse_price(s) == parse_price(s, currency=None)
 
 
 def test_abstract_scraper_requires_can_handle_and_scrape():
