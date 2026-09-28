@@ -1,0 +1,43 @@
+# legacy snapshot v1
+# scenario: admin.cmd_removeuser
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/removeuser" user=1
+-> sendMessage chat=1
+   param parse_mode="HTML"
+   text:
+   | ❌ Uso: /removeuser &lt;telegram_id&gt;
+## db after step 1
+(no changes)
+## step 2: command "/removeuser abc" user=1
+-> sendMessage chat=1
+   text:
+   | ❌ ID non valido.
+## db after step 2
+(no changes)
+## step 3: command "/removeuser 1" user=1
+-> sendMessage chat=1
+   text:
+   | ❌ Non puoi rimuovere te stesso.
+## db after step 3
+(no changes)
+## step 4: command "/removeuser 2" user=1
+-> sendMessage chat=1
+   text:
+   | ❌ Non puoi rimuovere un altro amministratore.
+## db after step 4
+(no changes)
+## step 5: command "/removeuser 10" user=1
+-> sendMessage chat=1
+   param parse_mode="HTML"
+   text:
+   | ❌ Utente <code>10</code> non trovato.
+## db after step 5
+~ users user_id=10 is_active: 1 -> 0
+## step 6: command "/removeuser 12345" user=1
+-> sendMessage chat=1
+   param parse_mode="HTML"
+   text:
+   | ❌ Utente <code>12345</code> non trovato.
+## db after step 6
+(no changes)

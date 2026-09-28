@@ -1,0 +1,160 @@
+# legacy snapshot v1
+# scenario: alert.many_failing
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: job run_check_all
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | ⏳ <b>Controlli in errore su example.com</b> (11)
+   |
+   | 11 prodotti hanno fallito 1/2 controlli di fila. Se continua, verranno sospesi automaticamente.
+   |
+   | • <b>Item 01</b> — prezzo non leggibile
+   | • <b>Item 02</b> — prezzo non leggibile
+   | • <b>Item 03</b> — prezzo non leggibile
+   | • <b>Item 04</b> — prezzo non leggibile
+   | • <b>Item 05</b> — prezzo non leggibile
+   | • <b>Item 06</b> — prezzo non leggibile
+   | • <b>Item 07</b> — prezzo non leggibile
+   | • <b>Item 08</b> — prezzo non leggibile
+   | • <b>Item 09</b> — prezzo non leggibile
+   | • <b>Item 10</b> — prezzo non leggibile
+   | … e altri 1
+   |
+   | Dettagli con /errori.
+   markup: {}
+## db after step 1
+~ products id=1 consecutive_errors: 0 -> 1
+~ products id=1 last_error: NULL -> "parse_error: no price"
+~ products id=1 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=2 consecutive_errors: 0 -> 1
+~ products id=2 last_error: NULL -> "parse_error: no price"
+~ products id=2 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=3 consecutive_errors: 0 -> 1
+~ products id=3 last_error: NULL -> "parse_error: no price"
+~ products id=3 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=4 consecutive_errors: 0 -> 1
+~ products id=4 last_error: NULL -> "parse_error: no price"
+~ products id=4 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=5 consecutive_errors: 0 -> 1
+~ products id=5 last_error: NULL -> "parse_error: no price"
+~ products id=5 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=6 consecutive_errors: 0 -> 1
+~ products id=6 last_error: NULL -> "parse_error: no price"
+~ products id=6 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=7 consecutive_errors: 0 -> 1
+~ products id=7 last_error: NULL -> "parse_error: no price"
+~ products id=7 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=8 consecutive_errors: 0 -> 1
+~ products id=8 last_error: NULL -> "parse_error: no price"
+~ products id=8 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=9 consecutive_errors: 0 -> 1
+~ products id=9 last_error: NULL -> "parse_error: no price"
+~ products id=9 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=10 consecutive_errors: 0 -> 1
+~ products id=10 last_error: NULL -> "parse_error: no price"
+~ products id=10 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=11 consecutive_errors: 0 -> 1
+~ products id=11 last_error: NULL -> "parse_error: no price"
+~ products id=11 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+## step 2: job run_check_all
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | ⚠️ <b>Prezzo illeggibile su example.com</b> (11)
+   |
+   | Le pagine si aprono, ma il prezzo non si legge più (layout cambiato o offerta diversa).
+   |
+   | • <b>Item 01</b> — prezzo non leggibile
+   | Nessuna lettura riuscita finora
+   | Errore: <code>parse_error: no price</code>
+   | • <b>Item 02</b> — prezzo non leggibile
+   | Nessuna lettura riuscita finora
+   | Errore: <code>parse_error: no price</code>
+   | • <b>Item 03</b> — prezzo non leggibile
+   | Nessuna lettura riuscita finora
+   | Errore: <code>parse_error: no price</code>
+   | • <b>Item 04</b> — prezzo non leggibile
+   | Nessuna lettura riuscita finora
+   | Errore: <code>parse_error: no price</code>
+   | • <b>Item 05</b> — prezzo non leggibile
+   | Nessuna lettura riuscita finora
+   | Errore: <code>parse_error: no price</code>
+   | • <b>Item 06</b> — prezzo non leggibile
+   | Nessuna lettura riuscita finora
+   | Errore: <code>parse_error: no price</code>
+   | • <b>Item 07</b> — prezzo non leggibile
+   | Nessuna lettura riuscita finora
+   | Errore: <code>parse_error: no price</code>
+   | • <b>Item 08</b> — prezzo non leggibile
+   | Nessuna lettura riuscita finora
+   | Errore: <code>parse_error: no price</code>
+   | • <b>Item 09</b> — prezzo non leggibile
+   | Nessuna lettura riuscita finora
+   | Errore: <code>parse_error: no price</code>
+   | • <b>Item 10</b> — prezzo non leggibile
+   | Nessuna lettura riuscita finora
+   | Errore: <code>parse_error: no price</code>
+   | … e altri 1
+   |
+   | Riattiva per fare subito un nuovo controllo.
+   keyboard:
+   | [▶️ Riattiva e ricontrolla (11) → ops_react_1]
+   | [🗑 Elimina tutti (11) → ops_del_1]
+## db after step 2
+~ products id=1 is_active: 1 -> 0
+~ products id=1 consecutive_errors: 1 -> 2
+~ products id=1 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
+~ products id=1 suspension_kind: NULL -> "automatic"
+~ products id=1 suspension_reason: NULL -> "parse_error"
+~ products id=2 is_active: 1 -> 0
+~ products id=2 consecutive_errors: 1 -> 2
+~ products id=2 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
+~ products id=2 suspension_kind: NULL -> "automatic"
+~ products id=2 suspension_reason: NULL -> "parse_error"
+~ products id=3 is_active: 1 -> 0
+~ products id=3 consecutive_errors: 1 -> 2
+~ products id=3 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
+~ products id=3 suspension_kind: NULL -> "automatic"
+~ products id=3 suspension_reason: NULL -> "parse_error"
+~ products id=4 is_active: 1 -> 0
+~ products id=4 consecutive_errors: 1 -> 2
+~ products id=4 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
+~ products id=4 suspension_kind: NULL -> "automatic"
+~ products id=4 suspension_reason: NULL -> "parse_error"
+~ products id=5 is_active: 1 -> 0
+~ products id=5 consecutive_errors: 1 -> 2
+~ products id=5 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
+~ products id=5 suspension_kind: NULL -> "automatic"
+~ products id=5 suspension_reason: NULL -> "parse_error"
+~ products id=6 is_active: 1 -> 0
+~ products id=6 consecutive_errors: 1 -> 2
+~ products id=6 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
+~ products id=6 suspension_kind: NULL -> "automatic"
+~ products id=6 suspension_reason: NULL -> "parse_error"
+~ products id=7 is_active: 1 -> 0
+~ products id=7 consecutive_errors: 1 -> 2
+~ products id=7 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
+~ products id=7 suspension_kind: NULL -> "automatic"
+~ products id=7 suspension_reason: NULL -> "parse_error"
+~ products id=8 is_active: 1 -> 0
+~ products id=8 consecutive_errors: 1 -> 2
+~ products id=8 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
+~ products id=8 suspension_kind: NULL -> "automatic"
+~ products id=8 suspension_reason: NULL -> "parse_error"
+~ products id=9 is_active: 1 -> 0
+~ products id=9 consecutive_errors: 1 -> 2
+~ products id=9 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
+~ products id=9 suspension_kind: NULL -> "automatic"
+~ products id=9 suspension_reason: NULL -> "parse_error"
+~ products id=10 is_active: 1 -> 0
+~ products id=10 consecutive_errors: 1 -> 2
+~ products id=10 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
+~ products id=10 suspension_kind: NULL -> "automatic"
+~ products id=10 suspension_reason: NULL -> "parse_error"
+~ products id=11 is_active: 1 -> 0
+~ products id=11 consecutive_errors: 1 -> 2
+~ products id=11 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
+~ products id=11 suspension_kind: NULL -> "automatic"
+~ products id=11 suspension_reason: NULL -> "parse_error"

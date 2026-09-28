@@ -1,0 +1,46 @@
+# legacy snapshot v1
+# scenario: monitor.pause
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/pausa" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | 📦 <b>Scegli prodotto da mettere in pausa:</b>
+   keyboard:
+   | [#1 Kettle €80.00 → pause_1]
+   | [#2 Fan → pause_2]
+## db after step 1
+~ users user_id=10 display_name: NULL -> "U10"
+## step 2: command "/pausa 1" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | ⏸ Tracking in pausa: <b>Kettle</b>
+   | Usa /riattiva 1 per riprendere.
+## db after step 2
+~ products id=1 is_active: 1 -> 0
+~ products id=1 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
+~ products id=1 suspension_kind: NULL -> "manual"
+## step 3: command "/pause abc" user=10
+-> sendMessage chat=10
+   text:
+   | ❌ ID non valido.
+## db after step 3
+(no changes)
+## step 4: command "/pause 999" user=10
+-> sendMessage chat=10
+   text:
+   | ❌ Prodotto non trovato.
+## db after step 4
+(no changes)
+## step 5: command "/pausa 3" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | ⏸ Tracking in pausa: <b>Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN</b>
+   | Usa /riattiva 3 per riprendere.
+## db after step 5
+~ products id=3 is_active: 1 -> 0
+~ products id=3 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
+~ products id=3 suspension_kind: NULL -> "manual"

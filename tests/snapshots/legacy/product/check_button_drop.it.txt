@@ -1,0 +1,47 @@
+# legacy snapshot v1
+# scenario: product.check_button_drop
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/lista" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | <b>📦 I tuoi prodotti (1)</b>
+-> sendMessage chat=10
+   param link_preview_options={"is_disabled": true}
+   param parse_mode="HTML"
+   text:
+   | <b>#1</b> Kettle
+   | 💰 €80.00
+   | 📌 Prezzo iniziale: €100.00 (<i>-20.0% dal tracking</i>)
+   | 🎯 Soglia: -10%
+   | 🕐 Ultimo check: 2h fa
+   keyboard:
+   | [🔍 Check → check_1] [📊 Storico prezzo → chart_1]
+   | [⏸ Pausa → pause_1] [🗑 Elimina → remove_1]
+   | [🔗 Apri → url:https://shop.example.com/item/1] [✏️ Modifica → edit_1]
+## db after step 1
+~ users user_id=10 display_name: NULL -> "U10"
+## step 2: press "check_1" user=10 on=1001
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1001
+   text:
+   | ⏳ Controllo prezzo in corso...
+-> editMessageText chat=10 message_id=1001
+   param parse_mode="HTML"
+   text:
+   | ✅ <b>#1</b> Kettle
+   | 💰 Prezzo: €64.00
+   | 📌 Iniziale: €100.00 (<i>-36.0% dal tracking</i>)
+   |
+   | 🔔 <b>PREZZO APPENA SCESO!</b>
+   | 💸 Era: €80.00 → Ora: €64.00
+   keyboard:
+   | [📊 Storico prezzo → chart_1]
+## db after step 2
++ price_history id=6 {product_id=1, price="64.00", checked_at=<now:9999-99-99 99:99:99>}
+~ products id=1 current_price: "80.00" -> "64.00"
+~ products id=1 last_checked_at: "2026-03-01 10:00:00" -> <now:9999-99-99 99:99:99>
+~ products id=1 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
+~ products id=1 lowest_price: "80.00" -> "64.00"
++ scraper_health domain="example.com" {state="CLOSED", consecutive_blocks=0, locked_until=NULL, last_block_at=NULL, last_block_reason=NULL, last_success_at="2026-03-01T12:00:00+00:00", updated_at=<now:9999-99-99 99:99:99>}

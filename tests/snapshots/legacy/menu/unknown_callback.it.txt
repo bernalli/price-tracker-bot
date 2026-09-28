@@ -1,0 +1,21 @@
+# legacy snapshot v1
+# scenario: menu.unknown_callback
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/menu" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | 📋 <b>Menu</b>
+   |
+   | Cosa vuoi fare?
+   keyboard:
+   | [📦 Prodotti → menu_prodotti] [🔍 Prezzi → menu_prezzi]
+   | [🔔 Notifiche → menu_notifiche] [💾 Dati → menu_dati]
+   | [📊 Stato e info → menu_info]
+## db after step 1
+~ users user_id=10 display_name: NULL -> "U10"
+## step 2: press "does_not_exist" user=10 on=1000
+-> answerCallbackQuery
+## db after step 2
+(no changes)

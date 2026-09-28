@@ -1,0 +1,43 @@
+# legacy snapshot v1
+# scenario: status.health_many_domains
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: seed "record block d1.example.net"
+## step 2: seed "reanchor d1.example.net"
+## step 3: seed "record block d2.example.net"
+## step 4: seed "reanchor d2.example.net"
+## step 5: seed "record block d3.example.net"
+## step 6: seed "reanchor d3.example.net"
+## step 7: seed "record block d4.example.net"
+## step 8: seed "reanchor d4.example.net"
+## step 9: seed "record block d5.example.net"
+## step 10: seed "reanchor d5.example.net"
+## step 11: seed "record block d6.example.net"
+## step 12: seed "reanchor d6.example.net"
+## step 13: seed "reload domain health"
+## step 14: seed "record block 1"
+## step 15: seed "record block 2"
+## step 16: seed "record block 3"
+## step 17: seed "lock edge.example.net until 2026-03-01T12:00:01+00:00"
+## step 18: seed "reload domain health"
+## step 19: command "/health" user=1
+-> sendMessage chat=1
+   param parse_mode="HTML"
+   text:
+   | 🏥 <b>Scraper Health Report</b>
+   |
+   | ✅ Healthy domains: 6
+   | ⚠️ Half-open: 0
+   | 🔒 Locked: 1
+   |
+   | <b>Locked:</b>
+   |   • edge.example.net — T1 (1h), expires in 0m
+   |
+   | <b>Last 5 block events:</b>
+   |   • edge.example.net — http_403 — 2026-03-01 12:00:00Z
+   |   • d6.example.net — http_403 — 2026-03-01 11:06:00Z
+   |   • d5.example.net — http_403 — 2026-03-01 11:05:00Z
+   |   • d4.example.net — http_403 — 2026-03-01 11:04:00Z
+   |   • d3.example.net — http_403 — 2026-03-01 11:03:00Z
+## db after step 19
+(no changes)

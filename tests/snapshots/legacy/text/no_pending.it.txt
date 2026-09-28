@@ -1,0 +1,8 @@
+# legacy snapshot v1
+# scenario: text.no_pending
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: text "ciao" user=10
+(no calls)
+## db after step 1
+~ users user_id=10 display_name: NULL -> "U10"

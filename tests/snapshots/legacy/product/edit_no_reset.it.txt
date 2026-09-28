@@ -1,0 +1,42 @@
+# legacy snapshot v1
+# scenario: product.edit_no_reset
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/lista" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | <b>📦 I tuoi prodotti (1)</b>
+-> sendMessage chat=10
+   param link_preview_options={"is_disabled": true}
+   param parse_mode="HTML"
+   text:
+   | <b>#1</b> Kettle
+   | 💰 €100.00
+   | 📉 Min: €80.00
+   | 🎯 Soglia: -10%
+   | 🕐 Ultimo check: 2h fa
+   keyboard:
+   | [🔍 Check → check_1] [📊 Storico prezzo → chart_1]
+   | [⏸ Pausa → pause_1] [🗑 Elimina → remove_1]
+   | [🔗 Apri → url:https://shop.example.com/item/1] [✏️ Modifica → edit_1]
+## db after step 1
+~ users user_id=10 display_name: NULL -> "U10"
+## step 2: press "edit_1" user=10 on=1001
+-> answerCallbackQuery
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | ✏️ <b>Modifica #1</b> Kettle
+   |
+   | 🎯 Soglia attuale: <b>-10%</b>
+   | 🏁 Target attuale: <b>non impostato</b>
+   | 📌 Prezzo base: <b>€100.00</b>
+   |
+   | <b>Cosa vuoi modificare?</b>
+   keyboard:
+   | [🔔 Ogni ribasso → track_any_1]
+   | [📉 Soglia % o € → track_threshold_1]
+   | [💰 Prezzo target → track_target_1]
+## db after step 2
+(no changes)

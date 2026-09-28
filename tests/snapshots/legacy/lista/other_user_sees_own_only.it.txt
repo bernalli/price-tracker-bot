@@ -1,0 +1,22 @@
+# legacy snapshot v1
+# scenario: lista.other_user_sees_own_only
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/lista" user=11
+-> sendMessage chat=11
+   param parse_mode="HTML"
+   text:
+   | <b>📦 I tuoi prodotti (1)</b>
+-> sendMessage chat=11
+   param link_preview_options={"is_disabled": true}
+   param parse_mode="HTML"
+   text:
+   | <b>#2</b> Lamp
+   | 💰 €30.00
+   | 🎯 Soglia: -10%
+   keyboard:
+   | [🔍 Check → check_2] [📊 Storico prezzo → chart_2]
+   | [⏸ Pausa → pause_2] [🗑 Elimina → remove_2]
+   | [🔗 Apri → url:https://shop.example.com/item/3] [✏️ Modifica → edit_2]
+## db after step 1
+~ users user_id=11 display_name: NULL -> "U11"

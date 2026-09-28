@@ -1,0 +1,26 @@
+# legacy snapshot v1
+# scenario: ops.reactivate_still_failing
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: seed "job run_check_all"
+## step 2: seed "job run_check_all"
+## step 3: press "ops_react_1" user=10 on=1001
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1001
+   text:
+   | ⏳ Riattivo 2 prodotti e li ricontrollo...
+-> editMessageText chat=10 message_id=1001
+   param parse_mode="HTML"
+   text:
+   | ▶️ <b>Ricontrollati 2 prodotti su example.com</b>
+   | ❌ Kettle — prezzo non leggibile
+   | ❌ Speaker — prezzo non leggibile
+## db after step 3
+~ products id=1 is_active: 0 -> 1
+~ products id=1 consecutive_errors: 2 -> 1
+~ products id=1 suspension_kind: "automatic" -> NULL
+~ products id=1 suspension_reason: "parse_error" -> NULL
+~ products id=2 is_active: 0 -> 1
+~ products id=2 consecutive_errors: 2 -> 1
+~ products id=2 suspension_kind: "automatic" -> NULL
+~ products id=2 suspension_reason: "parse_error" -> NULL

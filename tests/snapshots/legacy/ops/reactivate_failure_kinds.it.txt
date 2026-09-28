@@ -1,0 +1,42 @@
+# legacy snapshot v1
+# scenario: ops.reactivate_failure_kinds
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: seed "job run_check_all"
+## step 2: seed "job run_check_all"
+## step 3: press "ops_react_1" user=10 on=1001
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1001
+   text:
+   | ⏳ Riattivo 4 prodotti e li ricontrollo...
+-> editMessageText chat=10 message_id=1001
+   param parse_mode="HTML"
+   text:
+   | ▶️ <b>Ricontrollati 4 prodotti su example.com</b>
+   | ❌ Kettle — bloccato
+   | ❌ Speaker — pagina non trovata (HTTP 404)
+   | ❌ Mixer — sito irraggiungibile
+   | ❌ Heater — sito irraggiungibile
+## db after step 3
+~ products id=1 is_active: 0 -> 1
+~ products id=1 consecutive_errors: 2 -> 1
+~ products id=1 last_error: "parse_error: no price" -> "block: HTTP 403 block on https://shop.example.com/item/1"
+~ products id=1 suspension_kind: "automatic" -> NULL
+~ products id=1 suspension_reason: "parse_error" -> NULL
+~ products id=2 is_active: 0 -> 1
+~ products id=2 consecutive_errors: 2 -> 1
+~ products id=2 last_error: "parse_error: no price" -> "listing_gone: HTTP 404"
+~ products id=2 gone_streak: 0 -> 1
+~ products id=2 suspension_kind: "automatic" -> NULL
+~ products id=2 suspension_reason: "parse_error" -> NULL
+~ products id=3 is_active: 0 -> 1
+~ products id=3 consecutive_errors: 2 -> 1
+~ products id=3 last_error: "parse_error: no price" -> "http_error: connection refused"
+~ products id=3 suspension_kind: "automatic" -> NULL
+~ products id=3 suspension_reason: "parse_error" -> NULL
+~ products id=4 is_active: 0 -> 1
+~ products id=4 consecutive_errors: 2 -> 1
+~ products id=4 last_error: "parse_error: no price" -> "unexpected: scraper crashed"
+~ products id=4 suspension_kind: "automatic" -> NULL
+~ products id=4 suspension_reason: "parse_error" -> NULL
++ scraper_health domain="example.com" {state="CLOSED", consecutive_blocks=1, locked_until=NULL, last_block_at="2026-03-01T12:00:00+00:00", last_block_reason="HTTP 403", last_success_at=NULL, updated_at=<now:9999-99-99 99:99:99>}

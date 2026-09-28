@@ -1,0 +1,24 @@
+# legacy snapshot v1
+# scenario: alert.operational_warning
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: job run_check_all
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | ⏳ <b>Controlli in errore su example.com</b> (2)
+   |
+   | 2 prodotti hanno fallito 1/2 controlli di fila. Se continua, verranno sospesi automaticamente.
+   |
+   | • <b>Kettle</b> — prezzo non leggibile
+   | • <b>Speaker</b> — prezzo non leggibile
+   |
+   | Dettagli con /errori.
+   markup: {}
+## db after step 1
+~ products id=1 consecutive_errors: 0 -> 1
+~ products id=1 last_error: NULL -> "parse_error: no price"
+~ products id=1 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=2 consecutive_errors: 0 -> 1
+~ products id=2 last_error: NULL -> "parse_error: no price"
+~ products id=2 last_error_at: NULL -> <now:9999-99-99 99:99:99>

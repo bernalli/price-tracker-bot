@@ -1,0 +1,48 @@
+# legacy snapshot v1
+# scenario: settings.digest_mode
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/digest_mode" user=10
+-> sendMessage chat=10
+   text:
+   | Usage: /digest_mode on|off [interval_min]
+## db after step 1
+~ users user_id=10 display_name: NULL -> "U10"
+## step 2: command "/digest_mode on" user=10
+-> sendMessage chat=10
+   text:
+   | Digest mode on (interval 60m).
+## db after step 2
++ notification_prefs user_id=10,product_id=NULL {mute=0, mute_until=NULL, digest_mode=1, digest_interval_minutes=60, quiet_hours_start=NULL, quiet_hours_end=NULL, throttle_per_hour=NULL, timezone="Europe/Rome", throttle_state_json=NULL, updated_at=<now:9999-99-99 99:99:99>}
+## step 3: command "/digest_mode on 30" user=10
+-> sendMessage chat=10
+   text:
+   | Digest mode on (interval 30m).
+## db after step 3
+~ notification_prefs user_id=10,product_id=NULL digest_interval_minutes: 60 -> 30
+## step 4: command "/digest_mode on 0" user=10
+-> sendMessage chat=10
+   text:
+   | interval_min must be > 0
+## db after step 4
+(no changes)
+## step 5: command "/digest_mode on abc" user=10
+-> sendMessage chat=10
+   text:
+   | interval_min must be a positive integer
+## db after step 5
+(no changes)
+## step 6: command "/digest_mode off" user=10
+-> sendMessage chat=10
+   text:
+   | Digest mode off.
+## db after step 6
+~ notification_prefs user_id=10,product_id=NULL digest_mode: 1 -> 0
+~ notification_prefs user_id=10,product_id=NULL digest_interval_minutes: 30 -> 60
+## step 7: command "/digest_mode on 1" user=10
+-> sendMessage chat=10
+   text:
+   | Digest mode on (interval 1m).
+## db after step 7
+~ notification_prefs user_id=10,product_id=NULL digest_mode: 0 -> 1
+~ notification_prefs user_id=10,product_id=NULL digest_interval_minutes: 60 -> 1

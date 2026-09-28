@@ -1,0 +1,29 @@
+# legacy snapshot v1
+# scenario: product.ownership
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: press "edit_2" user=10 on=1 synthetic
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1
+   text:
+   | ❌ Prodotto non trovato.
+## db after step 1
+(no changes)
+## step 2: press "edit_2" user=1 on=1 synthetic
+-> answerCallbackQuery
+-> sendMessage chat=1
+   param parse_mode="HTML"
+   text:
+   | ✏️ <b>Modifica #2</b> Lamp
+   |
+   | 🎯 Soglia attuale: <b>-10%</b>
+   | 🏁 Target attuale: <b>non impostato</b>
+   | 📌 Prezzo base: <b>€30.00</b>
+   |
+   | <b>Cosa vuoi modificare?</b>
+   keyboard:
+   | [🔔 Ogni ribasso → track_any_2]
+   | [📉 Soglia % o € → track_threshold_2]
+   | [💰 Prezzo target → track_target_2]
+## db after step 2
+(no changes)

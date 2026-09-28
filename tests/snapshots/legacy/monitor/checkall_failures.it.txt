@@ -1,0 +1,77 @@
+# legacy snapshot v1
+# scenario: monitor.checkall_failures
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/checkall" user=10
+-> sendMessage chat=10
+   text:
+   | 🔍 Controllo di 6 prodotti in corso...
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | 🔒 <b>Sito in pausa automatica</b>
+   |
+   | <b>amazon.com</b> ha fallito troppi controlli (HTTP 403 block on https://www.amazon.com/dp/B0FIXTURE3).
+   | Sospendo temporaneamente i check su questo sito per non insistere contro un blocco.
+   | 🔁 Riprovo da solo dopo: 2026-03-01 13:00 UTC
+   |
+   | Dettagli con /errori.
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | ⏳ <b>Controlli in errore su amazon.com</b> (3)
+   |
+   | 3 prodotti hanno fallito 1/2 controlli di fila. Se continua, verranno sospesi automaticamente.
+   |
+   | • <b>Amazon 1</b> — bloccato
+   | • <b>Amazon 2</b> — bloccato
+   | • <b>Amazon 3</b> — bloccato
+   |
+   | Dettagli con /errori.
+   markup: {}
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | ⏳ <b>Controlli in errore su example.com</b> (3)
+   |
+   | 3 prodotti hanno fallito 1/2 controlli di fila. Se continua, verranno sospesi automaticamente.
+   |
+   | • <b>Gone</b> — pagina non trovata (HTTP 410)
+   | • <b>Offline</b> — sito irraggiungibile
+   | • <b>Broken</b> — sito irraggiungibile
+   |
+   | Dettagli con /errori.
+   markup: {}
+-> editMessageText chat=10 message_id=1000
+   param parse_mode="HTML"
+   text:
+   | ✅ <b>Controllo completato</b> — 6 prodotti
+   |
+   |   #1 Amazon 1 — €25.00 ⚠️
+   |   #2 Amazon 2 — €25.00 ⚠️
+   |   #3 Amazon 3 — €25.00 ⚠️
+   |   #4 Gone — €40.00 ⚠️
+   |   #5 Offline — €40.00 ⚠️
+   |   #6 Broken — €40.00 ⚠️
+## db after step 1
+~ products id=1 consecutive_errors: 0 -> 1
+~ products id=1 last_error: NULL -> "block: HTTP 403 block on https://www.amazon.com/dp/B0FIXTURE1"
+~ products id=1 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=2 consecutive_errors: 0 -> 1
+~ products id=2 last_error: NULL -> "block: HTTP 403 block on https://www.amazon.com/dp/B0FIXTURE2"
+~ products id=2 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=3 consecutive_errors: 0 -> 1
+~ products id=3 last_error: NULL -> "block: HTTP 403 block on https://www.amazon.com/dp/B0FIXTURE3"
+~ products id=3 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=4 consecutive_errors: 0 -> 1
+~ products id=4 last_error: NULL -> "listing_gone: HTTP 410"
+~ products id=4 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=4 gone_streak: 0 -> 1
+~ products id=5 consecutive_errors: 0 -> 1
+~ products id=5 last_error: NULL -> "http_error: connection refused"
+~ products id=5 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=6 consecutive_errors: 0 -> 1
+~ products id=6 last_error: NULL -> "unexpected: scraper crashed"
+~ products id=6 last_error_at: NULL -> <now:9999-99-99 99:99:99>
++ scraper_health domain="amazon.com" {state="LOCKED_T1", consecutive_blocks=3, locked_until="2026-03-01T13:00:00+00:00", last_block_at="2026-03-01T12:00:00+00:00", last_block_reason="HTTP 403", last_success_at=NULL, updated_at=<now:9999-99-99 99:99:99>}
+~ users user_id=10 display_name: NULL -> "U10"

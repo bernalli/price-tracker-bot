@@ -1,0 +1,25 @@
+# legacy snapshot v1
+# scenario: status.admin
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/status" user=1
+-> sendMessage chat=1
+   param parse_mode="HTML"
+   text:
+   | 📊 <b>Le tue statistiche</b>
+   |
+   | 📦 Prodotti attivi: 0
+   | 📁 Prodotti totali: 0
+   | 🔍 Controlli effettuati: 0
+   | ⏱ Intervallo check: ogni 1.5h
+   |
+   | <b>👑 Panoramica admin</b>
+   | 👥 Utenti attivi: 3
+   | 📦 Prodotti totali (globali): 2
+   | 🔍 Check totali (globali): 5
+   |
+   | <b>📡 Bot Status</b>
+   | Uptime: 1h 2m 5s
+   | Products tracked: 2
+## db after step 1
+~ users user_id=1 display_name: NULL -> "U1"

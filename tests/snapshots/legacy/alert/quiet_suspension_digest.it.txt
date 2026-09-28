@@ -1,0 +1,54 @@
+# legacy snapshot v1
+# scenario: alert.quiet_suspension_digest
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: seed "\"/timezone Europe/Rome\""
+## step 2: seed "\"/quiet_hours 12:00-15:00\""
+## step 3: job run_check_all
+(no calls)
+## db after step 3
++ digest_queue id=1 {user_id=10, product_id=NULL, alert_payload_json="{\"kind\": \"operational\", \"event\": \"quarantine\", \"domain\": \"amazon.com\", \"products\": [{\"id\": 4, \"name\": \"Amazon 3\", \"why\": \"blocked\"}], \"count\": 1, \"event_id\": \"ops:quarantine:10:amazon.com:2026-03-01 13:00:00+00:00\", \"text\": \"\\ud83d\\udd12 <b>Sito in pausa automatica</b>\\n\\n<b>amazon.com</b> ha fallito troppi controlli (HTTP 403 block on https://www.amazon.com/dp/B0FIXTURE3).\\nSospendo temporaneamente i check su questo sito per non insistere contro un blocco.\\n\\ud83d\\udd01 Riprovo da solo dopo: 2026-03-01 13:00 UTC\\n\\nDettagli con /errori.\"}", enqueued_at=<now:9999-99-99 99:99:99>, flushed_at=NULL}
++ digest_queue id=2 {user_id=10, product_id=NULL, alert_payload_json="{\"kind\": \"operational\", \"event\": \"warning\", \"event_id\": \"ops:warning:10:amazon.com:2026-03-01T12:00:00+00:00\", \"user_id\": 10, \"domain\": \"amazon.com\", \"product_ids\": [2, 3, 4], \"products\": [{\"id\": 2, \"name\": \"Amazon 1\", \"why\": \"bloccato\"}, {\"id\": 3, \"name\": \"Amazon 2\", \"why\": \"bloccato\"}, {\"id\": 4, \"name\": \"Amazon 3\", \"why\": \"bloccato\"}], \"reason\": \"block\", \"count\": 3, \"error_count\": 1, \"max_errors\": 2, \"buttons\": [], \"text\": \"\\u23f3 <b>Controlli in errore su amazon.com</b> (3)\\n\\n3 prodotti hanno fallito 1/2 controlli di fila. Se continua, verranno sospesi automaticamente.\\n\\n\\u2022 <b>Amazon 1</b> \\u2014 bloccato\\n\\u2022 <b>Amazon 2</b> \\u2014 bloccato\\n\\u2022 <b>Amazon 3</b> \\u2014 bloccato\\n\\nDettagli con /errori.\"}", enqueued_at=<now:9999-99-99 99:99:99>, flushed_at=NULL}
++ digest_queue id=3 {user_id=10, product_id=NULL, alert_payload_json="{\"kind\": \"operational\", \"event\": \"warning\", \"event_id\": \"ops:warning:10:example.com:2026-03-01T12:00:00+00:00\", \"user_id\": 10, \"domain\": \"example.com\", \"product_ids\": [1], \"products\": [{\"id\": 1, \"name\": \"Kettle\", \"why\": \"prezzo non leggibile\"}], \"reason\": \"parse_error\", \"count\": 1, \"error_count\": 1, \"max_errors\": 2, \"buttons\": [], \"text\": \"\\u23f3 <b>Controlli in errore su example.com</b> (1)\\n\\n1 prodotti hanno fallito 1/2 controlli di fila. Se continua, verranno sospesi automaticamente.\\n\\n\\u2022 <b>Kettle</b> \\u2014 prezzo non leggibile\\n\\nDettagli con /errori.\"}", enqueued_at=<now:9999-99-99 99:99:99>, flushed_at=NULL}
+~ products id=1 consecutive_errors: 0 -> 1
+~ products id=1 last_error: NULL -> "parse_error: no price"
+~ products id=1 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=2 consecutive_errors: 0 -> 1
+~ products id=2 last_error: NULL -> "block: HTTP 403 block on https://www.amazon.com/dp/B0FIXTURE1"
+~ products id=2 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=3 consecutive_errors: 0 -> 1
+~ products id=3 last_error: NULL -> "block: HTTP 403 block on https://www.amazon.com/dp/B0FIXTURE2"
+~ products id=3 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=4 consecutive_errors: 0 -> 1
+~ products id=4 last_error: NULL -> "block: HTTP 403 block on https://www.amazon.com/dp/B0FIXTURE3"
+~ products id=4 last_error_at: NULL -> <now:9999-99-99 99:99:99>
++ scraper_health domain="amazon.com" {state="LOCKED_T1", consecutive_blocks=3, locked_until="2026-03-01T13:00:00+00:00", last_block_at="2026-03-01T12:00:00+00:00", last_block_reason="HTTP 403", last_success_at=NULL, updated_at=<now:9999-99-99 99:99:99>}
+## step 4: job run_check_all
+(no calls)
+## db after step 4
++ digest_queue id=4 {user_id=10, product_id=NULL, alert_payload_json="{\"kind\": \"operational\", \"event\": \"suspended\", \"event_id\": \"ops:suspended:10:example.com:2026-03-01T12:00:00+00:00\", \"user_id\": 10, \"domain\": \"example.com\", \"product_ids\": [1], \"products\": [{\"id\": 1, \"name\": \"Kettle\", \"why\": \"prezzo non leggibile\"}], \"reason\": \"parse_error\", \"count\": 1, \"error_count\": 2, \"max_errors\": 2, \"buttons\": [[{\"text\": \"\\u25b6\\ufe0f Riattiva e ricontrolla (1)\", \"callback_data\": \"ops_react_1\"}], [{\"text\": \"\\ud83d\\uddd1 Elimina tutti (1)\", \"callback_data\": \"ops_del_1\"}]], \"text\": \"\\u26a0\\ufe0f <b>Prezzo illeggibile su example.com</b> (1)\\n\\nLe pagine si aprono, ma il prezzo non si legge pi\\u00f9 (layout cambiato o offerta diversa).\\n\\n\\u2022 <b>Kettle</b> \\u2014 prezzo non leggibile\\nUltima lettura buona: 80.00 \\u20ac il 2026-03-01 10:00 UTC\\nErrore: <code>parse_error: no price</code>\\n\\nRiattiva per fare subito un nuovo controllo.\"}", enqueued_at=<now:9999-99-99 99:99:99>, flushed_at=NULL}
+~ products id=1 is_active: 1 -> 0
+~ products id=1 consecutive_errors: 1 -> 2
+~ products id=1 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
+~ products id=1 suspension_kind: NULL -> "automatic"
+~ products id=1 suspension_reason: NULL -> "parse_error"
+## step 5: command "/digest_now" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | 📊 <b>Riepilogo — 0 variazioni di prezzo</b>
+   | ⚠️ Avvisi operativi
+   | amazon.com — in quarantena
+   | amazon.com — 3 prodotti: controlli in errore (3/1)
+   | example.com — 1 prodotti: controlli in errore (1/1)
+   | example.com — 1 prodotti: tracking sospeso (prezzo non leggibile)
+   | Usa /reactivate o /errori per i dettagli.
+   | Usa /lista per lo stato completo.
+-> sendMessage chat=10
+   text:
+   | Flushed 4 pending digest entries.
+## db after step 5
+~ digest_queue id=1 flushed_at: NULL -> <now:9999-99-99 99:99:99>
+~ digest_queue id=2 flushed_at: NULL -> <now:9999-99-99 99:99:99>
+~ digest_queue id=3 flushed_at: NULL -> <now:9999-99-99 99:99:99>
+~ digest_queue id=4 flushed_at: NULL -> <now:9999-99-99 99:99:99>

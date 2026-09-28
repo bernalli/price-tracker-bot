@@ -1,0 +1,50 @@
+# legacy snapshot v1
+# scenario: admin.cmd_adduser
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/adduser" user=1
+-> sendMessage chat=1
+   param parse_mode="HTML"
+   text:
+   | ❌ Uso: /adduser &lt;telegram_id&gt;
+   |
+   | L'utente deve prima inviare /start al bot per ottenere il suo ID.
+## db after step 1
+(no changes)
+## step 2: command "/adduser abc" user=1
+-> sendMessage chat=1
+   text:
+   | ❌ ID non valido. Deve essere un numero.
+## db after step 2
+(no changes)
+## step 3: command "/adduser 99" user=1
+-> sendMessage chat=1
+   param parse_mode="HTML"
+   text:
+   | ✅ Utente <code>99</code> aggiunto!
+   | Ora può usare il bot inviando /start.
+-> sendMessage chat=99
+   text:
+   | 🎉 Sei stato autorizzato a usare il Price Tracker Bot!
+   | Invia /start per iniziare.
+## db after step 3
++ users user_id=99 {is_admin=0, is_active=1, created_at=<now:9999-99-99 99:99:99>, display_name=NULL, username=NULL}
+## step 4: command "/adduser 10" user=1
+-> sendMessage chat=1
+   param parse_mode="HTML"
+   text:
+   | ℹ️ L'utente <code>10</code> è già autorizzato.
+## db after step 4
+(no changes)
+## step 5: command "/adduser 98" user=1
+-> sendMessage chat=1
+   param parse_mode="HTML"
+   text:
+   | ✅ Utente <code>98</code> aggiunto!
+   | Ora può usare il bot inviando /start.
+-> sendMessage chat=98
+   text:
+   | 🎉 Sei stato autorizzato a usare il Price Tracker Bot!
+   | Invia /start per iniziare.
+## db after step 5
++ users user_id=98 {is_admin=0, is_active=1, created_at=<now:9999-99-99 99:99:99>, display_name=NULL, username=NULL}

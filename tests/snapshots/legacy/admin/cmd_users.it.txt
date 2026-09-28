@@ -1,0 +1,44 @@
+# legacy snapshot v1
+# scenario: admin.cmd_users
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/users" user=1
+-> sendMessage chat=1
+   param parse_mode="HTML"
+   text:
+   | <b>👥 Utenti autorizzati</b>
+   |
+   |
+   |   👑 Admin — <code>1</code>
+   |     Nome: N/D
+   |     Prodotti: 0 attivi / 0 totali
+   |
+   |   👤 Utente — <code>10</code>
+   |     Nome: N/D
+   |     Prodotti: 1 attivi / 1 totali
+   |
+   |   👤 Utente — <code>11</code>
+   |     Nome: Other (@oth)
+   |     Prodotti: 1 attivi / 1 totali
+## db after step 1
+(no changes)
+## step 2: command "/utenti" user=1
+-> sendMessage chat=1
+   param parse_mode="HTML"
+   text:
+   | <b>👥 Utenti autorizzati</b>
+   |
+   |
+   |   👑 Admin — <code>1</code>
+   |     Nome: N/D
+   |     Prodotti: 0 attivi / 0 totali
+   |
+   |   👤 Utente — <code>10</code>
+   |     Nome: N/D
+   |     Prodotti: 1 attivi / 1 totali
+   |
+   |   👤 Utente — <code>11</code>
+   |     Nome: Other (@oth)
+   |     Prodotti: 1 attivi / 1 totali
+## db after step 2
+(no changes)

@@ -1,0 +1,44 @@
+# legacy snapshot v1
+# scenario: lista.edges
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/lista" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | <b>📦 I tuoi prodotti (2)</b>
+-> sendMessage chat=10
+   param link_preview_options={"is_disabled": true}
+   param parse_mode="HTML"
+   text:
+   | <b>#1</b> Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN...
+   | 💰 €99.50
+   | 📌 Prezzo iniziale: €100.00 (<i>-0.5% dal tracking</i>)
+   | 🎯 Soglia: -10%
+   | 🔄 Check: ogni 1h
+   | ⚠️ 1 letture fallite di recente — dettagli con /errori
+   keyboard:
+   | [🔍 Check → check_1] [📊 Storico prezzo → chart_1]
+   | [⏸ Pausa → pause_1] [🗑 Elimina → remove_1]
+   | [🔗 Apri → url:https://shop.example.com/item/74] [✏️ Modifica → edit_1]
+-> sendMessage chat=10
+   param link_preview_options={"is_disabled": true}
+   param parse_mode="HTML"
+   text:
+   | <b>#2</b> Sticker
+   | 💰 €0.80
+   | 📌 Prezzo iniziale: €0.90 (<i>-11.1% dal tracking</i>)
+   | 🎯 Soglia: -10%
+   keyboard:
+   | [🔍 Check → check_2] [📊 Storico prezzo → chart_2]
+   | [⏸ Pausa → pause_2] [🗑 Elimina → remove_2]
+   | [🔗 Apri → url:https://shop.example.com/item/75] [✏️ Modifica → edit_2]
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | ───────────────
+   | 📦 <b>2</b> prodotti tracciati
+   keyboard:
+   | [🗑 Elimina tutti i prodotti → delete_all]
+## db after step 1
+~ users user_id=10 display_name: NULL -> "U10"

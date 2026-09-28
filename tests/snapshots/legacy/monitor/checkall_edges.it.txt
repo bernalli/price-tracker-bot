@@ -1,0 +1,26 @@
+# legacy snapshot v1
+# scenario: monitor.checkall_edges
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/checkall" user=10
+-> sendMessage chat=10
+   text:
+   | 🔍 Controllo di 2 prodotti in corso...
+-> editMessageText chat=10 message_id=1000
+   param parse_mode="HTML"
+   text:
+   | ✅ <b>Controllo completato</b> — 2 prodotti
+   |
+   |   #1 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN — €99.50 <i>(-0.5%)</i>
+   |   #2 Sticker — €0.80 <i>(-11.1%)</i>
+## db after step 1
++ price_history id=1 {product_id=1, price="99.50", checked_at=<now:9999-99-99 99:99:99>}
++ price_history id=2 {product_id=2, price="0.80", checked_at=<now:9999-99-99 99:99:99>}
+~ products id=1 last_checked_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=1 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
+~ products id=1 lowest_price: "100.00" -> "99.50"
+~ products id=2 last_checked_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=2 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
+~ products id=2 lowest_price: "0.90" -> "0.80"
++ scraper_health domain="example.com" {state="CLOSED", consecutive_blocks=0, locked_until=NULL, last_block_at=NULL, last_block_reason=NULL, last_success_at="2026-03-01T12:00:00+00:00", updated_at=<now:9999-99-99 99:99:99>}
+~ users user_id=10 display_name: NULL -> "U10"

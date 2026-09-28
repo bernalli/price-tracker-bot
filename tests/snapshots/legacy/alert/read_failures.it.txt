@@ -1,0 +1,43 @@
+# legacy snapshot v1
+# scenario: alert.read_failures
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: job run_check_all
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | ⏳ <b>Controlli in errore su example.com</b> (6)
+   |
+   | 6 prodotti hanno fallito 1/2 controlli di fila. Se continua, verranno sospesi automaticamente.
+   |
+   | • <b>Kettle</b> — prezzo non leggibile
+   | • <b>No Price</b> — prezzo non leggibile
+   | • <b>Used Offer</b> — prezzo non leggibile
+   | • <b>Offline</b> — sito irraggiungibile
+   | • <b>Gone</b> — pagina non trovata (HTTP 404)
+   | • <b>Broken</b> — sito irraggiungibile
+   |
+   | Dettagli con /errori.
+   markup: {}
+## db after step 1
+~ products id=1 consecutive_errors: 0 -> 1
+~ products id=1 last_error: NULL -> "implausible_read: 5000.00 against a median of recent readings"
+~ products id=1 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=2 consecutive_errors: 0 -> 1
+~ products id=2 last_error: NULL -> "price_none"
+~ products id=2 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=3 consecutive_errors: 1 -> 0
+~ products id=4 consecutive_errors: 0 -> 1
+~ products id=4 last_error: NULL -> "condition_mismatch: offer is 'used', tracking 'new'"
+~ products id=4 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=5 consecutive_errors: 0 -> 1
+~ products id=5 last_error: NULL -> "http_error: connection refused"
+~ products id=5 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=6 consecutive_errors: 0 -> 1
+~ products id=6 last_error: NULL -> "listing_gone: HTTP 404"
+~ products id=6 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=6 gone_streak: 0 -> 1
+~ products id=7 consecutive_errors: 0 -> 1
+~ products id=7 last_error: NULL -> "unexpected: scraper crashed"
+~ products id=7 last_error_at: NULL -> <now:9999-99-99 99:99:99>
++ scraper_health domain="example.com" {state="CLOSED", consecutive_blocks=0, locked_until=NULL, last_block_at=NULL, last_block_reason=NULL, last_success_at="2026-03-01T12:00:00+00:00", updated_at=<now:9999-99-99 99:99:99>}

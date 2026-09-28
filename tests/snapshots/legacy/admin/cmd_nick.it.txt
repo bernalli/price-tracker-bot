@@ -1,0 +1,34 @@
+# legacy snapshot v1
+# scenario: admin.cmd_nick
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/nick" user=1
+-> sendMessage chat=1
+   param parse_mode="HTML"
+   text:
+   | ❌ Uso: /nick &lt;id&gt; &lt;nome&gt;
+   |
+   | Esempio: <code>/nick 123456789 Marco</code>
+## db after step 1
+(no changes)
+## step 2: command "/nick abc x" user=1
+-> sendMessage chat=1
+   text:
+   | ❌ ID non valido.
+## db after step 2
+(no changes)
+## step 3: command "/nick 12345 Bob" user=1
+-> sendMessage chat=1
+   param parse_mode="HTML"
+   text:
+   | ❌ Utente <code>12345</code> non trovato.
+## db after step 3
+(no changes)
+## step 4: command "/nick 10 Bob Smith" user=1
+-> sendMessage chat=1
+   param parse_mode="HTML"
+   text:
+   | ✅ Nickname: <b>Bob Smith</b>
+   | ID: <code>10</code>
+## db after step 4
+~ users user_id=10 display_name: NULL -> "Bob Smith"

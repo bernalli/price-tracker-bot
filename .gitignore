@@ -9,6 +9,7 @@ docker-compose.override.yml
 *.db-shm
 *.db-wal
 data/
+!tests/snapshots/legacy/data/
 
 # Plugins (drop-in extension dir — keep README only)
 plugins/*

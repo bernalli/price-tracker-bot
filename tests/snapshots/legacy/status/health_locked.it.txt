@@ -1,0 +1,24 @@
+# legacy snapshot v1
+# scenario: status.health_locked
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: seed "record block 1"
+## step 2: seed "record block 2"
+## step 3: seed "record block 3"
+## step 4: command "/health" user=1
+-> sendMessage chat=1
+   param parse_mode="HTML"
+   text:
+   | 🏥 <b>Scraper Health Report</b>
+   |
+   | ✅ Healthy domains: 0
+   | ⚠️ Half-open: 0
+   | 🔒 Locked: 1
+   |
+   | <b>Locked:</b>
+   |   • blocked.example.com — T1 (1h), expires in 1h 00m
+   |
+   | <b>Last 5 block events:</b>
+   |   • blocked.example.com — http_403 — 2026-03-01 12:00:00Z
+## db after step 4
+(no changes)

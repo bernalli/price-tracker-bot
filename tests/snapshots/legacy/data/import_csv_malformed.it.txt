@@ -1,0 +1,12 @@
+# legacy snapshot v1
+# scenario: data.import_csv_malformed
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: document "x.csv" (10 bytes) user=10
+-> getFile
+   param file_id="doc1"
+-> sendMessage chat=10
+   text:
+   | ❌ Errore nel parsing del CSV: 'utf-8' codec can't decode byte 0xff in position 0: invalid start byte
+## db after step 1
+~ users user_id=10 display_name: NULL -> "U10"

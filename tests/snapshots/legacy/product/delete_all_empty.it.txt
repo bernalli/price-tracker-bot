@@ -1,0 +1,11 @@
+# legacy snapshot v1
+# scenario: product.delete_all_empty
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: press "delete_all" user=10 on=1 synthetic
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1
+   text:
+   | 📭 Nessun prodotto da eliminare.
+## db after step 1
+(no changes)

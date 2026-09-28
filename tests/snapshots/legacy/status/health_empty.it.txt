@@ -1,0 +1,16 @@
+# legacy snapshot v1
+# scenario: status.health_empty
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/health" user=1
+-> sendMessage chat=1
+   param parse_mode="HTML"
+   text:
+   | 🏥 <b>Scraper Health Report</b>
+   |
+   | ✅ Healthy domains: 0
+   | ⚠️ Half-open: 0
+   | 🔒 Locked: 0
+   |
+## db after step 1
+(no changes)

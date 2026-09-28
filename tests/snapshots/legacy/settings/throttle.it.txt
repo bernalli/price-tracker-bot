@@ -1,0 +1,34 @@
+# legacy snapshot v1
+# scenario: settings.throttle
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/throttle" user=10
+-> sendMessage chat=10
+   text:
+   | Usage: /throttle <N> | off
+## db after step 1
+~ users user_id=10 display_name: NULL -> "U10"
+## step 2: command "/throttle 5" user=10
+-> sendMessage chat=10
+   text:
+   | Throttle updated.
+## db after step 2
++ notification_prefs user_id=10,product_id=NULL {mute=0, mute_until=NULL, digest_mode=0, digest_interval_minutes=60, quiet_hours_start=NULL, quiet_hours_end=NULL, throttle_per_hour=5, timezone="Europe/Rome", throttle_state_json=NULL, updated_at=<now:9999-99-99 99:99:99>}
+## step 3: command "/throttle abc" user=10
+-> sendMessage chat=10
+   text:
+   | N must be a positive integer
+## db after step 3
+(no changes)
+## step 4: command "/throttle 0" user=10
+-> sendMessage chat=10
+   text:
+   | N must be > 0
+## db after step 4
+(no changes)
+## step 5: command "/throttle off" user=10
+-> sendMessage chat=10
+   text:
+   | Throttle updated.
+## db after step 5
+~ notification_prefs user_id=10,product_id=NULL throttle_per_hour: 5 -> NULL

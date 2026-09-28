@@ -1,0 +1,13 @@
+# legacy snapshot v1
+# scenario: product.cmd_target_no_current
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/target 1 30" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | 🎯 Target impostato: <b>USD 30.00 (~€27.60)</b>
+   | 📦 Fan
+## db after step 1
+~ products id=1 target_price: NULL -> "30"
+~ users user_id=10 display_name: NULL -> "U10"

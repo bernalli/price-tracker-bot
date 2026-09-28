@@ -1,0 +1,22 @@
+# legacy snapshot v1
+# scenario: alert.read_failures_domains
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: job run_check_all
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | ⏳ <b>Controlli in errore su amazon.com</b> (1)
+   |
+   | 1 prodotti hanno fallito 1/2 controlli di fila. Se continua, verranno sospesi automaticamente.
+   |
+   | • <b>Used Offer</b> — prezzo non leggibile
+   |
+   | Dettagli con /errori.
+   markup: {}
+## db after step 1
+~ products id=2 consecutive_errors: 0 -> 1
+~ products id=2 last_error: NULL -> "condition_mismatch: offer is 'used', tracking 'new'"
+~ products id=2 last_error_at: NULL -> <now:9999-99-99 99:99:99>
++ scraper_health domain="amazon.com" {state="CLOSED", consecutive_blocks=0, locked_until=NULL, last_block_at=NULL, last_block_reason=NULL, last_success_at="2026-03-01T12:00:00+00:00", updated_at=<now:9999-99-99 99:99:99>}
++ scraper_health domain="example.com" {state="CLOSED", consecutive_blocks=0, locked_until=NULL, last_block_at=NULL, last_block_reason=NULL, last_success_at="2026-03-01T12:00:00+00:00", updated_at=<now:9999-99-99 99:99:99>}

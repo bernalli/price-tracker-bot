@@ -1,0 +1,54 @@
+# legacy snapshot v1
+# scenario: history.reset
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/reset" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | ❌ Uso: /reset &lt;id&gt;
+   |
+   | Reimposta il prezzo iniziale al prezzo corrente.
+   | Utile quando il prezzo è sceso e vuoi azzerare il confronto.
+## db after step 1
+~ users user_id=10 display_name: NULL -> "U10"
+## step 2: command "/reset 1" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | ✅ Prezzo iniziale aggiornato!
+   |
+   | 📦 <b>#1</b> Kettle
+   | 💰 Nuovo prezzo base: <b>€80.00</b>
+## db after step 2
+~ products id=1 initial_price: "100.00" -> "80.00"
+~ products id=1 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
+## step 3: command "/azzera 2" user=10
+-> sendMessage chat=10
+   text:
+   | ❌ Impossibile aggiornare il prezzo iniziale.
+## db after step 3
+(no changes)
+## step 4: command "/reset abc" user=10
+-> sendMessage chat=10
+   text:
+   | ❌ ID non valido.
+## db after step 4
+(no changes)
+## step 5: command "/reset 999" user=10
+-> sendMessage chat=10
+   text:
+   | ❌ Prodotto non trovato.
+## db after step 5
+(no changes)
+## step 6: command "/reset 3" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | ✅ Prezzo iniziale aggiornato!
+   |
+   | 📦 <b>#3</b> Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
+   | 💰 Nuovo prezzo base: <b>€80.00</b>
+## db after step 6
+~ products id=3 initial_price: "100.00" -> "80.00"
+~ products id=3 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>

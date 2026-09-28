@@ -1,0 +1,53 @@
+# legacy snapshot v1
+# scenario: status.health_half_open
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: seed "record block 1"
+## step 2: seed "record block 2"
+## step 3: seed "record block 3"
+## step 4: seed "record block 1"
+## step 5: seed "record block 2"
+## step 6: seed "record block 3"
+## step 7: seed "lock example.com until 2026-03-01T11:00:00+00:00"
+## step 8: seed "reload domain health"
+## step 9: seed "lock blocked.example.com until 2026-03-01T12:30:00+00:00"
+## step 10: seed "reload domain health"
+## step 11: command "/health" user=1
+-> sendMessage chat=1
+   param parse_mode="HTML"
+   text:
+   | 🏥 <b>Scraper Health Report</b>
+   |
+   | ✅ Healthy domains: 0
+   | ⚠️ Half-open: 1
+   | 🔒 Locked: 1
+   |
+   | <b>Locked:</b>
+   |   • blocked.example.com — T1 (1h), expires in 30m
+   |
+   | <b>Half-open:</b>
+   |   • example.com — probing on next tick
+   |
+   | <b>Last 5 block events:</b>
+   |   • blocked.example.com — http_403 — 2026-03-01 12:00:00Z
+   |   • example.com — http_403 — 2026-03-01 12:00:00Z
+## db after step 11
+(no changes)
+## step 12: command "/errori" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | ⚠️ <b>Errori recenti (2)</b>
+   |
+   | <b>#2</b> Amazon Widget
+   |   🌐 amazon.com
+   |   ❌ 2 letture fallite
+   |
+   | <b>#1</b> Kettle
+   |   🌐 example.com — 🔒 T1 half-open (riprende tra expired)
+   |   ❌ 1 letture fallite
+   |   🐞 parse_error: no price — 30min fa
+   |
+   | ℹ️ I siti in 🔒 quarantena riprendono da soli; usa /reactivate per riattivare un prodotto sospeso.
+## db after step 12
+~ users user_id=10 display_name: NULL -> "U10"

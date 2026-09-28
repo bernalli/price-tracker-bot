@@ -1,0 +1,17 @@
+# legacy snapshot v1
+# scenario: ops.delete_prompt
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: seed "job run_check_all"
+## step 2: seed "job run_check_all"
+## step 3: press "ops_del_1" user=10 on=1001
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1001
+   param parse_mode="HTML"
+   text:
+   | 🗑 Eliminare 2 prodotti su example.com e il loro storico prezzi? Non si può annullare.
+   keyboard:
+   | [🗑 Sì, elimina 2 → ops_delok_1]
+   | [❌ Annulla → cancel_delete]
+## db after step 3
+(no changes)

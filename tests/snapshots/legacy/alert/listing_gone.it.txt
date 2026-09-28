@@ -1,0 +1,39 @@
+# legacy snapshot v1
+# scenario: alert.listing_gone
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: job run_check_all
+(no calls)
+## db after step 1
+~ products id=1 consecutive_errors: 0 -> 1
+~ products id=1 last_error: NULL -> "listing_gone: HTTP 404"
+~ products id=1 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=1 gone_streak: 0 -> 1
+## step 2: job run_check_all
+(no calls)
+## db after step 2
+~ products id=1 consecutive_errors: 1 -> 2
+~ products id=1 gone_streak: 1 -> 2
+## step 3: job run_check_all
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | ⚠️ <b>Prodotti rimossi da example.com</b> (1)
+   |
+   | Le pagine rispondono HTTP 404/410: lo store li ha tolti dal catalogo.
+   |
+   | • <b>Kettle</b> — pagina non trovata (HTTP 404)
+   | Ultima lettura buona: 80.00 € il 2026-03-01 10:00 UTC
+   | Errore: <code>listing_gone: HTTP 404</code>
+   |
+   | Eliminarli tiene pulita la lista. Riattivali solo se lo store li rimette in vendita.
+   keyboard:
+   | [🗑 Elimina tutti (1) → ops_del_1]
+   | [▶️ Riattiva e ricontrolla (1) → ops_react_1]
+## db after step 3
+~ products id=1 is_active: 1 -> 0
+~ products id=1 consecutive_errors: 2 -> 3
+~ products id=1 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
+~ products id=1 gone_streak: 2 -> 3
+~ products id=1 suspension_kind: NULL -> "automatic"
+~ products id=1 suspension_reason: NULL -> "listing_gone"
