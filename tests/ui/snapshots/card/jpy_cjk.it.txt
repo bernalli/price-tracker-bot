@@ -1,0 +1,19 @@
+# ui snapshot v1
+# screen: card.jpy_cjk
+# locale: it
+# now: 2026-03-01T12:00:00Z
+text:
+   | 📦 <b>⁨電動歯ブラシ プレミアム⁩</b>
+   | shop.example.com · #47 · attivo
+   | 
+   | 💰 Ora: 12.800 JPY
+   | 📌 Inizio: 13.500 JPY · ▼ 5,2%
+   | 📉 Minimo: 12.800 JPY
+   | 🔔 Avviso: ribasso del 5% dall'inizio
+   | 🔄 Controlli: ogni 30 min · ultimo 12 minuti fa
+keyboard:
+   [🔍 Controlla ora](cb:p:47:ck)  [📊 Storico](cb:p:47:ch:30d)
+   [⏸ Pausa](cb:p:47:pa)  [🗑 Elimina](cb:p:47:rm)
+   [🔔 Regola avviso](cb:p:47:th)  [🔄 Intervallo](cb:p:47:iv)
+   [🔗 Apri](url:https://shop.example.com/item/47)
+   [◀️ Lista](cb:l:a:1)

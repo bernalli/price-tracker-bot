@@ -1,0 +1,23 @@
+# ui snapshot v1
+# screen: card.estimate
+# locale: fr
+# now: 2026-03-01T12:00:00Z
+text:
+   | [📦 <b>⁨Desk Lamp⁩</b> 📦 <b>⁨Desk Lamp⁩</b> 📦 <b>⁨Desk Lamp⁩</b>]
+   | [shop.example.com · #60 · [active active active] shop.example.com · #60 · [active active active] shop.example.com · #60 · [active active active]]
+   | 
+   | [💰 Now: 1 299,99 $US ≈ 1 180,00 € 💰 Now: 1 299,99 $US ≈ 1 180,00 € 💰 Now: 1 299,99 $US ≈ 1 180,00 €]
+   | [📌 Start: 1 299,99 $US 📌 Start: 1 299,99 $US 📌 Start: 1 299,99 $US]
+   | [📉 Lowest: 1 199,50 $US 📉 Lowest: 1 199,50 $US 📉 Lowest: 1 199,50 $US]
+   | [🎯 Target: 999,99 $US 🎯 Target: 999,99 $US 🎯 Target: 999,99 $US]
+   | [🔔 Alert: at or below 999,99 $US 🔔 Alert: at or below 999,99 $US 🔔 Alert: at or below 999,99 $US]
+   | [🔄 Checks: every 1 j · last il y a 2 heures 🔄 Checks: every 1 j · last il y a 2 heures 🔄 Checks: every 1 j · last il y a 2 heures]
+keyboard:
+   [[🔍 Check now 🔍 Check now 🔍 Che…](cb:p:60:ck)
+   [[📊 History 📊 History 📊 History]](cb:p:60:ch:30d)
+   [[⏸ Pause ⏸ Pause ⏸ Pause]](cb:p:60:pa)
+   [[🗑 Delete 🗑 Delete 🗑 Delete]](cb:p:60:rm)
+   [[🔔 Alert rule 🔔 Alert rule 🔔 A…](cb:p:60:th)
+   [[🔄 Interval 🔄 Interval 🔄 Inter…](cb:p:60:iv)
+   [[🔗 Open 🔗 Open 🔗 Open]](url:https://shop.example.com/item/60)
+   [[◀️ List ◀️ List ◀️ List]](cb:l:a:1)

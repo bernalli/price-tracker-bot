@@ -841,3 +841,136 @@ msgstr ""
 #: src/price_tracker/bot/flows.py:442
 msgid "Use whole minutes, e.g. 30."
 msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+#, python-brace-format
+msgid "📦 <b>{name}</b>"
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+#, python-brace-format
+msgid "{domain} · #{id} · {status}"
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+msgid "active"
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+msgid "paused"
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+msgid "suspended"
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+msgid "💰 Now: —"
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+#, python-brace-format
+msgid "💰 Now: {price}"
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+#, python-brace-format
+msgid "💰 Now: {price} ≈ {estimate}"
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+#, python-brace-format
+msgid "📌 Start: {price}"
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+#, python-brace-format
+msgid "📌 Start: {price} · {change}"
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+#, python-brace-format
+msgid "📉 Lowest: {price}"
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+#, python-brace-format
+msgid "🎯 Target: {price}"
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+msgid "🔔 Alert: any drop"
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+#, python-brace-format
+msgid "🔔 Alert: drop of {percent} from start"
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+#, python-brace-format
+msgid "🔔 Alert: drop of {amount} from start"
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+#, python-brace-format
+msgid "🔔 Alert: at or below {price}"
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+#, python-brace-format
+msgid "🔄 Checks: every {interval} · never"
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+#, python-brace-format
+msgid "🔄 Checks: every {interval} · just now"
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+#, python-brace-format
+msgid "🔄 Checks: every {interval} · last {ago}"
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+msgid "🔍 Check now"
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+msgid "📊 History"
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+msgid "⏸ Pause"
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+msgid "▶️ Reactivate"
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+msgid "🗑 Delete"
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+msgid "🔔 Alert rule"
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+msgid "🔄 Interval"
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+msgid "🔗 Open"
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+msgid "◀️ List"
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+#, python-brace-format
+msgid "⚠️ {n} failed read · /errors"
+msgid_plural "⚠️ {n} failed reads · /errors"
+msgstr[0] ""
+msgstr[1] ""

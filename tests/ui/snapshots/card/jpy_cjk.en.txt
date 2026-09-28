@@ -1,0 +1,19 @@
+# ui snapshot v1
+# screen: card.jpy_cjk
+# locale: en
+# now: 2026-03-01T12:00:00Z
+text:
+   | 📦 <b>⁨電動歯ブラシ プレミアム⁩</b>
+   | shop.example.com · #47 · active
+   | 
+   | 💰 Now: ¥12,800
+   | 📌 Start: ¥13,500 · ▼ 5.2%
+   | 📉 Lowest: ¥12,800
+   | 🔔 Alert: drop of 5% from start
+   | 🔄 Checks: every 30 min · last 12 minutes ago
+keyboard:
+   [🔍 Check now](cb:p:47:ck)  [📊 History](cb:p:47:ch:30d)
+   [⏸ Pause](cb:p:47:pa)  [🗑 Delete](cb:p:47:rm)
+   [🔔 Alert rule](cb:p:47:th)  [🔄 Interval](cb:p:47:iv)
+   [🔗 Open](url:https://shop.example.com/item/47)
+   [◀️ List](cb:l:a:1)

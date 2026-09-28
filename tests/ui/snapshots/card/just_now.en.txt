@@ -1,0 +1,20 @@
+# ui snapshot v1
+# screen: card.just_now
+# locale: en
+# now: 2026-03-01T12:00:00Z
+text:
+   | 📦 <b>⁨Kettle⁩</b>
+   | shop.example.com · #7 · active
+   | 
+   | 💰 Now: €64.00
+   | 📌 Start: €80.00 · ▼ 20%
+   | 📉 Lowest: €64.00
+   | 🎯 Target: €60.00
+   | 🔔 Alert: drop of 10% from start
+   | 🔄 Checks: every 6 hr · just now
+keyboard:
+   [🔍 Check now](cb:p:7:ck)  [📊 History](cb:p:7:ch:30d)
+   [⏸ Pause](cb:p:7:pa)  [🗑 Delete](cb:p:7:rm)
+   [🔔 Alert rule](cb:p:7:th)  [🔄 Interval](cb:p:7:iv)
+   [🔗 Open](url:https://shop.example.com/item/7)
+   [◀️ List](cb:l:a:1)
