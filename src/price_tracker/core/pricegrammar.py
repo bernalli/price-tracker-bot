@@ -30,6 +30,7 @@ from decimal import Decimal, InvalidOperation
 from enum import Enum
 from typing import Final
 
+from price_tracker.core.currency_symbols import SYMBOLS as SYMBOLS
 from price_tracker.core.money import (
     ACCEPTED_CURRENCIES,
     MAX_AMOUNT,
@@ -80,42 +81,6 @@ _ALL_SEPARATORS: Final = _DUAL_SEPARATORS | _DECIMAL_ONLY | _GROUPING_ONLY
 
 _NO_CENTS_MARKERS: Final = (",-", ".-", ",\u2013", ",\u2014", ".\u2013")
 
-# Currency symbols the grammar strips (a curated subset; the generated table of the
-# currency engine replaces it). A symbol maps to every currency that writes it; the
-# grammar uses the set only to decide the precision, never to name the currency.
-SYMBOLS: Final[Mapping[str, frozenset[str]]] = {
-    "€": frozenset({"EUR"}),
-    "$": frozenset({"USD", "CAD", "AUD", "NZD", "MXN", "ARS", "CLP", "COP", "SGD", "HKD"}),
-    "US$": frozenset({"USD"}),
-    "C$": frozenset({"CAD"}),
-    "A$": frozenset({"AUD"}),
-    "NZ$": frozenset({"NZD"}),
-    "S$": frozenset({"SGD"}),
-    "HK$": frozenset({"HKD"}),
-    "R$": frozenset({"BRL"}),
-    "£": frozenset({"GBP"}),
-    "¥": frozenset({"JPY", "CNY"}),
-    "\uffe5": frozenset({"JPY", "CNY"}),
-    "円": frozenset({"JPY"}),
-    "元": frozenset({"CNY", "TWD"}),
-    "₩": frozenset({"KRW"}),
-    "원": frozenset({"KRW"}),
-    "₹": frozenset({"INR"}),
-    "Rs": frozenset({"INR", "PKR", "LKR", "NPR"}),
-    "Rs.": frozenset({"INR", "PKR", "LKR", "NPR"}),
-    "zł": frozenset({"PLN"}),
-    "kr": frozenset({"SEK", "NOK", "DKK", "ISK"}),
-    "kr.": frozenset({"DKK", "ISK"}),
-    "₺": frozenset({"TRY"}),
-    "TL": frozenset({"TRY"}),
-    "₴": frozenset({"UAH"}),
-    "₪": frozenset({"ILS"}),
-    "฿": frozenset({"THB"}),
-    "₫": frozenset({"VND"}),
-    "Fr.": frozenset({"CHF"}),
-    "Kč": frozenset({"CZK"}),
-    "Ft": frozenset({"HUF"}),
-}
 _SYMBOLS_LONGEST_FIRST: Final = tuple(sorted(SYMBOLS, key=len, reverse=True))
 _ISO_TOKEN_AT_START: Final = re.compile(r"([A-Z]{3})(?![A-Za-z])")
 _ISO_TOKEN_AT_END: Final = re.compile(r"(?<![A-Za-z])([A-Z]{3})\Z")
