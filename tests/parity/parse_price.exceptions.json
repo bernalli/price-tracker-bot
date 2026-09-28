@@ -1,7 +1,7 @@
 {
  "schema": 1,
  "function": "parse_price",
- "subject": "price_tracker.core.pricegrammar:parse_price_text",
+ "subject": "price_tracker.core.scraper_base:parse_price",
  "count": 290,
  "rows": [
   {

@@ -104,7 +104,12 @@ def test_price_core_has_documented_callers_only() -> None:
             "_generated_currency_symbols.py",
         )
     }
-    allowed_callers = {SRC_ROOT / "scrapers" / "shopify.py"}
+    allowed_callers = {
+        SRC_ROOT / "scrapers" / "shopify.py",
+        # scraper_base.parse_price/detect_currency delegate to the price grammar
+        # and the currency engine.
+        SRC_ROOT / "core" / "scraper_base.py",
+    }
     module_names = (
         "money|pricegrammar|anchoring|identity|structured_data"
         "|currencies|currency_symbols|_generated_currency_symbols"
@@ -129,12 +134,12 @@ def test_price_core_has_documented_callers_only() -> None:
         assert path.exists(), f"allow-listed caller no longer exists: {path}"
 
 
-def test_parse_price_untouched_by_the_port() -> None:
-    """scraper_base.parse_price still exists, and scraper_base still does
-    not reach into pricegrammar: the port adds a nucleus, it does not touch
-    the caller that keeps working today."""
+def test_parse_price_delegates_to_the_grammar() -> None:
+    """scraper_base.parse_price/detect_currency delegate to the price core:
+    the old inline parser table is gone, and the grammar is the one doing the work."""
     from price_tracker.core import scraper_base
 
     assert callable(scraper_base.parse_price)
     source = inspect.getsource(scraper_base)
-    assert "pricegrammar" not in source
+    assert "pricegrammar" in source
+    assert "_CURRENCY_SIGNS" not in source
