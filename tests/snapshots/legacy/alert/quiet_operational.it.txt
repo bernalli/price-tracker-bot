@@ -1,0 +1,53 @@
+# legacy snapshot v1
+# scenario: alert.quiet_operational
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: seed "\"/timezone Europe/Rome\""
+## step 2: seed "\"/quiet_hours 12:00-15:00\""
+## step 3: job run_check_all
+(no calls)
+## db after step 3
+~ products id=1 consecutive_errors: 0 -> 1
+~ products id=1 last_error: NULL -> "parse_error: no price"
+~ products id=1 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+## step 4: job run_check_all
+(no calls)
+## db after step 4
++ digest_queue id=1 {user_id=10, product_id=NULL, alert_payload_json="{\"kind\": \"operational\", \"event\": \"warning\", \"event_id\": \"ops:warning:10:example.com:2026-03-01T12:00:00+00:00\", \"user_id\": 10, \"domain\": \"example.com\", \"product_ids\": [1], \"products\": [{\"id\": 1, \"name\": \"Kettle\", \"why\": \"prezzo non leggibile\"}], \"reason\": \"parse_error\", \"count\": 1, \"error_count\": 2, \"max_errors\": 4, \"buttons\": [], \"text\": \"\\u23f3 <b>Controlli in errore su example.com</b> (1)\\n\\n1 prodotti hanno fallito 2/4 controlli di fila. Se continua, verranno sospesi automaticamente.\\n\\n\\u2022 <b>Kettle</b> \\u2014 prezzo non leggibile\\n\\nDettagli con /errori.\"}", enqueued_at=<now:9999-99-99 99:99:99>, flushed_at=NULL}
+~ products id=1 consecutive_errors: 1 -> 2
+## step 5: command "/digest_now" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | 📊 <b>Riepilogo — 0 variazioni di prezzo</b>
+   | ⚠️ Avvisi operativi
+   | example.com — 1 prodotti: controlli in errore (1/1)
+   | Usa /reactivate o /errori per i dettagli.
+   | Usa /lista per lo stato completo.
+-> sendMessage chat=10
+   text:
+   | Flushed 1 pending digest entries.
+## db after step 5
+~ digest_queue id=1 flushed_at: NULL -> <now:9999-99-99 99:99:99>
+## step 6: job run_check_all
+(no calls)
+## db after step 6
++ price_history id=6 {product_id=1, price="80.00", checked_at=<now:9999-99-99 99:99:99>}
+~ products id=1 consecutive_errors: 2 -> 0
+~ products id=1 last_checked_at: "2026-03-01 10:00:00" -> <now:9999-99-99 99:99:99>
+~ products id=1 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
++ scraper_health domain="example.com" {state="CLOSED", consecutive_blocks=0, locked_until=NULL, last_block_at=NULL, last_block_reason=NULL, last_success_at="2026-03-01T12:00:00+00:00", updated_at=<now:9999-99-99 99:99:99>}
+## step 7: job run_check_all
+(no calls)
+## db after step 7
+~ products id=1 consecutive_errors: 0 -> 1
+## step 8: job run_check_all
+(no calls)
+## db after step 8
+~ products id=1 consecutive_errors: 1 -> 2
+## step 9: command "/digest_now" user=10
+-> sendMessage chat=10
+   text:
+   | Flushed 0 pending digest entries.
+## db after step 9
+(no changes)

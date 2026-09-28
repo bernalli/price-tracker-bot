@@ -1,0 +1,93 @@
+# legacy snapshot v1
+# scenario: menu.paused
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/menu" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | 📋 <b>Menu</b>
+   |
+   | Cosa vuoi fare?
+   keyboard:
+   | [📦 Prodotti → menu_prodotti] [🔍 Prezzi → menu_prezzi]
+   | [🔔 Notifiche → menu_notifiche] [💾 Dati → menu_dati]
+   | [📊 Stato e info → menu_info]
+## db after step 1
+~ users user_id=10 display_name: NULL -> "U10"
+## step 2: press "menu_prodotti" user=10 on=1000
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1000
+   param parse_mode="HTML"
+   text:
+   | 📦 <b>I tuoi prodotti</b> (1 attivi)
+   |
+   | Tocca un prodotto per modificarlo.
+   keyboard:
+   | [#1 Kettle €80.00 → edit_1]
+   | [⏸ 1 in pausa → riattiva → menu_paused]
+   | [◀️ Menu → menu_main]
+## db after step 2
+(no changes)
+## step 3: press "menu_paused" user=10 on=1000
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1000
+   param parse_mode="HTML"
+   text:
+   | ⏸ <b>Prodotti in pausa</b> (1)
+   |
+   | Tocca per riattivare.
+   keyboard:
+   | [▶️ #2 Old Fan → reactivate_2]
+   | [◀️ Menu → menu_main]
+## db after step 3
+(no changes)
+## step 4: command "/menu" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | 📋 <b>Menu</b>
+   |
+   | Cosa vuoi fare?
+   keyboard:
+   | [📦 Prodotti → menu_prodotti] [🔍 Prezzi → menu_prezzi]
+   | [🔔 Notifiche → menu_notifiche] [💾 Dati → menu_dati]
+   | [📊 Stato e info → menu_info]
+## db after step 4
+(no changes)
+## step 5: press "menu_prodotti" user=10 on=1001
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1001
+   param parse_mode="HTML"
+   text:
+   | 📦 <b>I tuoi prodotti</b> (1 attivi)
+   |
+   | Tocca un prodotto per modificarlo.
+   keyboard:
+   | [#1 Kettle €80.00 → edit_1]
+   | [⏸ 11 in pausa → riattiva → menu_paused]
+   | [◀️ Menu → menu_main]
+## db after step 5
+(no changes)
+## step 6: press "menu_paused" user=10 on=1001
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1001
+   param parse_mode="HTML"
+   text:
+   | ⏸ <b>Prodotti in pausa</b> (11)
+   |
+   | Tocca per riattivare.
+   keyboard:
+   | [▶️ #2 Old Fan → reactivate_2]
+   | [▶️ #3 Paused 80 → reactivate_3]
+   | [▶️ #4 Paused 81 → reactivate_4]
+   | [▶️ #5 Paused 82 → reactivate_5]
+   | [▶️ #6 Paused 83 → reactivate_6]
+   | [▶️ #7 Paused 84 → reactivate_7]
+   | [▶️ #8 Paused 85 → reactivate_8]
+   | [▶️ #9 Paused 86 → reactivate_9]
+   | [▶️ #10 Paused 87 → reactivate_10]
+   | [▶️ #11 Paused 88 → reactivate_11]
+   | [◀️ Menu → menu_main]
+## db after step 6
+(no changes)

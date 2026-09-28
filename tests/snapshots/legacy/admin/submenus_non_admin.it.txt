@@ -1,0 +1,28 @@
+# legacy snapshot v1
+# scenario: admin.submenus_non_admin
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: press "menu_admin_adduser" user=10 on=1 synthetic
+-> answerCallbackQuery
+## db after step 1
+(no changes)
+## step 2: press "menu_admin_removeuser" user=10 on=1 synthetic
+-> answerCallbackQuery
+## db after step 2
+(no changes)
+## step 3: press "menu_admin_nick" user=10 on=1 synthetic
+-> answerCallbackQuery
+## db after step 3
+(no changes)
+## step 4: press "admin_nick_10" user=10 on=1 synthetic
+-> answerCallbackQuery
+## db after step 4
+(no changes)
+## step 5: press "menu_admin_interval" user=10 on=1 synthetic
+-> answerCallbackQuery
+## db after step 5
+(no changes)
+## step 6: press "menu_admin_debug" user=10 on=1 synthetic
+-> answerCallbackQuery
+## db after step 6
+(no changes)

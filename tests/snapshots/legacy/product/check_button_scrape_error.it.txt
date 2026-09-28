@@ -1,0 +1,52 @@
+# legacy snapshot v1
+# scenario: product.check_button_scrape_error
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/lista" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | <b>📦 I tuoi prodotti (1)</b>
+-> sendMessage chat=10
+   param link_preview_options={"is_disabled": true}
+   param parse_mode="HTML"
+   text:
+   | <b>#1</b> Kettle
+   | 💰 €80.00
+   | 📌 Prezzo iniziale: €100.00 (<i>-20.0% dal tracking</i>)
+   | 🎯 Soglia: -10%
+   | 🕐 Ultimo check: 2h fa
+   keyboard:
+   | [🔍 Check → check_1] [📊 Storico prezzo → chart_1]
+   | [⏸ Pausa → pause_1] [🗑 Elimina → remove_1]
+   | [🔗 Apri → url:https://shop.example.com/item/1] [✏️ Modifica → edit_1]
+## db after step 1
+~ users user_id=10 display_name: NULL -> "U10"
+## step 2: press "check_1" user=10 on=1001
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1001
+   text:
+   | ⏳ Controllo prezzo in corso...
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | ⏳ <b>Controlli in errore su example.com</b> (1)
+   |
+   | 1 prodotti hanno fallito 1/2 controlli di fila. Se continua, verranno sospesi automaticamente.
+   |
+   | • <b>Kettle</b> — prezzo non leggibile
+   |
+   | Dettagli con /errori.
+   markup: {}
+-> editMessageText chat=10 message_id=1001
+   param parse_mode="HTML"
+   text:
+   | ✅ <b>#1</b> Kettle
+   | 💰 Prezzo: €80.00
+   | 📌 Iniziale: €100.00 (<i>-20.0% dal tracking</i>)
+   keyboard:
+   | [📊 Storico prezzo → chart_1]
+## db after step 2
+~ products id=1 consecutive_errors: 0 -> 1
+~ products id=1 last_error: NULL -> "parse_error: no price"
+~ products id=1 last_error_at: NULL -> <now:9999-99-99 99:99:99>

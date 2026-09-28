@@ -1,0 +1,56 @@
+# legacy snapshot v1
+# scenario: product.delete_all_prompt
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/lista" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | <b>📦 I tuoi prodotti (2)</b>
+-> sendMessage chat=10
+   param link_preview_options={"is_disabled": true}
+   param parse_mode="HTML"
+   text:
+   | <b>#1</b> Kettle
+   | 💰 €80.00
+   | 📌 Prezzo iniziale: €100.00 (<i>-20.0% dal tracking</i>)
+   | 🎯 Soglia: -10%
+   | 🕐 Ultimo check: 2h fa
+   keyboard:
+   | [🔍 Check → check_1] [📊 Storico prezzo → chart_1]
+   | [⏸ Pausa → pause_1] [🗑 Elimina → remove_1]
+   | [🔗 Apri → url:https://shop.example.com/item/1] [✏️ Modifica → edit_1]
+-> sendMessage chat=10
+   param link_preview_options={"is_disabled": true}
+   param parse_mode="HTML"
+   text:
+   | <b>#2</b> Fan
+   | 💰 N/D
+   | 🎯 Soglia: -10%
+   keyboard:
+   | [🔍 Check → check_2] [📊 Storico prezzo → chart_2]
+   | [⏸ Pausa → pause_2] [🗑 Elimina → remove_2]
+   | [🔗 Apri → url:https://shop.example.com/item/2] [✏️ Modifica → edit_2]
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | ───────────────
+   | 📦 <b>2</b> prodotti tracciati
+   keyboard:
+   | [🗑 Elimina tutti i prodotti → delete_all]
+## db after step 1
+~ users user_id=10 display_name: NULL -> "U10"
+## step 2: press "delete_all" user=10 on=1003
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1003
+   param parse_mode="HTML"
+   text:
+   | 🚨 <b>Attenzione!</b>
+   |
+   | Stai per eliminare <b>definitivamente 2 prodotti</b> e tutto il loro storico prezzi.
+   |
+   | Questa azione <b>non è reversibile</b>.
+   keyboard:
+   | [⚠️ Sì, elimina tutti (2) → confirmdeleteall] [❌ Annulla → cancel_delete]
+## db after step 2
+(no changes)

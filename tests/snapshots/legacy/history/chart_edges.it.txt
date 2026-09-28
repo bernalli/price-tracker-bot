@@ -1,0 +1,33 @@
+# legacy snapshot v1
+# scenario: history.chart_edges
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/storia 1" user=10
+-> sendPhoto chat=10 photo=png filename=chart_1.png
+   param parse_mode="HTML"
+   caption:
+   | 📊 <b>#1</b> Cable $\zz xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+   | 📉 Min: €40.00  📈 Max: €50.00
+## db after step 1
+~ users user_id=10 display_name: NULL -> "U10"
+## step 2: command "/storia 2" user=10
+-> sendPhoto chat=10 photo=png filename=chart_2.png
+   param parse_mode="HTML"
+   caption:
+   | 📊 <b>#2</b> Sticker
+   | 📉 Min: €0.80  📈 Max: €0.90
+## db after step 2
+(no changes)
+## step 3: command "/storia 3" user=10
+-> sendMessage chat=10
+   text:
+   | 📭 Dati insufficienti per generare il grafico (servono almeno 2 punti).
+## db after step 3
+(no changes)
+## step 4: command "/storia 4" user=10
+-> sendMessage chat=10
+   text:
+   | ❌ Si è verificato un errore. Riprova tra qualche istante.
+   !! error_handler: ValueError: \n\zz\n^\nParseFatalException: Unknown symbol: \zz, found '\'  (at char 0), (line:1, col:1)
+## db after step 4
+(no changes)

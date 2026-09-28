@@ -1,0 +1,62 @@
+# legacy snapshot v1
+# scenario: admin.nick_prompt
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: press "menu_admin_nick" user=1 on=1 synthetic
+-> answerCallbackQuery
+-> editMessageText chat=1 message_id=1
+   param parse_mode="HTML"
+   text:
+   | ✏️ <b>Nickname</b>
+   |
+   | Scegli utente:
+   keyboard:
+   | [✏️ 1 → admin_nick_1]
+   | [✏️ 10 → admin_nick_10]
+   | [✏️ 11 → admin_nick_11]
+   | [◀️ Impostazioni → menu_admin]
+## db after step 1
+(no changes)
+## step 2: press "admin_nick_10" user=1 on=1
+-> answerCallbackQuery
+-> editMessageText chat=1 message_id=1
+   param parse_mode="HTML"
+   text:
+   | ✏️ <b>Nickname per 10</b>
+   | Attuale: None
+   |
+   | Scrivi il nuovo nickname:
+## db after step 2
+(no changes)
+## step 3: text "Bob" user=1
+-> sendMessage chat=1
+   param parse_mode="HTML"
+   text:
+   | ✅ Nickname aggiornato: <b>Bob</b>
+## db after step 3
+~ users user_id=1 display_name: NULL -> "U1"
+~ users user_id=10 display_name: NULL -> "Bob"
+## step 4: press "admin_nick_x" user=1 on=1 synthetic
+-> answerCallbackQuery
+-> editMessageText chat=1 message_id=1
+   text:
+   | ❌ ID non valido.
+## db after step 4
+(no changes)
+## step 5: press "admin_nick_10" user=1 on=1 synthetic
+-> answerCallbackQuery
+-> editMessageText chat=1 message_id=1
+   param parse_mode="HTML"
+   text:
+   | ✏️ <b>Nickname per 10</b>
+   | Attuale: Bob
+   |
+   | Scrivi il nuovo nickname:
+## db after step 5
+(no changes)
+## step 6: text "   " user=1
+-> sendMessage chat=1
+   text:
+   | ❌ Nickname vuoto.
+## db after step 6
+(no changes)

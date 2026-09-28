@@ -1,0 +1,20 @@
+# legacy snapshot v1
+# scenario: ops.invalid_id_delete
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: seed "job run_check_all"
+## step 2: seed "job run_check_all"
+## step 3: press "ops_del_x" user=10 on=1001
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1001
+   text:
+   | ❌ ID non valido.
+## db after step 3
+(no changes)
+## step 4: press "ops_delok_x" user=10 on=1 synthetic
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1
+   text:
+   | ❌ ID non valido.
+## db after step 4
+(no changes)

@@ -1,0 +1,105 @@
+# legacy snapshot v1
+# scenario: menu.checkall_no_change
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/menu" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | 📋 <b>Menu</b>
+   |
+   | Cosa vuoi fare?
+   keyboard:
+   | [📦 Prodotti → menu_prodotti] [🔍 Prezzi → menu_prezzi]
+   | [🔔 Notifiche → menu_notifiche] [💾 Dati → menu_dati]
+   | [📊 Stato e info → menu_info]
+## db after step 1
+~ users user_id=10 display_name: NULL -> "U10"
+## step 2: press "menu_prezzi" user=10 on=1000
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1000
+   param parse_mode="HTML"
+   text:
+   | 🔍 <b>Controllo prezzi</b>
+   |
+   | Tocca un prodotto per controllarlo.
+   keyboard:
+   | [🔄 Controlla tutti i prezzi → menu_checkall]
+   | [🔍 #1 Kettle → check_1]
+   | [📊 Storico prezzo → menu_storia]
+   | [◀️ Menu → menu_main]
+## db after step 2
+(no changes)
+## step 3: press "menu_checkall" user=10 on=1000
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1000
+   text:
+   | 🔍 Controllo 1 prodotti...
+-> editMessageText chat=10 message_id=1000
+   param parse_mode="HTML"
+   text:
+   | ✅ <b>Completato</b> — 1 prodotti
+   |
+   |   #1 Kettle — €80.00 <i>(-20.0%)</i>
+   keyboard:
+   | [◀️ Menu → menu_main]
+## db after step 3
++ price_history id=6 {product_id=1, price="80.00", checked_at=<now:9999-99-99 99:99:99>}
+~ products id=1 last_checked_at: "2026-03-01 10:00:00" -> <now:9999-99-99 99:99:99>
+~ products id=1 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
++ scraper_health domain="example.com" {state="CLOSED", consecutive_blocks=0, locked_until=NULL, last_block_at=NULL, last_block_reason=NULL, last_success_at="2026-03-01T12:00:00+00:00", updated_at=<now:9999-99-99 99:99:99>}
+## step 4: command "/menu" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | 📋 <b>Menu</b>
+   |
+   | Cosa vuoi fare?
+   keyboard:
+   | [📦 Prodotti → menu_prodotti] [🔍 Prezzi → menu_prezzi]
+   | [🔔 Notifiche → menu_notifiche] [💾 Dati → menu_dati]
+   | [📊 Stato e info → menu_info]
+## db after step 4
+(no changes)
+## step 5: press "menu_prezzi" user=10 on=1001
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1001
+   param parse_mode="HTML"
+   text:
+   | 🔍 <b>Controllo prezzi</b>
+   |
+   | Tocca un prodotto per controllarlo.
+   keyboard:
+   | [🔄 Controlla tutti i prezzi → menu_checkall]
+   | [🔍 #1 Kettle → check_1]
+   | [🔍 #2 Cheap → check_2]
+   | [🔍 #3 Near → check_3]
+   | [📊 Storico prezzo → menu_storia]
+   | [◀️ Menu → menu_main]
+## db after step 5
+(no changes)
+## step 6: press "menu_checkall" user=10 on=1001
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1001
+   text:
+   | 🔍 Controllo 3 prodotti...
+-> editMessageText chat=10 message_id=1001
+   param parse_mode="HTML"
+   text:
+   | ✅ <b>Completato</b> — 3 prodotti
+   |
+   |   #1 Kettle — €80.00 <i>(-20.0%)</i>
+   |   #2 Cheap — €0.64 <i>(-20.0%)</i>
+   |   #3 Near — €99.50 <i>(-0.5%)</i>
+   keyboard:
+   | [◀️ Menu → menu_main]
+## db after step 6
++ price_history id=7 {product_id=1, price="80.00", checked_at=<now:9999-99-99 99:99:99>}
++ price_history id=8 {product_id=2, price="0.64", checked_at=<now:9999-99-99 99:99:99>}
++ price_history id=9 {product_id=3, price="99.50", checked_at=<now:9999-99-99 99:99:99>}
+~ products id=2 last_checked_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=2 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
+~ products id=2 lowest_price: "0.80" -> "0.64"
+~ products id=3 last_checked_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=3 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
+~ products id=3 lowest_price: "100.00" -> "99.50"

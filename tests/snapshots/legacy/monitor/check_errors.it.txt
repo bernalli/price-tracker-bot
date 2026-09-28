@@ -1,0 +1,16 @@
+# legacy snapshot v1
+# scenario: monitor.check_errors
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/check abc" user=10
+-> sendMessage chat=10
+   text:
+   | ❌ ID non valido.
+## db after step 1
+~ users user_id=10 display_name: NULL -> "U10"
+## step 2: command "/check 999" user=10
+-> sendMessage chat=10
+   text:
+   | ❌ Prodotto non trovato.
+## db after step 2
+(no changes)

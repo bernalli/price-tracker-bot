@@ -1,0 +1,8 @@
+# legacy snapshot v1
+# scenario: data.import_not_csv
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: document "note.txt" (1 bytes) user=10
+(no calls)
+## db after step 1
+(no changes)

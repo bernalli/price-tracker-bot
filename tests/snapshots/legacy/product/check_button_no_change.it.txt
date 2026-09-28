@@ -1,0 +1,130 @@
+# legacy snapshot v1
+# scenario: product.check_button_no_change
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/lista" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | <b>📦 I tuoi prodotti (1)</b>
+-> sendMessage chat=10
+   param link_preview_options={"is_disabled": true}
+   param parse_mode="HTML"
+   text:
+   | <b>#1</b> Kettle
+   | 💰 €80.00
+   | 📌 Prezzo iniziale: €100.00 (<i>-20.0% dal tracking</i>)
+   | 🎯 Soglia: -10%
+   | 🕐 Ultimo check: 2h fa
+   keyboard:
+   | [🔍 Check → check_1] [📊 Storico prezzo → chart_1]
+   | [⏸ Pausa → pause_1] [🗑 Elimina → remove_1]
+   | [🔗 Apri → url:https://shop.example.com/item/1] [✏️ Modifica → edit_1]
+## db after step 1
+~ users user_id=10 display_name: NULL -> "U10"
+## step 2: press "check_1" user=10 on=1001
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1001
+   text:
+   | ⏳ Controllo prezzo in corso...
+-> editMessageText chat=10 message_id=1001
+   param parse_mode="HTML"
+   text:
+   | ✅ <b>#1</b> Kettle
+   | 💰 Prezzo: €80.00
+   | 📌 Iniziale: €100.00 (<i>-20.0% dal tracking</i>)
+   keyboard:
+   | [📊 Storico prezzo → chart_1]
+## db after step 2
++ price_history id=6 {product_id=1, price="80.00", checked_at=<now:9999-99-99 99:99:99>}
+~ products id=1 last_checked_at: "2026-03-01 10:00:00" -> <now:9999-99-99 99:99:99>
+~ products id=1 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
++ scraper_health domain="example.com" {state="CLOSED", consecutive_blocks=0, locked_until=NULL, last_block_at=NULL, last_block_reason=NULL, last_success_at="2026-03-01T12:00:00+00:00", updated_at=<now:9999-99-99 99:99:99>}
+## step 3: seed "reanchor last_checked_at"
+## step 4: command "/lista" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | <b>📦 I tuoi prodotti (3)</b>
+-> sendMessage chat=10
+   param link_preview_options={"is_disabled": true}
+   param parse_mode="HTML"
+   text:
+   | <b>#1</b> Kettle
+   | 💰 €80.00
+   | 📌 Prezzo iniziale: €100.00 (<i>-20.0% dal tracking</i>)
+   | 🎯 Soglia: -10%
+   | 🕐 Ultimo check: 1h fa
+   keyboard:
+   | [🔍 Check → check_1] [📊 Storico prezzo → chart_1]
+   | [⏸ Pausa → pause_1] [🗑 Elimina → remove_1]
+   | [🔗 Apri → url:https://shop.example.com/item/1] [✏️ Modifica → edit_1]
+-> sendMessage chat=10
+   param link_preview_options={"is_disabled": true}
+   param parse_mode="HTML"
+   text:
+   | <b>#2</b> Cheap
+   | 💰 €0.64
+   | 📌 Prezzo iniziale: €0.80 (<i>-20.0% dal tracking</i>)
+   | 🎯 Soglia: -10%
+   keyboard:
+   | [🔍 Check → check_2] [📊 Storico prezzo → chart_2]
+   | [⏸ Pausa → pause_2] [🗑 Elimina → remove_2]
+   | [🔗 Apri → url:https://shop.example.com/item/72] [✏️ Modifica → edit_2]
+-> sendMessage chat=10
+   param link_preview_options={"is_disabled": true}
+   param parse_mode="HTML"
+   text:
+   | <b>#3</b> Near
+   | 💰 €99.50
+   | 📌 Prezzo iniziale: €100.00 (<i>-0.5% dal tracking</i>)
+   | 🎯 Soglia: -10%
+   keyboard:
+   | [🔍 Check → check_3] [📊 Storico prezzo → chart_3]
+   | [⏸ Pausa → pause_3] [🗑 Elimina → remove_3]
+   | [🔗 Apri → url:https://shop.example.com/item/73] [✏️ Modifica → edit_3]
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | ───────────────
+   | 📦 <b>3</b> prodotti tracciati
+   keyboard:
+   | [🗑 Elimina tutti i prodotti → delete_all]
+## db after step 4
+(no changes)
+## step 5: press "check_2" user=10 on=1004
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1004
+   text:
+   | ⏳ Controllo prezzo in corso...
+-> editMessageText chat=10 message_id=1004
+   param parse_mode="HTML"
+   text:
+   | ✅ <b>#2</b> Cheap
+   | 💰 Prezzo: €0.64
+   | 📌 Iniziale: €0.80 (<i>-20.0% dal tracking</i>)
+   keyboard:
+   | [📊 Storico prezzo → chart_2]
+## db after step 5
++ price_history id=7 {product_id=2, price="0.64", checked_at=<now:9999-99-99 99:99:99>}
+~ products id=2 last_checked_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=2 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
+~ products id=2 lowest_price: "0.80" -> "0.64"
+## step 6: press "check_3" user=10 on=1005
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1005
+   text:
+   | ⏳ Controllo prezzo in corso...
+-> editMessageText chat=10 message_id=1005
+   param parse_mode="HTML"
+   text:
+   | ✅ <b>#3</b> Near
+   | 💰 Prezzo: €99.50
+   | 📌 Iniziale: €100.00 (<i>-0.5% dal tracking</i>)
+   keyboard:
+   | [📊 Storico prezzo → chart_3]
+## db after step 6
++ price_history id=8 {product_id=3, price="99.50", checked_at=<now:9999-99-99 99:99:99>}
+~ products id=3 last_checked_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=3 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
+~ products id=3 lowest_price: "100.00" -> "99.50"

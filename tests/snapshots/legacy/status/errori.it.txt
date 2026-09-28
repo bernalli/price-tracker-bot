@@ -1,0 +1,74 @@
+# legacy snapshot v1
+# scenario: status.errori
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: seed "record block 1"
+## step 2: seed "record block 2"
+## step 3: seed "record block 3"
+## step 4: command "/errori" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | ⚠️ <b>Errori recenti (2)</b>
+   |
+   | <b>#1</b> Kettle
+   |   🌐 example.com — 🔒 T1 (1h) (riprende tra 1h 00m)
+   |   ❌ 3 letture fallite
+   |   🐞 parse_error: no price — 30min fa
+   |
+   | <b>#2</b> Fan
+   |   🌐 example.com — 🔒 T1 (1h) (riprende tra 1h 00m)
+   |   ❌ 1 letture fallite
+   |   🐞 http_error: 503 — 1g fa
+   |
+   | ℹ️ I siti in 🔒 quarantena riprendono da soli; usa /reactivate per riattivare un prodotto sospeso.
+## db after step 4
+~ users user_id=10 display_name: NULL -> "U10"
+## step 5: command "/errors" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | ⚠️ <b>Errori recenti (2)</b>
+   |
+   | <b>#1</b> Kettle
+   |   🌐 example.com — 🔒 T1 (1h) (riprende tra 1h 00m)
+   |   ❌ 3 letture fallite
+   |   🐞 parse_error: no price — 30min fa
+   |
+   | <b>#2</b> Fan
+   |   🌐 example.com — 🔒 T1 (1h) (riprende tra 1h 00m)
+   |   ❌ 1 letture fallite
+   |   🐞 http_error: 503 — 1g fa
+   |
+   | ℹ️ I siti in 🔒 quarantena riprendono da soli; usa /reactivate per riattivare un prodotto sospeso.
+## db after step 5
+(no changes)
+## step 6: command "/errori" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | ⚠️ <b>Errori recenti (4)</b>
+   |
+   | <b>#1</b> Kettle
+   |   🌐 example.com — 🔒 T1 (1h) (riprende tra 1h 00m)
+   |   ❌ 3 letture fallite
+   |   🐞 parse_error: no price — 30min fa
+   |
+   | <b>#2</b> Fan
+   |   🌐 example.com — 🔒 T1 (1h) (riprende tra 1h 00m)
+   |   ❌ 1 letture fallite
+   |   🐞 http_error: 503 — 1g fa
+   |
+   | <b>#3</b> Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
+   |   🌐 example.com — 🔒 T1 (1h) (riprende tra 1h 00m)
+   |   ❌ 1 letture fallite
+   |   🐞 parse_error: eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee — 1h fa
+   |
+   | <b>#4</b> P4
+   |   🌐 example.com — 🔒 T1 (1h) (riprende tra 1h 00m)
+   |   ❌ 1 letture fallite
+   |   🐞 x — 1g fa
+   |
+   | ℹ️ I siti in 🔒 quarantena riprendono da soli; usa /reactivate per riattivare un prodotto sospeso.
+## db after step 6
+(no changes)

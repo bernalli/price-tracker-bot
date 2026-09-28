@@ -1,0 +1,16 @@
+# legacy snapshot v1
+# scenario: add.usage
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/add" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | ❌ Uso: /add &lt;url&gt;
+   |
+   | Esempio:
+   | <code>/add https://www.amazon.it/dp/B09V3K...</code>
+   |
+   | Oppure incolla direttamente il link in chat!
+## db after step 1
+~ users user_id=10 display_name: NULL -> "U10"

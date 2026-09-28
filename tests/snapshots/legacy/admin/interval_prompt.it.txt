@@ -1,0 +1,130 @@
+# legacy snapshot v1
+# scenario: admin.interval_prompt
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: press "menu_admin_interval" user=1 on=1 synthetic
+-> answerCallbackQuery
+-> editMessageText chat=1 message_id=1
+   param parse_mode="HTML"
+   text:
+   | ⏱ <b>Intervallo globale</b>
+   |
+   | Scrivi i minuti (es. <code>60</code>, <code>360</code>):
+## db after step 1
+(no changes)
+## step 2: text "abc" user=1
+-> sendMessage chat=1
+   text:
+   | ❌ Numero non valido.
+## db after step 2
+~ users user_id=1 display_name: NULL -> "U1"
+## step 3: text "3" user=1
+-> sendMessage chat=1
+   text:
+   | ❌ Minimo 5 minuti.
+## db after step 3
+(no changes)
+## step 4: text "99999" user=1
+-> sendMessage chat=1
+   text:
+   | ❌ L'intervallo massimo è 7 giorni.
+## db after step 4
+(no changes)
+## step 5: text "60" user=1
+-> sendMessage chat=1
+   param parse_mode="HTML"
+   text:
+   | ✅ Intervallo aggiornato: <b>ogni 1 ore</b>
+## db after step 5
++ bot_config key="check_interval_minutes" {value="60"}
+## step 6: press "menu_admin_interval" user=1 on=1 synthetic
+-> answerCallbackQuery
+-> editMessageText chat=1 message_id=1
+   param parse_mode="HTML"
+   text:
+   | ⏱ <b>Intervallo globale</b>
+   |
+   | Scrivi i minuti (es. <code>60</code>, <code>360</code>):
+## db after step 6
+(no changes)
+## step 7: text "30" user=1
+-> sendMessage chat=1
+   param parse_mode="HTML"
+   text:
+   | ✅ Intervallo aggiornato: <b>ogni 30 minuti</b>
+## db after step 7
+~ bot_config key="check_interval_minutes" value: "60" -> "30"
+## step 8: press "menu_admin_interval" user=1 on=1 synthetic
+-> answerCallbackQuery
+-> editMessageText chat=1 message_id=1
+   param parse_mode="HTML"
+   text:
+   | ⏱ <b>Intervallo globale</b>
+   |
+   | Scrivi i minuti (es. <code>60</code>, <code>360</code>):
+## db after step 8
+(no changes)
+## step 9: text "10081" user=1
+-> sendMessage chat=1
+   text:
+   | ❌ L'intervallo massimo è 7 giorni.
+## db after step 9
+(no changes)
+## step 10: text "5" user=1
+-> sendMessage chat=1
+   param parse_mode="HTML"
+   text:
+   | ✅ Intervallo aggiornato: <b>ogni 5 minuti</b>
+## db after step 10
+~ bot_config key="check_interval_minutes" value: "30" -> "5"
+## step 11: press "menu_admin_interval" user=1 on=1 synthetic
+-> answerCallbackQuery
+-> editMessageText chat=1 message_id=1
+   param parse_mode="HTML"
+   text:
+   | ⏱ <b>Intervallo globale</b>
+   |
+   | Scrivi i minuti (es. <code>60</code>, <code>360</code>):
+## db after step 11
+(no changes)
+## step 12: text "60" user=1
+-> sendMessage chat=1
+   param parse_mode="HTML"
+   text:
+   | ✅ Intervallo aggiornato: <b>ogni 1 ore</b>
+## db after step 12
+~ bot_config key="check_interval_minutes" value: "5" -> "60"
+## step 13: command "/menu" user=1
+-> sendMessage chat=1
+   param parse_mode="HTML"
+   text:
+   | 📋 <b>Menu</b>
+   |
+   | Cosa vuoi fare?
+   keyboard:
+   | [📦 Prodotti → menu_prodotti] [🔍 Prezzi → menu_prezzi]
+   | [🔔 Notifiche → menu_notifiche] [💾 Dati → menu_dati]
+   | [📊 Stato e info → menu_info]
+   | [👑 Impostazioni (admin) → menu_admin]
+## db after step 13
+(no changes)
+## step 14: press "menu_info" user=1 on=1008
+-> answerCallbackQuery
+-> editMessageText chat=1 message_id=1008
+   param parse_mode="HTML"
+   text:
+   | 📊 <b>Statistiche</b>
+   |
+   | 📦 Prodotti attivi: 0
+   | 📁 Totali: 0
+   | 🔍 Check: 0
+   | ⏱ Intervallo: ogni 1h
+   |
+   | 👑 <b>Admin</b>
+   | 👥 Utenti: 3
+   | 📦 Prodotti globali: 0
+   | 🔍 Check globali: 0
+   keyboard:
+   | [◀️ Menu → menu_main]
+## db after step 14
+(no changes)

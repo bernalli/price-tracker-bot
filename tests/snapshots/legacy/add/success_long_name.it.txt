@@ -1,0 +1,27 @@
+# legacy snapshot v1
+# scenario: add.success_long_name
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/add https://shop.example.com/item/9" user=10
+-> sendMessage chat=10
+   text:
+   | 🔍 Analizzo il prodotto...
+-> editMessageText chat=10 message_id=1000
+   param link_preview_options={"is_disabled": true}
+   param parse_mode="HTML"
+   text:
+   | ✅ <b>Prodotto aggiunto!</b> (#1)
+   |
+   | 📦 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN...
+   | 💰 Prezzo: <b>€19.90</b>
+   | 🌐 Sito: example.com
+   |
+   | <b>Come vuoi essere avvisato?</b>
+   keyboard:
+   | [🔔 Ogni ribasso → track_any_1]
+   | [📉 Soglia % o € → track_threshold_1]
+   | [💰 Prezzo target → track_target_1]
+   | [👍 Va bene -10% (default) → track_default_1]
+## db after step 1
++ products id=1 {url="https://shop.example.com/item/9", name="Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN", initial_price="19.90", current_price="19.90", is_active=1, consecutive_errors=0, last_checked_at=NULL, last_notified_at=NULL, created_at=<now:9999-99-99 99:99:99>, updated_at=<now:9999-99-99 99:99:99>, threshold_type="percentage", threshold_value="10", target_price=NULL, domain="example.com", lowest_price="19.90", highest_price="19.90", user_id=10, currency="EUR", is_available=1, pending_alert_price=NULL, pending_alert_at=NULL, preferred_condition=NULL, preferred_seller=NULL, check_interval_minutes=NULL, last_error=NULL, last_error_at=NULL, pending_read_price=NULL, pending_read_count=0, pending_read_streak=0, gone_streak=0, suspension_kind=NULL, suspension_reason=NULL}
+~ users user_id=10 display_name: NULL -> "U10"

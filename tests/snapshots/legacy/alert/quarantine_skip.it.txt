@@ -1,0 +1,28 @@
+# legacy snapshot v1
+# scenario: alert.quarantine_skip
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: seed "record block 1"
+## step 2: seed "record block 2"
+## step 3: seed "record block 3"
+## step 4: seed "record block 1"
+## step 5: seed "record block 2"
+## step 6: seed "record block 3"
+## step 7: seed "lock amazon.com until 2026-03-01T11:00:00+00:00"
+## step 8: seed "reload domain health"
+## step 9: job run_check_all
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | ⏳ <b>Controlli in errore su amazon.com</b> (1)
+   |
+   | 1 prodotti hanno fallito 1/2 controlli di fila. Se continua, verranno sospesi automaticamente.
+   |
+   | • <b>Amazon 1</b> — prezzo non leggibile
+   |
+   | Dettagli con /errori.
+   markup: {}
+## db after step 9
+~ products id=2 consecutive_errors: 0 -> 1
+~ products id=2 last_error: NULL -> "parse_error: no price"
+~ products id=2 last_error_at: NULL -> <now:9999-99-99 99:99:99>

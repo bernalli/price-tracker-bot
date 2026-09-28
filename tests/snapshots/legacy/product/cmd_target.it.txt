@@ -1,0 +1,93 @@
+# legacy snapshot v1
+# scenario: product.cmd_target
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/target" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | 📦 <b>Scegli prodotto per impostare target:</b>
+   keyboard:
+   | [#1 Kettle €80.00 → settarget_1]
+## db after step 1
+~ users user_id=10 display_name: NULL -> "U10"
+## step 2: command "/target 1" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | ❌ Uso: /target &lt;id&gt; &lt;prezzo&gt;
+   | Esempio: <code>/target 3 29.99</code>
+   |
+   | Usa <code>/target &lt;id&gt; 0</code> per rimuovere il target.
+## db after step 2
+(no changes)
+## step 3: command "/target 1 49,90" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | 🎯 Target impostato: <b>€49.90</b>
+   | 📦 Kettle
+   | 💰 Attuale: €80.00 (-37.6% necessario)
+## db after step 3
+~ products id=1 target_price: NULL -> "49.90"
+## step 4: command "/target 1 90" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | 🎯 Target impostato: <b>€90.00</b>
+   | 📦 Kettle
+   | 💰 Attuale: €80.00 — <b>già raggiunto!</b>
+## db after step 4
+~ products id=1 target_price: "49.90" -> "90"
+## step 5: command "/target 1 0" user=10
+-> sendMessage chat=10
+   text:
+   | 🎯 Target rimosso per #1.
+## db after step 5
+~ products id=1 target_price: "90" -> NULL
+## step 6: command "/target 1 abc" user=10
+-> sendMessage chat=10
+   text:
+   | ❌ Prezzo non valido.
+## db after step 6
+(no changes)
+## step 7: command "/target abc 1" user=10
+-> sendMessage chat=10
+   text:
+   | ❌ ID non valido.
+## db after step 7
+(no changes)
+## step 8: command "/target 999 1" user=10
+-> sendMessage chat=10
+   text:
+   | ❌ Prodotto non trovato.
+## db after step 8
+(no changes)
+## step 9: command "/target 1 1" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | 🎯 Target impostato: <b>€1.00</b>
+   | 📦 Kettle
+   | 💰 Attuale: €80.00 (-98.8% necessario)
+## db after step 9
+~ products id=1 target_price: NULL -> "1"
+## step 10: command "/target" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | 📦 <b>Scegli prodotto per impostare target:</b>
+   keyboard:
+   | [#1 Kettle €80.00 → settarget_1]
+   | [#2 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNN €80.00 → settarget_2]
+## db after step 10
+(no changes)
+## step 11: command "/target 2 50" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | 🎯 Target impostato: <b>€50.00</b>
+   | 📦 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
+   | 💰 Attuale: €80.00 (-37.5% necessario)
+## db after step 11
+~ products id=2 target_price: NULL -> "50"

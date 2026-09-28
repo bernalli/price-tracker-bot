@@ -1,0 +1,29 @@
+# legacy snapshot v1
+# scenario: monitor.check_drop_chart_error
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/check 1" user=10
+-> sendMessage chat=10
+   text:
+   | 🔍 Controllo in corso...
+-> deleteMessage chat=10 message_id=1000
+-> sendMessage chat=10
+   param link_preview_options={"is_disabled": true}
+   param parse_mode="HTML"
+   text:
+   | 📉 <b>Price drop!</b>
+   |
+   | <b>Cable $\zz$</b>
+   | <a href="https://shop.example.com/item/90">View product</a>
+   |
+   | Was: <s>80.00 €</s>
+   | Now: <b>64.00 €</b>
+   | Drop: -16.00 € (20.0%)
+## db after step 1
++ price_history id=6 {product_id=1, price="64.00", checked_at=<now:9999-99-99 99:99:99>}
+~ products id=1 current_price: "80.00" -> "64.00"
+~ products id=1 last_checked_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=1 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
+~ products id=1 lowest_price: "80.00" -> "64.00"
++ scraper_health domain="example.com" {state="CLOSED", consecutive_blocks=0, locked_until=NULL, last_block_at=NULL, last_block_reason=NULL, last_success_at="2026-03-01T12:00:00+00:00", updated_at=<now:9999-99-99 99:99:99>}
+~ users user_id=10 display_name: NULL -> "U10"

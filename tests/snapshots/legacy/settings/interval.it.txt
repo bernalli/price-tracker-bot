@@ -1,0 +1,66 @@
+# legacy snapshot v1
+# scenario: settings.interval
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/intervallo" user=1
+-> sendMessage chat=1
+   param parse_mode="HTML"
+   text:
+   | ⏱ Intervallo attuale: <b>ogni 360 minuti</b>
+   |
+   | Uso: /intervallo &lt;minuti&gt;
+   | Esempio: <code>/intervallo 120</code> per ogni 2 ore
+## db after step 1
+(no changes)
+## step 2: command "/intervallo 120" user=1
+-> sendMessage chat=1
+   param parse_mode="HTML"
+   text:
+   | ✅ Intervallo aggiornato: <b>ogni 2 ore</b>
+## db after step 2
++ bot_config key="check_interval_minutes" {value="120"}
+## step 3: command "/setinterval 3" user=1
+-> sendMessage chat=1
+   text:
+   | ❌ L'intervallo minimo è 5 minuti.
+## db after step 3
+(no changes)
+## step 4: command "/intervallo 99999" user=1
+-> sendMessage chat=1
+   text:
+   | ❌ L'intervallo massimo è 7 giorni.
+## db after step 4
+(no changes)
+## step 5: command "/intervallo abc" user=1
+-> sendMessage chat=1
+   text:
+   | ❌ Valore non valido.
+## db after step 5
+(no changes)
+## step 6: command "/intervallo 30" user=1
+-> sendMessage chat=1
+   param parse_mode="HTML"
+   text:
+   | ✅ Intervallo aggiornato: <b>ogni 30 minuti</b>
+## db after step 6
+~ bot_config key="check_interval_minutes" value: "120" -> "30"
+## step 7: command "/intervallo 5" user=1
+-> sendMessage chat=1
+   param parse_mode="HTML"
+   text:
+   | ✅ Intervallo aggiornato: <b>ogni 5 minuti</b>
+## db after step 7
+~ bot_config key="check_interval_minutes" value: "30" -> "5"
+## step 8: command "/intervallo 60" user=1
+-> sendMessage chat=1
+   param parse_mode="HTML"
+   text:
+   | ✅ Intervallo aggiornato: <b>ogni 1 ore</b>
+## db after step 8
+~ bot_config key="check_interval_minutes" value: "5" -> "60"
+## step 9: command "/intervallo 10081" user=1
+-> sendMessage chat=1
+   text:
+   | ❌ L'intervallo massimo è 7 giorni.
+## db after step 9
+(no changes)

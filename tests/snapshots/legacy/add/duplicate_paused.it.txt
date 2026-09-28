@@ -1,0 +1,12 @@
+# legacy snapshot v1
+# scenario: add.duplicate_paused
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/add https://shop.example.com/item/8" user=10
+-> sendMessage chat=10
+   text:
+   | ♻️ Prodotto riattivato! (#1)
+## db after step 1
+~ products id=1 is_active: 0 -> 1
+~ products id=1 suspension_kind: "manual" -> NULL
+~ users user_id=10 display_name: NULL -> "U10"

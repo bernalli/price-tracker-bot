@@ -1,0 +1,18 @@
+# legacy snapshot v1
+# scenario: product.check_button_not_found
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: press "check_999" user=10 on=1 synthetic
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1
+   text:
+   | ❌ Prodotto non trovato.
+## db after step 1
+(no changes)
+## step 2: press "check_x" user=10 on=1 synthetic
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1
+   text:
+   | ❌ ID non valido.
+## db after step 2
+(no changes)

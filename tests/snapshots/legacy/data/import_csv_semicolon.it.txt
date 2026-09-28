@@ -1,0 +1,17 @@
+# legacy snapshot v1
+# scenario: data.import_csv_semicolon
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: document "excel.csv" (51 bytes) user=10
+-> getFile
+   param file_id="doc1"
+-> sendMessage chat=10
+   text:
+   | ⏳ Importazione in corso...
+-> editMessageText chat=10 message_id=1000
+   param parse_mode="HTML"
+   text:
+   | 📁 <b>Importazione completata</b>
+   | ✅ Importati: 0
+## db after step 1
+~ users user_id=10 display_name: NULL -> "U10"

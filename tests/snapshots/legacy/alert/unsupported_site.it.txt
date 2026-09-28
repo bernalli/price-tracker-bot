@@ -1,0 +1,52 @@
+# legacy snapshot v1
+# scenario: alert.unsupported_site
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: job run_check_all
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | ⏳ <b>Controlli in errore su 93.184.216.34</b> (1)
+   |
+   | 1 prodotti hanno fallito 1/2 controlli di fila. Se continua, verranno sospesi automaticamente.
+   |
+   | • <b>Bare IP</b> — prezzo non leggibile
+   |
+   | Dettagli con /errori.
+   markup: {}
+## db after step 1
+~ products id=1 consecutive_errors: 0 -> 1
+~ products id=1 last_error: NULL -> "no_scraper"
+~ products id=1 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+## step 2: command "/check 1" user=10
+-> sendMessage chat=10
+   text:
+   | 🔍 Controllo in corso...
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | ⚠️ <b>Prezzo illeggibile su 93.184.216.34</b> (1)
+   |
+   | Le pagine si aprono, ma il prezzo non si legge più (layout cambiato o offerta diversa).
+   |
+   | • <b>Bare IP</b> — prezzo non leggibile
+   | Nessuna lettura riuscita finora
+   | Errore: <code>no_scraper</code>
+   |
+   | Riattiva per fare subito un nuovo controllo.
+   keyboard:
+   | [▶️ Riattiva e ricontrolla (1) → ops_react_1]
+   | [🗑 Elimina tutti (1) → ops_del_1]
+-> editMessageText chat=10 message_id=1001
+   param parse_mode="HTML"
+   text:
+   | ✅ <b>Bare IP</b>
+   | 💰 Prezzo: €10.00
+   | 📊 Nessuna variazione significativa.
+## db after step 2
+~ products id=1 is_active: 1 -> 0
+~ products id=1 consecutive_errors: 1 -> 2
+~ products id=1 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
+~ products id=1 suspension_kind: NULL -> "automatic"
+~ products id=1 suspension_reason: NULL -> "no_scraper"
+~ users user_id=10 display_name: NULL -> "U10"

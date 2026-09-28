@@ -1,0 +1,88 @@
+# legacy snapshot v1
+# scenario: product.buttons_bad_ids
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: press "pause_x" user=10 on=1 synthetic
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1
+   text:
+   | ❌ ID non valido.
+## db after step 1
+(no changes)
+## step 2: press "pause_999" user=10 on=1 synthetic
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1
+   text:
+   | ❌ Prodotto non trovato.
+## db after step 2
+(no changes)
+## step 3: press "remove_x" user=10 on=1 synthetic
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1
+   text:
+   | ❌ ID non valido.
+## db after step 3
+(no changes)
+## step 4: press "remove_999" user=10 on=1 synthetic
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1
+   text:
+   | ❌ Prodotto non trovato.
+## db after step 4
+(no changes)
+## step 5: press "reset_x" user=10 on=1 synthetic
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1
+   text:
+   | ❌ ID non valido.
+## db after step 5
+(no changes)
+## step 6: press "reset_999" user=10 on=1 synthetic
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1
+   text:
+   | ❌ Prodotto non trovato.
+## db after step 6
+(no changes)
+## step 7: press "reactivate_x" user=10 on=1 synthetic
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1
+   text:
+   | ❌ ID non valido.
+## db after step 7
+(no changes)
+## step 8: press "reactivate_999" user=10 on=1 synthetic
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1
+   text:
+   | ❌ Prodotto non trovato.
+## db after step 8
+(no changes)
+## step 9: press "chart_x" user=10 on=1 synthetic
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1
+   text:
+   | ❌ ID non valido.
+## db after step 9
+(no changes)
+## step 10: press "chart_999" user=10 on=1 synthetic
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1
+   text:
+   | ❌ Prodotto non trovato.
+## db after step 10
+(no changes)
+## step 11: press "track_any_x" user=10 on=1 synthetic
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1
+   text:
+   | ❌ ID non valido.
+## db after step 11
+(no changes)
+## step 12: press "track_default_x" user=10 on=1 synthetic
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1
+   text:
+   | ❌ ID non valido.
+## db after step 12
+(no changes)

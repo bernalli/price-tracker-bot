@@ -1,0 +1,78 @@
+# legacy snapshot v1
+# scenario: product.cmd_delete
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/elimina" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | 📦 <b>Scegli prodotto da eliminare:</b>
+   keyboard:
+   | [#1 Kettle €80.00 → remove_1]
+   | [#2 Fan → remove_2]
+   | [🗑 Elimina tutti i prodotti → delete_all]
+## db after step 1
+~ users user_id=10 display_name: NULL -> "U10"
+## step 2: command "/elimina 1" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | ⚠️ Vuoi eliminare <b>definitivamente</b> questo prodotto?
+   |
+   | 📦 #1 — Kettle
+   |
+   | Verrà cancellato anche tutto lo storico prezzi.
+   keyboard:
+   | [🗑 Sì, elimina → confirm_delete_1] [❌ Annulla → cancel_delete]
+## db after step 2
+(no changes)
+## step 3: command "/elimina abc" user=10
+-> sendMessage chat=10
+   text:
+   | ❌ ID non valido.
+## db after step 3
+(no changes)
+## step 4: command "/elimina 999" user=10
+-> sendMessage chat=10
+   text:
+   | ❌ Prodotto non trovato.
+## db after step 4
+(no changes)
+## step 5: command "/delete 2" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | ⚠️ Vuoi eliminare <b>definitivamente</b> questo prodotto?
+   |
+   | 📦 #2 — Fan
+   |
+   | Verrà cancellato anche tutto lo storico prezzi.
+   keyboard:
+   | [🗑 Sì, elimina → confirm_delete_2] [❌ Annulla → cancel_delete]
+## db after step 5
+(no changes)
+## step 6: command "/elimina" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | 📦 <b>Scegli prodotto da eliminare:</b>
+   keyboard:
+   | [#1 Kettle €80.00 → remove_1]
+   | [#2 Fan → remove_2]
+   | [#3 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNN €80.00 → remove_3]
+   | [🗑 Elimina tutti i prodotti → delete_all]
+## db after step 6
+(no changes)
+## step 7: command "/elimina 3" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | ⚠️ Vuoi eliminare <b>definitivamente</b> questo prodotto?
+   |
+   | 📦 #3 — Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
+   |
+   | Verrà cancellato anche tutto lo storico prezzi.
+   keyboard:
+   | [🗑 Sì, elimina → confirm_delete_3] [❌ Annulla → cancel_delete]
+## db after step 7
+(no changes)

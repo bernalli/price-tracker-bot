@@ -1,0 +1,16 @@
+# legacy snapshot v1
+# scenario: add.unsafe_url
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/add http://127.0.0.1/x" user=10
+-> sendMessage chat=10
+   text:
+   | ❌ URL non consentito: punta a un indirizzo privato o interno.
+## db after step 1
+~ users user_id=10 display_name: NULL -> "U10"
+## step 2: command "/add ftp://shop.example.com/x" user=10
+-> sendMessage chat=10
+   text:
+   | ❌ URL non consentito: punta a un indirizzo privato o interno.
+## db after step 2
+(no changes)
