@@ -24,6 +24,13 @@ _AVAILABLE: set[str] = {"en", "it_IT"}
 
 _null_translations: gettext.NullTranslations = gettext.NullTranslations()
 
+
+class _Catalog(gettext.GNUTranslations):
+    """A loaded catalogue that remembers which locale directory it came from."""
+
+    code: str = "en"
+
+
 _translation_var: ContextVar[gettext.NullTranslations] = ContextVar(
     "_translation_var",
     default=_null_translations,
@@ -83,11 +90,15 @@ def get_translation(lang_code: str | None) -> gettext.NullTranslations:
         if resolved is None:
             continue
         try:
-            return gettext.translation(
+            translation = gettext.translation(
                 "messages",
                 localedir=_LOCALE_DIR,
                 languages=[resolved],
+                class_=_Catalog,
             )
+            if isinstance(translation, _Catalog):
+                translation.code = resolved
+            return translation
         except OSError:
             # FileNotFoundError (catalog absent) or corrupt .mo (Bad magic
             # number, truncated file, permission error) — fall through to
@@ -119,3 +130,12 @@ def _(text: str) -> str:
 def ngettext(singular: str, plural: str, n: int) -> str:
     """Plural-aware translation per current ContextVar locale."""
     return _translation_var.get().ngettext(singular, plural, n)
+
+
+def current_locale() -> str:
+    """Return the catalogue code selected by the last ``set_locale`` in this context.
+
+    ``en`` when no catalogue is loaded (the source language passes through).
+    """
+    active = _translation_var.get()
+    return active.code if isinstance(active, _Catalog) else "en"

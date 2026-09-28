@@ -56,6 +56,7 @@ dev = [
     "pre-commit>=4.6.2",
     "freezegun>=1.5",
     "hypothesis==6.168.1",
+    "wcwidth==0.9.1",
 ]
 
 [project.entry-points."price_tracker.scrapers"]
@@ -134,12 +135,15 @@ disable_error_code = [
 
 # The guided-flow coordinator is strict: this concrete section takes
 # precedence over the legacy `price_tracker.bot.*` wildcard above and
-# re-enables every error code that wildcard disables.
+# re-enables every error code that wildcard disables. Also covers the
+# renderers in `price_tracker.bot.ui`.
 [[tool.mypy.overrides]]
 module = [
     "price_tracker.bot.callbacks",
     "price_tracker.bot.flow_services",
     "price_tracker.bot.flows",
+    "price_tracker.bot.ui",
+    "price_tracker.bot.ui.*",
 ]
 enable_error_code = [
     "union-attr",
@@ -170,12 +174,20 @@ markers = [
 #   gated separately when their suites land. Same scope alignment as `[tool.mypy.overrides]`.
 # - main.py (entry point) and notifier/telegram.py (real Telegram I/O) are omitted —
 #   covered by unit and integration tests directly, just not gated on percentage here.
+# - The legacy bot/* omit is now an explicit file list instead of a glob: the
+#   glob also matched `bot/ui/**`, which is measured by this gate.
 [tool.coverage.run]
 source = ["src/price_tracker"]
 omit = [
     "src/price_tracker/main.py",
     "src/price_tracker/notifier/telegram.py",
-    "src/price_tracker/bot/*",
+    "src/price_tracker/bot/decorators.py",
+    "src/price_tracker/bot/keyboards.py",
+    "src/price_tracker/bot/messages.py",
+    "src/price_tracker/bot/callbacks.py",
+    "src/price_tracker/bot/flows.py",
+    "src/price_tracker/bot/flow_services.py",
+    "src/price_tracker/bot/handlers/*",
     "src/price_tracker/scrapers/amazon.py",
     "src/price_tracker/scrapers/ebay.py",
     "src/price_tracker/scrapers/generic.py",

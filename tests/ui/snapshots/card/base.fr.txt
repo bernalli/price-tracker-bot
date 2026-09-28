@@ -1,0 +1,23 @@
+# ui snapshot v1
+# screen: card.base
+# locale: fr
+# now: 2026-03-01T12:00:00Z
+text:
+   | [📦 <b>⁨Wireless Headphones X200 Pro Edition with Active Noise Canc…⁩</b> 📦 <b>⁨Wireless Headphones X200 Pro Edition with Active Noise Canc…⁩</b> 📦 <b>⁨Wireless Headphones X200 Pro Edition with Active Noise Canc…⁩</b>]
+   | [⁨shop.example.com⁩ · #42 · [active active active] ⁨shop.example.com⁩ · #42 · [active active active] ⁨shop.example.com⁩ · #42 · [active active active]]
+   | 
+   | [💰 Now: 1 299,99 € 💰 Now: 1 299,99 € 💰 Now: 1 299,99 €]
+   | [📌 Start: 1 499,99 € · ▼ 13,3 % 📌 Start: 1 499,99 € · ▼ 13,3 % 📌 Start: 1 499,99 € · ▼ 13,3 %]
+   | [📉 Lowest: 1 249,00 € 📉 Lowest: 1 249,00 € 📉 Lowest: 1 249,00 €]
+   | [🎯 Target: 1 199,00 € 🎯 Target: 1 199,00 € 🎯 Target: 1 199,00 €]
+   | [🔔 Alert: drop of 10 % from start 🔔 Alert: drop of 10 % from start 🔔 Alert: drop of 10 % from start]
+   | [🔄 Checks: every 6 h · last il y a 6 heures 🔄 Checks: every 6 h · last il y a 6 heures 🔄 Checks: every 6 h · last il y a 6 heures]
+keyboard:
+   [[🔍 Check now 🔍 Check now 🔍 Che…](cb:p:42:ck)
+   [[📊 History 📊 History 📊 History]](cb:p:42:ch:30d)
+   [[⏸ Pause ⏸ Pause ⏸ Pause]](cb:p:42:pa)
+   [[🗑 Delete 🗑 Delete 🗑 Delete]](cb:p:42:rm)
+   [[🔔 Alert rule 🔔 Alert rule 🔔 A…](cb:p:42:th)
+   [[🔄 Interval 🔄 Interval 🔄 Inter…](cb:p:42:iv)
+   [[🔗 Open 🔗 Open 🔗 Open]](url:https://shop.example.com/item/42)
+   [[◀️ List ◀️ List ◀️ List]](cb:l:a:1)

@@ -1,0 +1,21 @@
+# ui snapshot v1
+# screen: card.paused
+# locale: uk
+# now: 2026-03-01T12:00:00Z
+text:
+   | [📦 <b>⁨Coffee Grinder G5⁩</b> 📦 <b>⁨Coffee Grinder G5⁩</b> 📦 <b>⁨Coffee Grinder G5⁩</b>]
+   | [⁨shop.example.com⁩ · #43 · [paused paused paused] ⁨shop.example.com⁩ · #43 · [paused paused paused] ⁨shop.example.com⁩ · #43 · [paused paused paused]]
+   | 
+   | [💰 Now: 89,90 EUR 💰 Now: 89,90 EUR 💰 Now: 89,90 EUR]
+   | [📌 Start: 88,05 EUR · ▲ 2,1% 📌 Start: 88,05 EUR · ▲ 2,1% 📌 Start: 88,05 EUR · ▲ 2,1%]
+   | [🔔 Alert: any drop 🔔 Alert: any drop 🔔 Alert: any drop]
+   | [🔄 Checks: every 6 год · last 3 години тому 🔄 Checks: every 6 год · last 3 години тому 🔄 Checks: every 6 год · last 3 години тому]
+keyboard:
+   [[🔍 Check now 🔍 Check now 🔍 Che…](cb:p:43:ck)
+   [[📊 History 📊 History 📊 History]](cb:p:43:ch:30d)
+   [[▶️ Reactivate ▶️ Reactivate ▶️ R…](cb:p:43:ra)
+   [[🗑 Delete 🗑 Delete 🗑 Delete]](cb:p:43:rm)
+   [[🔔 Alert rule 🔔 Alert rule 🔔 A…](cb:p:43:th)
+   [[🔄 Interval 🔄 Interval 🔄 Inter…](cb:p:43:iv)
+   [[🔗 Open 🔗 Open 🔗 Open]](url:https://shop.example.com/item/43)
+   [[◀️ List ◀️ List ◀️ List]](cb:l:a:1)

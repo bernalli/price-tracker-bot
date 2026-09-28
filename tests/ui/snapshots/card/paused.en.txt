@@ -1,0 +1,18 @@
+# ui snapshot v1
+# screen: card.paused
+# locale: en
+# now: 2026-03-01T12:00:00Z
+text:
+   | 📦 <b>⁨Coffee Grinder G5⁩</b>
+   | ⁨shop.example.com⁩ · #43 · paused
+   | 
+   | 💰 Now: €89.90
+   | 📌 Start: €88.05 · ▲ 2.1%
+   | 🔔 Alert: any drop
+   | 🔄 Checks: every 6 hr · last 3 hours ago
+keyboard:
+   [🔍 Check now](cb:p:43:ck)  [📊 History](cb:p:43:ch:30d)
+   [▶️ Reactivate](cb:p:43:ra)  [🗑 Delete](cb:p:43:rm)
+   [🔔 Alert rule](cb:p:43:th)  [🔄 Interval](cb:p:43:iv)
+   [🔗 Open](url:https://shop.example.com/item/43)
+   [◀️ List](cb:l:a:1)
