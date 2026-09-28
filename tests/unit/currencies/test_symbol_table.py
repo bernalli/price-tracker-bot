@@ -39,7 +39,7 @@ PROTOTYPE_SYMBOLS: dict[str, frozenset[str]] = {
     "R$": frozenset({"BRL"}),
     "£": frozenset({"GBP"}),
     "¥": frozenset({"JPY", "CNY"}),
-    "￥": frozenset({"JPY", "CNY"}),
+    "\uffe5": frozenset({"JPY", "CNY"}),
     "円": frozenset({"JPY"}),
     "元": frozenset({"CNY", "TWD"}),
     "₩": frozenset({"KRW"}),

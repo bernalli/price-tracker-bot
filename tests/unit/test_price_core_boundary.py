@@ -105,9 +105,14 @@ def test_price_core_has_documented_callers_only() -> None:
         )
     }
     allowed_callers = {SRC_ROOT / "scrapers" / "shopify.py"}
+    module_names = (
+        "money|pricegrammar|anchoring|identity|structured_data"
+        "|currencies|currency_symbols|_generated_currency_symbols"
+    )
     reference = re.compile(
-        r"price_tracker\.core\.(money|pricegrammar|anchoring|identity|structured_data"
-        r"|currencies|currency_symbols|_generated_currency_symbols)"
+        rf"price_tracker\.core\.({module_names})\b"
+        rf"|from\s+price_tracker\.core\s+import\s*\(?\s*"
+        rf"[A-Za-z0-9_,\s]*?\b(?:{module_names})\b"
     )
     offenders: list[str] = []
     for py in SRC_ROOT.rglob("*.py"):
