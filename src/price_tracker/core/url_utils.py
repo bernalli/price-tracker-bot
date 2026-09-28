@@ -18,7 +18,7 @@ class UnsafeURLError(ValueError):
 
 
 def _is_blocked_ip(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
-    """True for loopback/private/link-local/reserved/multicast/unspecified addresses."""
+    """True for loopback/private/link-local/reserved/multicast/unspecified/non-global addresses."""
     return (
         ip.is_private
         or ip.is_loopback
@@ -26,6 +26,7 @@ def _is_blocked_ip(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
         or ip.is_multicast
         or ip.is_reserved
         or ip.is_unspecified
+        or not ip.is_global  # e.g. shared address space 100.64.0.0/10 (RFC 6598)
     )
 
 
