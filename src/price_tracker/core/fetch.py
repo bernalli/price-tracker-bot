@@ -13,6 +13,7 @@ into a scrape result.
 from __future__ import annotations
 
 import asyncio
+import codecs
 import logging
 import zlib
 from dataclasses import dataclass
@@ -199,14 +200,28 @@ def _cap(body: bytes, max_bytes: int) -> tuple[bytes, bool]:
     return body[:max_bytes], len(body) > max_bytes
 
 
+_NOT_DOCUMENT_ENCODINGS: Final = frozenset({"punycode", "idna", "undefined"})
+
+
 def _decode(body: bytes, encoding: str | None) -> str:
     """Decode ``body`` with ``encoding``, or utf-8 if it is unknown. Never raises.
 
     ``LookupError`` covers unknown and non-text codecs; ``UnicodeError`` covers
-    codecs that refuse ``errors="replace"`` (``idna``, ``undefined``, ``punycode``).
+    codecs that refuse ``errors="replace"`` (``idna``, ``undefined``). ``punycode``
+    is checked ahead of decoding instead of relying on that fallback: it is a
+    hostname transform, not a document encoding, and with ``errors="replace"`` it
+    does not always raise — it can turn a WAF or CAPTCHA marker into garbage
+    instead, which hides the block from every fingerprint that looks for it.
     """
+    name = encoding or "utf-8"
     try:
-        return body.decode(encoding or "utf-8", errors="replace")
+        canonical = codecs.lookup(name).name
+    except LookupError:
+        return body.decode("utf-8", errors="replace")
+    if canonical in _NOT_DOCUMENT_ENCODINGS:
+        return body.decode("utf-8", errors="replace")
+    try:
+        return body.decode(name, errors="replace")
     except (LookupError, UnicodeError):
         return body.decode("utf-8", errors="replace")
 

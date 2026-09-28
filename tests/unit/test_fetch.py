@@ -1223,6 +1223,25 @@ async def test_hostile_charset_does_not_hide_block_or_gone(client, charset):
         )
         with pytest.raises(WAFBlocked):
             await fetch_page(url, client)
+    # Pure ASCII bodies: some codecs Python accepts are not document encodings and
+    # can turn a WAF/CAPTCHA marker into garbage instead of raising, on any input
+    # byte, not only on the invalid trailing byte used above.
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).mock(
+            return_value=httpx.Response(200, content=b"Access Denied", headers=headers)
+        )
+        with pytest.raises(WAFBlocked):
+            await fetch_page(url, client)
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).mock(
+            return_value=httpx.Response(
+                200,
+                content=b'<div class="g-recaptcha" data-sitekey="x"></div>',
+                headers=headers,
+            )
+        )
+        with pytest.raises(CaptchaDetected):
+            await fetch_page(url, client)
 
 
 @pytest.mark.parametrize("location", ["https:\\\\127.0.0.1\\x", "X.http:@ [::1][::1]ftp:"])
