@@ -50,7 +50,7 @@ def test_hostile_name_never_leaks_raw_markup() -> None:
 def test_domain_row_wraps_the_domain_in_bidi_isolates() -> None:
     screen = _card("base")
     domain_line = screen.text.split("\n")[1]
-    assert domain_line.startswith("⁨shop.example.com⁩ ")
+    assert domain_line.startswith("\u2068shop.example.com\u2069 ")
 
 
 def test_empty_domain_renders_no_isolate() -> None:
