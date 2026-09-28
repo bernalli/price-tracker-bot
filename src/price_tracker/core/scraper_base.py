@@ -92,7 +92,7 @@ def parse_price(price_str: str | None, *, currency: str | None = None) -> Decima
 
     if price_str is None:
         return None
-    known = currency if currency is not None and currency in ACCEPTED_CURRENCIES else None
+    known = currency if isinstance(currency, str) and currency in ACCEPTED_CURRENCIES else None
     return parse_price_text(price_str, PriceContext(currency=known))
 
 

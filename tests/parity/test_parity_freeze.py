@@ -326,7 +326,7 @@ def test_classifier_is_total_on_examples(monkeypatch: pytest.MonkeyPatch) -> Non
 
 
 def test_scraper_base_import_does_not_load_the_price_core() -> None:
-    """``core/fetch.py`` imports ``scraper_base`` for block detection (D3): it must stay clean."""
+    """``core/fetch.py`` imports ``scraper_base`` for block detection: it must stay clean."""
     before = subprocess.run(
         [
             sys.executable,

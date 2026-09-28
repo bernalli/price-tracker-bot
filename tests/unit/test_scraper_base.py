@@ -523,7 +523,7 @@ def test_parse_price_rejects_ambiguous_or_malformed_text(raw):
 
 
 def test_parse_price_token_with_dot_is_not_a_decimal_point():
-    """Roadmap item 188: the ``.`` of ``kr.``/``Fr.`` is not a decimal separator."""
+    """The ``.`` of a ``kr.``/``Fr.`` token is not a decimal separator."""
     assert parse_price("kr. 89") == Decimal("89")
     assert parse_price("26,72 kr.") == Decimal("26.72")
     assert parse_price("Fr. 70,205,780") == Decimal("70205780")

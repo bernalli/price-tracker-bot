@@ -107,7 +107,7 @@ def test_price_core_has_documented_callers_only() -> None:
     allowed_callers = {
         SRC_ROOT / "scrapers" / "shopify.py",
         # scraper_base.parse_price/detect_currency delegate to the price grammar
-        # and the currency engine (SP2-PR2b wiring).
+        # and the currency engine.
         SRC_ROOT / "core" / "scraper_base.py",
     }
     module_names = (
@@ -135,7 +135,7 @@ def test_price_core_has_documented_callers_only() -> None:
 
 
 def test_parse_price_delegates_to_the_grammar() -> None:
-    """scraper_base.parse_price/detect_currency delegate to the price core (D1, D2, D3):
+    """scraper_base.parse_price/detect_currency delegate to the price core:
     the old inline parser table is gone, and the grammar is the one doing the work."""
     from price_tracker.core import scraper_base
 

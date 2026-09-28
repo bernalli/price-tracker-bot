@@ -216,7 +216,7 @@ def test_mediamarkt_dom_joins_whole_and_decimal_spans() -> None:
 
 
 def test_mediamarkt_round_price_without_currency_span_is_not_read() -> None:
-    """Fail-closed (invariant 4): without the currency span, "1.299" stays ambiguous.
+    """Fail-closed: without the currency span, "1.299" stays ambiguous.
 
     Same page as ``test_mediamarkt_dom_joins_whole_and_decimal_spans``, minus the
     ``branded-price-currency`` span: the grammar has no currency to anchor the

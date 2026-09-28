@@ -1,4 +1,4 @@
-"""Property tests for the wired ``parse_price``/``detect_currency`` wrapper (D10, §4.1.7).
+"""Property tests for the wired ``parse_price``/``detect_currency`` wrapper.
 
 Out of the harvest plugin's default perimeter (``--tests tests/unit``): these generate
 inputs with ``hypothesis`` and are not meant to grow the parity corpus.
@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
@@ -75,3 +76,16 @@ def test_detect_currency_shared_symbol_is_none_for_every_key() -> None:
         elif len(accepted) == 1:
             (expected,) = accepted
             assert detect_currency(f"10 {key}") == expected, key
+
+
+@pytest.mark.parametrize("currency", [["EUR"], {"code": "EUR"}, 123, b"EUR", 1.5])
+def test_parse_price_currency_keyword_ignores_values_that_are_not_a_code(currency: object) -> None:
+    """A ``currency`` that is not an accepted code is ignored, whatever its type: never raises."""
+    assert parse_price("1.299", currency=currency) is None  # type: ignore[arg-type]
+    assert parse_price("12,99 €", currency=currency) == Decimal("12.99")  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("value", [123, 1.5, b"12", ["12"], {"a": 1}, object()])
+def test_wrapper_is_total_on_non_string_input(value: object) -> None:
+    assert parse_price(value) is None  # type: ignore[arg-type]
+    assert detect_currency(value) is None  # type: ignore[arg-type]
