@@ -83,6 +83,14 @@ def test_layout_rows_wide_button_in_the_middle_splits_the_group() -> None:
     assert [tuple(btn.callback for btn in row) for row in rows] == [("a",), ("c",), ("b",)]
 
 
+def test_layout_rows_truncates_a_solo_button_wider_than_row_width() -> None:
+    over_budget = button("x" * 60, callback="c")
+    rows = layout_rows([over_budget])
+    assert len(rows) == 1
+    assert len(rows[0]) == 1
+    assert display_width(rows[0][0].label) <= ROW_WIDTH
+
+
 def test_layout_rows_empty_group_produces_no_rows() -> None:
     assert layout_rows([]) == ()
 
