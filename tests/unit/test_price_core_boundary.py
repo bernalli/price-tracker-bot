@@ -1,6 +1,6 @@
 """Boundary tests for the price-core port.
 
-The port adds five modules under ``price_tracker.core`` without wiring them
+The port adds eight modules under ``price_tracker.core`` without wiring them
 into anything: no caller changes, nothing imports them yet. These tests
 guard that boundary so a later change cannot cross it by accident, before
 crossing it is a deliberate, reviewed decision.
@@ -22,6 +22,9 @@ CORE_MODULES = (
     "price_tracker.core.anchoring",
     "price_tracker.core.identity",
     "price_tracker.core.structured_data",
+    "price_tracker.core.currencies",
+    "price_tracker.core.currency_symbols",
+    "price_tracker.core._generated_currency_symbols",
 )
 
 FORBIDDEN_MODULES = (
@@ -36,7 +39,7 @@ FORBIDDEN_MODULES = (
 
 
 def test_price_core_imports_are_effect_free() -> None:
-    """Importing any of the five core modules pulls in no app, db, scraper,
+    """Importing any of the eight core modules pulls in no app, db, scraper,
     notifier or network-client module, and builds no on-disk TLD cache.
 
     tldextract's DiskCache stringifies a ``cache_dir=None`` constructor
@@ -77,7 +80,7 @@ def test_price_core_imports_are_effect_free() -> None:
 
 
 def test_price_core_has_documented_callers_only() -> None:
-    """Every file outside the five core modules that references them is on this
+    """Every file outside the eight core modules that references them is on this
     explicit allow-list.
 
     Replaces ``test_price_core_has_no_callers_yet``: the tripwire's own docstring
@@ -96,11 +99,20 @@ def test_price_core_has_documented_callers_only() -> None:
             "anchoring.py",
             "identity.py",
             "structured_data.py",
+            "currencies.py",
+            "currency_symbols.py",
+            "_generated_currency_symbols.py",
         )
     }
     allowed_callers = {SRC_ROOT / "scrapers" / "shopify.py"}
+    module_names = (
+        "money|pricegrammar|anchoring|identity|structured_data"
+        "|currencies|currency_symbols|_generated_currency_symbols"
+    )
     reference = re.compile(
-        r"price_tracker\.core\.(money|pricegrammar|anchoring|identity|structured_data)"
+        rf"price_tracker\.core\.({module_names})\b"
+        rf"|from\s+price_tracker\.core\s+import\s*\(?\s*"
+        rf"[A-Za-z0-9_,\s]*?\b(?:{module_names})\b"
     )
     offenders: list[str] = []
     for py in SRC_ROOT.rglob("*.py"):
