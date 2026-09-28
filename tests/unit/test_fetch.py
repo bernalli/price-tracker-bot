@@ -8,12 +8,19 @@ network — every request goes through respx.
 
 from __future__ import annotations
 
+import encodings
+import encodings.aliases
 import gzip
 import inspect
+import itertools
+import pkgutil
+import random
 import re
+import string
 import subprocess
 import sys
 import tracemalloc
+import warnings
 import zlib
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -87,7 +94,7 @@ class ValidateSpy:
         self.calls.append(url)
 
 
-# ── 5.1 Block prima dello stato — percorso primario (I1) ─────────────────────
+# ── Block detection before status handling, primary path ─────────────────────
 
 
 @pytest.mark.parametrize("status", [403, 429])
@@ -202,7 +209,7 @@ async def test_other_client_errors_are_status_errors(client, status):
             await fetch_page(url, client)
 
 
-# ── 5.2 Gone non è blocco (I6) ────────────────────────────────────────────────
+# ── A removed listing is not a block ──────────────────────────────────────────
 
 
 @pytest.mark.parametrize("status", [404, 410])
@@ -257,7 +264,7 @@ async def test_gone_status_wins_over_waf_or_captcha_body(client, status):
     assert not isinstance(exc_info.value, BlockEvent)
 
 
-# ── 5.3 Redirect seguiti a mano e rivalidati (D3) ─────────────────────────────
+# ── Redirects followed one hop at a time and revalidated ─────────────────────
 
 
 async def test_redirect_is_followed_and_recorded(client):
@@ -410,7 +417,7 @@ async def test_redirect_chain_reaches_check_echoes(client):
     assert check_echoes(requested, final_url=page_canonical.url_final, canonical=url_a).ok is True
 
 
-# ── 5.4 Limite del corpo (D4) ─────────────────────────────────────────────────
+# ── Body cap ──────────────────────────────────────────────────────────────────
 
 
 @pytest.mark.parametrize(
@@ -514,12 +521,15 @@ async def test_wire_cap_stops_a_stream_that_produces_no_output(client):
 @pytest.mark.parametrize("encoding", ["zstd", "gzip, br"])
 async def test_unknown_or_multiple_content_encoding_is_a_decoding_error(client, encoding):
     url = "https://f.example/p/badenc"
+    # A body that is valid for the declared encodings (gzip applied first, then
+    # br), so a reader that decodes stacked encodings would return a page here.
+    payload = b"data" if encoding == "zstd" else brotli.compress(gzip.compress(b"data"))
 
     # An async generator, not raw bytes: httpx.Response(content=bytes) builds a
     # ByteStream and eagerly self-decodes it at construction time, which would
     # raise deep inside httpx's own decoder before fetch_page ever sees the body.
     async def body() -> AsyncIterator[bytes]:
-        yield b"data"
+        yield payload
 
     with respx.mock(assert_all_called=False) as router:
         router.get(url).mock(
@@ -544,11 +554,10 @@ async def test_unknown_or_multiple_content_encoding_is_a_decoding_error(client, 
 
 
 async def test_deflate_corruption_after_the_header_is_settled_is_a_decoding_error(client):
-    """Coverage completeness, not a numbered §5 item: once the zlib/raw-deflate
-    choice succeeds on the first wire chunk, a later corrupted chunk must not leak
-    a raw ``zlib.error`` — it is folded into ``httpx.DecodingError`` like every
-    other malformed body, so callers that only catch ``httpx.HTTPError``/``ValueError``
-    (P4) still see it."""
+    """Once the zlib/raw-deflate choice succeeds on the first wire chunk, a later
+    corrupted chunk must not leak a raw ``zlib.error`` — it is folded into
+    ``httpx.DecodingError`` like every other malformed body, so callers that only
+    catch ``httpx.HTTPError``/``ValueError`` still see it."""
     payload = b"x" * 5000
     compressed = zlib.compress(payload, 9)
     split = len(compressed) // 2
@@ -569,9 +578,8 @@ async def test_deflate_corruption_after_the_header_is_settled_is_a_decoding_erro
 
 
 async def test_brotli_decoding_spans_more_than_one_process_call(client):
-    """Coverage completeness, not a numbered §5 item: a decoded body larger than
-    one brotli ``output_buffer_limit`` chunk must keep decoding, at the step size,
-    across the ``can_accept_more_data`` loop — not just the first call."""
+    """A decoded body larger than one brotli ``output_buffer_limit`` chunk must keep
+    decoding, at the step size, across the drain loop — not just the first call."""
     n = 8 * 1024 * 1024
     compressed = brotli.compress(b"\x00" * n, quality=5)
     max_bytes = 256 * 1024  # a few times the ~96 KiB a single brotli call yields
@@ -637,7 +645,7 @@ def test_cap_is_pure_and_total(body, n):
     assert _cap(body, n) == (body[:n], len(body) > n)
 
 
-# ── 5.5 Fallback (D5, D6) ──────────────────────────────────────────────────────
+# ── Fallbacks ──────────────────────────────────────────────────────────────────
 
 
 async def test_fallback_page_after_primary_block(client):
@@ -866,7 +874,7 @@ async def test_fallback_redirects_field(client):
     assert page2.redirects == (other_url,)
 
 
-# ── 5.6 Intestazioni ───────────────────────────────────────────────────────────
+# ── Headers ────────────────────────────────────────────────────────────────────
 
 
 async def test_default_headers_rotate_user_agent_and_extra_headers_merge(client):
@@ -927,7 +935,7 @@ async def test_default_headers_rotate_user_agent_and_extra_headers_merge(client)
     assert "cookie" not in same_headers
 
 
-# ── 5.7 Confini e costruzione ───────────────────────────────────────────────────
+# ── Module boundaries and construction ─────────────────────────────────────────
 
 
 def test_fetch_has_no_callers_yet():
@@ -938,8 +946,11 @@ def test_fetch_has_no_callers_yet():
     pattern = re.compile(
         r"price_tracker\.core\.fetch\b"
         r"|from\s+price_tracker\.core\s+import\s+[^\n]*\bfetch\b"
+        r"|from\s+price_tracker\.core\s+import\s*\([^)]*\bfetch\b"
         r"|from\s+\.\s*import\s+[^\n]*\bfetch\b"
+        r"|from\s+\.\s*import\s*\([^)]*\bfetch\b"
         r"|from\s+\.fetch\s+import"
+        r"|from\s+\.\.core(?:\.fetch\b|\s+import\s*\(?[^)]*?\bfetch\b)"
     )
     offenders: list[str] = []
     for py in SRC_ROOT.rglob("*.py"):
@@ -981,7 +992,7 @@ def test_fetch_import_is_layer_clean():
     )
     for name in forbidden:
         assert name not in loaded, f"importing fetch pulled in {name!r}"
-    # D9: fetch.py names none of the five core-price modules, even in comments or
+    # fetch.py names none of the five core-price modules, even in comments or
     # docstrings. Matched as a qualified reference (as the boundary tripwire for the
     # nucleus itself does), not as a bare word: "identity" also names the ordinary
     # Content-Encoding value, unrelated to price_tracker.core.identity.
@@ -1048,3 +1059,226 @@ async def test_fetch_page_rejects_bad_limits(client):
 def test_decode_never_raises(body, encoding):
     result = _decode(body, encoding)
     assert isinstance(result, str)
+
+
+# -- Regression cases for decoder termination, decoder errors and hostile headers --
+
+_ALL_CODECS = sorted(
+    {
+        *encodings.aliases.aliases,
+        *encodings.aliases.aliases.values(),
+        *(m.name for m in pkgutil.iter_modules(encodings.__path__)),
+    }
+)
+
+
+def _brotli_streamed(n_mib: int) -> bytes:
+    """A brotli stream built block by block, so the decoder holds input back."""
+    compressor = brotli.Compressor(quality=5, lgwin=24)
+    block = b"\x00" * (1 << 20)
+    return b"".join([compressor.process(block) for _ in range(n_mib)] + [compressor.finish()])
+
+
+@pytest.mark.parametrize("split", [False, True])
+async def test_brotli_body_below_the_cap_is_decoded_in_full(client, split):
+    rng = random.Random(0)
+    page_text = "".join(rng.choice(string.ascii_letters) for _ in range(150_000))
+    compressed = brotli.compress(page_text.encode(), quality=5)
+    half = len(compressed) // 2
+    parts = [compressed[:half], compressed[half:]] if split else [compressed]
+
+    decoder = fetch._decoder_for("br", httpx.Request("GET", "https://f.example/p/br"))
+    pieces: list[bytes] = []
+    for part in parts:
+        feed = decoder.feed(part)
+        # A bounded pull: a drain loop that never ends must fail here, not hang.
+        pieces.extend(itertools.islice(feed, 64))
+        assert next(feed, None) is None, "the brotli drain loop did not terminate"
+    assert b"".join(pieces) == page_text.encode()
+
+    async def body() -> AsyncIterator[bytes]:
+        for part in parts:
+            yield part
+
+    url = "https://f.example/p/br"
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).mock(
+            return_value=httpx.Response(200, content=body(), headers={"content-encoding": "br"})
+        )
+        page = await fetch_page(url, client)
+    assert page.truncated is False
+    assert page.text == page_text
+
+
+async def test_brotli_stream_that_holds_input_back_is_not_silently_cut(client):
+    # Larger than the 16 MiB window, so the decoder keeps compressed input
+    # buffered after the first bounded step instead of consuming it all.
+    n_mib = 32
+    compressed = _brotli_streamed(n_mib)
+    decoder = fetch._decoder_for("br", httpx.Request("GET", "https://f.example/p/br-streamed"))
+    total = 0
+    for count, piece in enumerate(decoder.feed(compressed)):
+        # Bounded: a drain loop that never ends must fail here, not hang.
+        assert count < 4096, "the brotli drain loop did not terminate"
+        total += len(piece)
+    assert total == n_mib * 1024 * 1024
+
+    url = "https://f.example/p/br-streamed"
+
+    async def body() -> AsyncIterator[bytes]:
+        yield compressed
+
+    max_bytes = 4 * 1024 * 1024
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).mock(
+            return_value=httpx.Response(200, content=body(), headers={"content-encoding": "br"})
+        )
+        page = await fetch_page(url, client, max_bytes=max_bytes)
+    assert page.truncated is True
+    assert len(page.text) == max_bytes
+
+
+@pytest.mark.parametrize(
+    ("encoding", "raw"),
+    [
+        ("gzip", b"<html>not gzip at all</html>"),
+        ("deflate", b"\xff\xff\xff\xff not deflate in either form"),
+        ("br", b"\xff\xff\xff\xff not brotli"),
+        ("zstd", b"data"),
+    ],
+)
+async def test_undecodable_body_is_a_decoding_error_but_status_still_decides(client, encoding, raw):
+    url = f"https://f.example/p/undecodable-{encoding}"
+
+    def response(status: int) -> httpx.Response:
+        async def body() -> AsyncIterator[bytes]:
+            yield raw
+
+        return httpx.Response(status, content=body(), headers={"content-encoding": encoding})
+
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).mock(return_value=response(200))
+        with pytest.raises(httpx.DecodingError):
+            await fetch_page(url, client)
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).mock(return_value=response(403))
+        with pytest.raises(HTTPBlockStatus):
+            await fetch_page(url, client)
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).mock(return_value=response(404))
+        with pytest.raises(ListingGone):
+            await fetch_page(url, client)
+
+
+async def test_rejected_encoding_still_closes_the_response(client, monkeypatch):
+    seen: list[httpx.Response] = []
+    real_send = client.send
+
+    async def recording_send(request: httpx.Request, **kwargs: object) -> httpx.Response:
+        response: httpx.Response = await real_send(request, **kwargs)
+        seen.append(response)
+        return response
+
+    monkeypatch.setattr(client, "send", recording_send)
+    url = "https://f.example/p/zstd"
+
+    async def body() -> AsyncIterator[bytes]:
+        yield b"data"
+
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).mock(
+            return_value=httpx.Response(200, content=body(), headers={"content-encoding": "zstd"})
+        )
+        with pytest.raises(httpx.DecodingError):
+            await fetch_page(url, client)
+    assert len(seen) == 1
+    assert seen[0].is_closed is True
+
+
+def test_decode_never_raises_for_any_registered_codec():
+    samples = [b"", b"caf\xc3\xa9", bytes(range(256)), b"\\x\\u12", b"xn--"]
+    with warnings.catch_warnings():
+        # unicode_escape warns on invalid escapes; only the return type matters here.
+        warnings.simplefilter("ignore")
+        for name in _ALL_CODECS:
+            for body in samples:
+                assert isinstance(_decode(body, name), str), name
+
+
+@pytest.mark.parametrize("charset", ["undefined", "idna", "punycode"])
+async def test_hostile_charset_does_not_hide_block_or_gone(client, charset):
+    url = "https://f.example/p/charset-hostile"
+    headers = {"content-type": f"text/html; charset={charset}"}
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).mock(return_value=httpx.Response(403, content=b"blocked", headers=headers))
+        with pytest.raises(HTTPBlockStatus):
+            await fetch_page(url, client)
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).mock(return_value=httpx.Response(404, content=b"gone", headers=headers))
+        with pytest.raises(ListingGone):
+            await fetch_page(url, client)
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).mock(
+            return_value=httpx.Response(200, content=b"Just a moment...\xff", headers=headers)
+        )
+        with pytest.raises(WAFBlocked):
+            await fetch_page(url, client)
+
+
+@pytest.mark.parametrize("location", ["https:\\\\127.0.0.1\\x", "X.http:@ [::1][::1]ftp:"])
+async def test_unusable_location_is_a_protocol_error(client, location):
+    url = "https://f.example/p/A"
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).mock(return_value=httpx.Response(302, headers={"Location": location}))
+        other = router.route().mock(side_effect=AssertionError("must never be requested"))
+        with pytest.raises(httpx.RemoteProtocolError):
+            await fetch_page(url, client)
+    assert other.called is False
+
+
+@pytest.mark.parametrize(
+    "url_final",
+    ["ftp://f.example/x", "file://f.example/etc/passwd", "http://f.example:abc/"],
+)
+async def test_fallback_final_url_with_other_scheme_or_unusable_is_refused(client, url_final):
+    url = "https://f.example/p/A"
+    fb = FakeFallback("A", FallbackResponse(status=200, text="ok", url_final=url_final))
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).mock(return_value=httpx.Response(403, text="blocked"))
+        with pytest.raises(UnsafeURLError):
+            await fetch_page(url, client, fallbacks=(fb,))
+
+
+@pytest.mark.parametrize("encoding", ["gzip", "deflate", "br"])
+async def test_truncated_compressed_body_is_a_decoding_error(client, encoding):
+    page_bytes = b"<html>" + b"price 9.99 " * 3000 + b"</html>"
+    compressors = {"gzip": gzip.compress, "deflate": zlib.compress, "br": brotli.compress}
+    compressed = compressors[encoding](page_bytes)
+    url = f"https://f.example/p/cut-{encoding}"
+    decoder = fetch._decoder_for(encoding, httpx.Request("GET", url))
+    feed = decoder.feed(compressed)
+    # Bounded pull first: a decoder that never stops must fail here, not hang below.
+    assert b"".join(itertools.islice(feed, 4096)) == page_bytes
+    assert next(feed, None) is None, "the decoder did not terminate"
+    assert decoder.complete() is True
+
+    def response(raw: bytes) -> httpx.Response:
+        async def body() -> AsyncIterator[bytes]:
+            if raw:
+                yield raw
+
+        return httpx.Response(200, content=body(), headers={"content-encoding": encoding})
+
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).mock(return_value=response(compressed[: len(compressed) // 2]))
+        with pytest.raises(httpx.DecodingError):
+            await fetch_page(url, client)
+    # positive controls: the whole stream is a page, and an empty body is not damaged
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).mock(return_value=response(compressed))
+        page = await fetch_page(url, client)
+    assert page.text == page_bytes.decode()
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).mock(return_value=response(b""))
+        empty = await fetch_page(url, client)
+    assert empty.text == ""

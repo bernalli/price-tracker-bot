@@ -30,7 +30,7 @@ from price_tracker.core.scraper_base import (
     detect_listing_gone,
     get_headers,
 )
-from price_tracker.core.url_utils import validate_public_url
+from price_tracker.core.url_utils import UnsafeURLError, validate_public_url
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +94,8 @@ class _StepDecoder(Protocol):
 
     def feed(self, data: bytes) -> Iterator[bytes]: ...
 
+    def complete(self) -> bool: ...
+
 
 class _IdentityDecoder:
     """No content-encoding: the wire bytes are the decoded bytes."""
@@ -101,17 +103,27 @@ class _IdentityDecoder:
     def feed(self, data: bytes) -> Iterator[bytes]:
         yield data
 
+    def complete(self) -> bool:
+        return True
+
 
 class _ZlibDecoder:
     """gzip decoding, chunked so no single call inflates more than the step."""
 
-    def __init__(self, wbits: int) -> None:
+    def __init__(self, wbits: int, request: httpx.Request) -> None:
         self._dec = zlib.decompressobj(wbits)
+        self._request = request
 
     def feed(self, data: bytes) -> Iterator[bytes]:
-        yield self._dec.decompress(data, _DECODE_STEP)
-        while self._dec.unconsumed_tail:
-            yield self._dec.decompress(self._dec.unconsumed_tail, _DECODE_STEP)
+        try:
+            yield self._dec.decompress(data, _DECODE_STEP)
+            while self._dec.unconsumed_tail:
+                yield self._dec.decompress(self._dec.unconsumed_tail, _DECODE_STEP)
+        except zlib.error as exc:
+            raise httpx.DecodingError(str(exc), request=self._request) from exc
+
+    def complete(self) -> bool:
+        return self._dec.eof
 
 
 class _DeflateDecoder:
@@ -123,35 +135,50 @@ class _DeflateDecoder:
         self._request = request
 
     def _decompress(self, data: bytes) -> bytes:
-        was_first_attempt = self._first_attempt
-        self._first_attempt = False
-        try:
-            return self._dec.decompress(data, _DECODE_STEP)
-        except zlib.error as exc:
-            if not was_first_attempt:
-                # A second corruption, once the header/raw choice is already
-                # settled, is a transport error like any other bad body — not a
-                # raw zlib exception the caller was never told to expect.
-                raise httpx.DecodingError(str(exc), request=self._request) from exc
-            self._dec = zlib.decompressobj(-zlib.MAX_WBITS)
-            return self._dec.decompress(data, _DECODE_STEP)
+        if self._first_attempt:
+            self._first_attempt = False
+            try:
+                return self._dec.decompress(data, _DECODE_STEP)
+            except zlib.error:
+                self._dec = zlib.decompressobj(-zlib.MAX_WBITS)
+        return self._dec.decompress(data, _DECODE_STEP)
 
     def feed(self, data: bytes) -> Iterator[bytes]:
-        yield self._decompress(data)
-        while self._dec.unconsumed_tail:
-            yield self._dec.decompress(self._dec.unconsumed_tail, _DECODE_STEP)
+        # Every corruption (both header forms failing, a bad later chunk, a bad
+        # tail) leaves as a transport error, never as a raw zlib exception.
+        try:
+            yield self._decompress(data)
+            while self._dec.unconsumed_tail:
+                yield self._dec.decompress(self._dec.unconsumed_tail, _DECODE_STEP)
+        except zlib.error as exc:
+            raise httpx.DecodingError(str(exc), request=self._request) from exc
+
+    def complete(self) -> bool:
+        return self._dec.eof
 
 
 class _BrotliDecoder:
     """br decoding, chunked via brotli's own output-buffer-limit growth cap."""
 
-    def __init__(self) -> None:
+    def __init__(self, request: httpx.Request) -> None:
         self._dec = brotli.Decompressor()
+        self._request = request
 
     def feed(self, data: bytes) -> Iterator[bytes]:
-        yield self._dec.process(data, output_buffer_limit=_DECODE_STEP)
-        while self._dec.can_accept_more_data():
-            yield self._dec.process(b"", output_buffer_limit=_DECODE_STEP)
+        try:
+            yield self._dec.process(data, output_buffer_limit=_DECODE_STEP)
+            # Drain what the output limit held back. An empty step means the
+            # decoder needs more input or has finished: stop, never spin.
+            while not self._dec.is_finished():
+                piece = self._dec.process(b"", output_buffer_limit=_DECODE_STEP)
+                if not piece:
+                    return
+                yield piece
+        except brotli.error as exc:
+            raise httpx.DecodingError(str(exc), request=self._request) from exc
+
+    def complete(self) -> bool:
+        return bool(self._dec.is_finished())
 
 
 def _decoder_for(content_encoding: str, request: httpx.Request) -> _StepDecoder:
@@ -159,11 +186,11 @@ def _decoder_for(content_encoding: str, request: httpx.Request) -> _StepDecoder:
     if value in ("", "identity"):
         return _IdentityDecoder()
     if value == "gzip":
-        return _ZlibDecoder(zlib.MAX_WBITS | 16)
+        return _ZlibDecoder(zlib.MAX_WBITS | 16, request)
     if value == "deflate":
         return _DeflateDecoder(request)
     if value == "br":
-        return _BrotliDecoder()
+        return _BrotliDecoder(request)
     raise httpx.DecodingError(f"unsupported content-encoding {value!r}", request=request)
 
 
@@ -173,10 +200,14 @@ def _cap(body: bytes, max_bytes: int) -> tuple[bytes, bool]:
 
 
 def _decode(body: bytes, encoding: str | None) -> str:
-    """Decode ``body`` with ``encoding``, or utf-8 if it is unknown. Never raises."""
+    """Decode ``body`` with ``encoding``, or utf-8 if it is unknown. Never raises.
+
+    ``LookupError`` covers unknown and non-text codecs; ``UnicodeError`` covers
+    codecs that refuse ``errors="replace"`` (``idna``, ``undefined``, ``punycode``).
+    """
     try:
         return body.decode(encoding or "utf-8", errors="replace")
-    except LookupError:
+    except (LookupError, UnicodeError):
         return body.decode("utf-8", errors="replace")
 
 
@@ -194,12 +225,13 @@ async def _read_capped(response: httpx.Response, max_bytes: int) -> tuple[bytes,
     before the cap is seen. Stops as soon as the decoded output — or the wire itself,
     for a stream that consumes input without producing output — passes the cap.
     """
-    content_encoding = response.headers.get("content-encoding", "identity")
-    decoder = _decoder_for(content_encoding, response.request)
     buf = bytearray()
     wire_read = 0
     truncated = False
     try:
+        # Inside the try: a rejected encoding must still release the connection.
+        content_encoding = response.headers.get("content-encoding", "identity")
+        decoder = _decoder_for(content_encoding, response.request)
         async for raw_chunk in response.aiter_raw():
             wire_read += len(raw_chunk)
             for piece in decoder.feed(raw_chunk):
@@ -211,6 +243,12 @@ async def _read_capped(response: httpx.Response, max_bytes: int) -> tuple[bytes,
             if truncated or wire_read > max_bytes:
                 truncated = True
                 break
+        if not truncated and wire_read and not decoder.complete():
+            # A compressed body that stops before the end of its own stream is
+            # damaged, not a short page: never hand it on as a complete one.
+            raise httpx.DecodingError(
+                "compressed body ended before the end of its stream", request=response.request
+            )
     finally:
         await response.aclose()
     body, was_cut = _cap(bytes(buf), max_bytes)
@@ -233,11 +271,24 @@ async def _fetch_primary(
     hops: list[str] = []
     request = client.build_request("GET", url, headers=hdrs)
     while True:
-        response = await client.send(request, stream=True, follow_redirects=False)
-        body, truncated = await _read_capped(response, max_bytes)
+        try:
+            response = await client.send(request, stream=True, follow_redirects=False)
+        except httpx.InvalidURL as exc:
+            # httpx builds next_request inside send(); a Location it cannot turn
+            # into a URL surfaces as InvalidURL, which is not an HTTPError.
+            raise httpx.RemoteProtocolError(
+                f"unusable redirect target: {exc}", request=request
+            ) from exc
+        decode_error: httpx.DecodingError | None = None
+        try:
+            body, truncated = await _read_capped(response, max_bytes)
+        except httpx.DecodingError as exc:
+            # The status line still decides gone and hard blocks when the body
+            # cannot be decoded; the decoding error surfaces only after that.
+            decode_error, body, truncated = exc, b"", False
         text = _decode(body, response.encoding)
 
-        # Gone (I6) is checked before block (I1): the two status sets are disjoint,
+        # Gone is checked before block: the two status sets are disjoint,
         # so this only decides the one overlapping case — a 404/410 whose body also
         # carries a WAF/CAPTCHA marker, which is a removed listing, not a block.
         detect_listing_gone(status_code=response.status_code, url=current)
@@ -250,7 +301,7 @@ async def _fetch_primary(
                 )
             next_request = response.next_request
             next_url = str(next_request.url)
-            if _origin(httpx.URL(next_url)) != _origin(httpx.URL(current)):
+            if _origin(next_request.url) != _origin(request.url):
                 await asyncio.to_thread(validate_public_url, next_url)
             hops.append(next_url)
             current = next_url
@@ -264,6 +315,8 @@ async def _fetch_primary(
         # Only a response that will not be followed reaches block detection and
         # status handling: the body of a followed redirect is never inspected.
         detect_block_event(status_code=response.status_code, body=text, url=current)
+        if decode_error is not None:
+            raise decode_error
         response.raise_for_status()
         return FetchedPage(
             url_requested=url,
@@ -328,7 +381,13 @@ async def fetch_page(
             continue
         if not (200 <= result.status < 300) or not text:
             continue
-        if httpx.URL(result.url_final).host != httpx.URL(url).host:
+        try:
+            final = httpx.URL(result.url_final)
+        except httpx.InvalidURL as exc:
+            raise UnsafeURLError(
+                f"fallback {fallback.name} returned an unusable url_final {result.url_final!r}"
+            ) from exc
+        if _origin(final) != _origin(httpx.URL(url)):
             await asyncio.to_thread(validate_public_url, result.url_final)
         logger.debug("fallback %s delivered the page", fallback.name)
         return FetchedPage(
