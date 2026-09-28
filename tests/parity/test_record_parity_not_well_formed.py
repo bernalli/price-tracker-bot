@@ -14,8 +14,6 @@ not need those other files to exist yet.
 from __future__ import annotations
 
 import copy
-import hashlib
-import inspect
 import json
 import subprocess
 import sys
@@ -26,10 +24,25 @@ import pytest
 from scripts import record_parity as rp
 
 from price_tracker.core import scraper_base as sb
-from price_tracker.core.pricegrammar import PriceContext, parse_price_text
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts" / "record_parity.py"
+
+# The four fixed literals of the fixture, at the value the parser at ``83a91f6`` (the
+# base commit this parity freeze pins) produced — the oracle, not a value read from the
+# live (now wired) code, which no longer represents the old behaviour.
+OLD_PARSE: dict[str | None, str | None] = {
+    None: None,
+    "$0.00": "0.00",
+    "1.234,56": "1234.56",
+    "kr. 89": "0.89",
+}
+OLD_DETECT: dict[str | None, str | None] = {
+    None: None,
+    "$0.00": "USD",
+    "1.234,56": None,
+    "kr. 89": "SEK",
+}
 
 
 def _build_valid() -> dict[str, Any]:
@@ -49,23 +62,21 @@ def _build_valid() -> dict[str, Any]:
         "generated": {"seed": "test-seed", "requested": requested, "inputs": generated},
     }
 
-    pp_source_sha = hashlib.sha256(inspect.getsource(sb.parse_price).encode()).hexdigest()
-    dc_source_sha = hashlib.sha256(inspect.getsource(sb.detect_currency).encode()).hexdigest()
     manifest: dict[str, Any] = {
         "schema": 1,
         "base_commit": "0" * 40,
         "functions": {
             "parse_price": {
                 "frozen": "price_tracker.core.scraper_base:parse_price",
-                "source_sha256": pp_source_sha,
-                "subject": "price_tracker.core.pricegrammar:parse_price_text",
-                "wired": False,
+                "source_sha256": "0" * 64,
+                "subject": "price_tracker.core.scraper_base:parse_price",
+                "wired": True,
             },
             "detect_currency": {
                 "frozen": "price_tracker.core.scraper_base:detect_currency",
-                "source_sha256": dc_source_sha,
-                "subject": None,
-                "wired": False,
+                "source_sha256": "0" * 64,
+                "subject": "price_tracker.core.scraper_base:detect_currency",
+                "wired": True,
             },
         },
     }
@@ -76,32 +87,67 @@ def _build_valid() -> dict[str, Any]:
         "schema": 1,
         "function": "parse_price",
         "count": len(full_inputs),
-        "rows": [{"input": s, "old": rp.serialize(sb.parse_price(s))} for s in full_inputs],
+        "rows": [
+            {
+                "input": s,
+                "old": OLD_PARSE[s] if s in OLD_PARSE else rp.serialize(sb.parse_price(s)),
+            }
+            for s in full_inputs
+        ],
     }
     frozen_dc: dict[str, Any] = {
         "schema": 1,
         "function": "detect_currency",
         "count": len(full_inputs),
-        "rows": [{"input": s, "old": rp.serialize(sb.detect_currency(s))} for s in full_inputs],
+        "rows": [
+            {
+                "input": s,
+                "old": OLD_DETECT[s] if s in OLD_DETECT else rp.serialize(sb.detect_currency(s)),
+            }
+            for s in full_inputs
+        ],
     }
 
-    exception_rows: list[dict[str, Any]] = []
+    exception_rows_pp: list[dict[str, Any]] = []
     for row in frozen_pp["rows"]:
         s, old = row["input"], row["old"]
-        new = None if s is None else rp.serialize(parse_price_text(s, PriceContext()))
+        if s not in OLD_PARSE:
+            continue
+        new = None if s is None else rp.serialize(sb.parse_price(s))
         if new == old:
             continue
-        kind, cls = rp.classify(s, old, new)
-        exception_rows.append(
+        kind, cls = rp.classify(s, old, new, function="parse_price")
+        exception_rows_pp.append(
             {"input": s, "old": old, "new": new, "kind": kind, "class": cls, "note": ""}
         )
-    assert exception_rows, "the fixture must exercise at least one divergence"
+    assert exception_rows_pp, "the fixture must exercise at least one parse_price divergence"
     exceptions_pp: dict[str, Any] = {
         "schema": 1,
         "function": "parse_price",
-        "subject": "price_tracker.core.pricegrammar:parse_price_text",
-        "count": len(exception_rows),
-        "rows": exception_rows,
+        "subject": "price_tracker.core.scraper_base:parse_price",
+        "count": len(exception_rows_pp),
+        "rows": exception_rows_pp,
+    }
+
+    exception_rows_dc: list[dict[str, Any]] = []
+    for row in frozen_dc["rows"]:
+        s, old = row["input"], row["old"]
+        if s not in OLD_DETECT:
+            continue
+        new = None if s is None else rp.serialize(sb.detect_currency(s))
+        if new == old:
+            continue
+        kind, cls = rp.classify(s, old, new, function="detect_currency")
+        exception_rows_dc.append(
+            {"input": s, "old": old, "new": new, "kind": kind, "class": cls, "note": ""}
+        )
+    assert exception_rows_dc, "the fixture must exercise at least one detect_currency divergence"
+    exceptions_dc: dict[str, Any] = {
+        "schema": 1,
+        "function": "detect_currency",
+        "subject": "price_tracker.core.scraper_base:detect_currency",
+        "count": len(exception_rows_dc),
+        "rows": exception_rows_dc,
     }
 
     return {
@@ -110,6 +156,7 @@ def _build_valid() -> dict[str, Any]:
         "frozen_pp": frozen_pp,
         "frozen_dc": frozen_dc,
         "exceptions_pp": exceptions_pp,
+        "exceptions_dc": exceptions_dc,
     }
 
 
@@ -142,7 +189,7 @@ def test_valid_corpus_loads(tmp_path: Path, valid: dict[str, Any]) -> None:
 def test_valid_manifest_loads(tmp_path: Path, valid: dict[str, Any]) -> None:
     path = _dump(tmp_path, "manifest.json", valid["manifest"])
     loaded = rp.load_manifest(path)
-    assert loaded["functions"]["parse_price"]["wired"] is False
+    assert loaded["functions"]["parse_price"]["wired"] is True
 
 
 def test_valid_frozen_loads(tmp_path: Path, valid: dict[str, Any]) -> None:
@@ -641,6 +688,185 @@ def test_n26_string_rows_is_rejected(tmp_path: Path, valid: dict[str, Any]) -> N
     path = _dump(tmp_path, "parse_price.frozen.json", bad)
     with pytest.raises(rp.ParityFormatError):
         rp.load_frozen(path)
+
+
+# ── N27/N28: the two class vocabularies do not cross ────────────────────────
+
+
+def test_n27_parse_price_class_in_detect_currency_exceptions_is_rejected(
+    tmp_path: Path, valid: dict[str, Any]
+) -> None:
+    manifest_path = _dump(tmp_path, "manifest.json", valid["manifest"])
+    manifest = rp.load_manifest(manifest_path)
+    frozen_path = _dump(tmp_path, "detect_currency.frozen.json", valid["frozen_dc"])
+    frozen = rp.load_frozen(frozen_path, manifest=manifest)
+
+    rows = copy.deepcopy(valid["exceptions_dc"]["rows"])
+    rows[0]["class"] = "zero"  # a parse_price-only class
+    bad = _mutated(valid["exceptions_dc"], rows=rows)
+    path = _dump(tmp_path, "detect_currency.exceptions.json", bad)
+    with pytest.raises(rp.ParityFormatError) as exc_info:
+        rp.load_exceptions(path, manifest=manifest, frozen=frozen)
+    assert exc_info.value.code == "exceptions_row_class_invalid"
+
+
+def test_n28_detect_currency_class_in_parse_price_exceptions_is_rejected(
+    tmp_path: Path, valid: dict[str, Any]
+) -> None:
+    manifest_path = _dump(tmp_path, "manifest.json", valid["manifest"])
+    manifest = rp.load_manifest(manifest_path)
+    frozen_path = _dump(tmp_path, "parse_price.frozen.json", valid["frozen_pp"])
+    frozen = rp.load_frozen(frozen_path, manifest=manifest)
+
+    rows = copy.deepcopy(valid["exceptions_pp"]["rows"])
+    rows[0]["class"] = "shared_symbol"  # a detect_currency-only class
+    bad = _mutated(valid["exceptions_pp"], rows=rows)
+    path = _dump(tmp_path, "parse_price.exceptions.json", bad)
+    with pytest.raises(rp.ParityFormatError) as exc_info:
+        rp.load_exceptions(path, manifest=manifest, frozen=frozen)
+    assert exc_info.value.code == "exceptions_row_class_invalid"
+
+
+# ── N29-N31: cmd_exceptions' tolerant note reading, in a subprocess ─────────
+
+
+def _write_cli_layout(root: Path, fn: str, frozen_rows: list[dict[str, Any]], subject: str) -> None:
+    parity_dir = root / "tests" / "parity"
+    parity_dir.mkdir(parents=True, exist_ok=True)
+    other = "detect_currency" if fn == "parse_price" else "parse_price"
+    manifest = {
+        "schema": 1,
+        "base_commit": "0" * 40,
+        "functions": {
+            fn: {
+                "frozen": f"price_tracker.core.scraper_base:{fn}",
+                "source_sha256": "0" * 64,
+                "subject": subject,
+                "wired": True,
+            },
+            other: {
+                "frozen": f"price_tracker.core.scraper_base:{other}",
+                "source_sha256": "0" * 64,
+                "subject": None,
+                "wired": False,
+            },
+        },
+    }
+    rp.write_json(parity_dir / "manifest.json", manifest)
+    frozen = {"schema": 1, "function": fn, "count": len(frozen_rows), "rows": frozen_rows}
+    rp.write_json(parity_dir / f"{fn}.frozen.json", frozen)
+
+
+def test_n29_exceptions_write_over_mismatched_subject_keeps_notes(tmp_path: Path) -> None:
+    _write_cli_layout(
+        tmp_path,
+        "parse_price",
+        [{"input": "kr. 89", "old": "0.89"}],
+        "price_tracker.core.scraper_base:parse_price",
+    )
+    parity_dir = tmp_path / "tests" / "parity"
+    existing = {
+        "schema": 1,
+        "function": "parse_price",
+        "subject": "price_tracker.core.scraper_base:some_other_subject",
+        "count": 1,
+        "rows": [
+            {
+                "input": "kr. 89",
+                "old": "0.89",
+                "new": "0.89",
+                "kind": "value",
+                "class": "token_with_dot",
+                "note": "the note to keep",
+            }
+        ],
+    }
+    rp.write_json(parity_dir / "parse_price.exceptions.json", existing)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "exceptions",
+            "parse_price",
+            "--write",
+            "--root",
+            str(tmp_path),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    written = json.loads((parity_dir / "parse_price.exceptions.json").read_text(encoding="utf-8"))
+    rows = {r["input"]: r for r in written["rows"]}
+    assert rows["kr. 89"]["note"] == "the note to keep"
+    assert written["subject"] == "price_tracker.core.scraper_base:parse_price"
+
+
+def test_n30_exceptions_write_over_rows_not_a_list_carries_no_notes(tmp_path: Path) -> None:
+    _write_cli_layout(
+        tmp_path,
+        "parse_price",
+        [{"input": "kr. 89", "old": "0.89"}],
+        "price_tracker.core.scraper_base:parse_price",
+    )
+    parity_dir = tmp_path / "tests" / "parity"
+    existing = {
+        "schema": 1,
+        "function": "parse_price",
+        "subject": "price_tracker.core.scraper_base:parse_price",
+        "count": 1,
+        "rows": "not a list",
+    }
+    rp.write_json(parity_dir / "parse_price.exceptions.json", existing)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "exceptions",
+            "parse_price",
+            "--write",
+            "--root",
+            str(tmp_path),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    written = json.loads((parity_dir / "parse_price.exceptions.json").read_text(encoding="utf-8"))
+    assert written["rows"]
+    assert all(row["note"] == "" for row in written["rows"])
+
+
+def test_n31_exceptions_write_over_invalid_json_fails_loudly(tmp_path: Path) -> None:
+    _write_cli_layout(
+        tmp_path,
+        "parse_price",
+        [{"input": "kr. 89", "old": "0.89"}],
+        "price_tracker.core.scraper_base:parse_price",
+    )
+    parity_dir = tmp_path / "tests" / "parity"
+    (parity_dir / "parse_price.exceptions.json").write_text("{not json", encoding="utf-8")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "exceptions",
+            "parse_price",
+            "--write",
+            "--root",
+            str(tmp_path),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode != 0
+    assert "JSONDecodeError" in result.stderr
 
 
 # ── the harvest plugin, in a subprocess (never in this test's own process) ─

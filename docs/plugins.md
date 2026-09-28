@@ -157,7 +157,7 @@ Run with `pytest tests/unit/scrapers/test_myshop.py -v`. Coverage target: ≥80%
 
 - **Use the injected `client`** — it carries the bot's timeout, retry policy, and user-agent rotation. Do not create your own `httpx.AsyncClient` inside `scrape()`.
 - **Return errors, do not raise** — `ProductInfo(error="...")` is logged and the domain is recorded in `scraper_health`. Raising anything other than `BlockEvent` or `ListingGone` will be caught by the scheduler but the error context is lost. Those two must be raised: swallowing them into a `ProductInfo` is what once let a blocking store suspend every product tracked on it, one message each, without ever tripping the circuit breaker.
-- **Use `parse_price()`** — handles thousands separators, currency symbols, comma decimals, and returns `Decimal | None`. Do not implement your own.
+- **Use `parse_price()`** — reads one visible price text (thousands separators, currency symbols, comma or dot decimals) and returns `Decimal | None`. A text that is not exactly one unambiguous price is `None`, never a guess; `parse_price(text, currency="EUR")` passes the currency you already know about the page, so that `"1.299"` reads as thousands. Do not implement your own.
 - **Keep imports lazy** — heavy dependencies (Selenium, headless browsers) should be imported inside `scrape()` after a feature check, so the bot starts even if the dep is missing.
 - **Cache nothing in the instance** — scrapers are singletons, so an unbounded dict on `self` is a memory leak.
 - **Do not call the registry from inside `scrape()`** — keeps plugins composable and lockfree.

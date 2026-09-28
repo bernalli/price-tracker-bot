@@ -424,8 +424,76 @@ VALUE_CLASSES: tuple[tuple[str, ValuePredicate], ...] = (
 )
 
 
-def classify(s: str | None, old: str | None, new: str | None) -> tuple[str, str]:
-    """Name a divergence: ``(kind, class)``; the first true predicate wins."""
+_URL_SHAPED_RE = re.compile(r"^https?://")
+_LETTER = r"[^\W\d_]"
+
+
+def _edge_tokens(s: str) -> list[tuple[str | None, frozenset[str] | None]]:
+    """The at most two edge tokens the currency engine sees, as ``(iso, candidates)``."""
+    from price_tracker.core.pricegrammar import _strip_currency_token  # noqa: PLC0415
+
+    out: list[tuple[str | None, frozenset[str] | None]] = []
+    residue, iso, candidates = _strip_currency_token(s.strip())
+    if iso is not None or candidates is not None:
+        out.append((iso, candidates))
+        _residue2, iso2, candidates2 = _strip_currency_token(residue)
+        if iso2 is not None or candidates2 is not None:
+            out.append((iso2, candidates2))
+    return out
+
+
+def _shared_symbol(s: str) -> bool:
+    return any(c is not None and len(c & ACCEPTED_CURRENCIES) > 1 for _iso, c in _edge_tokens(s))
+
+
+def _token_glued_to_word(s: str) -> bool:
+    for token in KNOWN_TOKENS:
+        if not (token[0].isalpha() or token[-1].isalpha()):
+            continue
+        if re.search(rf"{_LETTER}{re.escape(token)}|{re.escape(token)}{_LETTER}", s):
+            return True
+    return False
+
+
+def _token_inside(s: str) -> bool:
+    """An exact token strictly inside the text: the engine, which reads the edges only, sees none.
+
+    Decided on the text, not through the engine: a token at an edge that the engine failed to
+    read must fall through to ``loss_other`` and demand a note, never be filed here.
+    """
+    if _edge_tokens(s):
+        return False
+    stripped = s.strip()
+    match = EXACT_TOKEN_RE.search(stripped)
+    return match is not None and match.start() != 0 and match.end() != len(stripped)
+
+
+CurrencyPredicate = Callable[[str], bool]
+
+CURRENCY_LOSS_CLASSES: tuple[tuple[str, CurrencyPredicate], ...] = (
+    ("url_shaped", lambda s: _URL_SHAPED_RE.match(s) is not None),
+    ("two_tokens", lambda s: len(KNOWN_TOKEN_RE.findall(s)) >= 2),
+    ("token_glued_to_word", _token_glued_to_word),
+    ("token_case", lambda s: EXACT_TOKEN_RE.search(s) is None),
+    ("residual_words", _has_residual_words),
+    ("shared_symbol", _shared_symbol),
+    ("token_inside", _token_inside),
+)
+CURRENCY_VALUE_CLASSES: tuple[tuple[str, CurrencyPredicate], ...] = (
+    ("symbol_superseded", lambda s: any(c is not None for _iso, c in _edge_tokens(s))),
+)
+CURRENCY_GAIN_CLASSES: tuple[tuple[str, CurrencyPredicate], ...] = (
+    ("symbol_added", lambda s: any(c is not None for _iso, c in _edge_tokens(s))),
+    ("iso_code_added", lambda s: any(iso is not None for iso, _c in _edge_tokens(s))),
+)
+
+
+def classify(
+    s: str | None, old: str | None, new: str | None, *, function: str = "parse_price"
+) -> tuple[str, str]:
+    """Name a divergence of ``function``: ``(kind, class)``; the first true predicate wins."""
+    if function not in KNOWN_FUNCTIONS:
+        raise ValueError(f"unknown function {function!r}")
     if old is not None and new is not None:
         kind, fallback = "value", "value_other"
     elif old is None:
@@ -433,6 +501,16 @@ def classify(s: str | None, old: str | None, new: str | None) -> tuple[str, str]
     else:
         kind, fallback = "loss", "loss_other"
     if s is None:
+        return kind, fallback
+    if function == "detect_currency":
+        table = {
+            "loss": CURRENCY_LOSS_CLASSES,
+            "value": CURRENCY_VALUE_CLASSES,
+            "gain": CURRENCY_GAIN_CLASSES,
+        }[kind]
+        for name, currency_predicate in table:
+            if currency_predicate(s):
+                return kind, name
         return kind, fallback
     if kind in ("value", "gain"):
         for name, value_predicate in VALUE_CLASSES:
@@ -446,14 +524,23 @@ def classify(s: str | None, old: str | None, new: str | None) -> tuple[str, str]
     return kind, fallback
 
 
-ALL_CLASSES: dict[str, frozenset[str]] = {
-    "loss": frozenset({name for name, _ in LOSS_CLASSES}) | {"loss_other"},
-    "value": frozenset({name for name, _ in VALUE_CLASSES}) | {"value_other"},
-    "gain": frozenset({name for name, _ in VALUE_CLASSES}) | {"gain_other"},
+ALL_CLASSES: dict[str, dict[str, frozenset[str]]] = {
+    "parse_price": {
+        "loss": frozenset({name for name, _ in LOSS_CLASSES}) | {"loss_other"},
+        "value": frozenset({name for name, _ in VALUE_CLASSES}) | {"value_other"},
+        "gain": frozenset({name for name, _ in VALUE_CLASSES}) | {"gain_other"},
+    },
+    "detect_currency": {
+        "loss": frozenset({name for name, _ in CURRENCY_LOSS_CLASSES}) | {"loss_other"},
+        "value": frozenset({name for name, _ in CURRENCY_VALUE_CLASSES}) | {"value_other"},
+        "gain": frozenset({name for name, _ in CURRENCY_GAIN_CLASSES}) | {"gain_other"},
+    },
 }
 
 
 # --- Section 3.4: format errors, loaders, writer ---
+
+KNOWN_FUNCTIONS = ("parse_price", "detect_currency")
 
 
 class ParityFormatError(Exception):
@@ -469,8 +556,6 @@ class ParityFormatError(Exception):
         self.code = code
         self.detail = detail
 
-
-KNOWN_FUNCTIONS = ("parse_price", "detect_currency")
 
 CORPUS_KEYS = {"schema", "count", "harvested", "curated", "generated"}
 GENERATED_KEYS = {"seed", "requested", "inputs"}
@@ -801,7 +886,7 @@ def load_exceptions(
         if kind != kind_expected:
             raise ParityFormatError("exceptions_row_kind_incoherent", repr((value_input, kind)))
         cls = row["class"]
-        allowed = ALL_CLASSES.get(kind, frozenset())
+        allowed = ALL_CLASSES[function].get(kind, frozenset())
         if type(cls) is not str or cls not in allowed:
             raise ParityFormatError("exceptions_row_class_invalid", repr((kind, cls)))
         note = row["note"]
@@ -1072,8 +1157,13 @@ def cmd_exceptions(args: argparse.Namespace) -> int:
     exc_path = _exceptions_path(root, fn)
     existing_notes: dict[str | None, str] = {}
     if exc_path.exists():
-        existing = load_exceptions(exc_path, manifest=manifest, frozen=frozen)
-        existing_notes = {row["input"]: row["note"] for row in existing["rows"]}
+        # Only the notes are reused: the file is about to be rewritten, and the tests, not
+        # this command, judge whether it is well formed.
+        raw = json.loads(exc_path.read_text(encoding="utf-8"))
+        raw_rows = raw.get("rows", []) if isinstance(raw, dict) else []
+        for raw_row in raw_rows if isinstance(raw_rows, list) else []:
+            if isinstance(raw_row, dict) and isinstance(raw_row.get("note"), str):
+                existing_notes[raw_row.get("input")] = raw_row["note"]
 
     rows = []
     for row in frozen["rows"]:
@@ -1082,7 +1172,7 @@ def cmd_exceptions(args: argparse.Namespace) -> int:
         new = None if s is None else serialize(_call_subject(subject, s))
         if new == old:
             continue
-        kind, cls = classify(s, old, new)
+        kind, cls = classify(s, old, new, function=fn)
         rows.append(
             {
                 "input": s,
@@ -1137,7 +1227,7 @@ def cmd_diff(args: argparse.Namespace) -> int:
         if new == old:
             same += 1
             continue
-        kind, cls = classify(s, old, new)
+        kind, cls = classify(s, old, new, function=fn)
         if kind == "loss":
             loss += 1
         elif kind == "value":

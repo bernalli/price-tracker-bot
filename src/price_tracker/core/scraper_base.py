@@ -7,11 +7,12 @@ import random
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from decimal import Decimal, InvalidOperation
 from typing import TYPE_CHECKING, ClassVar
 from urllib.parse import urlparse
 
 if TYPE_CHECKING:
+    from decimal import Decimal
+
     import httpx
     from bs4 import BeautifulSoup, Tag
 
@@ -67,128 +68,55 @@ def get_headers(extra: dict[str, str] | None = None) -> dict[str, str]:
 
 # ── Price parsing (returns Decimal, never float) ──────────────────
 
-# Trailing German "no cents" marker: "349,-" / "1.299,-" → keep the separator, drop the dash.
-_NO_CENTS_RE = re.compile(r"([.,])\s*-\s*$")
-# Anything that is NOT a digit or a thousands/decimal separator. Strips currency symbols
-# and labels (€, $, zł, Kč, kr, EUR, ...), spaces, thin/zero-width spaces and stray chars.
-_NON_NUMERIC_RE = re.compile(r"[^\d.,']")
+# The price core (``pricegrammar``, ``currencies``, ``money``) is imported inside the two
+# functions below, not at module level: ``core/fetch.py`` imports this module for block
+# detection and must stay free of the price core (``test_fetch_import_is_layer_clean``).
 
 
-def _to_decimal(s: str) -> Decimal | None:
-    try:
-        return Decimal(s)
-    except (InvalidOperation, ValueError):
-        return None
+def parse_price(price_str: str | None, *, currency: str | None = None) -> Decimal | None:
+    """Read one visible price text into a ``Decimal``, or return ``None``.
 
-
-def _is_thousands_grouping(groups: list[str]) -> bool:
-    """True if `groups` form a valid thousands grouping: first 1–3 digits, the rest exactly 3."""
-    if len(groups) < 2 or not groups[0] or len(groups[0]) > 3 or not groups[0].isdigit():
-        return False
-    return all(len(g) == 3 and g.isdigit() for g in groups[1:])
-
-
-def parse_price(price_str: str | None) -> Decimal | None:
-    """Parse a price string in arbitrary international format into Decimal.
-
-    Handles EU comma-decimal, US comma-thousands, Swiss apostrophe, EU/US thousands
-    with NO decimal part, German "349,-" notation, and currency labels/symbols mixed
-    in (€, $, zł, Kč, kr, ISO codes).
-
-    Disambiguation: a lone separator followed by exactly three digits (e.g. "1.299"
-    or "1,234") is read as thousands grouping, NOT a three-decimal fraction — retail
-    prices never carry three decimals, while EU dot-thousands integers ("1.299 €" =
-    1299) are extremely common. (Trade-off: 3-decimal niche prices like fuel/crypto
-    are out of scope for this e-commerce tracker.)
+    Delegates to the price grammar (``pricegrammar.parse_price_text``) as visible
+    text. ``currency`` is what the caller already knows about the page — an accepted
+    ISO 4217 code, or ``None`` — and only fixes the precision: a token in the text
+    that contradicts it makes the text unreadable, and a value that is not an
+    accepted code is ignored. Anything that is not exactly one unambiguous price is
+    rejected, never guessed: signs, exponents, ranges, residual words, a second
+    number, mixed grouping, zero, and a lone separator followed by three digits
+    with no currency (``"1,234"``, ``"12.345"``). Every row of the previous parser
+    that this rejects or reads differently is listed in
+    ``tests/parity/parse_price.exceptions.json``.
     """
-    if not price_str:
+    from price_tracker.core.money import ACCEPTED_CURRENCIES  # noqa: PLC0415
+    from price_tracker.core.pricegrammar import PriceContext, parse_price_text  # noqa: PLC0415
+
+    if price_str is None:
         return None
-
-    # "349,-" → "349," so the integer survives the rest of the pipeline.
-    s = _NO_CENTS_RE.sub(r"\1", price_str)
-    cleaned = _NON_NUMERIC_RE.sub("", s)
-    cleaned = cleaned.replace("'", "")  # Swiss apostrophe is always a thousands sep.
-    if not cleaned:
-        return None
-
-    has_dot = "." in cleaned
-    has_comma = "," in cleaned
-
-    # No separators → plain integer.
-    if not has_dot and not has_comma:
-        return _to_decimal(cleaned)
-
-    # Both separators present → whichever appears LAST is the decimal point.
-    if has_dot and has_comma:
-        if cleaned.rfind(".") > cleaned.rfind(","):
-            # US: dot decimal, comma thousands.
-            return _to_decimal(cleaned.replace(",", ""))
-        # EU: comma decimal, dot thousands.
-        last = cleaned.rfind(",")
-        whole = cleaned[:last].replace(".", "").replace(",", "")
-        return _to_decimal(whole + "." + cleaned[last + 1 :])
-
-    # Exactly one kind of separator present.
-    sep = "." if has_dot else ","
-    if cleaned.count(sep) == 1:
-        before, after = cleaned.split(sep)
-        # >3 trailing digits is neither a 2-decimal fraction nor a 3-digit thousands
-        # group — typically a split-span concatenation ("$1,299"+"99" → "1,29999").
-        # Reject so the scraper can fall back to a reliable source (bug #12).
-        if len(after) > 3:
-            return None
-        # Lone separator + exactly 3 trailing digits + non-zero leading group → thousands.
-        if len(after) == 3 and after.isdigit() and before[:1] not in ("", "0"):
-            return _to_decimal(before + after)
-        return _to_decimal(before + "." + after)
-
-    # Multiple separators of the same kind.
-    groups = cleaned.split(sep)
-    if sep == ",":
-        # US thousands only if every group lines up ("1,234,567"); otherwise the last
-        # comma is an EU decimal ("5,250,00" → 5250.00).
-        if _is_thousands_grouping(groups):
-            return _to_decimal(cleaned.replace(",", ""))
-        last = cleaned.rfind(",")
-        return _to_decimal(cleaned[:last].replace(",", "") + "." + cleaned[last + 1 :])
-    # Multiple dots: only valid as EU thousands grouping, else malformed ("1.2.3.4").
-    if _is_thousands_grouping(groups):
-        return _to_decimal(cleaned.replace(".", ""))
-    return None
+    known = currency if isinstance(currency, str) and currency in ACCEPTED_CURRENCIES else None
+    return parse_price_text(price_str, PriceContext(currency=known))
 
 
 # ── Currency detection ───────────────────────────────────────────
 
-_CURRENCY_SIGNS: list[tuple[str, str]] = [
-    # Order matters: longer matches first (CHF before generic letter triggers)
-    ("CHF", "CHF"),
-    ("EUR", "EUR"),
-    ("USD", "USD"),
-    ("GBP", "GBP"),
-    ("JPY", "JPY"),
-    ("SEK", "SEK"),
-    ("NOK", "NOK"),
-    ("DKK", "DKK"),
-    ("PLN", "PLN"),
-    ("CZK", "CZK"),
-    ("€", "EUR"),
-    ("$", "USD"),
-    ("£", "GBP"),
-    ("¥", "JPY"),
-    ("zł", "PLN"),
-    ("kr", "SEK"),  # 'kr' last — overlaps with NOK/DKK; ambiguous, default SEK
-]
-
 
 def detect_currency(text: str | None) -> str | None:
-    """Detect ISO-4217 currency code from a string. Returns None if unknown."""
-    if not text:
-        return None
-    upper = text.upper()
-    for sign, code in _CURRENCY_SIGNS:
-        if sign.upper() in upper:
-            return code
-    return None
+    """Detect the ISO 4217 code named by a currency field or a price text, or ``None``.
+
+    A field that is exactly one accepted code (any case, surrounding whitespace
+    ignored) is that code. Otherwise the currency engine reads the text
+    (``currencies.detect_currency``) with no expectation: at most one token at each
+    end of the text, and a symbol shared by several currencies (``$``, ``¥``,
+    ``kr``) yields ``None`` rather than a default. Nothing is searched inside the
+    text. Every row of the previous detector that this reads differently is listed
+    in ``tests/parity/detect_currency.exceptions.json``.
+    """
+    from price_tracker.core import currencies  # noqa: PLC0415
+    from price_tracker.core.money import normalize_currency_code  # noqa: PLC0415
+
+    code = normalize_currency_code(text)
+    if code is not None:
+        return code
+    return currencies.detect_currency(text)
 
 
 # ── JSON-LD offer selection (shared across scrapers) ─────────────
