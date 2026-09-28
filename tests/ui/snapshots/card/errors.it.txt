@@ -4,7 +4,7 @@
 # now: 2026-03-01T12:00:00Z
 text:
    | 📦 <b>⁨Running Shoes — size 44⁩</b>
-   | shop.example.com · #51 · attivo
+   | ⁨shop.example.com⁩ · #51 · attivo
    | 
    | 💰 Ora: —
    | 📌 Inizio: 34,50 €

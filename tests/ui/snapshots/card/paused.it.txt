@@ -4,7 +4,7 @@
 # now: 2026-03-01T12:00:00Z
 text:
    | 📦 <b>⁨Coffee Grinder G5⁩</b>
-   | shop.example.com · #43 · in pausa
+   | ⁨shop.example.com⁩ · #43 · in pausa
    | 
    | 💰 Ora: 89,90 €
    | 📌 Inizio: 88,05 € · ▲ 2,1%

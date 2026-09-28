@@ -4,7 +4,7 @@
 # now: 2026-03-01T12:00:00Z
 text:
    | 📦 <b>⁨Desk Lamp⁩</b>
-   | shop.example.com · #60 · active
+   | ⁨shop.example.com⁩ · #60 · active
    | 
    | 💰 Now: $1,299.99 ≈ €1,180.00
    | 📌 Start: $1,299.99

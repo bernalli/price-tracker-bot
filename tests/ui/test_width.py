@@ -12,26 +12,27 @@ from hypothesis import strategies as st
 from price_tracker.bot.ui.width import display_width, sanitize_label, truncate_to_width
 from tests.ui.conftest import hostile_text
 
-# Known, declared divergences between D8 (price_tracker.bot.ui.width) and the
-# wcwidth 0.9.1 oracle. D8 never *under*estimates on any single assigned,
-# non-Cf code point (test_display_width_never_below_wcwidth_on_every_assigned_code_point
-# proves that exhaustively); these are the classes where it *over*estimates,
-# or where the two tables disagree only on a Cf code point that D8 counts as
-# zero-width and wcwidth counts as one cell.
+# Known divergences between display_width (price_tracker.bot.ui.width) and
+# the wcwidth 0.9.1 oracle. display_width never *under*estimates on any
+# single assigned, non-Cf code point
+# (test_display_width_never_below_wcwidth_on_every_assigned_code_point proves
+# that exhaustively); these are the classes where it *over*estimates, or
+# where the two tables disagree only on a Cf code point that display_width
+# counts as zero-width and wcwidth counts as one cell.
 KNOWN_DISAGREEMENTS: dict[str, tuple[int, int]] = {
-    # The three East-Asian-Width-Neutral wide blocks: D8 counts every code
+    # The three East-Asian-Width-Neutral wide blocks: display_width counts every code
     # point in range 2; wcwidth's 18.0.0 tables give the unassigned/So ones 1.
     "U+2300 (misc technical block)": (display_width("⌀"), wcwidth.wcswidth("⌀")),
     "U+2600 (misc symbols block)": (display_width("☀"), wcwidth.wcswidth("☀")),
     "U+2B00 (misc symbols/arrows block)": (display_width("⬀"), wcwidth.wcswidth("⬀")),
-    # A flag (two regional indicators): D8 sums each indicator at 2 (both are
+    # A flag (two regional indicators): display_width sums each indicator at 2 (both are
     # inside the wide emoji block); wcwidth treats the pair as one 2-cell
     # glyph.
     "regional indicator pair (flag)": (
         display_width("\U0001f1ee\U0001f1f9"),
         wcwidth.wcswidth("\U0001f1ee\U0001f1f9"),
     ),
-    # An emoji plus a skin-tone modifier: D8 sums both at 2 each; wcwidth
+    # An emoji plus a skin-tone modifier: display_width sums both at 2 each; wcwidth
     # renders the modifier as part of one 2-cell glyph.
     "emoji + skin-tone modifier": (
         display_width("\U0001f44b\U0001f3fd"),
@@ -39,8 +40,8 @@ KNOWN_DISAGREEMENTS: dict[str, tuple[int, int]] = {
     ),
 }
 
-# Cf code points where raw wcwidth.wcwidth() counts 1 cell and D8 counts 0.
-# Declared limit (§0 D8): the "never underestimate" guarantee is scoped to
+# Cf code points where raw wcwidth.wcwidth() counts 1 cell and display_width
+# counts 0. Known limit: the "never underestimate" guarantee is scoped to
 # wcwidth_oracle(), which strips every Cf before comparing (a Cf is never
 # rendered as a visible cell in the first place), so these do not violate
 # it — they are exactly why Cf is stripped.
@@ -64,7 +65,7 @@ def wcwidth_oracle(text: str) -> int:
     return wcwidth.wcswidth(_strip_invisible(text))
 
 
-# --- display_width: pinned table (P15/P16) ----------------------------------
+# --- display_width: pinned table ---------------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -163,7 +164,7 @@ def test_display_width_never_below_wcwidth_on_every_assigned_code_point() -> Non
         )
 
 
-# --- truncate_to_width: property 4 --------------------------------------------
+# --- truncate_to_width: budget and cluster properties -------------------------
 
 
 def test_truncate_fits_unchanged() -> None:

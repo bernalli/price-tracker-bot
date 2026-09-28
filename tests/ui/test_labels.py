@@ -109,7 +109,7 @@ def test_layout_rows_never_crosses_a_group_boundary() -> None:
     assert ("a", "b") not in row_callbacks
 
 
-# --- layout_rows: property 5 --------------------------------------------------
+# --- layout_rows: row invariants ----------------------------------------------
 
 _LABEL_TEXT = st.text(
     alphabet=st.characters(min_codepoint=0x21, max_codepoint=0x7E), min_size=1, max_size=60

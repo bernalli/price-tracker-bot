@@ -76,12 +76,15 @@ def money(amount: Decimal, currency: str, *, locale: str) -> str:
 def delta(old: Decimal, new: Decimal, currency: str, *, locale: str) -> str:
     """``▼``/``▲`` plus the absolute change, or ``""`` when ``old == new``."""
     babel_locale(locale)
+    checked_currency = _check_currency(currency)
     checked_old = _require_amount("old", old)
     checked_new = _require_amount("new", new)
     if checked_new < checked_old:
-        return f"{_CHANGE_DOWN} {money(checked_old - checked_new, currency, locale=locale)}"
+        difference = money(checked_old - checked_new, checked_currency, locale=locale)
+        return f"{_CHANGE_DOWN} {difference}"
     if checked_new > checked_old:
-        return f"{_CHANGE_UP} {money(checked_new - checked_old, currency, locale=locale)}"
+        difference = money(checked_new - checked_old, checked_currency, locale=locale)
+        return f"{_CHANGE_UP} {difference}"
     return ""
 
 

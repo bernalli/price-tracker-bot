@@ -4,7 +4,7 @@
 # now: 2026-03-01T12:00:00Z
 text:
    | [📦 <b>⁨Desk Lamp⁩</b> 📦 <b>⁨Desk Lamp⁩</b> 📦 <b>⁨Desk Lamp⁩</b>]
-   | [shop.example.com · #60 · [active active active] shop.example.com · #60 · [active active active] shop.example.com · #60 · [active active active]]
+   | [⁨shop.example.com⁩ · #60 · [active active active] ⁨shop.example.com⁩ · #60 · [active active active] ⁨shop.example.com⁩ · #60 · [active active active]]
    | 
    | [💰 Now: US$ 1.299,99 ≈ € 1.180,00 💰 Now: US$ 1.299,99 ≈ € 1.180,00 💰 Now: US$ 1.299,99 ≈ € 1.180,00]
    | [📌 Start: US$ 1.299,99 📌 Start: US$ 1.299,99 📌 Start: US$ 1.299,99]

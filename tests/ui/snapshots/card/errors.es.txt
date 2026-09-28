@@ -4,7 +4,7 @@
 # now: 2026-03-01T12:00:00Z
 text:
    | [📦 <b>⁨Running Shoes — size 44⁩</b> 📦 <b>⁨Running Shoes — size 44⁩</b> 📦 <b>⁨Running Shoes — size 44⁩</b>]
-   | [shop.example.com · #51 · [active active active] shop.example.com · #51 · [active active active] shop.example.com · #51 · [active active active]]
+   | [⁨shop.example.com⁩ · #51 · [active active active] ⁨shop.example.com⁩ · #51 · [active active active] ⁨shop.example.com⁩ · #51 · [active active active]]
    | 
    | [💰 Now: — 💰 Now: — 💰 Now: —]
    | [📌 Start: 34,50 € 📌 Start: 34,50 € 📌 Start: 34,50 €]

@@ -19,10 +19,10 @@ if TYPE_CHECKING:
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _CARD_ROOT = _REPO_ROOT / "src/price_tracker/bot/ui"
 # The two locales with a real, hand-translated catalog; the rest of
-# SUPPORTED_LOCALES gets a pseudo-catalog (§3.13).
+# SUPPORTED_LOCALES gets a pseudo-catalog.
 _PSEUDO_LOCALES: Final = tuple(code for code in SUPPORTED_LOCALES if code not in ("en", "it"))
 
-# Fixed code point ranges, stable between Unicode 14 and 15.1 (P15), so a
+# Fixed code point ranges, stable between Unicode 14 and 15.1, so a
 # hostile string generated on one CI matrix leg means the same thing on
 # another: ASCII printable (includes < > & " '), CJK, hiragana/katakana,
 # hangul, Arabic, Hebrew, three emoji blocks, skin-tone modifiers, ZWJ, VS16,

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+import json
 import string
-import subprocess
 from pathlib import Path
 
 from babel.messages.pofile import read_po
@@ -16,6 +16,10 @@ _PO_PATHS = {
     "it_IT": _REPO_ROOT / "src/price_tracker/locale/it_IT/LC_MESSAGES/messages.po",
     "en": _REPO_ROOT / "src/price_tracker/locale/en/LC_MESSAGES/messages.po",
 }
+# Every entry the two catalogs held before the card entries were appended, as
+# {id, string} pairs (plural ids and strings are lists). A translation that
+# changes on purpose is changed here in the same commit, in the open.
+_BASELINE_PATH = Path(__file__).parent / "fixtures" / "catalog_baseline.json"
 
 
 def _placeholders(text: str) -> set[str]:
@@ -59,21 +63,21 @@ def test_po_files_have_no_fuzzy_and_no_obsolete() -> None:
             assert len(list(catalog)) == 195
 
 
-def test_po_old_msgids_unchanged_from_head() -> None:
+def _as_key(value: str | tuple[str, ...] | list[str] | None) -> str | tuple[str, ...] | None:
+    return tuple(value) if isinstance(value, (tuple, list)) else value
+
+
+def test_pre_existing_entries_match_the_pinned_baseline() -> None:
+    baseline = json.loads(_BASELINE_PATH.read_text(encoding="utf-8"))
     for locale, path in _PO_PATHS.items():
-        rel_path = path.relative_to(_REPO_ROOT).as_posix()
-        head_bytes = subprocess.run(
-            ["git", "show", f"HEAD:{rel_path}"],
-            cwd=_REPO_ROOT,
-            capture_output=True,
-            check=True,
-        ).stdout
-        old_catalog = read_po(head_bytes.split(b"\n"))
         with path.open("rb") as handle:
-            new_catalog = read_po(handle)
-        new_by_id = {message.id: message for message in new_catalog}
-        for old_message in old_catalog:
-            new_message = new_by_id.get(old_message.id)
-            assert new_message is not None, (locale, old_message.id)
-            assert new_message.string == old_message.string, (locale, old_message.id)
-            assert not new_message.fuzzy, (locale, old_message.id)
+            catalog = read_po(handle)
+        by_id = {_as_key(message.id): message for message in catalog if message.id}
+        expected_entries = baseline[locale]
+        assert len(expected_entries) > 0, locale
+        for entry in expected_entries:
+            key = _as_key(entry["id"])
+            message = by_id.get(key)
+            assert message is not None, (locale, key)
+            assert _as_key(message.string) == _as_key(entry["string"]), (locale, key)
+            assert not message.fuzzy, (locale, key)

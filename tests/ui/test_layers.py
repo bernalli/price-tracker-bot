@@ -1,10 +1,10 @@
-"""AST-enforced layer boundaries for i18n/, bot/ui/ and app/views.py (D12).
+"""AST-enforced layer boundaries for i18n/, bot/ui/ and app/views.py.
 
-There is no ``.importlinter`` on this branch (§0: creating one now would
-need the still-empty ``charts/``/``notifier/render.py`` modules and the
-``import-linter`` dependency — that is tooling PR territory). This test
-reproduces the same ``ui-pure``/``leaves`` boundary for exactly the three
-packages this PR adds, by walking the AST of each file instead.
+There is no import-linter configuration in the repository yet, so the
+``ui-pure``/``leaves`` boundary of these three packages is enforced here by
+walking the AST of each file: ``i18n`` stays a leaf (stdlib and Babel only),
+``bot/ui`` never reaches Telegram, storage, the scheduler or the notifier,
+and ``app/views`` never reaches the bot package.
 """
 
 from __future__ import annotations
@@ -15,15 +15,22 @@ import sys
 from pathlib import Path
 from typing import Final
 
+import pytest
+
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SRC_ROOT = _REPO_ROOT / "src"
 _PACKAGE_ROOT = _SRC_ROOT / "price_tracker"
 
-# The PR that moves the gettext runtime into price_tracker.i18n empties this
-# set; the test then requires it to be empty (D11).
+# The gettext runtime still lives in price_tracker.bot.messages; once it moves
+# into price_tracker.i18n this set becomes empty and the test below requires
+# exactly that.
 TRANSITIONAL_IMPORTS: Final = frozenset({"price_tracker.bot.messages"})
 
 _STDLIB: Final = frozenset(sys.stdlib_module_names)
+
+# Modules that import at run time: any import of them, under any alias, is a
+# way around the static scan and is rejected outright in these packages.
+_DYNAMIC_IMPORT_MODULES: Final = frozenset({"importlib", "builtins"})
 
 
 def _module_dotted_name(path: Path) -> tuple[str, bool]:
@@ -61,7 +68,10 @@ def _resolved_imports(tree: ast.Module, module_dotted: str, is_init: bool) -> li
 
 
 def _dynamic_import_usages(tree: ast.Module) -> list[str]:
-    """Any ``Name``/``Attribute`` node resolving to ``importlib`` or ``__import__``."""
+    """Every run-time import path: a ``Name`` resolving to ``importlib`` or
+    ``__import__``, an ``Attribute`` chain rooted in ``importlib``, or any
+    ``import``/``from ... import`` of ``importlib`` or ``builtins`` under
+    whatever alias."""
     found: list[str] = []
     for node in ast.walk(tree):
         if isinstance(node, ast.Name) and node.id in ("importlib", "__import__"):
@@ -72,6 +82,19 @@ def _dynamic_import_usages(tree: ast.Module) -> list[str]:
                 base = base.value  # type: ignore[assignment]
             if isinstance(base, ast.Name) and base.id == "importlib":
                 found.append("importlib")
+        elif isinstance(node, ast.Import):
+            found.extend(
+                alias.name
+                for alias in node.names
+                if alias.name.split(".")[0] in _DYNAMIC_IMPORT_MODULES
+            )
+        elif (
+            isinstance(node, ast.ImportFrom)
+            and node.level == 0
+            and node.module
+            and node.module.split(".")[0] in _DYNAMIC_IMPORT_MODULES
+        ):
+            found.append(node.module)
     return found
 
 
@@ -187,8 +210,8 @@ def test_app_views_boundaries() -> None:
 
 
 def test_transitional_imports_names_bot_messages_only() -> None:
-    # Documents D11: the runtime-move PR empties this constant and this
-    # assertion then requires exactly that.
+    # Moving the gettext runtime into price_tracker.i18n empties this constant,
+    # and this assertion is the one to update when that happens.
     assert frozenset({"price_tracker.bot.messages"}) == TRANSITIONAL_IMPORTS
 
 
@@ -210,6 +233,19 @@ def test_scan_flags_a_dynamic_telegram_import(tmp_path: Path) -> None:
     tree = ast.parse(module.read_text(encoding="utf-8"), filename=str(module))
     violations = _check_dynamic_imports(tree, "leaky_dynamic.py")
     assert violations, "the scan did not flag a dynamic import via importlib"
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        'from importlib import import_module\nimport_module("telegram")\n',
+        'import importlib as il\nil.import_module("telegram")\n',
+        'import builtins\nbuiltins.__import__("telegram")\n',
+    ],
+)
+def test_scan_flags_every_aliased_dynamic_import(source: str) -> None:
+    tree = ast.parse(source)
+    assert _check_dynamic_imports(tree, "leaky_alias.py"), source
 
 
 def test_scan_flags_a_forbidden_non_babel_import_in_i18n(tmp_path: Path) -> None:

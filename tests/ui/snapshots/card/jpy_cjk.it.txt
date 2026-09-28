@@ -4,7 +4,7 @@
 # now: 2026-03-01T12:00:00Z
 text:
    | 📦 <b>⁨電動歯ブラシ プレミアム⁩</b>
-   | shop.example.com · #47 · attivo
+   | ⁨shop.example.com⁩ · #47 · attivo
    | 
    | 💰 Ora: 12.800 JPY
    | 📌 Inizio: 13.500 JPY · ▼ 5,2%

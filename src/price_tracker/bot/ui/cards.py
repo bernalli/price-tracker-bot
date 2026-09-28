@@ -31,14 +31,25 @@ class CardActions:
     back: str
 
 
+def _isolated(text: str) -> str:
+    """Wrap in U+2068 FIRST STRONG ISOLATE / U+2069 POP DIRECTIONAL ISOLATE.
+
+    A hostile or right-to-left value is laid out on its own and can no longer
+    reorder the text that follows it on the same row.
+    """
+    return f"\u2068{text}\u2069"
+
+
 def _name_value(view: ProductView) -> str:
     if not view.name:
         return escape_html(_("Product #{product_id}").format(product_id=view.id))
-    truncated = truncate_to_width(view.name, NAME_BUDGET)
-    # U+2068 FIRST STRONG ISOLATE / U+2069 POP DIRECTIONAL ISOLATE: keep a
-    # hostile or right-to-left product name from reordering the rest of the
-    # card's text around it.
-    return f"⁨{escape_html(truncated)}⁩"
+    return _isolated(escape_html(truncate_to_width(view.name, NAME_BUDGET)))
+
+
+def _domain_value(view: ProductView) -> str:
+    if not view.domain:
+        return ""
+    return _isolated(escape_html(truncate_to_width(view.domain, DOMAIN_BUDGET)))
 
 
 def _name_line(view: ProductView) -> str:
@@ -133,7 +144,7 @@ def product_card(view: ProductView, actions: CardActions, *, now: datetime) -> S
     lines = [
         _name_line(view),
         _("{domain} · #{id} · {status}").format(
-            domain=escape_html(truncate_to_width(view.domain, DOMAIN_BUDGET)),
+            domain=_domain_value(view),
             id=view.id,
             status=_status_word(view.status),
         ),

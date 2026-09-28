@@ -120,7 +120,7 @@ def test_card_snapshot(case: tuple[str, str], ui_locales: Path) -> None:
     compare_or_update(path, content)
 
 
-# --- pseudo_locale: its own properties (§4.5) -------------------------------
+# --- pseudo_locale: its own properties ---------------------------------------
 
 
 def _placeholders(text: str) -> set[str]:
@@ -133,9 +133,9 @@ def test_pseudo_catalog_contains_exactly_the_29_card_msgids() -> None:
     singular_ids = {m.id for m in messages if isinstance(m.id, str)}
     plural_ids = {m.id for m in messages if not isinstance(m.id, str)}
     # "Product #{product_id}" is the pre-existing empty-name fallback msgid
-    # (already in the catalog, reused from notifier/digest.py, §3.9 row 1):
-    # it is a real _() call site under bot/ui/, so extraction finds it, but
-    # it is not one of the 29 msgids §3.10 adds for this PR.
+    # (already in the catalog, shared with notifier/digest.py): it is a real
+    # _() call site under bot/ui/, so extraction finds it, but it is not one
+    # of the 29 msgids the card adds.
     singular_ids -= {"Product #{product_id}"}
     assert singular_ids == set(CARD_SINGULAR)
     assert plural_ids == {CARD_PLURAL}

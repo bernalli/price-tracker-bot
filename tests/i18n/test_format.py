@@ -16,7 +16,7 @@ from price_tracker.i18n.locales import SUPPORTED_LOCALES
 CURRENCIES = tuple(sorted(list_currencies()))
 
 
-# --- money: pinned currency examples (P10) ---------------------------------
+# --- money: pinned currency examples ---------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -106,14 +106,14 @@ def test_money_rejects_not_well_formed_locale(bad_locale: object) -> None:
         money(Decimal("1"), "EUR", locale=bad_locale)  # type: ignore[arg-type]
 
 
-# --- money: property 6 (§17.3) ----------------------------------------------
+# --- money: digits round-trip property ----------------------------------------
 
 
 def _extract_digits(text: str) -> str:
     """Digits only, group separators and the decimal mark stripped.
 
-    Every supported locale renders amounts with ASCII digits (verified by
-    P10, including ja/zh_Hans), and every group separator or decimal mark
+    Every supported locale renders amounts with ASCII digits (the pinned
+    examples above cover ja and zh_Hans too), and every group separator or decimal mark
     Babel could use for these locales is itself a non-digit character, so
     filtering to ``str.isdigit()`` strips exactly the separators.
     """
@@ -185,6 +185,12 @@ def test_delta_rejects_not_well_formed_operands_without_invalid_operation(
 ) -> None:
     with pytest.raises(ValueError, match=r"."):
         delta(old, new, "EUR", locale="en")  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("bad_currency", ["eur", "XYZ", "", None])
+def test_delta_rejects_not_well_formed_currency_even_when_equal(bad_currency: object) -> None:
+    with pytest.raises(ValueError, match=r"^currency:"):
+        delta(Decimal("1"), Decimal("1"), bad_currency, locale="en")  # type: ignore[arg-type]
 
 
 def test_change_down_glyph() -> None:

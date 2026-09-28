@@ -4,7 +4,7 @@
 # now: 2026-03-01T12:00:00Z
 text:
    | [📦 <b>⁨電動歯ブラシ プレミアム⁩</b> 📦 <b>⁨電動歯ブラシ プレミアム⁩</b> 📦 <b>⁨電動歯ブラシ プレミアム⁩</b>]
-   | [shop.example.com · #47 · [active active active] shop.example.com · #47 · [active active active] shop.example.com · #47 · [active active active]]
+   | [⁨shop.example.com⁩ · #47 · [active active active] ⁨shop.example.com⁩ · #47 · [active active active] ⁨shop.example.com⁩ · #47 · [active active active]]
    | 
    | [💰 Now: 12.800 JPY 💰 Now: 12.800 JPY 💰 Now: 12.800 JPY]
    | [📌 Start: 13.500 JPY · ▼ 5,2 % 📌 Start: 13.500 JPY · ▼ 5,2 % 📌 Start: 13.500 JPY · ▼ 5,2 %]

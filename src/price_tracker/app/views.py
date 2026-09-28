@@ -1,11 +1,10 @@
 """Product view model: pure Python, no Telegram and no HTML.
 
-Deviations from the shared design brief, declared: no ``cross_store`` or
-``scope_override`` (the migration that carries per-product scope is not part
-of this foundation); ``default_interval_minutes`` is added, because the card
-shows the interval that actually applies — a per-product override or the
-global default; ``reference_estimate`` arrives already converted by the
-pricing service that will compute it.
+There is no ``cross_store`` or ``scope_override`` field yet: per-product scope
+arrives with its own migration. ``default_interval_minutes`` is carried so the
+card can show the interval that actually applies, a per-product override or
+the global default. ``reference_estimate`` arrives already converted by the
+pricing service that computes it.
 """
 
 from __future__ import annotations

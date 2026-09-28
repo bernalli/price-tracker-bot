@@ -47,6 +47,23 @@ def test_hostile_name_never_leaks_raw_markup() -> None:
     assert "<script" not in screen.text
 
 
+def test_domain_row_wraps_the_domain_in_bidi_isolates() -> None:
+    screen = _card("base")
+    domain_line = screen.text.split("\n")[1]
+    assert domain_line.startswith("⁨shop.example.com⁩ ")
+
+
+def test_empty_domain_renders_no_isolate() -> None:
+    view = VARIANTS["base"]
+    from price_tracker.app.views import ProductView
+
+    no_domain_view = ProductView(
+        **{**{f: getattr(view, f) for f in view.__dataclass_fields__}, "domain": ""}
+    )
+    screen = product_card(no_domain_view, actions_for(no_domain_view), now=NOW)
+    assert screen.text.split("\n")[1].startswith(" · #42")
+
+
 def test_now_naive_rejected() -> None:
     view = VARIANTS["base"]
     with pytest.raises(ValueError, match=r"."):
@@ -142,7 +159,7 @@ def test_initial_none_has_no_start_row() -> None:
     assert not any(line.startswith("📌") for line in screen.text.split("\n"))
 
 
-# --- property 1 ----------------------------------------------------------
+# --- label budget in every locale ------------------------------------------
 
 
 def _random_view_kwargs(draw: st.DrawFn) -> dict[str, object]:

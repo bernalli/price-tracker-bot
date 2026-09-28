@@ -4,7 +4,7 @@
 # now: 2026-03-01T12:00:00Z
 text:
    | 📦 <b>⁨Kettle⁩</b>
-   | shop.example.com · #7 · attivo
+   | ⁨shop.example.com⁩ · #7 · attivo
    | 
    | 💰 Ora: 64,00 €
    | 📌 Inizio: 80,00 € · ▼ 20%

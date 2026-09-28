@@ -4,7 +4,7 @@
 # now: 2026-03-01T12:00:00Z
 text:
    | 📦 <b>⁨電動歯ブラシ プレミアム⁩</b>
-   | shop.example.com · #47 · active
+   | ⁨shop.example.com⁩ · #47 · active
    | 
    | 💰 Now: ¥12,800
    | 📌 Start: ¥13,500 · ▼ 5.2%

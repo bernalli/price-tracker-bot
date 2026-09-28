@@ -4,7 +4,7 @@
 # now: 2026-03-01T12:00:00Z
 text:
    | [📦 <b>⁨Wireless Headphones X200 Pro Edition with Active Noise Canc…⁩</b> 📦 <b>⁨Wireless Headphones X200 Pro Edition with Active Noise Canc…⁩</b> 📦 <b>⁨Wireless Headphones X200 Pro Edition with Active Noise Canc…⁩</b>]
-   | [shop.example.com · #42 · [active active active] shop.example.com · #42 · [active active active] shop.example.com · #42 · [active active active]]
+   | [⁨shop.example.com⁩ · #42 · [active active active] ⁨shop.example.com⁩ · #42 · [active active active] ⁨shop.example.com⁩ · #42 · [active active active]]
    | 
    | [💰 Now: 1 299,99 € 💰 Now: 1 299,99 € 💰 Now: 1 299,99 €]
    | [📌 Start: 1 499,99 € · ▼ 13,3 % 📌 Start: 1 499,99 € · ▼ 13,3 % 📌 Start: 1 499,99 € · ▼ 13,3 %]

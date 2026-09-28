@@ -30,7 +30,7 @@ WIDE_BLOCKS: Final = (
 )
 ELLIPSIS: Final = "…"
 
-_VARIATION_SELECTOR_16: Final = "️"
+_VARIATION_SELECTOR_16: Final = "\ufe0f"
 _FLATTEN_CATEGORIES: Final = frozenset({"Cc", "Zl", "Zp"})
 
 
