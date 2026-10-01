@@ -11,14 +11,19 @@
    param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
-   | <b>#1</b> Kettle
-   | 💰 €80.00
-   | 📌 Prezzo iniziale: €100.00 (<i>-20.0% dal tracking</i>)
-   | 🎯 Soglia: -10%
-   | 🕐 Ultimo check: 2h fa
+   | 📦 <b>⁨Kettle⁩</b>
+   | ⁨example.com⁩ · #1 · attivo
+   |
+   | 💰 Ora: 80,00 €
+   | 📌 Inizio: 100,00 € · ▼ 20%
+   | 📉 Minimo: 80,00 €
+   | 🔔 Avviso: ribasso del 10% dall'inizio
+   | 🔄 Controlli: ogni 6 h · ultimo 2 ore fa
    keyboard:
-   | [🔍 Check → check_1] [📊 Storico prezzo → chart_1]
+   | [🔍 Controlla ora → check_1] [📊 Storico → chart_1]
    | [⏸ Pausa → pause_1] [🗑 Elimina → remove_1]
-   | [🔗 Apri → url:https://shop.example.com/item/1] [✏️ Modifica → edit_1]
+   | [🔔 Regola avviso → edit_1] [🔄 Intervallo → setrefresh_1]
+   | [🔗 Apri → url:https://shop.example.com/item/1]
+   | [◀️ Lista → menu_prodotti]
 ## db after step 1
 ~ users user_id=10 display_name: NULL -> "U10"

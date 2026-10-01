@@ -23,6 +23,7 @@ import pytest
 from price_tracker.bot.flow_services import RepositoryFlowServices
 from price_tracker.bot.flows import GuidedFlow
 from price_tracker.bot.handlers import register_handlers
+from price_tracker.config import Config
 from price_tracker.db.migrator import apply_migrations
 from price_tracker.db.repository import Repository
 from tests.support.fake_telegram import (
@@ -79,6 +80,21 @@ class Wired:
         )
         register_handlers(self.app)
         self.app.bot_data["db"] = repo
+        # main.py always provides the runtime Config; /lista reads the global interval from it.
+        self.app.bot_data["config"] = Config(
+            telegram_bot_token="123456:TEST-TOKEN",
+            admin_users=(),
+            check_interval_minutes=360,
+            database_path=":memory:",
+            default_threshold_type="percentage",
+            default_threshold_value="10",
+            max_consecutive_errors=10,
+            check_delay_seconds=0.0,
+            notification_cooldown_hours=24,
+            request_timeout=5,
+            log_level="WARNING",
+            lang="en",
+        )
         self.errors: list[BaseException] = []
         self.app.add_error_handler(self._record_error)
         flows = [

@@ -7,19 +7,16 @@ budget.
 from __future__ import annotations
 
 import logging
+from datetime import UTC, datetime
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler, ContextTypes
 
-from price_tracker.bot.decorators import _convert_display, _db, restricted, with_locale
-from price_tracker.bot.handlers._helpers import (
-    _escape_html,
-    _format_relative_time,
-    _format_threshold,
-    _safe_dec,
-)
+from price_tracker.bot.decorators import _config, _db, restricted, with_locale
+from price_tracker.bot.handlers._cards import card_actions, product_view, screen_markup
 from price_tracker.bot.messages import _
+from price_tracker.bot.ui.cards import product_card
 
 logger = logging.getLogger(__name__)
 
@@ -43,88 +40,18 @@ async def cmd_list(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         parse_mode=ParseMode.HTML,
     )
 
-    # Deferred import: the scrapers package may evolve independently of this handler.
-    from price_tracker.core.scraper_base import detect_currency  # noqa: PLC0415
-
+    config = _config(context)
+    saved = await db.get_config("check_interval_minutes")
+    default_interval = int(saved) if saved and saved.isdigit() else config.check_interval_minutes
+    now = datetime.now(UTC)
     for p in products:
-        pid = p["id"]
-        name = p.get("name") or "Sconosciuto"
-        name_short = name[:60] + ("..." if len(name) > 60 else "")
-        current = _safe_dec(p.get("current_price"))
-        initial = _safe_dec(p.get("initial_price"))
-        target = _safe_dec(p.get("target_price"))
-        lowest = _safe_dec(p.get("lowest_price"))
-        url = p.get("url", "")
-        currency = p.get("currency", "") or detect_currency(url) or "EUR"
-        price_str = _convert_display(current, currency) if current else "N/D"
-        threshold = _format_threshold(
-            p.get("threshold_type", "percentage"),
-            p.get("threshold_value", "10"),
-        )
-
-        parts = [f"<b>#{pid}</b> {_escape_html(name_short)}", f"💰 {price_str}"]
-
-        if initial and current and initial != current and initial > 0:
-            diff = (initial - current) / initial * 100
-            if diff > 0:
-                parts.append(
-                    f"📌 Prezzo iniziale: €{initial:.2f} (<i>-{diff:.1f}% dal tracking</i>)"
-                )
-            elif diff < 0:
-                increase = abs(diff)
-                parts.append(
-                    f"📈 Prezzo iniziale: €{initial:.2f} (<i>+{increase:.1f}% dal tracking</i>)"
-                )
-
-        if lowest and current and lowest < current:
-            parts.append(f"📉 Min: €{lowest:.2f}")
-
-        parts.append(f"🎯 Soglia: {threshold}")
-        if target:
-            parts.append(f"🏁 Target: €{target:.2f}")
-
-        custom_int = p.get("check_interval_minutes")
-        if custom_int:
-            if custom_int >= 60:
-                h = custom_int / 60
-                int_str = f"{h:.0f}h" if h == int(h) else f"{h:.1f}h"
-            else:
-                int_str = f"{custom_int}min"
-            parts.append(f"🔄 Check: ogni {int_str}")
-
-        # Last check time
-        ago = _format_relative_time(p.get("last_checked_at"))
-        if ago:
-            parts.append(f"🕐 Ultimo check: {ago}")
-
-        errors = p.get("consecutive_errors", 0)
-        if errors and errors > 0:
-            parts.append(f"⚠️ {errors} letture fallite di recente — dettagli con /errori")
-
-        text = "\n".join(parts)
-
-        btn_rows = [
-            [
-                InlineKeyboardButton("🔍 Check", callback_data=f"check_{pid}"),
-                InlineKeyboardButton("📊 Storico prezzo", callback_data=f"chart_{pid}"),
-            ],
-            [
-                InlineKeyboardButton("⏸ Pausa", callback_data=f"pause_{pid}"),
-                InlineKeyboardButton("🗑 Elimina", callback_data=f"remove_{pid}"),
-            ],
-            [
-                InlineKeyboardButton("✏️ Modifica", callback_data=f"edit_{pid}"),
-            ],
-        ]
-        if url:
-            btn_rows[2].insert(0, InlineKeyboardButton("🔗 Apri", url=url))
-        keyboard = InlineKeyboardMarkup(btn_rows)
-
+        view = product_view(p, default_interval_minutes=default_interval)
+        screen = product_card(view, card_actions(view), now=now)
         await update.message.reply_text(
-            text,
+            screen.text,
             parse_mode=ParseMode.HTML,
-            disable_web_page_preview=True,
-            reply_markup=keyboard,
+            disable_web_page_preview=screen.disable_link_preview,
+            reply_markup=screen_markup(screen),
         )
 
     # "Elimina tutti" button at the end
