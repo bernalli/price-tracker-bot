@@ -34,11 +34,10 @@ def validate_public_url(url: str) -> None:
     """Raise :class:`UnsafeURLError` if ``url`` is not a safe public http(s) target.
 
     SSRF guard for user-supplied product URLs. Blocks non-http(s) schemes and
-    hosts that are — or resolve to — loopback/private/link-local/reserved
+    IPv6 literals and hosts that are — or resolve to — loopback/private/link-local/reserved
     addresses (e.g. ``http://localhost``, ``http://127.0.0.1``,
     ``http://169.254.169.254`` cloud-metadata, ``http://192.168.x.x``,
-    ``http://[::1]``). An unresolvable host may be stored, but the outbound transport must
-    resolve it again and refuse the fetch if resolution fails.
+    ``http://[::1]``). Hostnames must resolve to at least one public IPv4 address.
 
     This is an admission check only. The public HTTP transport independently
     validates every request and redirect and connects to the validated address.
@@ -55,23 +54,39 @@ def validate_public_url(url: str) -> None:
     except ValueError:
         literal_ip = None
     if literal_ip is not None:
+        if literal_ip.version != 4:
+            raise UnsafeURLError(f"host {host} is an IPv6 address")
         if _is_blocked_ip(literal_ip):
             raise UnsafeURLError(f"host {host} is a non-public address")
         return
 
     port = parsed.port or (443 if parsed.scheme.lower() == "https" else 80)
     try:
-        infos = socket.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
-    except socket.gaierror:
-        return  # unresolvable → not reachable → not an SSRF risk
-    for info in infos:
-        addr = info[4][0]
+        infos = socket.getaddrinfo(
+            host,
+            port,
+            family=socket.AF_INET,
+            type=socket.SOCK_STREAM,
+            proto=socket.IPPROTO_TCP,
+        )
+    except socket.gaierror as exc:
+        raise UnsafeURLError(f"host {host} has no IPv4 address") from exc
+    addresses: list[ipaddress.IPv4Address] = []
+    for family, _type, _proto, _canonname, sockaddr in infos:
+        if family != socket.AF_INET:
+            continue
+        addr = sockaddr[0]
         try:
             resolved = ipaddress.ip_address(addr)
         except ValueError:
             continue
+        if resolved.version == 4:
+            addresses.append(resolved)
+    if not addresses:
+        raise UnsafeURLError(f"host {host} has no IPv4 address")
+    for resolved in addresses:
         if _is_blocked_ip(resolved):
-            raise UnsafeURLError(f"host {host} resolves to non-public address {addr}")
+            raise UnsafeURLError(f"host {host} resolves to non-public address {resolved}")
 
 
 def extract_etld_plus_one(url: str) -> str:

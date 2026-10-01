@@ -35,6 +35,8 @@ BLOCKED = [
     "224.0.0.1",
 ]
 
+PUBLIC_IPV6 = "2606:4700:4700::1111"
+
 
 class Wire(httpcore.AsyncNetworkStream):
     def __init__(self, response: bytes, *, delay: float = 0) -> None:
@@ -71,6 +73,7 @@ class Network:
     def __init__(self) -> None:
         self.answers = [PUBLIC]
         self.lookups: list[str] = []
+        self.lookup_families: list[int | None] = []
         self.targets: list[tuple[str, int]] = []
         self.responses = [b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok"]
         self.streams: list[Wire] = []
@@ -78,6 +81,7 @@ class Network:
 
     def resolve(self, host: str, port: int, *args: Any, **kwargs: Any) -> list[Any]:
         self.lookups.append(host)
+        self.lookup_families.append(kwargs.get("family", args[0] if args else None))
         return [
             (
                 socket.AF_INET6 if ":" in ip else socket.AF_INET,
@@ -126,9 +130,30 @@ async def test_blocked_literal_never_connects(network: Network, address: str) ->
     assert network.targets == []
 
 
-@pytest.mark.parametrize(
-    "answers", [["100.101.102.103"], [PUBLIC, "10.0.0.1"], ["::1", PUBLIC], []]
-)
+async def test_public_ipv6_literal_never_connects(network: Network) -> None:
+    async with build_client() as client:
+        with pytest.raises(UnsafeURLError):
+            await client.get(f"http://[{PUBLIC_IPV6}]/product")
+    assert network.targets == []
+
+
+async def test_resolution_requests_and_accepts_only_ipv4(network: Network) -> None:
+    network.answers = [PUBLIC, PUBLIC_IPV6]
+    async with build_client() as client:
+        await client.get("https://shop.example/product")
+    assert network.lookup_families == [socket.AF_INET]
+    assert network.targets == [(PUBLIC, 443)]
+
+
+async def test_hostname_without_ipv4_answer_never_connects(network: Network) -> None:
+    network.answers = [PUBLIC_IPV6]
+    async with build_client() as client:
+        with pytest.raises(UnsafeURLError):
+            await client.get("https://shop.example/product")
+    assert network.targets == []
+
+
+@pytest.mark.parametrize("answers", [["100.101.102.103"], [PUBLIC, "10.0.0.1"], []])
 async def test_entire_dns_answer_must_be_public(network: Network, answers: list[str]) -> None:
     network.answers = answers
     async with build_client() as client:
@@ -501,7 +526,7 @@ async def test_connection_limit_includes_open_response_body(network: Network) ->
 async def test_failed_address_uses_remaining_validated_answers(
     network: Network, monkeypatch: pytest.MonkeyPatch, failure: type[Exception]
 ) -> None:
-    first = "2606:4700:4700::1111"
+    first = "8.8.8.8"
     last = "1.1.1.1"
     network.answers = [first, PUBLIC, first, last]
     attempts: list[str] = []

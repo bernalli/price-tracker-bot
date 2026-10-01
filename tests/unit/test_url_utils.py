@@ -56,14 +56,19 @@ def test_validate_public_url_allows_public_host(monkeypatch: pytest.MonkeyPatch)
     validate_public_url("https://shop.example/products/widget")
 
 
-def test_validate_public_url_allows_unresolvable_host(monkeypatch: pytest.MonkeyPatch) -> None:
-    """An unresolvable host cannot be used for SSRF (no connection); don't block it."""
+def test_validate_public_url_rejects_public_ipv6_literal() -> None:
+    with pytest.raises(UnsafeURLError):
+        validate_public_url("http://[2606:4700:4700::1111]/x")
+
+
+def test_validate_public_url_rejects_unresolvable_host(monkeypatch: pytest.MonkeyPatch) -> None:
 
     def _boom(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202, ARG001
         raise socket.gaierror("name resolution failed")
 
     monkeypatch.setattr(socket, "getaddrinfo", _boom)
-    validate_public_url("https://does-not-resolve.example/x")  # must not raise
+    with pytest.raises(UnsafeURLError):
+        validate_public_url("https://does-not-resolve.example/x")
 
 
 # --- Shared address space (100.64.0.0/10, RFC 6598) ---------------------------

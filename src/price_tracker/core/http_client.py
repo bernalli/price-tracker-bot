@@ -28,16 +28,24 @@ async def _resolve_public(url: httpx.URL) -> tuple[str, ...]:
     except ValueError:
         literal = None
     if literal is not None:
+        if literal.version != 4:
+            raise UnsafeURLError("IPv6 destinations are not allowed")
         addresses = [literal]
     else:
         try:
             infos = await asyncio.get_running_loop().getaddrinfo(
                 host,
                 url.port or (443 if url.scheme == "https" else 80),
+                family=socket.AF_INET,
                 type=socket.SOCK_STREAM,
                 proto=socket.IPPROTO_TCP,
             )
-            addresses = [ipaddress.ip_address(info[4][0]) for info in infos]
+            addresses = [
+                address
+                for info in infos
+                if info[0] == socket.AF_INET
+                and (address := ipaddress.ip_address(info[4][0])).version == 4
+            ]
         except (OSError, ValueError, UnicodeError) as exc:
             raise UnsafeURLError("destination resolution failed") from exc
     if not addresses or any(_is_blocked_ip(address) for address in addresses):
