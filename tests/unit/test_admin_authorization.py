@@ -198,3 +198,20 @@ async def test_confirm_delete_by_a_plain_user_leaves_another_users_product(
 
     assert await repo.get_product(product_id) is not None
     assert "Eliminato" not in _text(query)
+
+
+# ── /adduser on a deactivated user ────────────────────────────────────
+
+
+async def test_adduser_reactivates_a_deactivated_user(repo: Repository) -> None:
+    await repo.remove_user(PLAIN_USER_ID)
+    update = _command_update(ADMIN_ID, f"/adduser {PLAIN_USER_ID}")
+    context = _context()
+    context.args = [str(PLAIN_USER_ID)]
+    context.bot_data = {"db": repo}
+    context.bot.send_message = AsyncMock()
+
+    await cmd_add_user(update, context)
+
+    assert await repo.is_user_allowed(PLAIN_USER_ID)
+    assert "added" in str(update.message.reply_text.await_args.args[0])
