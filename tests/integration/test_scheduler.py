@@ -600,10 +600,10 @@ async def test_scheduler_price_none_keeps_scraper_error_detail(
 ) -> None:
     """The scraper's ``error`` message must reach ``record_failure`` as ``detail``.
 
-    Regression for the 2026-09-28 incident: 13 products were suspended with
-    only ``reason="price_none"`` persisted, losing the scraper's own
-    explanation (e.g. "Impossibile caricare la pagina Amazon") and making the
-    DB unreconstructable. ``reason`` must stay ``"price_none"`` — only
+    When no price is read, the failure must keep the scraper's own
+    explanation (e.g. "Impossibile caricare la pagina Amazon") alongside
+    ``reason="price_none"``, so a suspended product can be diagnosed from
+    the database. ``reason`` must stay ``"price_none"`` — only
     ``detail`` is new.
     """
     repo, pid = repo_with_product
