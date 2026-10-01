@@ -163,11 +163,8 @@ case "$CONTENT_STAGES" in
 esac
 
 # ---------------------------------------------------------------------------
-# Precondition: the five secret term lists — only in "all" mode. In "skip"
-# mode they are allowed to be absent (a fork PR never has them), and every
-# stage that would use one of them does not run at all (enforced further
-# below — not by leaving these variables empty and hoping nothing
-# downstream notices).
+# In "all" mode, require every pattern variable to be non-empty.
+# In "skip" mode, the stages are disabled and the variables may be absent.
 # ---------------------------------------------------------------------------
 if [ "$CONTENT_STAGES" = "all" ]; then
     for _v in LEAK_WORD_TERMS LEAK_PHRASE_TERMS LEAK_NAME_TERMS LEAK_PII_TERMS LEAK_PATH_TERMS; do
@@ -246,19 +243,9 @@ if [ -z "$files_scanned" ] || [ "$files_scanned" -eq 0 ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# LEAK_CONTENT_STAGES=skip: nothing below this point can run. A pull_request
-# from a fork never gets any of the five secret term lists (see the
-# workflow) — deliberately, to avoid turning this check into a membership
-# oracle over its own secrets: a PR author who fully controls the checked-
-# out content could otherwise add one candidate string per push and read
-# the public log to learn whether THAT stage matched, i.e. whether the
-# candidate is IN one of the five lists. PATH_TERMS is a secret exactly
-# like the other four now, so even the one stage that used to be safe to
-# run without any trust in the PR author (a public path blocklist) cannot
-# run either: with it empty, an unconditional `grep -E ""` would match
-# every path — a silent false-positive-on-everything, not a safe no-op.
-# Only the tracked-file count above required no secret, and it is already
-# printed below.
+# LEAK_CONTENT_STAGES=skip: report the tracked-file count without running
+# pattern matching. The workflow selects this mode when pattern variables
+# are unavailable; empty patterns must never be interpreted as a clean scan.
 # ---------------------------------------------------------------------------
 if [ "$CONTENT_STAGES" = "skip" ]; then
     echo "tree-scan: NOT MEASURED — LEAK_CONTENT_STAGES=skip (pull request from a fork: the lists are not available to this job by design); full coverage runs on the merge push" >&2

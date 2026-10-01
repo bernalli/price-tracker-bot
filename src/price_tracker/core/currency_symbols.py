@@ -4,7 +4,7 @@ The curated table is copied character-for-character from the prototype
 (``pricegrammar.py``, 31 keys): it is precision-only evidence, one symbol maps to
 every currency that writes it. ``generate_symbols`` derives a second table from
 Babel's own per-territory, per-locale currency symbols, admitting only the keys
-that cannot be mistaken for a word or an invisible character (D3): at least one
+that cannot be mistaken for a word or an invisible character: at least one
 Unicode currency-sign (``Sc``) character, none of ``Cf``/``Zs``/``Zl``/``Zp``/``Cc``,
 and never a key the curated table already owns. The generated data itself is
 versioned separately, in ``_generated_currency_symbols.py``: ``generate_symbols``

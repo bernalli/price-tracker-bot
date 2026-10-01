@@ -1,7 +1,7 @@
-"""``parse_regional_price``: detection, cross-check (I13) and the grammar, composed.
+"""``parse_regional_price``: detection, cross-check and the grammar, composed.
 
 The expectation disambiguates a shared symbol; it never fills in a currency
-the text never named (C4.4) — that filling arrives with storefronts in a
+the text never named — that filling arrives with storefronts in a
 later change.
 """
 
@@ -70,7 +70,7 @@ ARAB_DIGITS_CASE = ("١٢٣٤٫٥٦", "arab")
 def test_fullwidth_digits_without_a_symbol_is_unreadable() -> None:
     # No currency token in the text at all: a single separator with three digits either
     # side is ambiguous on its own (measured ``None`` on the grammar), and the
-    # expectation disambiguates a symbol, it never invents one (C4.4).
+    # expectation disambiguates a symbol, it never invents one.
     got = parse_regional_price("１，２３４", url="https://shop.example.jp/p", digits="fullwidth")
     assert got == RegionalMiss("unreadable")
 

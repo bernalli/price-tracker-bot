@@ -27,7 +27,7 @@ from price_tracker.core.money import ACCEPTED_CURRENCIES, currency_precision
 
 DEFAULT_ROOT = Path(__file__).resolve().parent.parent
 BASE_COMMIT = "83a91f68dc9e9b3483a6c11d232b85946870188c"
-# --- Section 3.2: corpus constants (curated, normative content) ---
+# --- Curated corpus constants ---
 
 TEST_LITERALS: tuple[str | None, ...] = (
     "29,99 €",
@@ -235,8 +235,9 @@ URL_SHAPED: tuple[str, ...] = (
     "https://www.example.org/kreditkarte/1",
 )
 
-# --- Section 3.3: generator (normative, transcribed verbatim) ---
+# --- Deterministic corpus generator ---
 
+# Keep this seed stable: the stored generated inputs and snapshots depend on it.
 SEED = "sp2-pr0-parity-v1"
 TOKENS = (
     "€",
@@ -322,7 +323,7 @@ def generate(count: int) -> list[str]:
     return out
 
 
-# --- Section 3.5: exceptions classifier (normative, transcribed verbatim) ---
+# --- Parser exception classifier ---
 
 KNOWN_TOKENS = sorted(
     set(TOKENS) | {"Rs", "Rs.", "TL", "Ft", "US$", "₹", "₺", "BHD", "KWD"},
@@ -538,7 +539,7 @@ ALL_CLASSES: dict[str, dict[str, frozenset[str]]] = {
 }
 
 
-# --- Section 3.4: format errors, loaders, writer ---
+# --- Format errors, loaders, writer ---
 
 KNOWN_FUNCTIONS = ("parse_price", "detect_currency")
 
@@ -573,7 +574,7 @@ _CURRENCY_CODE_RE = re.compile(r"[A-Z]{3}")
 
 
 def sort_key(x: str | None) -> tuple[bool, str]:
-    """The corpus ordering key of P10: ``None`` first, then strings by code point."""
+    """The corpus ordering key: ``None`` first, then strings by code point."""
     return (x is not None, x or "")
 
 
@@ -918,7 +919,7 @@ def write_json(path: Path, obj: Any) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-# --- Section 3.6: CLI ---
+# --- CLI ---
 
 DEFAULT_REQUESTED = 600
 

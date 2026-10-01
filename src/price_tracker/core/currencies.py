@@ -8,7 +8,7 @@ combines what they say, and returns a single code only when the signals agree
 or the caller's expectation breaks a tie between exactly two remaining
 candidates. It never returns a default: an unresolved case is ``None``, not a
 guess. ``expected_currencies`` derives an expectation from a domain, giving no
-expectation at all for a generic ccTLD (D6) or an IDN suffix (D7) rather than
+expectation at all for a generic ccTLD or an IDN suffix rather than
 a wrong one: a wrong expectation would make a shared symbol resolve to the
 wrong currency and reject a correct price at the cross-check.
 """
@@ -28,9 +28,7 @@ from price_tracker.core.pricegrammar import PriceContext
 ISO_CURRENCIES: Final = money.ACCEPTED_CURRENCIES
 
 # ccTLDs sold and used as generic brand domains, not as a signal of a region's currency
-# (Google Search Central's list of ccTLDs treated as generic; see the spec for this PR —
-# not verified verbatim through a summarising tool, kept here as a product decision in
-# its own right, not because of that source).
+# These suffixes deliberately provide no regional currency expectation.
 GENERIC_CCTLDS: Final[frozenset[str]] = frozenset(
     {
         "ad",
@@ -84,7 +82,7 @@ def _validate_currency_set(value: object, *, name: str, allow_empty: bool) -> fr
 
 
 def detect_currency(text: object, *, expected: frozenset[str] = frozenset()) -> str | None:
-    """Detect a single currency from at most two tokens of ``text`` (D5).
+    """Detect a single currency from at most two tokens of ``text``.
 
     Total on ``text``: never raises, whatever its type or content. ``expected``
     is a trusted argument: a non-``frozenset`` or a member outside
@@ -126,7 +124,7 @@ def detect_currency(text: object, *, expected: frozenset[str] = frozenset()) -> 
 
 
 def expected_currencies(url: object, *, declared: frozenset[str] | None = None) -> frozenset[str]:
-    """Currencies a page at ``url`` is expected to price in (D6, D7).
+    """Currencies a page at ``url`` is expected to price in.
 
     ``declared`` is a trusted argument: when given it must be a non-empty
     ``frozenset`` of codes in :data:`ISO_CURRENCIES`, and it wins over the
@@ -158,7 +156,7 @@ def parse_regional_price(
     digits: str = "latin",
     grouping: str = "auto",
 ) -> Money | RegionalMiss:
-    """Read one regional price: detect the currency, then read the amount (§3.6).
+    """Read one regional price: detect the currency, then read the amount.
 
     Total on ``text`` and ``url``: never raises for them, whatever their type
     or content. Raises only for malformed trusted arguments (``declared``, and
