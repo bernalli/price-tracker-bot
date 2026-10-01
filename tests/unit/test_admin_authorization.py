@@ -15,6 +15,7 @@ import pytest_asyncio
 
 from price_tracker.bot.handlers.auth import cmd_add_user
 from price_tracker.bot.handlers.callbacks._admin import handle_admin_menu
+from price_tracker.bot.handlers.text_input import handle_text_input
 from price_tracker.db.migrator import apply_migrations
 from price_tracker.db.repository import Repository
 
@@ -107,3 +108,43 @@ async def test_admin_only_refuses_a_deactivated_admin(repo: Repository) -> None:
     assert await repo.get_user(PLAIN_USER_ID + 1) is None
     replies = [str(c.args[0]) for c in update.message.reply_text.await_args_list]
     assert replies == ["⛔ Admin-only command."]
+
+
+# ── admin pending_action, second step ─────────────────────────────────
+
+
+def _text_update(user_id: int, text: str) -> MagicMock:
+    update = _command_update(user_id, text)
+    update.effective_user.first_name = "User"
+    update.effective_user.full_name = "User"
+    update.effective_user.username = None
+    return update
+
+
+async def test_admin_pending_action_is_refused_after_the_admin_is_demoted(
+    repo: Repository,
+) -> None:
+    new_user_id = PLAIN_USER_ID + 2
+    context = _context()
+    context.bot_data = {"db": repo}
+    context.user_data["pending_action"] = ("admin_adduser", 0)
+    await repo.set_admin(ADMIN_ID, is_admin=False)
+
+    await handle_text_input(_text_update(ADMIN_ID, str(new_user_id)), context)
+
+    assert await repo.get_user(new_user_id) is None
+    assert "pending_action" not in context.user_data
+
+
+async def test_admin_pending_action_is_refused_after_the_admin_is_deactivated(
+    repo: Repository,
+) -> None:
+    new_user_id = PLAIN_USER_ID + 3
+    context = _context()
+    context.bot_data = {"db": repo}
+    context.user_data["pending_action"] = ("admin_adduser", 0)
+    await repo.remove_user(ADMIN_ID)
+
+    await handle_text_input(_text_update(ADMIN_ID, str(new_user_id)), context)
+
+    assert await repo.get_user(new_user_id) is None
