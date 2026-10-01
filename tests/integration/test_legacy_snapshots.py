@@ -227,7 +227,7 @@ KETTLE_URL: Final = "https://shop.example.com/item/1"
 NETWORK_SCENARIOS: Final[dict[str, frozenset[str]]] = {
     "add.success_generic": frozenset({"shop.example.com"}),
     "data.import_csv": frozenset({"shop.example.com"}),
-    "admin.cmd_debug": frozenset(),
+    "admin.cmd_debug": frozenset({"shop.example.com", "unknown.example.org"}),
     "alert.price_drop": frozenset(),
 }
 

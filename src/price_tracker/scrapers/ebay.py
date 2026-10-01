@@ -14,6 +14,8 @@ from typing import TYPE_CHECKING, ClassVar
 import httpx
 from bs4 import BeautifulSoup
 
+from price_tracker.core.http_client import public_request
+
 if TYPE_CHECKING:
     from decimal import Decimal
 
@@ -35,7 +37,7 @@ logger = logging.getLogger(__name__)
 async def _fetch_ebay_html(url: str, client: httpx.AsyncClient) -> str:
     """Single GET attempt with browser headers. Tenacity handles retries."""
     headers = get_headers()
-    response = await client.get(url, headers=headers, follow_redirects=True)
+    response = await public_request(client, "GET", url, headers=headers)
     detect_listing_gone(status_code=response.status_code, url=url)
     response.raise_for_status()
     return response.text

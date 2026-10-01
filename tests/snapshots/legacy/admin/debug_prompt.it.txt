@@ -60,7 +60,7 @@
    | 🔍 <b>Debug scraping</b>
    | 🔗 http:/x
    |
-   | ❌ httpx: unknown url type: '/x'
+   | ❌ httpx: a public HTTP(S) destination is required
    |
    | ❌ Impossibile caricare la pagina con nessun metodo.
 ## db after step 5

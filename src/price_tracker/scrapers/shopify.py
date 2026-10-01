@@ -17,6 +17,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 from price_tracker.core.exceptions import BlockEvent, ListingGone
+from price_tracker.core.http_client import public_request
 from price_tracker.core.identity import RequestedIdentity
 from price_tracker.core.money import Money
 from price_tracker.core.pricegrammar import Unreadable, select_offer
@@ -43,7 +44,7 @@ _SHOPIFY_PRODUCT_PATH_RE = re.compile(r"(?:^|/)products/[a-z0-9\-_]+", re.IGNORE
 async def _fetch_shopify_response(url: str, client: httpx.AsyncClient) -> httpx.Response:
     """Single GET attempt with browser headers. Tenacity handles retries."""
     headers = get_headers()
-    response = await client.get(url, headers=headers, follow_redirects=True)
+    response = await public_request(client, "GET", url, headers=headers)
     # Surface 403/429 (and WAF/CAPTCHA bodies) as a BlockEvent BEFORE
     # raise_for_status, so the scheduler quarantines the domain instead of
     # recording a generic failure (#16). with_retry never retries BlockEvents.
@@ -151,7 +152,7 @@ async def _fetch_shopify_json(json_url: str, client: httpx.AsyncClient) -> httpx
         "Accept": "application/json",
         "Accept-Language": "it-IT,it;q=0.9,en;q=0.8",
     }
-    response = await client.get(json_url, headers=headers, follow_redirects=True)
+    response = await public_request(client, "GET", json_url, headers=headers)
     # Don't raise_for_status here — caller handles 403 specially.
     return response
 
@@ -414,19 +415,7 @@ class ShopifyScraper(AbstractScraper):
 
     @staticmethod
     async def _fetch_json_via_curl_cffi(json_url: str) -> dict | None:
-        """Fallback for 403 from Shopify JSON endpoint."""
-        try:
-            from curl_cffi import CurlError
-            from curl_cffi.requests import AsyncSession
-        except ImportError:
-            return None
-        try:
-            async with AsyncSession(impersonate="chrome") as session:
-                resp = await session.get(json_url, allow_redirects=True, timeout=30)
-                if resp.status_code == 200:
-                    return resp.json()
-        except (CurlError, ValueError, OSError, AttributeError) as e:
-            logger.debug("Shopify curl_cffi fallback failed: %s", e)
+        """Disabled: this backend cannot bind connections to validated addresses."""
         return None
 
     @staticmethod

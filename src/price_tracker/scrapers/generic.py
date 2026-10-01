@@ -26,6 +26,7 @@ import httpx
 from bs4 import BeautifulSoup, Tag
 
 from price_tracker.core.exceptions import BlockEvent, ListingGone
+from price_tracker.core.http_client import public_request
 from price_tracker.core.retry_policy import RetryConfig, with_retry
 from price_tracker.core.scraper_base import (
     AbstractScraper,
@@ -77,7 +78,7 @@ _JS_BARE_PRICE_PATTERNS: list[str] = [
 async def _fetch_generic_html(url: str, client: httpx.AsyncClient) -> str:
     """Single GET attempt with browser headers. Tenacity handles retries."""
     headers = get_headers()
-    response = await client.get(url, headers=headers, follow_redirects=True)
+    response = await public_request(client, "GET", url, headers=headers)
     # Surface 403/429 (and WAF/CAPTCHA bodies) as a BlockEvent BEFORE
     # raise_for_status, so the scheduler quarantines the domain instead of
     # recording a generic failure (#16). with_retry never retries BlockEvents.
@@ -88,24 +89,7 @@ async def _fetch_generic_html(url: str, client: httpx.AsyncClient) -> str:
 
 
 async def _fetch_with_curl_cffi(url: str) -> str | None:
-    """Fetch via curl_cffi with Chrome JA3/TLS impersonation. Returns None on failure."""
-    try:
-        from curl_cffi import CurlError
-        from curl_cffi.requests import AsyncSession
-    except ImportError:
-        return None
-    try:
-        async with AsyncSession(impersonate="chrome") as session:
-            resp = await session.get(url, allow_redirects=True, timeout=30)
-            if resp.status_code in (403, 429):
-                # Hard block on the primary path: raise instead of discarding the
-                # status, so scrape() can quarantine after fallbacks fail (#16).
-                detect_block_event(status_code=resp.status_code, body=resp.text or "", url=url)
-            if 200 <= resp.status_code < 300 and resp.text:
-                return resp.text
-            logger.debug("curl_cffi got %s for %s", resp.status_code, url[:60])
-    except (CurlError, ValueError, OSError, AttributeError) as e:
-        logger.debug("curl_cffi fetch failed for %s: %s", url[:60], e)
+    """Disabled: this backend cannot bind connections to validated addresses."""
     return None
 
 
@@ -197,8 +181,7 @@ class GenericScraper(AbstractScraper):
         return True  # Fallback — handles everything
 
     async def scrape(self, url: str, client: httpx.AsyncClient) -> ProductInfo:
-        # Anti-bot primary: try curl_cffi (Chrome JA3) first — covers many
-        # Shopify / boutique e-commerce fronts that drop plain httpx requests.
+        # Keep the legacy fallback contract; its unbound backend is disabled.
         html: str | None = None
         curl_block: BlockEvent | None = None
         try:

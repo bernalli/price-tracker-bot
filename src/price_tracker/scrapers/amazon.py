@@ -1,13 +1,12 @@
 """Amazon-specific scraper.
 
 Amazon has aggressive anti-bot measures — this scraper uses targeted
-selectors, careful header management, and multiple fallbacks (curl_cffi,
-scrapling) when 403/CAPTCHA are returned.
+selectors, careful header management, and a fresh validated HTTP client for
+suspiciously small responses. Independent network backends are disabled.
 """
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import random
@@ -19,6 +18,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 from price_tracker.core.exceptions import BlockEvent, CaptchaDetected, ListingGone
+from price_tracker.core.http_client import build_client, public_request
 from price_tracker.core.retry_policy import RetryConfig, with_retry
 from price_tracker.core.scraper_base import (
     USER_AGENTS,
@@ -41,7 +41,7 @@ async def _fetch_amazon_html(
 ) -> str:
     """Single GET attempt with browser-like headers. Tenacity handles retries."""
     headers = get_headers(extra_headers)
-    response = await client.get(url, headers=headers, follow_redirects=True)
+    response = await public_request(client, "GET", url, headers=headers)
     # Surface 403/429/WAF/CAPTCHA as a BlockEvent and 404/410 as ListingGone
     # BEFORE raise_for_status — same schema as shopify.py (#16), so neither
     # collapses into a generic httpx.HTTPStatusError further down the chain.
@@ -60,8 +60,8 @@ async def _fetch_with_fresh_client(url: str) -> str | None:
         "Accept-Language": "it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7",
     }
     try:
-        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as fresh:
-            response = await fresh.get(url, headers=headers)
+        async with build_client(timeout=30.0) as fresh:
+            response = await public_request(fresh, "GET", url, headers=headers)
             # Same schema as the primary fetch: block/gone detection precedes
             # raise_for_status on this path too (#16).
             detect_block_event(status_code=response.status_code, body=response.text, url=url)
@@ -74,45 +74,12 @@ async def _fetch_with_fresh_client(url: str) -> str | None:
 
 
 async def _fetch_via_curl_cffi(url: str) -> str | None:
-    """Last-resort fetch with Chrome JA3/TLS impersonation. Returns None on any failure."""
-    try:
-        from curl_cffi import CurlError
-        from curl_cffi.requests import AsyncSession
-    except ImportError:
-        logger.debug("curl_cffi not available for Amazon fallback")
-        return None
-    try:
-        async with AsyncSession(impersonate="chrome") as session:
-            resp = await session.get(url, allow_redirects=True, timeout=30)
-            if resp.status_code == 200:
-                logger.info("curl_cffi fallback succeeded for %s", url[:60])
-                return resp.text
-            logger.warning("curl_cffi fallback got %s for %s", resp.status_code, url[:60])
-    except (CurlError, httpx.HTTPError, ValueError, OSError) as e:
-        logger.warning("curl_cffi fallback failed for %s: %s", url[:60], e)
+    """Disabled: this backend cannot bind connections to validated addresses."""
     return None
 
 
 async def _fetch_via_scrapling(url: str) -> str | None:
-    """Final fallback via Scrapling (stealth headers). Returns None on any failure."""
-    try:
-        from curl_cffi import CurlError
-        from scrapling import Fetcher
-    except ImportError:
-        logger.debug("Scrapling not available for Amazon fallback")
-        return None
-    try:
-        # Fetcher.get is synchronous (time.sleep between retries, up to 3x30s):
-        # run it in a worker thread so it cannot block the event loop (#21/#59).
-        page = await asyncio.to_thread(
-            Fetcher.get, url, stealthy_headers=True, follow_redirects=True, timeout=30
-        )
-        if page.status == 200 and page.text:
-            logger.info("Scrapling fallback succeeded for %s", url[:60])
-            return page.text
-        logger.warning("Scrapling fallback got status %s for %s", page.status, url[:60])
-    except (CurlError, ValueError, OSError, AttributeError) as e:
-        logger.warning("Scrapling fallback failed for %s: %s", url[:60], e)
+    """Disabled: this backend cannot bind connections to validated addresses."""
     return None
 
 
@@ -216,10 +183,11 @@ class AmazonScraper(AbstractScraper):
         # Resolve Amazon short links to full URL
         if "amzn.eu" in url or "amzn.to" in url:
             try:
-                resp = await client.head(
+                resp = await public_request(
+                    client,
+                    "HEAD",
                     url,
                     headers={"User-Agent": "Mozilla/5.0"},
-                    follow_redirects=True,
                 )
                 if resp.status_code == 200 and "amazon" in str(resp.url):
                     url = str(resp.url)

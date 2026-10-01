@@ -1,6 +1,6 @@
 # Scrapers
 
-`price-tracker-bot` ships **17 built-in scrapers** plus two fallbacks (a generic structured-data extractor and a Playwright-based renderer for JavaScript-heavy sites). All are registered at startup and resolved by URL host via the central registry. Custom scrapers can be added as drop-in plugins or pip packages — see [plugins.md](plugins.md).
+`price-tracker-bot` ships **17 built-in scrapers** including a generic structured-data extractor and a disabled Playwright renderer. All are registered at startup and resolved by URL host via the central registry. Custom scrapers can be added as drop-in plugins or pip packages — see [plugins.md](plugins.md).
 
 ## Built-in inventory
 
@@ -21,8 +21,8 @@
 | `walmart.com`                                                            | `WalmartScraper`           | 50       | NextData JSON parsing                                 |
 | `wayfair.{com,co.uk,ca,de}`                                              | `WayfairScraper`           | 50       | Furniture/home goods                                  |
 | `zalando.{it,de,fr,es,nl,co.uk,pl,...}`                                  | `ZalandoScraper`           | 50       | EU fashion locales                                    |
-| (any URL not matched by a site-specific scraper)                         | `PlaywrightFallbackScraper`| 10       | Headless Chromium render; requires `playwright` package, returns error if unavailable |
-| (rare; only if PlaywrightFallback errors before resolution)              | `GenericScraper`           | 0        | Last-resort structured-data extractor; runs the 9-strategy chain |
+| (any URL not matched by a site-specific scraper)                         | `PlaywrightFallbackScraper`| 10       | Disabled: browser connections cannot use the public-address transport |
+| (any URL not matched by a site-specific scraper)              | `GenericScraper`           | 0        | Last-resort structured-data extractor; runs the 9-strategy chain |
 
 > Total: **17** (15 site-specific + `GenericScraper` + `PlaywrightFallbackScraper`).
 
@@ -30,7 +30,7 @@ All scrapers return prices as `Decimal` (never `float`). Outlier detection via m
 
 ## Resolution algorithm
 
-The registry sorts scrapers by `priority` (descending). On each URL lookup (`registry.resolve(url)`), the registry walks the sorted list and returns the first scraper whose `can_handle(url)` returns `True`. Site-specific scrapers implement `can_handle` as a regex match against `domain_patterns`. Both fallbacks (`PlaywrightFallbackScraper`, `GenericScraper`) override `can_handle` to broaden their reach: `PlaywrightFallbackScraper` returns `True` for every URL (and earns precedence via its higher priority), so `GenericScraper` is reached only when Playwright is selectively unregistered or its `can_handle` is bypassed by the caller.
+The registry sorts scrapers by `priority` (descending). On each URL lookup (`registry.resolve(url)`), the registry walks the sorted list and returns the first scraper whose `can_handle(url)` returns `True`. Site-specific scrapers implement `can_handle` as a regex match against `domain_patterns`. Both fallbacks (`PlaywrightFallbackScraper`, `GenericScraper`) override `can_handle` to broaden their reach: `PlaywrightFallbackScraper` currently returns `False` because browser rendering is disabled, so unmatched URLs reach `GenericScraper`.
 
 ```
 resolution order:
@@ -41,7 +41,7 @@ resolution order:
   EtsyScraper, GoogleStoreScraper, MediamarktScraper,
   NeweggScraper, OttoScraper, TargetScraper, WalmartScraper,
   WayfairScraper, ZalandoScraper (50, alphabetical tie-break)
-  PlaywrightFallbackScraper (10, always-handles)
+  PlaywrightFallbackScraper (10, disabled)
   GenericScraper (0, last resort)
 ```
 

@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, ClassVar, TypedDict
 import httpx
 from bs4 import BeautifulSoup, Tag
 
+from price_tracker.core.http_client import public_request
 from price_tracker.core.retry_policy import RetryConfig, with_retry
 from price_tracker.core.scraper_base import (
     AbstractScraper,
@@ -55,7 +56,7 @@ class StrategyResult(TypedDict, total=False):
 @with_retry(RetryConfig(max_attempts=3, base_wait=2.0, max_wait=10.0))
 async def _fetch_aliexpress_html(url: str, client: httpx.AsyncClient) -> httpx.Response:
     headers = get_headers()
-    response = await client.get(url, headers=headers, follow_redirects=True)
+    response = await public_request(client, "GET", url, headers=headers)
     detect_listing_gone(status_code=response.status_code, url=url)
     response.raise_for_status()
     return response
@@ -87,7 +88,7 @@ class AliexpressScraper(AbstractScraper):
             detect_block_event(status_code=e.response.status_code, body=e.response.text, url=url)
             logger.debug("AliExpress fetch failed for %s: %s", url[:80], e)
             return ProductInfo(error=f"HTTP error: {e}")
-        except httpx.HTTPError as e:
+        except (httpx.HTTPError, ValueError) as e:
             logger.debug("AliExpress fetch failed for %s: %s", url[:80], e)
             return ProductInfo(error=f"HTTP error: {e}")
 

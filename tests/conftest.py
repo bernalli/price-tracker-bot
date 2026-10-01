@@ -61,3 +61,21 @@ def mock_router() -> respx.Router:
 def tmp_db_path(tmp_path: Path) -> Path:
     """Return a path to a temporary SQLite database file (does not yet exist)."""
     return tmp_path / "test.db"
+
+
+@pytest.fixture(autouse=True)
+def public_dns(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep HTTP fixtures offline while exercising destination validation."""
+    import ipaddress
+    import socket
+    from typing import Any
+
+    def resolve(host: str, port: int, *args: Any, **kwargs: Any) -> list[Any]:
+        try:
+            address = str(ipaddress.ip_address(host))
+        except ValueError:
+            address = "127.0.0.1" if host == "localhost" else "93.184.216.34"
+        family = socket.AF_INET6 if ":" in address else socket.AF_INET
+        return [(family, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", (address, port))]
+
+    monkeypatch.setattr(socket, "getaddrinfo", resolve)

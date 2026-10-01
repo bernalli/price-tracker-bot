@@ -46,6 +46,7 @@ from price_tracker.bot import decorators
 from price_tracker.bot.handlers import error_handler, register_handlers
 from price_tracker.bot.messages import get_translation
 from price_tracker.config import Config
+from price_tracker.core import http_client as public_http
 from price_tracker.core.health import HealthManager
 from price_tracker.core.registry import ScraperRegistry
 from price_tracker.core.scheduler import Scheduler, SchedulerDeps
@@ -447,9 +448,11 @@ async def build_world(
     dns_lookups: list[str] = []
 
     def offline_getaddrinfo(host: object, *args: object, **kwargs: object) -> list[Any]:
-        del args, kwargs
         dns_lookups.append(str(host))
-        raise socket.gaierror(socket.EAI_NONAME, "offline")
+        port = args[0] if args else 443
+        return [
+            (socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", ("93.184.216.34", port))
+        ]
 
     monkeypatch.setattr(socket, "getaddrinfo", offline_getaddrinfo)
     # Exchange rates loaded by an earlier test would change every non-EUR price.
@@ -483,7 +486,12 @@ async def build_world(
         scraper = ScriptedScraper(request.faults)
         registry = ScraperRegistry()
         registry.register(scraper)
-        http_client = httpx.AsyncClient(transport=httpx.MockTransport(_fixture_html))
+        monkeypatch.setattr(
+            public_http,
+            "_ConnectionTransport",
+            lambda address: httpx.MockTransport(_fixture_html),
+        )
+        http_client = public_http.build_client()
         health = HealthManager(repo)
         await health.load()
         digest = DigestService(repo=repo, bot=app.bot, metrics=None, lang=locale)

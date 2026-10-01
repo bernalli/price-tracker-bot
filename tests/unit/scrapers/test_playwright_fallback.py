@@ -17,11 +17,11 @@ def test_playwright_priority_low():
     assert PlaywrightFallbackScraper.priority == 10
 
 
-def test_playwright_can_handle_anything():
+def test_disabled_playwright_does_not_claim_urls():
     scraper = PlaywrightFallbackScraper()
-    assert scraper.can_handle("https://anything.example.com/")
-    assert scraper.can_handle("https://shop.example.com/products/abc")
-    assert scraper.can_handle("https://www.amazon.it/dp/B01")
+    assert not scraper.can_handle("https://anything.example.com/")
+    assert not scraper.can_handle("https://shop.example.com/products/abc")
+    assert not scraper.can_handle("https://www.amazon.it/dp/B01")
 
 
 def test_playwright_priority_below_specific_scrapers():

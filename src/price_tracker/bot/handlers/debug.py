@@ -14,7 +14,6 @@ import time
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-import httpx
 from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler
 
@@ -29,6 +28,7 @@ from price_tracker.bot.decorators import (
 )
 from price_tracker.bot.handlers._helpers import _escape_html, _format_relative_time
 from price_tracker.bot.messages import _
+from price_tracker.core.http_client import build_client, public_request
 
 if TYPE_CHECKING:
     from telegram import Update
@@ -130,7 +130,7 @@ async def cmd_debug(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     # Step 1: Fetch with httpx
     html = None
     try:
-        resp = await client.get(url, headers=get_headers(), follow_redirects=True)
+        resp = await public_request(client, "GET", url, headers=get_headers())
         lines.append(f"📡 httpx shared: <b>HTTP {resp.status_code}</b> ({len(resp.text)} chars)")
         if resp.status_code == 200:
             html = resp.text
@@ -138,8 +138,10 @@ async def cmd_debug(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             if len(html) < 80000 and "application/ld+json" not in html:
                 lines.append("⚠️ Risposta piccola senza dati strutturati, provo client fresco...")
                 try:
-                    async with httpx.AsyncClient(timeout=30, follow_redirects=True) as fresh:
-                        r2 = await fresh.get(
+                    async with build_client(timeout=30) as fresh:
+                        r2 = await public_request(
+                            fresh,
+                            "GET",
                             url,
                             headers={
                                 "User-Agent": (
@@ -162,36 +164,7 @@ async def cmd_debug(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 except Exception as e:  # noqa: BLE001 — debug surface, never crash
                     lines.append(f"❌ httpx fresh: {str(e)[:60]}")
         elif resp.status_code == 403:
-            lines.append("⚠️ 403 — provo curl_cffi...")
-            try:
-                from curl_cffi.requests import AsyncSession  # noqa: PLC0415
-
-                async with AsyncSession(impersonate="chrome") as session:
-                    r2 = await session.get(url, allow_redirects=True, timeout=30)
-                    lines.append(
-                        f"📡 curl_cffi: <b>HTTP {r2.status_code}</b> ({len(r2.text)} chars)"
-                    )
-                    if r2.status_code == 200:
-                        html = r2.text
-            except Exception as e:  # noqa: BLE001 — debug surface, never crash
-                lines.append(f"❌ curl_cffi: {str(e)[:60]}")
-
-            if not html:
-                lines.append("⚠️ Provo Scrapling...")
-                try:
-                    from scrapling import Fetcher  # noqa: PLC0415
-
-                    page = Fetcher.get(
-                        url, stealthy_headers=True, follow_redirects=True, timeout=30
-                    )
-                    lines.append(
-                        f"📡 Scrapling: <b>HTTP {page.status}</b> "
-                        f"({len(page.text) if page.text else 0} chars)"
-                    )
-                    if page.status == 200 and page.text:
-                        html = page.text
-                except Exception as e:  # noqa: BLE001 — debug surface, never crash
-                    lines.append(f"❌ Scrapling: {str(e)[:60]}")
+            lines.append("Unbound curl and Scrapling backends are disabled.")
     except Exception as e:  # noqa: BLE001 — debug surface, never crash
         lines.append(f"❌ httpx: {str(e)[:80]}")
 

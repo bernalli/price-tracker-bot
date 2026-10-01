@@ -33,7 +33,7 @@ import respx
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from price_tracker.core import fetch
+from price_tracker.core import fetch, http_client
 from price_tracker.core.exceptions import (
     BlockEvent,
     CaptchaDetected,
@@ -60,7 +60,7 @@ SRC_ROOT = Path(__file__).resolve().parents[2] / "src" / "price_tracker"
 
 @pytest_asyncio.fixture
 async def client():
-    async with httpx.AsyncClient(follow_redirects=True) as c:
+    async with http_client.build_client() as c:
         yield c
 
 
@@ -358,25 +358,23 @@ async def test_hop_to_non_http_scheme_is_refused_and_never_requested(client, loc
     assert target_route.calls.call_count == 0
 
 
-async def test_same_host_hop_skips_revalidation_and_cross_host_hop_triggers_it(client, monkeypatch):
-    url_a = "https://f.example/p/A"
-    url_b = "https://f.example/p/B"
-    spy = ValidateSpy()
-    monkeypatch.setattr(fetch, "validate_public_url", spy)
-    with respx.mock(assert_all_called=False) as router:
-        router.get(url_a).mock(return_value=httpx.Response(302, headers={"Location": url_b}))
-        router.get(url_b).mock(return_value=httpx.Response(200, text="B"))
-        await fetch_page(url_a, client)
-    assert spy.calls == []
+async def test_every_hop_resolves_once_including_same_origin(client, monkeypatch):
+    original = http_client._resolve_public
+    calls: list[str] = []
 
-    cross_b = "https://b.example/p/B"
-    spy2 = ValidateSpy()
-    monkeypatch.setattr(fetch, "validate_public_url", spy2)
-    with respx.mock(assert_all_called=False) as router:
-        router.get(url_a).mock(return_value=httpx.Response(302, headers={"Location": cross_b}))
-        router.get(cross_b).mock(return_value=httpx.Response(200, text="B"))
-        await fetch_page(url_a, client)
-    assert spy2.calls == [cross_b]
+    async def record(url: httpx.URL) -> tuple[str, ...]:
+        calls.append(str(url))
+        return await original(url)
+
+    monkeypatch.setattr(http_client, "_resolve_public", record)
+    url_a = "https://f.example/p/A"
+    for target in ["https://f.example/p/B", "https://b.example/p/B"]:
+        calls.clear()
+        with respx.mock(assert_all_called=False) as router:
+            router.get(url_a).mock(return_value=httpx.Response(302, headers={"Location": target}))
+            router.get(target).mock(return_value=httpx.Response(200, text="B"))
+            await fetch_page(url_a, client)
+        assert calls == [url_a, target]
 
 
 async def test_redirect_loop_terminates(client):
@@ -933,6 +931,16 @@ async def test_default_headers_rotate_user_agent_and_extra_headers_merge(client)
     same_headers = route_same.calls.last.request.headers
     assert same_headers["authorization"] == "Bearer x"
     assert "cookie" not in same_headers
+
+
+async def test_http_to_https_redirect_drops_authorization(client):
+    source = "http://f.example/p/A"
+    target = "https://f.example/p/B"
+    with respx.mock(assert_all_called=False) as router:
+        router.get(source).mock(return_value=httpx.Response(302, headers={"Location": target}))
+        final = router.get(target).mock(return_value=httpx.Response(200, text="ok"))
+        await fetch_page(source, client, headers={"Authorization": "Bearer x"})
+    assert "authorization" not in final.calls.last.request.headers
 
 
 # ── Module boundaries and construction ─────────────────────────────────────────

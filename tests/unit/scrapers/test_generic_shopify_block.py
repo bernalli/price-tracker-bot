@@ -141,31 +141,15 @@ async def test_generic_short_curl_html_survives_httpx_404(
     assert info.error is None
 
 
-class _Blocked403Session:
-    """Fake curl_cffi AsyncSession whose .get() returns an HTTP 403 response."""
-
-    def __init__(self, *args: object, **kwargs: object) -> None:
-        pass
-
-    async def __aenter__(self) -> _Blocked403Session:
-        return self
-
-    async def __aexit__(self, *args: object) -> bool:
-        return False
-
-    async def get(self, *args: object, **kwargs: object) -> object:
-        class _Resp:
-            status_code = 403
-            text = "<html>blocked</html>"
-
-        return _Resp()
+async def _blocked_fallback(url: str) -> str | None:
+    raise HTTPBlockStatus(status=403, url=url)
 
 
-async def test_generic_curl_403_surfaces_block_when_httpx_also_fails(
+async def test_generic_deferred_block_surfaces_when_httpx_also_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """curl_cffi 403 must not be discarded: when httpx also fails → BlockEvent."""
-    monkeypatch.setattr("curl_cffi.requests.AsyncSession", _Blocked403Session)
+    """A deferred block must survive failure of the following HTTP request."""
+    monkeypatch.setattr(generic_module, "_fetch_with_curl_cffi", _blocked_fallback)
 
     async def _httpx_down(url: str, client: httpx.AsyncClient) -> str:  # noqa: ARG001
         raise httpx.ConnectError("connection refused")
@@ -176,11 +160,11 @@ async def test_generic_curl_403_surfaces_block_when_httpx_also_fails(
             await GenericScraper().scrape("https://shop.example/p/curl403", client)
 
 
-async def test_generic_curl_403_falls_back_to_httpx_success(
+async def test_generic_deferred_block_allows_httpx_success(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """curl_cffi 403 but httpx succeeds → normal ProductInfo, no quarantine."""
-    monkeypatch.setattr("curl_cffi.requests.AsyncSession", _Blocked403Session)
+    """A successful HTTP request supersedes a deferred block."""
+    monkeypatch.setattr(generic_module, "_fetch_with_curl_cffi", _blocked_fallback)
     url = "https://shop.example/p/curl403-ok"
     html = (
         '<html><head><script type="application/ld+json">'

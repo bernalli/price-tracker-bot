@@ -2,6 +2,24 @@
 
 Deploy, configure, back up, upgrade, and troubleshoot the bot. For the architectural overview see [architecture.md](architecture.md). For metrics and dashboards see [observability.md](observability.md).
 
+## Outbound destination policy
+
+Product requests resolve the destination for every request and redirect. The complete
+DNS answer must contain only public addresses; failed or empty resolution is refused.
+The connection uses one validated numeric address while preserving the hostname for
+HTTP Host, TLS SNI and certificate verification. Environment proxies are ignored.
+Redirect chains are limited to five hops and one total request deadline, including
+DNS and response reading. Connections are not reused across requests.
+
+The curl impersonation, Scrapling and Playwright backends are disabled. Chromium is
+never started, so page scripts, subresources, service workers and WebSockets cannot
+open separate connections. Products requiring browser rendering or impersonation may
+no longer yield prices; ordinary HTTP extraction remains available.
+
+Telegram uses its fixed API endpoints. Locally installed Python plugins and fetch
+fallbacks are trusted code and must use the supplied client or `public_request` for
+network access; they are not sandboxed.
+
 ## Deploy options
 
 ### Docker compose (recommended)
