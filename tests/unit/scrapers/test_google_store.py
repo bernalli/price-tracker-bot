@@ -9,6 +9,7 @@ import httpx
 import pytest
 import respx
 
+from price_tracker.core.fetch import fetch_page
 from price_tracker.scrapers import google_store as google_store_module
 from price_tracker.scrapers.google_store import GoogleStoreScraper
 
@@ -83,8 +84,9 @@ async def test_google_store_returns_error_on_http_500(
     """5xx response → ProductInfo with HTTP error."""
     scraper = GoogleStoreScraper()
 
-    async def _fast_fetch(url: str, client: httpx.AsyncClient) -> httpx.Response:
-        return await client.get(url)
+    async def _fast_fetch(url: str, client: httpx.AsyncClient) -> str:
+        # The production fetch without its retry wait.
+        return (await fetch_page(url, client)).text
 
     monkeypatch.setattr(google_store_module, "_fetch_google_store_html", _fast_fetch)
 

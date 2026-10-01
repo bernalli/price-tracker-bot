@@ -11,6 +11,7 @@ import pytest
 import respx
 from bs4 import BeautifulSoup
 
+from price_tracker.core.fetch import fetch_page
 from price_tracker.scrapers import mediamarkt as mediamarkt_module
 from price_tracker.scrapers.mediamarkt import MediamarktScraper
 
@@ -109,8 +110,9 @@ async def test_mediamarkt_returns_error_on_http_500(
     """5xx response → ProductInfo with HTTP error."""
     scraper = MediamarktScraper()
 
-    async def _fast_fetch(url: str, client: httpx.AsyncClient) -> httpx.Response:
-        return await client.get(url)
+    async def _fast_fetch(url: str, client: httpx.AsyncClient) -> str:
+        # The production fetch without its retry wait.
+        return (await fetch_page(url, client)).text
 
     monkeypatch.setattr(mediamarkt_module, "_fetch_mediamarkt_html", _fast_fetch)
 
