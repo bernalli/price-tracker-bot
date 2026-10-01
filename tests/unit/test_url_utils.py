@@ -128,3 +128,12 @@ def test_validate_public_url_allows_host_resolving_next_to_shared_address_space(
 ) -> None:
     monkeypatch.setattr(socket, "getaddrinfo", _fake_getaddrinfo(ip))
     validate_public_url("https://shop.example/products/widget")  # must not raise
+
+
+@pytest.mark.parametrize("port", [65536, 65537, 99999])
+def test_validate_public_url_rejects_out_of_range_port(
+    port: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(socket, "getaddrinfo", _fake_getaddrinfo("93.184.216.34"))
+    with pytest.raises(UnsafeURLError):
+        validate_public_url(f"http://shop.example:{port}/")

@@ -50,6 +50,8 @@ def validate_public_url(url: str) -> None:
         raise UnsafeURLError(f"scheme {parsed.scheme!r} not allowed")
     if not parsed.raw_host:
         raise UnsafeURLError("URL has no host")
+    if parsed.port is not None and not 0 <= parsed.port <= 65535:
+        raise UnsafeURLError("URL port must be between 0 and 65535")
     host = parsed.raw_host.decode("ascii")
 
     try:
