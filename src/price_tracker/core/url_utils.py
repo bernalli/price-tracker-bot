@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import ipaddress
 import socket
-from urllib.parse import urlparse
 
+import httpx
 import tldextract
 
 _extractor = tldextract.TLDExtract(suffix_list_urls=(), cache_dir=None)
@@ -42,12 +42,15 @@ def validate_public_url(url: str) -> None:
     This is an admission check only. The public HTTP transport independently
     validates every request and redirect and connects to the validated address.
     """
-    parsed = urlparse(url)
-    if parsed.scheme.lower() not in _ALLOWED_SCHEMES:
+    try:
+        parsed = httpx.URL(url)
+    except (httpx.InvalidURL, TypeError) as exc:
+        raise UnsafeURLError("URL is not a valid HTTPX destination") from exc
+    if parsed.scheme not in _ALLOWED_SCHEMES:
         raise UnsafeURLError(f"scheme {parsed.scheme!r} not allowed")
-    host = parsed.hostname
-    if not host:
+    if not parsed.raw_host:
         raise UnsafeURLError("URL has no host")
+    host = parsed.raw_host.decode("ascii")
 
     try:
         literal_ip = ipaddress.ip_address(host)
@@ -60,7 +63,7 @@ def validate_public_url(url: str) -> None:
             raise UnsafeURLError(f"host {host} is a non-public address")
         return
 
-    port = parsed.port or (443 if parsed.scheme.lower() == "https" else 80)
+    port = parsed.port or (443 if parsed.scheme == "https" else 80)
     try:
         infos = socket.getaddrinfo(
             host,
