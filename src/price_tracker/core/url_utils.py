@@ -37,12 +37,11 @@ def validate_public_url(url: str) -> None:
     hosts that are — or resolve to — loopback/private/link-local/reserved
     addresses (e.g. ``http://localhost``, ``http://127.0.0.1``,
     ``http://169.254.169.254`` cloud-metadata, ``http://192.168.x.x``,
-    ``http://[::1]``). An unresolvable host is allowed (it cannot be connected to,
-    so it carries no SSRF risk); the scrape simply fails later with a normal error.
+    ``http://[::1]``). An unresolvable host may be stored, but the outbound transport must
+    resolve it again and refuse the fetch if resolution fails.
 
-    Note: this validates the user-supplied URL at the storage boundary. Redirect
-    chains followed at fetch time are a separate, narrower vector and are not
-    covered here.
+    This is an admission check only. The public HTTP transport independently
+    validates every request and redirect and connects to the validated address.
     """
     parsed = urlparse(url)
     if parsed.scheme.lower() not in _ALLOWED_SCHEMES:

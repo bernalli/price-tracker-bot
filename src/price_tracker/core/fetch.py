@@ -2,8 +2,8 @@
 
 Block detection and gone detection run on every response, from the primary client
 and from every fallback, before any status handling. Redirects are followed one hop
-at a time, and every hop that lands on a different origin is revalidated against the
-public-URL guard before it is requested. The body is read in bounded steps and cut at
+at a time, and every hop connects through the public-address transport. The body
+is read in bounded steps and cut at
 a byte cap counted on the decoded output, never on the wire. Network and status
 errors leave this module as ``httpx.HTTPError``; a redirect toward a non-public
 destination leaves it as ``UnsafeURLError``, for a caller that already folds both
@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
 from price_tracker.core.exceptions import BlockEvent, ListingGone
+from price_tracker.core.http_client import public_client
 from price_tracker.core.scraper_base import (
     detect_block_event,
     detect_listing_gone,
@@ -287,7 +288,12 @@ async def _fetch_primary(
     request = client.build_request("GET", url, headers=hdrs)
     while True:
         try:
-            response = await client.send(request, stream=True, follow_redirects=False)
+            response = await client.send(
+                request,
+                stream=True,
+                follow_redirects=False,
+                auth=httpx.USE_CLIENT_DEFAULT if not hops else None,
+            )
         except httpx.InvalidURL as exc:
             # httpx builds next_request inside send(); a Location it cannot turn
             # into a URL surfaces as InvalidURL, which is not an HTTPError.
@@ -316,8 +322,6 @@ async def _fetch_primary(
                 )
             next_request = response.next_request
             next_url = str(next_request.url)
-            if _origin(next_request.url) != _origin(request.url):
-                await asyncio.to_thread(validate_public_url, next_url)
             hops.append(next_url)
             current = next_url
             # httpx already built next_request with its own redirect policy
@@ -344,7 +348,7 @@ async def _fetch_primary(
         )
 
 
-async def fetch_page(
+async def _fetch_page(
     url: str,
     client: httpx.AsyncClient,
     *,
@@ -417,3 +421,32 @@ async def fetch_page(
     if deferred is not None:
         raise deferred
     raise primary_failure
+
+
+async def fetch_page(
+    url: str,
+    client: httpx.AsyncClient,
+    *,
+    headers: dict[str, str] | None = None,
+    fallbacks: tuple[FetchFallback, ...] = (),
+    max_redirects: int = DEFAULT_MAX_REDIRECTS,
+    max_bytes: int = DEFAULT_MAX_BYTES,
+    deadline: float = 30.0,
+) -> FetchedPage:
+    """Fetch through validated connections with one deadline for all hops and bodies.
+
+    Fallbacks are trusted local code, like installed scraper plugins, and must
+    perform any network I/O through ``public_request`` or ``build_client``.
+    """
+    try:
+        async with asyncio.timeout(deadline), public_client(client) as protected:
+            return await _fetch_page(
+                url,
+                protected,
+                headers=headers,
+                fallbacks=fallbacks,
+                max_redirects=max_redirects,
+                max_bytes=max_bytes,
+            )
+    except TimeoutError as exc:
+        raise httpx.ReadTimeout("overall fetch deadline exceeded") from exc

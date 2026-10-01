@@ -25,6 +25,8 @@ from tenacity import (
     wait_random_exponential,
 )
 
+from price_tracker.core.http_client import build_client, public_request
+
 logger = logging.getLogger(__name__)
 
 BASE = "EUR"
@@ -62,7 +64,7 @@ _FALLBACK_RATES: dict[str, Decimal] = {
 async def _fetch_fresh_rates(client: httpx.AsyncClient) -> dict[str, Any] | None:
     """Fetch fresh rates from API. Returns dict with rates+fetched_at, or None on parse."""
     try:
-        r = await client.get(API_URL, timeout=15.0)
+        r = await public_request(client, "GET", API_URL, timeout=15.0)
         r.raise_for_status()
         data = r.json()
     except (httpx.HTTPError, ValueError) as e:
@@ -105,7 +107,7 @@ async def get_rates(
 
     own_client = client is None
     if own_client:
-        client = httpx.AsyncClient(timeout=15.0)
+        client = build_client(timeout=15.0)
     else:
         assert client is not None
     network_errored = False
