@@ -19,13 +19,15 @@ def _make_context(
 ) -> MagicMock:
     """Build a minimal ContextTypes.DEFAULT_TYPE mock for health_command tests.
 
-    The real admin_only decorator calls _db(context).is_user_admin(user_id),
-    so we wire a mock DB that returns the desired admin bool. The health
+    The real admin_only decorator calls _db(context).is_user_admin(user_id)
+    and is_user_allowed(user_id), so we wire a mock DB that returns the
+    desired admin bool for an active user. The health
     manager is a real HealthManager (records injected) so the handler sees
     the genuine effective-state logic (lockout expiry -> HALF_OPEN on read).
     """
     db_mock = MagicMock()
     db_mock.is_user_admin = AsyncMock(return_value=is_admin)
+    db_mock.is_user_allowed = AsyncMock(return_value=True)
 
     health_mgr = HealthManager(repo=MagicMock())
     health_mgr._records = {r.domain: r for r in health_records}

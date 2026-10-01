@@ -711,6 +711,8 @@ async def test_legacy_button_ends_new_flow_and_legacy_consumes_next_text(
     legacy_h: tuple[Harness, AsyncMock],
 ) -> None:
     h, db = legacy_h
+    # The legacy button stands in for the admin menu, so the reply comes from an admin.
+    db.is_user_admin.return_value = True
     _, message_id = await _open_value(h, PRIVATE, USER, 1, "tg")
 
     await h.press(PRIVATE, USER, LEGACY_PROMPT_BUTTON)

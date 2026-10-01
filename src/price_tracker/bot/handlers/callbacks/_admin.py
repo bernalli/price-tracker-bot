@@ -18,6 +18,7 @@ from telegram.constants import ParseMode
 from price_tracker.bot.decorators import _config
 from price_tracker.bot.handlers._helpers import _escape_html, _parse_id
 from price_tracker.bot.keyboards import menu_back_button
+from price_tracker.bot.messages import _
 
 if TYPE_CHECKING:
     from telegram.ext import ContextTypes
@@ -125,6 +126,16 @@ async def handle_admin_menu(
         target_id = _parse_id(data.replace("admin_rm_", ""))
         if target_id is None:
             await query.edit_message_text("❌ ID non valido.")
+            return True
+        if target_id == user_id:
+            await query.edit_message_text(
+                _("❌ You cannot remove yourself."), reply_markup=_BACK_TO_ADMIN
+            )
+            return True
+        if await db.is_user_admin(target_id):
+            await query.edit_message_text(
+                _("❌ You cannot remove another administrator."), reply_markup=_BACK_TO_ADMIN
+            )
             return True
         removed = await db.remove_user(target_id)
         if removed:

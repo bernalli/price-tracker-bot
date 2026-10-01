@@ -19,8 +19,9 @@
 ## step 2: press "admin_rm_11" user=1 on=1
 -> answerCallbackQuery
 -> editMessageText chat=1 message_id=1
+   param parse_mode="HTML"
    text:
-   | ❌ Utente non trovato.
+   | ✅ Utente <code>11</code> rimosso.
    keyboard:
    | [◀️ Impostazioni → menu_admin]
 ## db after step 2

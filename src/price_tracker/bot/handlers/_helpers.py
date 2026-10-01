@@ -5,12 +5,17 @@ Split out of the original monolithic bot.py module, verbatim.
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Final, cast
 
 if TYPE_CHECKING:
     from telegram.ext import ContextTypes
+
+# Largest value an SQLite INTEGER holds; product and user ids never exceed it.
+ID_MAX: Final = 9_223_372_036_854_775_807
+_ID_RE: Final = re.compile(r"#?([0-9]{1,19})")
 
 
 def _format_relative_time(iso_ts: str | None, *, now: datetime | None = None) -> str | None:
@@ -76,11 +81,16 @@ def _format_threshold(threshold_type: str, threshold_value: str) -> str:
 
 
 def _parse_id(text: str) -> int | None:
-    """Parse a product id from a string (accepts `#123` and `123`)."""
-    try:
-        return int(text.strip().replace("#", ""))
-    except (ValueError, AttributeError):
+    """Parse a product or user id: `123` or `#123`, ASCII digits, 1..ID_MAX.
+
+    Anything else (whitespace, signs, separators, non-ASCII digits, zero or an
+    overflow) returns None.
+    """
+    match = _ID_RE.fullmatch(text) if isinstance(text, str) else None
+    if match is None:
         return None
+    value = int(match.group(1))
+    return value if 1 <= value <= ID_MAX else None
 
 
 def _safe_dec(value: object) -> Decimal | None:

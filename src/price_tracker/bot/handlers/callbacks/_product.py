@@ -48,9 +48,10 @@ async def handle_delete_flow(
             await query.edit_message_text("❌ ID non valido.")
             return True
         product = await _get_user_product(context, product_id, user_id)
-        if product:
+        # An admin may delete any product (as with every other product action),
+        # so the delete is scoped to the owner, and only a deleted row is confirmed.
+        if product and await db.delete_product(product_id, user_id=product["user_id"]):
             name = product.get("name") or "Sconosciuto"
-            await db.delete_product(product_id, user_id=user_id)
             await query.edit_message_text(
                 f"🗑 Eliminato definitivamente: <b>{_escape_html(name[:80])}</b>",
                 parse_mode=ParseMode.HTML,
