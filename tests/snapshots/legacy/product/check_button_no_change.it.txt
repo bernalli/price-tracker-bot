@@ -11,15 +11,20 @@
    param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
-   | <b>#1</b> Kettle
-   | 💰 €80.00
-   | 📌 Prezzo iniziale: €100.00 (<i>-20.0% dal tracking</i>)
-   | 🎯 Soglia: -10%
-   | 🕐 Ultimo check: 2h fa
+   | 📦 <b>⁨Kettle⁩</b>
+   | ⁨example.com⁩ · #1 · attivo
+   |
+   | 💰 Ora: 80,00 €
+   | 📌 Inizio: 100,00 € · ▼ 20%
+   | 📉 Minimo: 80,00 €
+   | 🔔 Avviso: ribasso del 10% dall'inizio
+   | 🔄 Controlli: ogni 6 h · ultimo 2 ore fa
    keyboard:
-   | [🔍 Check → check_1] [📊 Storico prezzo → chart_1]
+   | [🔍 Controlla ora → check_1] [📊 Storico → chart_1]
    | [⏸ Pausa → pause_1] [🗑 Elimina → remove_1]
-   | [🔗 Apri → url:https://shop.example.com/item/1] [✏️ Modifica → edit_1]
+   | [🔔 Regola avviso → edit_1] [🔄 Intervallo → setrefresh_1]
+   | [🔗 Apri → url:https://shop.example.com/item/1]
+   | [◀️ Lista → menu_prodotti]
 ## db after step 1
 ~ users user_id=10 display_name: NULL -> "U10"
 ## step 2: press "check_1" user=10 on=1001
@@ -50,39 +55,56 @@
    param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
-   | <b>#1</b> Kettle
-   | 💰 €80.00
-   | 📌 Prezzo iniziale: €100.00 (<i>-20.0% dal tracking</i>)
-   | 🎯 Soglia: -10%
-   | 🕐 Ultimo check: 1h fa
+   | 📦 <b>⁨Kettle⁩</b>
+   | ⁨example.com⁩ · #1 · attivo
+   |
+   | 💰 Ora: 80,00 €
+   | 📌 Inizio: 100,00 € · ▼ 20%
+   | 📉 Minimo: 80,00 €
+   | 🔔 Avviso: ribasso del 10% dall'inizio
+   | 🔄 Controlli: ogni 6 h · ultimo 1 ora fa
    keyboard:
-   | [🔍 Check → check_1] [📊 Storico prezzo → chart_1]
+   | [🔍 Controlla ora → check_1] [📊 Storico → chart_1]
    | [⏸ Pausa → pause_1] [🗑 Elimina → remove_1]
-   | [🔗 Apri → url:https://shop.example.com/item/1] [✏️ Modifica → edit_1]
+   | [🔔 Regola avviso → edit_1] [🔄 Intervallo → setrefresh_1]
+   | [🔗 Apri → url:https://shop.example.com/item/1]
+   | [◀️ Lista → menu_prodotti]
 -> sendMessage chat=10
    param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
-   | <b>#2</b> Cheap
-   | 💰 €0.64
-   | 📌 Prezzo iniziale: €0.80 (<i>-20.0% dal tracking</i>)
-   | 🎯 Soglia: -10%
+   | 📦 <b>⁨Cheap⁩</b>
+   | ⁨example.com⁩ · #2 · attivo
+   |
+   | 💰 Ora: 0,64 €
+   | 📌 Inizio: 0,80 € · ▼ 20%
+   | 📉 Minimo: 0,80 €
+   | 🔔 Avviso: ribasso del 10% dall'inizio
+   | 🔄 Controlli: ogni 6 h · mai
    keyboard:
-   | [🔍 Check → check_2] [📊 Storico prezzo → chart_2]
+   | [🔍 Controlla ora → check_2] [📊 Storico → chart_2]
    | [⏸ Pausa → pause_2] [🗑 Elimina → remove_2]
-   | [🔗 Apri → url:https://shop.example.com/item/72] [✏️ Modifica → edit_2]
+   | [🔔 Regola avviso → edit_2] [🔄 Intervallo → setrefresh_2]
+   | [🔗 Apri → url:https://shop.example.com/item/72]
+   | [◀️ Lista → menu_prodotti]
 -> sendMessage chat=10
    param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
-   | <b>#3</b> Near
-   | 💰 €99.50
-   | 📌 Prezzo iniziale: €100.00 (<i>-0.5% dal tracking</i>)
-   | 🎯 Soglia: -10%
+   | 📦 <b>⁨Near⁩</b>
+   | ⁨example.com⁩ · #3 · attivo
+   |
+   | 💰 Ora: 99,50 €
+   | 📌 Inizio: 100,00 € · ▼ 0,5%
+   | 📉 Minimo: 100,00 €
+   | 🔔 Avviso: ribasso del 10% dall'inizio
+   | 🔄 Controlli: ogni 6 h · mai
    keyboard:
-   | [🔍 Check → check_3] [📊 Storico prezzo → chart_3]
+   | [🔍 Controlla ora → check_3] [📊 Storico → chart_3]
    | [⏸ Pausa → pause_3] [🗑 Elimina → remove_3]
-   | [🔗 Apri → url:https://shop.example.com/item/73] [✏️ Modifica → edit_3]
+   | [🔔 Regola avviso → edit_3] [🔄 Intervallo → setrefresh_3]
+   | [🔗 Apri → url:https://shop.example.com/item/73]
+   | [◀️ Lista → menu_prodotti]
 -> sendMessage chat=10
    param parse_mode="HTML"
    text:
