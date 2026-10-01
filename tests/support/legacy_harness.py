@@ -928,6 +928,17 @@ def _canonical(value: object) -> str:
     return json.dumps(value, sort_keys=True, ensure_ascii=False)
 
 
+def _describe_error(exc: BaseException) -> str:
+    """``Type: message`` on one line, without repeating a type the message already starts with.
+
+    Telegram's error descriptions start with the error kind ("Forbidden: bot was
+    blocked by the user"), which ``Type: message`` would print twice.
+    """
+    name = type(exc).__name__
+    message = _one_line(str(exc))
+    return message if message.startswith(f"{name}:") else f"{name}: {message}"
+
+
 def _one_line(value: str) -> str:
     """``value`` with CR and LF written as ``\\r`` and ``\\n``.
 
@@ -1246,10 +1257,7 @@ class Recorder:
         world = self._world
         new_errors = world.errors[self._errors_seen :]
         self._errors_seen = len(world.errors)
-        return [
-            f"{_INDENT}!! error_handler: {type(e).__name__}: {_one_line(str(e))}"
-            for e in new_errors
-        ]
+        return [f"{_INDENT}!! error_handler: {_describe_error(e)}" for e in new_errors]
 
     def snapshot(self, scenario_id: str) -> Snapshot:
         """The rendering of every step recorded so far, as scenario ``scenario_id``."""
