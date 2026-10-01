@@ -653,6 +653,7 @@ class Scheduler:
                 scraper_name=scraper_name,
                 domain=domain,
                 reason="price_none",
+                detail=info.error,
                 collector=collector,
             )
             return (p.user_id, None, disabled)
