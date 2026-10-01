@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-01
+
+### Added
+
+- The check interval set per product with `/refresh` is honoured: the periodic job runs
+  every 5 minutes and checks only the products whose own interval (else the global one)
+  has elapsed since their last attempt. A failed read counts as an attempt, so a failing
+  product is not retried every 5 minutes.
+- `/lista` shows each product as the new product card, in the language of the user's
+  Telegram app, with buttons to check, show the history, pause or reactivate, delete,
+  change the alert rule, change the interval, and go back to the list.
+
+### Changed
+
+- `/intervallo` takes effect from the next 5-minute tick.
+- `/refresh` confirms the interval in the user's language ("ogni 1 h", "ogni 90 min",
+  "ogni 1 giorno").
+- Product pages are fetched only from validated public IPv4 addresses: every request and
+  redirect hop resolves the host once, rejects non-public answers and connects to the
+  validated address. IPv6 targets are refused, and the curl_cffi, Scrapling and headless
+  Chromium fetch backends are disabled because they cannot be bound to a validated address.
+- `/importa` reads files separated by `;` as well as `,`, and answers with an explicit
+  error when the file has no `URL` column.
+- `/importa` validates the `Soglia` column like the threshold prompt (an integer percentage
+  1-99, an amount above 0, or any drop); rows with an invalid threshold are skipped and
+  counted in the summary.
+
+### Fixed
+
+- Amazon: a price is accepted only if it belongs to the tracked product, so a
+  recommendation or sponsored card can no longer stand in for a missing buy-box price.
+- Apple Store, Best Buy, Etsy, Google Store, MediaMarkt, Newegg, Otto, Target, Walmart,
+  Wayfair and Zalando: a removed listing (404/410) is now detected and suspends the product
+  instead of counting as a generic read failure. eBay: a blocked page now quarantines the
+  domain.
+- A product name containing `$` no longer breaks `/storia`: the chart title is literal text.
+- `/removeuser` and the remove-user button report a removal instead of "not found".
+- `/adduser` on a deactivated user reactivates them.
+- An administrator confirming the deletion of another user's product now deletes it; the
+  confirmation is shown only when a product was deleted.
+
+### Security
+
+- The remove-user button refuses administrators and the administrator pressing it.
+- A deactivated administrator can no longer run admin commands, and an admin prompt is
+  re-checked when it is answered.
+- Product and user ids in commands and buttons are accepted only as positive ASCII integers
+  (optionally `#`-prefixed) within the database range.
+
 ## [1.2.0] - 2026-09-25
 
 ### Added
@@ -570,7 +619,8 @@ auto-quarantine, and a plugin extension point.
 - osv-scanner dependency vulnerability scan in CI.
 - Pre-commit hooks block secrets at commit time.
 
-[Unreleased]: https://github.com/bernalli/price-tracker-bot/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/bernalli/price-tracker-bot/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/bernalli/price-tracker-bot/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/bernalli/price-tracker-bot/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/bernalli/price-tracker-bot/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/bernalli/price-tracker-bot/compare/v0.2.0...v1.0.0
