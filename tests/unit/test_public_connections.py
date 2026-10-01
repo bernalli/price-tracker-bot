@@ -14,7 +14,7 @@ import httpcore
 import httpx
 import pytest
 
-from price_tracker.core.http_client import _PublicTransport, build_client
+from price_tracker.core.http_client import PublicAsyncClient, _PublicTransport, build_client
 from price_tracker.core.url_utils import UnsafeURLError, validate_public_url
 
 PUBLIC = "93.184.216.34"
@@ -483,6 +483,22 @@ async def test_proxy_environment_does_not_change_connection(
     async with build_client() as client:
         await client.get("https://shop.example/product")
     assert network.targets == [(PUBLIC, 443)]
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"mounts": {"http://": httpx.MockTransport(lambda request: httpx.Response(200))}},
+        {"proxy": "http://127.0.0.1:8080"},
+        {"transport": httpx.MockTransport(lambda request: httpx.Response(200))},
+        {"app": object()},
+        {"trust_env": True},
+    ],
+    ids=["mounts", "proxy", "transport", "app", "trust-env"],
+)
+def test_alternate_transports_are_rejected(kwargs: dict[str, Any]) -> None:
+    with pytest.raises(TypeError, match="does not allow alternate transports"):
+        PublicAsyncClient(**kwargs)
 
 
 def test_disabled_browser_does_not_shadow_generic_scraper() -> None:

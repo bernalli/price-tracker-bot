@@ -187,6 +187,12 @@ class PublicAsyncClient(httpx.AsyncClient):
     """HTTPX client with manual redirects and one deadline per request chain."""
 
     def __init__(self, *, deadline: float = 30.0, max_connections: int = 10, **kwargs: Any) -> None:
+        alternate_transports = {"app", "mounts", "proxy", "transport", "trust_env"}.intersection(
+            kwargs
+        )
+        if alternate_transports:
+            names = ", ".join(sorted(alternate_transports))
+            raise TypeError(f"PublicAsyncClient does not allow alternate transports: {names}")
         self._deadline_seconds = deadline
         super().__init__(
             transport=_PublicTransport(max_connections),
