@@ -180,9 +180,13 @@ class Repository:
         )
         await self._conn.commit()
 
-    async def remove_user(self, user_id: int) -> None:
-        await self._conn.execute("UPDATE users SET is_active = 0 WHERE user_id = ?", (user_id,))
+    async def remove_user(self, user_id: int) -> bool:
+        """Deactivate a user; True only if an active user was deactivated by this call."""
+        cursor = await self._conn.execute(
+            "UPDATE users SET is_active = 0 WHERE user_id = ? AND is_active = 1", (user_id,)
+        )
         await self._conn.commit()
+        return int(cursor.rowcount) > 0
 
     async def list_users(self) -> list[UserRecord]:
         cursor = await self._conn.execute(

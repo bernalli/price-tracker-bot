@@ -14,7 +14,7 @@ from unittest.mock import AsyncMock, MagicMock
 import aiosqlite
 import pytest_asyncio
 
-from price_tracker.bot.handlers.auth import cmd_add_user
+from price_tracker.bot.handlers.auth import cmd_add_user, cmd_remove_user
 from price_tracker.bot.handlers.callbacks._admin import handle_admin_menu
 from price_tracker.bot.handlers.callbacks._product import handle_delete_flow
 from price_tracker.bot.handlers.text_input import handle_text_input
@@ -215,3 +215,26 @@ async def test_adduser_reactivates_a_deactivated_user(repo: Repository) -> None:
 
     assert await repo.is_user_allowed(PLAIN_USER_ID)
     assert "added" in str(update.message.reply_text.await_args.args[0])
+
+
+# ── remove_user outcome ───────────────────────────────────────────────
+
+
+async def test_remove_user_reports_whether_an_active_user_was_deactivated(
+    repo: Repository,
+) -> None:
+    assert await repo.remove_user(PLAIN_USER_ID) is True
+    assert await repo.remove_user(PLAIN_USER_ID) is False
+    assert await repo.remove_user(PLAIN_USER_ID + 5) is False
+
+
+async def test_removeuser_confirms_the_removal(repo: Repository) -> None:
+    update = _command_update(ADMIN_ID, f"/removeuser {PLAIN_USER_ID}")
+    context = _context()
+    context.args = [str(PLAIN_USER_ID)]
+    context.bot_data = {"db": repo}
+
+    await cmd_remove_user(update, context)
+
+    assert not await repo.is_user_allowed(PLAIN_USER_ID)
+    assert "removed" in str(update.message.reply_text.await_args.args[0])
