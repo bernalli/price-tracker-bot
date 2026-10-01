@@ -20,7 +20,6 @@ from telegram.ext import (
 
 from price_tracker.bot.decorators import _db, restricted, with_locale
 from price_tracker.bot.handlers._helpers import _escape_html
-from price_tracker.bot.handlers.settings import _reschedule_periodic_check
 from price_tracker.bot.messages import _
 
 if TYPE_CHECKING:
@@ -148,7 +147,6 @@ async def handle_text_input(  # noqa: PLR0915 — verbatim port; not yet split i
             context.user_data["pending_action"] = pending_action
             return
         await db.set_config("check_interval_minutes", str(minutes))
-        _reschedule_periodic_check(context, minutes)
         if minutes >= 60:
             h = minutes / 60
             display = f"{h:.0f} ore" if h == int(h) else f"{h:.1f} ore"
