@@ -359,6 +359,18 @@ async def test_cross_origin_redirect_drops_client_auth(network: Network) -> None
     assert b"Authorization:" not in network.streams[1].writes
 
 
+async def test_scheme_change_redirect_drops_client_auth(network: Network) -> None:
+    network.responses = [
+        b"HTTP/1.1 302 Found\r\nLocation: https://shop.example/next\r\nContent-Length: 0\r\n\r\n",
+        b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok",
+    ]
+    async with build_client() as client:
+        client.auth = ("example-user", "example-password")
+        await client.get("http://shop.example/product", follow_redirects=True)
+    assert b"Authorization:" in network.streams[0].writes
+    assert b"Authorization:" not in network.streams[1].writes
+
+
 @pytest.mark.parametrize(
     "module",
     [

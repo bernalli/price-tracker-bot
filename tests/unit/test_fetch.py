@@ -933,6 +933,16 @@ async def test_default_headers_rotate_user_agent_and_extra_headers_merge(client)
     assert "cookie" not in same_headers
 
 
+async def test_http_to_https_redirect_drops_authorization(client):
+    source = "http://f.example/p/A"
+    target = "https://f.example/p/B"
+    with respx.mock(assert_all_called=False) as router:
+        router.get(source).mock(return_value=httpx.Response(302, headers={"Location": target}))
+        final = router.get(target).mock(return_value=httpx.Response(200, text="ok"))
+        await fetch_page(source, client, headers={"Authorization": "Bearer x"})
+    assert "authorization" not in final.calls.last.request.headers
+
+
 # ── Module boundaries and construction ─────────────────────────────────────────
 
 

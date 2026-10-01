@@ -17,6 +17,11 @@ import httpx
 from price_tracker.core.url_utils import UnsafeURLError, _is_blocked_ip
 
 
+def _origin(url: httpx.URL) -> tuple[str, bytes, int]:
+    default_port = 443 if url.scheme == "https" else 80
+    return (url.scheme, url.raw_host, url.port or default_port)
+
+
 async def _resolve_public(url: httpx.URL) -> tuple[str, ...]:
     if url.scheme not in {"http", "https"} or not url.raw_host:
         raise UnsafeURLError("a public HTTP(S) destination is required")
@@ -233,8 +238,11 @@ class PublicAsyncClient(httpx.AsyncClient):
                             raise httpx.TooManyRedirects(
                                 "redirect hop limit exceeded", request=request
                             )
+                        next_request = response.next_request
+                        if _origin(request.url) != _origin(next_request.url):
+                            next_request.headers.pop("Authorization", None)
                         history.append(response)
-                        request = response.next_request
+                        request = next_request
                         auth = None
                     except BaseException:
                         await response.aclose()

@@ -271,8 +271,9 @@ async def _read_capped(response: httpx.Response, max_bytes: int) -> tuple[bytes,
     return body, truncated or was_cut
 
 
-def _origin(url: httpx.URL) -> tuple[str, str, int | None]:
-    return (url.scheme, url.host, url.port)
+def _origin(url: httpx.URL) -> tuple[str, str, int]:
+    default_port = 443 if url.scheme == "https" else 80
+    return (url.scheme, url.host, url.port or default_port)
 
 
 async def _fetch_primary(
@@ -321,6 +322,8 @@ async def _fetch_primary(
                     request=request,
                 )
             next_request = response.next_request
+            if _origin(request.url) != _origin(next_request.url):
+                next_request.headers.pop("Authorization", None)
             next_url = str(next_request.url)
             hops.append(next_url)
             current = next_url
