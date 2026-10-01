@@ -13,6 +13,7 @@ from unittest.mock import AsyncMock, MagicMock
 import aiosqlite
 import pytest_asyncio
 
+from price_tracker.bot.handlers.auth import cmd_add_user
 from price_tracker.bot.handlers.callbacks._admin import handle_admin_menu
 from price_tracker.db.migrator import apply_migrations
 from price_tracker.db.repository import Repository
@@ -80,3 +81,29 @@ async def test_admin_rm_refuses_to_deactivate_the_caller(repo: Repository) -> No
     assert handled is True
     assert await repo.is_user_allowed(ADMIN_ID)
     assert "yourself" in _text(query) or "te stesso" in _text(query)
+
+
+# ── admin_only ────────────────────────────────────────────────────────
+
+
+def _command_update(user_id: int, text: str) -> MagicMock:
+    update = MagicMock()
+    update.effective_user.id = user_id
+    update.effective_user.language_code = "en"
+    update.message.text = text
+    update.message.reply_text = AsyncMock()
+    return update
+
+
+async def test_admin_only_refuses_a_deactivated_admin(repo: Repository) -> None:
+    await repo.remove_user(OTHER_ADMIN_ID)
+    update = _command_update(OTHER_ADMIN_ID, f"/adduser {PLAIN_USER_ID + 1}")
+    context = _context()
+    context.args = [str(PLAIN_USER_ID + 1)]
+    context.bot_data = {"db": repo}
+
+    await cmd_add_user(update, context)
+
+    assert await repo.get_user(PLAIN_USER_ID + 1) is None
+    replies = [str(c.args[0]) for c in update.message.reply_text.await_args_list]
+    assert replies == ["⛔ Admin-only command."]

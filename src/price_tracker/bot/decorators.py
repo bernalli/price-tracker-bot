@@ -88,7 +88,7 @@ def restricted(func: HandlerFn) -> HandlerFn:
 
 
 def admin_only(func: HandlerFn) -> HandlerFn:
-    """Restrict a handler to admin users only."""
+    """Restrict a handler to active admin users only."""
 
     @wraps(func)
     async def wrapped(
@@ -98,7 +98,8 @@ def admin_only(func: HandlerFn) -> HandlerFn:
         if not user:
             return None
         db = _db(context)
-        is_admin = await db.is_user_admin(user.id)
+        # A deactivated admin keeps is_admin = 1, so both flags must hold.
+        is_admin = await db.is_user_admin(user.id) and await db.is_user_allowed(user.id)
         if not is_admin:
             if update.message:
                 await update.message.reply_text(_("⛔ Admin-only command."))
