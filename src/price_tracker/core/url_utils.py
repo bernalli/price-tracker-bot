@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import ipaddress
 import socket
-from urllib.parse import urlparse
 
+import httpx
 import tldextract
 
 _extractor = tldextract.TLDExtract(suffix_list_urls=(), cache_dir=None)
@@ -18,7 +18,7 @@ class UnsafeURLError(ValueError):
 
 
 def _is_blocked_ip(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
-    """True for loopback/private/link-local/reserved/multicast/unspecified addresses."""
+    """True for loopback/private/link-local/reserved/multicast/unspecified/non-global addresses."""
     return (
         ip.is_private
         or ip.is_loopback
@@ -26,6 +26,7 @@ def _is_blocked_ip(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
         or ip.is_multicast
         or ip.is_reserved
         or ip.is_unspecified
+        or not ip.is_global  # e.g. the shared address space of RFC 6598
     )
 
 
@@ -33,45 +34,64 @@ def validate_public_url(url: str) -> None:
     """Raise :class:`UnsafeURLError` if ``url`` is not a safe public http(s) target.
 
     SSRF guard for user-supplied product URLs. Blocks non-http(s) schemes and
-    hosts that are — or resolve to — loopback/private/link-local/reserved
+    IPv6 literals and hosts that are — or resolve to — loopback/private/link-local/reserved
     addresses (e.g. ``http://localhost``, ``http://127.0.0.1``,
     ``http://169.254.169.254`` cloud-metadata, ``http://192.168.x.x``,
-    ``http://[::1]``). An unresolvable host is allowed (it cannot be connected to,
-    so it carries no SSRF risk); the scrape simply fails later with a normal error.
+    ``http://[::1]``). Hostnames must resolve to at least one public IPv4 address.
 
-    Note: this validates the user-supplied URL at the storage boundary. Redirect
-    chains followed at fetch time are a separate, narrower vector and are not
-    covered here.
+    This is an admission check only. The public HTTP transport independently
+    validates every request and redirect and connects to the validated address.
     """
-    parsed = urlparse(url)
-    if parsed.scheme.lower() not in _ALLOWED_SCHEMES:
+    try:
+        parsed = httpx.URL(url)
+    except (httpx.InvalidURL, TypeError) as exc:
+        raise UnsafeURLError("URL is not a valid HTTPX destination") from exc
+    if parsed.scheme not in _ALLOWED_SCHEMES:
         raise UnsafeURLError(f"scheme {parsed.scheme!r} not allowed")
-    host = parsed.hostname
-    if not host:
+    if not parsed.raw_host:
         raise UnsafeURLError("URL has no host")
+    if parsed.port is not None and not 0 <= parsed.port <= 65535:
+        raise UnsafeURLError("URL port must be between 0 and 65535")
+    host = parsed.raw_host.decode("ascii")
 
     try:
         literal_ip = ipaddress.ip_address(host)
     except ValueError:
         literal_ip = None
     if literal_ip is not None:
+        if literal_ip.version != 4:
+            raise UnsafeURLError(f"host {host} is an IPv6 address")
         if _is_blocked_ip(literal_ip):
             raise UnsafeURLError(f"host {host} is a non-public address")
         return
 
-    port = parsed.port or (443 if parsed.scheme.lower() == "https" else 80)
+    port = parsed.port or (443 if parsed.scheme == "https" else 80)
     try:
-        infos = socket.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
-    except socket.gaierror:
-        return  # unresolvable → not reachable → not an SSRF risk
-    for info in infos:
-        addr = info[4][0]
+        infos = socket.getaddrinfo(
+            host,
+            port,
+            family=socket.AF_INET,
+            type=socket.SOCK_STREAM,
+            proto=socket.IPPROTO_TCP,
+        )
+    except socket.gaierror as exc:
+        raise UnsafeURLError(f"host {host} has no IPv4 address") from exc
+    addresses: list[ipaddress.IPv4Address] = []
+    for family, _type, _proto, _canonname, sockaddr in infos:
+        if family != socket.AF_INET:
+            continue
+        addr = sockaddr[0]
         try:
             resolved = ipaddress.ip_address(addr)
         except ValueError:
             continue
+        if resolved.version == 4:
+            addresses.append(resolved)
+    if not addresses:
+        raise UnsafeURLError(f"host {host} has no IPv4 address")
+    for resolved in addresses:
         if _is_blocked_ip(resolved):
-            raise UnsafeURLError(f"host {host} resolves to non-public address {addr}")
+            raise UnsafeURLError(f"host {host} resolves to non-public address {resolved}")
 
 
 def extract_etld_plus_one(url: str) -> str:

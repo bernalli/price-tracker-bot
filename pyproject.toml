@@ -13,6 +13,7 @@ requires-python = ">=3.11"
 dependencies = [
     "python-telegram-bot[job-queue]>=22.8",
     "httpx>=0.27.0",
+    "httpcore>=1.0.9,<2",
     "brotli>=1.2.0",  # httpx needs this to decompress br-encoded responses (some sites serve brotli by default)
     "beautifulsoup4>=4.15.0",
     "lxml>=6.1.3",

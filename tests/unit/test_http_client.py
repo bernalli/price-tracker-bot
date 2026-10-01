@@ -13,7 +13,7 @@ async def test_build_client_returns_async_client():
     client = build_client(timeout=5.0)
     try:
         assert isinstance(client, httpx.AsyncClient)
-        assert client.follow_redirects is True
+        assert client.follow_redirects is False
     finally:
         await client.aclose()
 

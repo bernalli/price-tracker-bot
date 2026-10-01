@@ -56,11 +56,84 @@ def test_validate_public_url_allows_public_host(monkeypatch: pytest.MonkeyPatch)
     validate_public_url("https://shop.example/products/widget")
 
 
-def test_validate_public_url_allows_unresolvable_host(monkeypatch: pytest.MonkeyPatch) -> None:
-    """An unresolvable host cannot be used for SSRF (no connection); don't block it."""
+def test_validate_public_url_rejects_public_ipv6_literal() -> None:
+    with pytest.raises(UnsafeURLError):
+        validate_public_url("http://[2606:4700:4700::1111]/x")
+
+
+def test_validate_public_url_rejects_unresolvable_host(monkeypatch: pytest.MonkeyPatch) -> None:
 
     def _boom(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202, ARG001
         raise socket.gaierror("name resolution failed")
 
     monkeypatch.setattr(socket, "getaddrinfo", _boom)
-    validate_public_url("https://does-not-resolve.example/x")  # must not raise
+    with pytest.raises(UnsafeURLError):
+        validate_public_url("https://does-not-resolve.example/x")
+
+
+# --- Shared address space (100.64.0.0/10, RFC 6598) ---------------------------
+
+
+@pytest.mark.parametrize(
+    "ip",
+    [
+        "100.64.0.0",  # lower bound
+        "100.64.0.1",
+        "100.100.100.100",
+        "100.101.102.103",
+        "100.127.255.255",  # upper bound
+    ],
+)
+def test_validate_public_url_rejects_shared_address_space_literal(ip: str) -> None:
+    with pytest.raises(UnsafeURLError):
+        validate_public_url(f"http://{ip}/x")
+
+
+@pytest.mark.parametrize("ip", ["100.63.255.255", "100.128.0.0"])
+def test_validate_public_url_allows_neighbours_of_shared_address_space(ip: str) -> None:
+    # Just outside 100.64.0.0/10 on either side: ordinary public addresses.
+    validate_public_url(f"http://{ip}/x")  # must not raise
+
+
+@pytest.mark.parametrize(
+    "ip",
+    [
+        "::ffff:100.64.0.1",  # IPv4-mapped, shared address space
+        "::ffff:100.127.255.255",
+        "::ffff:127.0.0.1",  # IPv4-mapped, loopback
+        "::ffff:10.0.0.1",  # IPv4-mapped, private
+        "::127.0.0.1",  # IPv4-compatible, loopback
+        "::100.64.0.1",  # IPv4-compatible, shared address space
+        "64:ff9b::7f00:1",  # NAT64 of 127.0.0.1
+        "64:ff9b::6440:1",  # NAT64 of 100.64.0.1
+    ],
+)
+def test_validate_public_url_rejects_ipv6_embedding_non_public_ipv4(ip: str) -> None:
+    with pytest.raises(UnsafeURLError):
+        validate_public_url(f"http://[{ip}]/x")
+
+
+@pytest.mark.parametrize("ip", ["100.64.0.0", "100.101.102.103", "100.127.255.255"])
+def test_validate_public_url_rejects_host_resolving_to_shared_address_space(
+    monkeypatch: pytest.MonkeyPatch, ip: str
+) -> None:
+    monkeypatch.setattr(socket, "getaddrinfo", _fake_getaddrinfo(ip))
+    with pytest.raises(UnsafeURLError):
+        validate_public_url("https://shop.example/products/widget")
+
+
+@pytest.mark.parametrize("ip", ["100.63.255.255", "100.128.0.0"])
+def test_validate_public_url_allows_host_resolving_next_to_shared_address_space(
+    monkeypatch: pytest.MonkeyPatch, ip: str
+) -> None:
+    monkeypatch.setattr(socket, "getaddrinfo", _fake_getaddrinfo(ip))
+    validate_public_url("https://shop.example/products/widget")  # must not raise
+
+
+@pytest.mark.parametrize("port", [65536, 65537, 99999])
+def test_validate_public_url_rejects_out_of_range_port(
+    port: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(socket, "getaddrinfo", _fake_getaddrinfo("93.184.216.34"))
+    with pytest.raises(UnsafeURLError):
+        validate_public_url(f"http://shop.example:{port}/")
