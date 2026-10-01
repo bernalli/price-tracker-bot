@@ -6,6 +6,7 @@ that every assertion reads the state the bot would actually leave behind.
 
 from __future__ import annotations
 
+from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
@@ -15,6 +16,7 @@ import pytest_asyncio
 
 from price_tracker.bot.handlers.auth import cmd_add_user
 from price_tracker.bot.handlers.callbacks._admin import handle_admin_menu
+from price_tracker.bot.handlers.callbacks._product import handle_delete_flow
 from price_tracker.bot.handlers.text_input import handle_text_input
 from price_tracker.db.migrator import apply_migrations
 from price_tracker.db.repository import Repository
@@ -148,3 +150,51 @@ async def test_admin_pending_action_is_refused_after_the_admin_is_deactivated(
     await handle_text_input(_text_update(ADMIN_ID, str(new_user_id)), context)
 
     assert await repo.get_user(new_user_id) is None
+
+
+# ── confirm_delete_ on another user's product ─────────────────────────
+
+
+async def _add_plain_user_product(repo: Repository) -> int:
+    return await repo.add_product(
+        user_id=PLAIN_USER_ID,
+        url="https://example.com/products/widget",
+        name="Widget",
+        domain="example.com",
+        initial_price=Decimal("10.00"),
+        currency="EUR",
+    )
+
+
+async def test_confirm_delete_by_an_admin_deletes_another_users_product(
+    repo: Repository,
+) -> None:
+    product_id = await _add_plain_user_product(repo)
+    query = _query()
+    context = _context()
+    context.bot_data = {"db": repo}
+
+    handled = await handle_delete_flow(
+        query, context, repo, ADMIN_ID, f"confirm_delete_{product_id}"
+    )
+
+    assert handled is True
+    assert await repo.get_product(product_id) is None
+    assert "Eliminato" in _text(query)
+
+
+async def test_confirm_delete_by_a_plain_user_leaves_another_users_product(
+    repo: Repository,
+) -> None:
+    product_id = await _add_plain_user_product(repo)
+    await repo.ensure_user(PLAIN_USER_ID + 4)
+    query = _query()
+    context = _context()
+    context.bot_data = {"db": repo}
+
+    await handle_delete_flow(
+        query, context, repo, PLAIN_USER_ID + 4, f"confirm_delete_{product_id}"
+    )
+
+    assert await repo.get_product(product_id) is not None
+    assert "Eliminato" not in _text(query)
