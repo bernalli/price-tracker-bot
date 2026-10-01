@@ -150,7 +150,7 @@ src/price_tracker/
 └── locale/         # gettext catalogs (en, it_IT)
 plugins/            # extension point for custom scrapers
 docs/               # user + contributor documentation
-tests/              # pytest suite (717 tests, ≥90% coverage)
+tests/              # pytest suite (about 3,800 tests, ≥90% coverage)
 ```
 
 ## Stability
@@ -170,8 +170,11 @@ follow them, which is maintenance rather than a breaking change.
 - v0.2.0 — confirmation-based alerting: a single bad scrape can no longer raise a price-drop alert
 - **v1.0.0 — stable schema and command surface**; per-domain quarantine reachable from every
   scraper, public metadata and artwork carrying no real tracked listing
-- next — operational notices grouped per store and explaining themselves, per-product check
-  intervals honoured by the scheduler, full UI localisation
+- v1.1.0 — operational notices grouped per store and explaining themselves, removed-listing
+  detection
+- v1.3.0 — per-product check intervals honoured by the scheduler, the localised product card in
+  `/lista`, product pages fetched only from validated public IPv4 addresses
+- next — the remaining screens on the localised UI, one shared fetch pipeline for every scraper
 
 ## Contributing
 
