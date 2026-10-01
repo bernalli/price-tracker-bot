@@ -32,7 +32,8 @@ from price_tracker.bot.handlers._helpers import (
     _parse_id,
     _safe_dec,
 )
-from price_tracker.bot.messages import _, ngettext
+from price_tracker.bot.messages import _, current_locale
+from price_tracker.i18n.format import duration
 
 if TYPE_CHECKING:
     from telegram import Update
@@ -150,13 +151,7 @@ async def cmd_refresh(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     await db.set_product_interval(product_id, minutes)
     name = product.get("name") or _("Unknown")
 
-    if minutes >= 60:
-        hours = minutes / 60
-        hours_str = f"{hours:.0f}" if hours == int(hours) else f"{hours:.1f}"
-        n_hours = int(hours) if hours == int(hours) else 2  # use plural form for fractional hours
-        display = ngettext("{n} hour", "{n} hours", n_hours).format(n=hours_str)
-    else:
-        display = _("{n} minutes").format(n=minutes)
+    display = duration(minutes, locale=current_locale())
 
     await update.message.reply_text(
         _("🔄 Check interval: <b>every {display}</b>\n📦 #{pid} — {name}").format(

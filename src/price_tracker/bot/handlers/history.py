@@ -82,7 +82,8 @@ def _render_chart(
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%d/%m"))
     fig.autofmt_xdate(rotation=30)
 
-    ax.set_title(name, color="white", fontsize=10, pad=10)
+    # A product name is literal text: '$' must not start mathtext.
+    ax.set_title(name, color="white", fontsize=10, pad=10, parse_math=False)
 
     min_p, max_p = min(prices), max(prices)
     margin = (max_p - min_p) * 0.15 if max_p != min_p else max_p * 0.05

@@ -974,3 +974,14 @@ msgid "⚠️ {n} failed read · /errors"
 msgid_plural "⚠️ {n} failed reads · /errors"
 msgstr[0] ""
 msgstr[1] ""
+
+#: src/price_tracker/bot/handlers/product_io.py
+msgid ""
+"❌ The CSV file has no URL column. Send the file exported with /esporta, "
+"separated by commas or semicolons."
+msgstr ""
+
+#: src/price_tracker/bot/handlers/product_io.py
+#, python-brace-format
+msgid "❌ Rows with an invalid threshold: {n}"
+msgstr ""

@@ -25,9 +25,10 @@
 ## db after step 3
 (no changes)
 ## step 4: command "/storia 4" user=10
--> sendMessage chat=10
-   text:
-   | ❌ Si è verificato un errore. Riprova tra qualche istante.
-   !! error_handler: ValueError: \n\zz\n^\nParseFatalException: Unknown symbol: \zz, found '\'  (at char 0), (line:1, col:1)
+-> sendPhoto chat=10 photo=png filename=chart_4.png
+   param parse_mode="HTML"
+   caption:
+   | 📊 <b>#4</b> Cable $\zz$
+   | 📉 Min: €40.00  📈 Max: €50.00
 ## db after step 4
 (no changes)
