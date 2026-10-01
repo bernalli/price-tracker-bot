@@ -9,6 +9,7 @@ import httpx
 import pytest
 import respx
 
+from price_tracker.core.exceptions import ListingGone
 from price_tracker.scrapers import amazon as amazon_module
 from price_tracker.scrapers.amazon import AmazonScraper
 
@@ -81,77 +82,28 @@ async def test_amazon_parses_fixture_html(
 
 
 @pytest.mark.asyncio
-async def test_amazon_handles_404(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Non-retryable 404 → ProductInfo with error, price=None, no crash."""
+async def test_amazon_handles_404() -> None:
+    """404 (listing removed) raises ListingGone, not a generic price=None error.
+
+    Amazon used to collapse every non-2xx status into ProductInfo(error=...);
+    404/410 must instead surface as ListingGone so the scheduler records a
+    removed listing rather than a fetch failure (#16/#73).
+    """
     scraper = AmazonScraper()
-
-    # Speed up retry: replace retry-decorated fetcher with a single-attempt version.
-    async def _fast_fetch(
-        url: str,
-        client: httpx.AsyncClient,
-        extra_headers: dict[str, str] | None = None,
-    ) -> str:
-        headers = extra_headers or {}
-        response = await client.get(url, headers=headers)
-        response.raise_for_status()
-        return response.text
-
-    monkeypatch.setattr(amazon_module, "_fetch_amazon_html", _fast_fetch)
-
-    async def _no_fresh(url: str) -> str | None:
-        return None
-
-    async def _no_curl(url: str) -> str | None:
-        return None
-
-    async def _no_scrapling(url: str) -> str | None:
-        return None
-
-    monkeypatch.setattr(amazon_module, "_fetch_with_fresh_client", _no_fresh)
-    monkeypatch.setattr(amazon_module, "_fetch_via_curl_cffi", _no_curl)
-    monkeypatch.setattr(amazon_module, "_fetch_via_scrapling", _no_scrapling)
+    url = "https://www.amazon.it/dp/MISSING"
 
     with respx.mock(assert_all_called=False) as router:
-        router.get("https://www.amazon.it/dp/MISSING").respond(404)
+        router.get(url).respond(404)
         async with httpx.AsyncClient() as client:
-            info = await scraper.scrape("https://www.amazon.it/dp/MISSING", client)
+            with pytest.raises(ListingGone) as exc:
+                await scraper.scrape(url, client)
 
-    assert info.price is None
-    assert info.error is not None
+    assert exc.value.status == 404
 
 
-@pytest.mark.asyncio
-async def test_amazon_handles_429_after_retries(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Retryable 429 → after retries+fallbacks exhausted, raise HTTPBlockStatus (quarantine)."""
-    from price_tracker.core.exceptions import HTTPBlockStatus
-
-    scraper = AmazonScraper()
-
-    # Bypass the retry decorator by replacing the module-level fetcher.
-    async def _fast_fail(
-        url: str,
-        client: httpx.AsyncClient,
-        extra_headers: dict[str, str] | None = None,
-    ) -> str:
-        headers = extra_headers or {}
-        response = await client.get(url, headers=headers)
-        response.raise_for_status()
-        return response.text
-
-    monkeypatch.setattr(amazon_module, "_fetch_amazon_html", _fast_fail)
-
-    async def _none(url: str) -> str | None:
-        return None
-
-    monkeypatch.setattr(amazon_module, "_fetch_with_fresh_client", _none)
-    monkeypatch.setattr(amazon_module, "_fetch_via_curl_cffi", _none)
-    monkeypatch.setattr(amazon_module, "_fetch_via_scrapling", _none)
-
-    with respx.mock(assert_all_called=False) as router:
-        router.get("https://www.amazon.it/dp/RATE").respond(429)
-        async with httpx.AsyncClient() as client:
-            with pytest.raises(HTTPBlockStatus):
-                await scraper.scrape("https://www.amazon.it/dp/RATE", client)
+# Block-on-403/429 (with retries/fallbacks exhausted) is covered exhaustively
+# by tests/unit/scrapers/test_amazon_block_events.py; the fetch-path-level
+# 403/429/404/410 negative tests live in test_amazon_gone_status.py.
 
 
 # ── JSON-LD offer selection for the cross-check (#54) ────────────

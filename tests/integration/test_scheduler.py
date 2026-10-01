@@ -595,6 +595,79 @@ async def test_scheduler_price_none_increments_errors(
 
 
 @pytest.mark.asyncio
+async def test_scheduler_price_none_keeps_scraper_error_detail(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    """The scraper's ``error`` message must reach ``record_failure`` as ``detail``.
+
+    When no price is read, the failure must keep the scraper's own
+    explanation (e.g. "Impossibile caricare la pagina Amazon") alongside
+    ``reason="price_none"``, so a suspended product can be diagnosed from
+    the database. ``reason`` must stay ``"price_none"`` — only
+    ``detail`` is new.
+    """
+    repo, pid = repo_with_product
+    stub = _StubScraper(
+        ProductInfo(name="Widget", price=None, error="Impossibile caricare la pagina Amazon")
+    )
+    registry = ScraperRegistry()
+    registry.register(stub)
+    notifier = AsyncMock()
+    spy = AsyncMock(wraps=repo.record_failure)
+    repo.record_failure = spy
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=notifier,
+                max_consecutive_errors=10,
+                delay_between_products=0.0,
+            )
+        )
+        await scheduler.run_check_for_user(user_id=1)
+    spy.assert_awaited_once_with(
+        pid, reason="price_none", detail="Impossibile caricare la pagina Amazon"
+    )
+    p = await repo.get_product(pid)
+    assert p is not None
+    assert p.consecutive_errors == 1
+    assert p.last_error == "price_none: Impossibile caricare la pagina Amazon"
+
+
+@pytest.mark.asyncio
+async def test_scheduler_price_none_without_scraper_error_still_records_reason(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    """A scraper that sets no ``error`` message keeps today's behaviour: bare reason."""
+    repo, pid = repo_with_product
+    stub = _StubScraper(ProductInfo(name="Widget", price=None, error=None))
+    registry = ScraperRegistry()
+    registry.register(stub)
+    notifier = AsyncMock()
+    spy = AsyncMock(wraps=repo.record_failure)
+    repo.record_failure = spy
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=notifier,
+                max_consecutive_errors=10,
+                delay_between_products=0.0,
+            )
+        )
+        await scheduler.run_check_for_user(user_id=1)
+    spy.assert_awaited_once_with(pid, reason="price_none", detail=None)
+    p = await repo.get_product(pid)
+    assert p is not None
+    assert p.consecutive_errors == 1
+    assert p.last_error == "price_none"
+
+
+@pytest.mark.asyncio
 async def test_scheduler_cleanup_old_history(
     repo_with_product: tuple[Repository, int],
 ) -> None:

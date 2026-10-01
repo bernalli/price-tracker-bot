@@ -31,7 +31,8 @@
 -> sendMessage chat=1
    param parse_mode="HTML"
    text:
-   | ❌ Utente <code>10</code> non trovato.
+   | ✅ Utente <code>10</code> rimosso.
+   | I suoi prodotti restano nel database ma non riceverà più notifiche.
 ## db after step 5
 ~ users user_id=10 is_active: 1 -> 0
 ## step 6: command "/removeuser 12345" user=1

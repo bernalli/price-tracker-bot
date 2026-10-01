@@ -2,7 +2,7 @@
 
 The curated table is copied character-for-character from the prototype
 (``pricegrammar.py``); the generated table is Babel output filtered by the
-admission rule (D3); the fusion never lets a generated key shadow a curated
+admission rule; the fusion never lets a generated key shadow a curated
 one.
 """
 
@@ -169,7 +169,7 @@ def test_iso_currencies_is_the_money_set() -> None:
         assert code in ISO_CURRENCIES
     for code in ("XXX", "XTS", "XAU", "ADP", "XCG"):
         assert code not in ISO_CURRENCIES
-    assert len(ISO_CURRENCIES) == 153, f"P2: the set is date-dependent (got {len(ISO_CURRENCIES)})"
+    assert len(ISO_CURRENCIES) == 153, f"the set is date-dependent (got {len(ISO_CURRENCIES)})"
 
 
 def test_gen_script_check_mode(tmp_path: Path) -> None:

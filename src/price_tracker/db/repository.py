@@ -180,9 +180,13 @@ class Repository:
         )
         await self._conn.commit()
 
-    async def remove_user(self, user_id: int) -> None:
-        await self._conn.execute("UPDATE users SET is_active = 0 WHERE user_id = ?", (user_id,))
+    async def remove_user(self, user_id: int) -> bool:
+        """Deactivate a user; True only if an active user was deactivated by this call."""
+        cursor = await self._conn.execute(
+            "UPDATE users SET is_active = 0 WHERE user_id = ? AND is_active = 1", (user_id,)
+        )
         await self._conn.commit()
+        return int(cursor.rowcount) > 0
 
     async def list_users(self) -> list[UserRecord]:
         cursor = await self._conn.execute(
@@ -913,8 +917,13 @@ class Repository:
         return bool(row and row[0])
 
     async def add_user(self, user_id: int, *, is_admin: bool = False) -> None:
-        """Alias of :meth:`ensure_user`."""
-        await self.ensure_user(user_id=user_id, is_admin=is_admin)
+        """Like :meth:`ensure_user`, but also reactivates a deactivated user."""
+        await self._conn.execute(
+            "INSERT INTO users(user_id, is_admin, is_active) VALUES(?, ?, 1) "
+            "ON CONFLICT(user_id) DO UPDATE SET is_admin = excluded.is_admin, is_active = 1",
+            (user_id, 1 if is_admin else 0),
+        )
+        await self._conn.commit()
 
     async def get_all_users(self) -> list[UserRecord]:
         """Alias of :meth:`list_users`."""

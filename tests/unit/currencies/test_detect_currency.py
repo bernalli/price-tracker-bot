@@ -1,4 +1,4 @@
-"""``detect_currency`` (D5): same tokenizer as the grammar, at most two tokens.
+"""``detect_currency``: same tokenizer as the grammar, at most two tokens.
 
 The function never invents a currency: a unique signal wins regardless of the
 caller's expectation, two signals that disagree yield ``None``, and only a
@@ -32,13 +32,13 @@ CASES: list[tuple[str, frozenset[str], str | None]] = [
     ("$10 USD", frozenset(), "USD"),
     ("USD 10 €", frozenset(), None),
     ("R$ 10", frozenset(), "BRL"),
-    ("R$ 10", frozenset({"USD"}), "BRL"),  # the long symbol wins, P16
+    ("R$ 10", frozenset({"USD"}), "BRL"),  # the long symbol wins
     ("CA$ 10", frozenset(), "CAD"),
-    ("MOP$ 10", frozenset(), None),  # section 4(d)
-    ("10 MOP$", frozenset(), "MOP"),  # section 4(d)
+    ("MOP$ 10", frozenset(), None),  # prefix does not resolve to a unique currency
+    ("10 MOP$", frozenset(), "MOP"),  # suffix resolves to the explicit ISO code
     ("$USD 10", frozenset(), "USD"),
     ("€10 ₽", frozenset(), None),
-    ("TOP 10", frozenset(), "TOP"),  # section 4(e), pinned as a known limit
+    ("TOP 10", frozenset(), "TOP"),  # an ISO code can also be an ordinary word
     ("TOP 10", frozenset({"EUR"}), "TOP"),
     ("EUR10", frozenset(), "EUR"),
     ("x" * 64 + "€", frozenset(), None),  # 65 characters
@@ -67,7 +67,7 @@ def test_bad_expected_raises() -> None:
 
 
 def _rule_outcome(candidates: frozenset[str], expected: frozenset[str]) -> str | None:
-    """Independent re-derivation of the section 3.4 step-3 rule."""
+    """Resolve a unique candidate or use the expected currencies to break a tie."""
     if len(candidates) == 1:
         return next(iter(candidates))
     intersection = candidates & expected

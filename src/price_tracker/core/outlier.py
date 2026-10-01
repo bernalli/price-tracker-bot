@@ -46,12 +46,9 @@ SUSPICIOUS_DROP_RATIO = Decimal("0.6")
 
 # Consecutive agreeing reads required before an implausible price is accepted.
 #
-# Calibrated on the incident data rather than guessed: replaying the affected
-# product's real history, 2 confirmations left one false alert (the bad price
-# happened to repeat on two consecutive checks) while 3 removed every false
-# alert in the incident window and kept both genuine ones. 4 bought nothing
-# more. The cost is latency — a real deep discount is announced after
-# (N-1) × check_interval — so deployments on long check intervals may prefer 2.
+# More confirmations filter longer runs of transient bad reads, but delay a
+# genuine deep-discount alert by (N-1) × check_interval. Deployments can tune
+# the confirmation count to balance transient-read tolerance and alert latency.
 REQUIRED_CONFIRMATIONS = 3
 
 # Two held reads count as agreeing when they are within this relative distance.
@@ -62,8 +59,8 @@ CONFIRMATION_TOLERANCE = Decimal("0.02")
 # but jittery repricing could be held forever — held reads never enter history,
 # so the median rejecting them would never move. That is exactly the deadlock
 # this release fixes on the rejection path, and it must not reappear here.
-# Set well above the worst case seen in real price histories (5 consecutive
-# held reads across ~50k readings), so it only fires on genuinely pathological series.
+# Keep this above the normal confirmation count so stable changes can confirm
+# before the fallback accepts a persistently volatile series.
 MAX_HELD_READS = 8
 
 
@@ -123,8 +120,8 @@ def reads_agree(
 ) -> bool:
     """Return True when two held reads are close enough to confirm each other.
 
-    Exact equality would be too strict: a site under load may serve 187.95 and
-    then 187.90 for the same offer, and both are the same claim about reality.
+    Small variations within the relative tolerance count as agreement, so
+    confirmation does not require identical readings for the same offer.
     """
     if first <= 0 or second <= 0:
         return False

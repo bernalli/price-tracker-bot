@@ -105,7 +105,8 @@ for every release, and let the idempotent migrator run once at startup.
 
 ## Hardened deployment
 
-`docker-compose.yml` ships hardening directives out of the box. Reference excerpt:
+`docker-compose.yml` ships hardening directives out of the box. The excerpt below
+shows filesystem and privilege controls; consult the Compose file for resource limits.
 
 ```yaml
 services:
@@ -119,10 +120,6 @@ services:
     cap_drop: [ALL]
     security_opt:
       - no-new-privileges:true
-    mem_limit: 768m
-    mem_reservation: 384m
-    cpus: 1.0
-    pids_limit: 256
     restart: unless-stopped
     env_file: .env
     volumes:
@@ -133,7 +130,8 @@ Notes:
 - `read_only: true` makes the root filesystem immutable. Writable areas: `/tmp` (tmpfs 64m) and `/home/botuser/.cache` (tmpfs 512m for Playwright).
 - `cap_drop: [ALL]` removes every Linux capability — the bot needs none.
 - `no-new-privileges:true` blocks setuid escalation.
-- `mem_limit: 768m` + `cpus: 1.0` are the recommended budgets.
+- Size memory, CPU, and process limits for your workload, including browser-based scrapers.
+  Adjust the Compose defaults through a local override after measuring resource use.
 - The `/data` volume is the only writable persistent path; back up its content (see [Backup & restore](#backup--restore)).
 
 ### Bind mount instead of the named volume

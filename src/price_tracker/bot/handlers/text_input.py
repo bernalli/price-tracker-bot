@@ -67,6 +67,15 @@ async def handle_text_input(  # noqa: PLR0915 — verbatim port; not yet split i
     action_type, product_id = pending_action
     del context.user_data["pending_action"]
 
+    # The admin check ran when the prompt was armed; the reply may come later,
+    # after the user lost the role or was deactivated.
+    if action_type.startswith("admin_"):
+        db = _db(context)
+        user_id = update.effective_user.id
+        if not (await db.is_user_admin(user_id) and await db.is_user_allowed(user_id)):
+            await update.message.reply_text(_("⛔ Admin-only command."))
+            return
+
     if text.lower() in ("no", "skip", "salta", "-", "annulla"):
         await update.message.reply_text(_("👍 Ok, nessuna modifica."))
         return
