@@ -9,6 +9,7 @@ import httpx
 import pytest
 import respx
 
+from price_tracker.core.fetch import fetch_page
 from price_tracker.scrapers import etsy as etsy_module
 from price_tracker.scrapers.etsy import EtsyScraper
 
@@ -135,8 +136,9 @@ async def test_etsy_returns_error_on_http_500(
     """5xx response → ProductInfo with HTTP error."""
     scraper = EtsyScraper()
 
-    async def _fast_fetch(url: str, client: httpx.AsyncClient) -> httpx.Response:
-        return await client.get(url)
+    async def _fast_fetch(url: str, client: httpx.AsyncClient) -> str:
+        # The production fetch without its retry wait.
+        return (await fetch_page(url, client)).text
 
     monkeypatch.setattr(etsy_module, "_fetch_etsy_html", _fast_fetch)
 

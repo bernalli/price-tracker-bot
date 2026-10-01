@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, ClassVar
 import httpx
 from bs4 import BeautifulSoup
 
-from price_tracker.core.http_client import public_request
+from price_tracker.core.fetch import fetch_page
 
 if TYPE_CHECKING:
     from decimal import Decimal
@@ -23,7 +23,6 @@ from price_tracker.core.retry_policy import RetryConfig, with_retry
 from price_tracker.core.scraper_base import (
     AbstractScraper,
     ProductInfo,
-    detect_listing_gone,
     find_microdata_price_el,
     get_headers,
     jsonld_offer_availability,
@@ -37,10 +36,8 @@ logger = logging.getLogger(__name__)
 async def _fetch_ebay_html(url: str, client: httpx.AsyncClient) -> str:
     """Single GET attempt with browser headers. Tenacity handles retries."""
     headers = get_headers()
-    response = await public_request(client, "GET", url, headers=headers)
-    detect_listing_gone(status_code=response.status_code, url=url)
-    response.raise_for_status()
-    return response.text
+    page = await fetch_page(url, client, headers=headers)
+    return page.text
 
 
 class EbayScraper(AbstractScraper):
