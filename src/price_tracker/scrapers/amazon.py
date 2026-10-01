@@ -13,9 +13,10 @@ import random
 import re
 from decimal import Decimal
 from typing import ClassVar
+from urllib.parse import urlparse
 
 import httpx
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
 from price_tracker.core.exceptions import BlockEvent, CaptchaDetected, ListingGone
 from price_tracker.core.http_client import build_client, public_request
@@ -33,6 +34,51 @@ from price_tracker.core.scraper_base import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Path shapes that name a single product by its ASIN (ten letters or digits).
+_ASIN_PATH_RE = re.compile(
+    r"/(?:dp/product|dp|gp/product|gp/aw/d|gp/offer-listing|exec/obidos/ASIN|o/ASIN)"
+    r"/([A-Z0-9]{10})(?=[/?]|$)",
+    re.IGNORECASE,
+)
+
+
+def _extract_asin(url: str) -> str | None:
+    """Return the ASIN named by a product URL's path, or None."""
+    match = _ASIN_PATH_RE.search(urlparse(url).path)
+    return match.group(1).upper() if match else None
+
+
+def _page_asin(soup: BeautifulSoup) -> str | None:
+    """Return the page's own ASIN from its canonical link or hidden ASIN input."""
+    canonical = soup.find("link", rel="canonical")
+    if isinstance(canonical, Tag):
+        asin = _extract_asin(str(canonical.get("href") or ""))
+        if asin:
+            return asin
+    field = soup.select_one("input#ASIN, input[name='ASIN']")
+    if field is not None:
+        value = str(field.get("value") or "").strip().upper()
+        if re.fullmatch(r"[A-Z0-9]{10}", value):
+            return value
+    return None
+
+
+def _owned_by(element: Tag, target_asin: str | None) -> bool:
+    """Whether a price node may belong to the tracked product.
+
+    Recommendation, sponsored and carousel cards carry the ``data-asin`` of the
+    product they advertise, with price markup identical to the main price. The
+    nearest ancestor carrying ``data-asin`` decides: it must name the tracked
+    ASIN, so an empty value or an unknown tracked ASIN rejects the node. A node
+    with no such ancestor belongs to the page itself and is accepted.
+    """
+    for node in (element, *element.parents):
+        owner = node.get("data-asin")
+        if owner is None:
+            continue
+        return target_asin is not None and str(owner).strip().upper() == target_asin
+    return True
 
 
 @with_retry(RetryConfig(max_attempts=3, base_wait=2.0, max_wait=10.0))
@@ -217,8 +263,11 @@ class AmazonScraper(AbstractScraper):
         if unavail and "non disponibile" in unavail.get_text().lower():
             info.available = False
 
-        # Extract price — CSS selectors first (buybox = real price for Amazon)
-        css_price = self._extract_price(soup)
+        # Extract price — CSS selectors first (buybox = real price for Amazon).
+        # Prices are accepted only if they belong to this product's ASIN, so a
+        # recommendation card can never stand in for a missing buy-box price.
+        target_asin = _extract_asin(url) or _page_asin(soup)
+        css_price = self._extract_price(soup, target_asin=target_asin)
         ld_price = self._try_json_ld_price(soup)
 
         # Prefer CSS, but cross-check with JSON-LD: when CSS differs >2x from
@@ -257,7 +306,7 @@ class AmazonScraper(AbstractScraper):
 
         # If buybox shows used/renewed, try to find the new price and override
         if info.condition != "new":
-            new_price = self._extract_new_price(soup)
+            new_price = self._extract_new_price(soup, target_asin=target_asin)
             if new_price:
                 logger.info(
                     "Buybox is %s at %s, new price available at %s — using new price",
@@ -274,7 +323,9 @@ class AmazonScraper(AbstractScraper):
 
         return info
 
-    def _extract_price(self, soup: BeautifulSoup) -> Decimal | None:
+    def _extract_price(
+        self, soup: BeautifulSoup, *, target_asin: str | None = None
+    ) -> Decimal | None:
         # Strategy 1: Target the main buy box directly (most reliable)
         buybox_containers = [
             "#corePrice_desktop",
@@ -294,6 +345,8 @@ class AmazonScraper(AbstractScraper):
                 ".a-price:not(.a-text-price) .a-offscreen",
             ]:
                 for el in container.select(sel):
+                    if not _owned_by(el, target_asin):
+                        continue
                     # Skip if this price is in an installment/pay-later sub-widget
                     skip = False
                     for parent in el.parents:
@@ -385,6 +438,8 @@ class AmazonScraper(AbstractScraper):
         for selector in self.PRICE_SELECTORS:
             elements = soup.select(selector)
             for el in elements:
+                if not _owned_by(el, target_asin):
+                    continue
                 skip = False
                 for parent in el.parents:
                     pid = (parent.get("id") or "").lower()
@@ -546,24 +601,26 @@ class AmazonScraper(AbstractScraper):
 
         return "new"
 
-    def _extract_new_price(self, soup: BeautifulSoup) -> Decimal | None:
+    def _extract_new_price(
+        self, soup: BeautifulSoup, *, target_asin: str | None = None
+    ) -> Decimal | None:
         """Extract the "new" price when the buybox shows a used/renewed item."""
         for sel in ["[id*=newAccordionRow]", "#newAccordionRow", "#buyBoxAccordion"]:
             for row in soup.select(sel):
                 price_el = row.select_one(".a-price .a-offscreen")
-                if price_el:
+                if price_el and _owned_by(price_el, target_asin):
                     parsed = parse_price(price_el.get_text(strip=True))
                     if parsed:
                         return parsed
 
         nbp = soup.select_one("#newBuyBoxPrice")
-        if nbp:
+        if nbp and _owned_by(nbp, target_asin):
             parsed = parse_price(nbp.get_text(strip=True))
             if parsed:
                 return parsed
 
         new_link = soup.select_one('a[href*="condition=new"]')
-        if new_link:
+        if new_link and _owned_by(new_link, target_asin):
             parsed = parse_price(new_link.get_text(strip=True))
             if parsed:
                 return parsed
