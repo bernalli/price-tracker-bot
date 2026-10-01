@@ -1,9 +1,9 @@
-"""Domain-to-currency expectations (D6, D7): ccTLD territory, generic ccTLDs.
+"""Domain-to-currency expectations: ccTLD territory, generic ccTLDs.
 
 A generic ccTLD used as a global brand (``GENERIC_CCTLDS``) or ``.eu`` gives no
 expectation at any suffix depth: an assumed currency is worse than none,
 because it can make a shared symbol resolve to the wrong currency and reject
-a correct price at the cross-check (I13).
+a correct price at the cross-check.
 """
 
 from __future__ import annotations
