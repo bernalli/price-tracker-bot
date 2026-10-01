@@ -7,10 +7,9 @@
    text:
    | 🔍 Controllo in corso...
 -> deleteMessage chat=10 message_id=1000
--> sendMessage chat=10
-   param link_preview_options={"is_disabled": true}
+-> sendPhoto chat=10 photo=png filename=application.octet-stream
    param parse_mode="HTML"
-   text:
+   caption:
    | 📉 <b>Price drop!</b>
    |
    | <b>Cable $\zz$</b>

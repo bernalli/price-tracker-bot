@@ -24,10 +24,45 @@ from telegram.ext import (
     filters,
 )
 
+from price_tracker.app.inputs import Absolute, Percentage, parse_threshold
 from price_tracker.bot.decorators import _client, _db, _scraper, restricted, with_locale
 from price_tracker.bot.messages import _
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_CSV_THRESHOLD = ("percentage", Decimal(10))
+
+
+def _csv_dialect(text: str) -> type[csv.Dialect] | csv.Dialect:
+    """Detect a ',' or ';' delimiter from the start of the file; ',' when unsure."""
+    try:
+        return csv.Sniffer().sniff(text[:4096], delimiters=",;")
+    except csv.Error:
+        return csv.excel
+
+
+def parse_csv_threshold(cell: str) -> tuple[str, Decimal] | None:
+    """Parse a "Soglia" cell (``<type>:<value>``) with the threshold input grammar.
+
+    An empty cell gives the default ``percentage:10``. ``percentage`` takes an
+    integer in 1..99, ``absolute`` an amount > 0 and ``any_drop`` any value, as
+    the threshold prompt accepts. Anything else returns None.
+    """
+    text = cell.strip()
+    if not text:
+        return DEFAULT_CSV_THRESHOLD
+    th_type, separator, value = text.partition(":")
+    if not separator:
+        return None
+    if th_type == "percentage":
+        parsed = parse_threshold(f"{value}%")
+        return ("percentage", Decimal(parsed.value)) if isinstance(parsed, Percentage) else None
+    if th_type == "absolute":
+        parsed = parse_threshold(value)
+        return ("absolute", parsed.amount) if isinstance(parsed, Absolute) else None
+    if th_type == "any_drop":
+        return ("any_drop", Decimal(0))
+    return None
 
 
 @with_locale
@@ -106,9 +141,19 @@ async def cmd_import(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     buf.seek(0)
 
     try:
-        reader = csv.DictReader(io.StringIO(buf.read().decode("utf-8")))
+        text = buf.read().decode("utf-8")
+        reader = csv.DictReader(io.StringIO(text), dialect=_csv_dialect(text))
+        fieldnames = reader.fieldnames or []
     except Exception as e:  # noqa: BLE001 — surface parse error to user
         await update.message.reply_text(f"❌ Errore nel parsing del CSV: {e}")
+        return
+    if "URL" not in fieldnames:
+        await update.message.reply_text(
+            _(
+                "❌ The CSV file has no URL column. Send the file exported with "
+                "/esporta, separated by commas or semicolons."
+            )
+        )
         return
 
     db = _db(context)
@@ -118,6 +163,7 @@ async def cmd_import(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     imported = 0
     skipped = 0
     errors = 0
+    invalid_thresholds = 0
 
     msg = await update.message.reply_text(_("⏳ Importazione in corso..."))
 
@@ -140,6 +186,11 @@ async def cmd_import(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         except UnsafeURLError as e:
             logger.warning("Rejected unsafe CSV product URL from user %d: %s", user_id, e)
             errors += 1
+            continue
+
+        threshold = parse_csv_threshold(row.get("Soglia") or "")
+        if threshold is None:
+            invalid_thresholds += 1
             continue
 
         # Skip duplicates
@@ -165,13 +216,6 @@ async def cmd_import(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
                 with contextlib.suppress(ValueError, ArithmeticError):
                     target = Decimal(target_str)
 
-            # Parse threshold from CSV
-            threshold_str = row.get("Soglia", "percentage:10")
-            th_type, th_value = "percentage", "10"
-            if ":" in threshold_str:
-                parts = threshold_str.split(":", 1)
-                th_type, th_value = parts[0], parts[1]
-
             currency = row.get("Valuta", "EUR").strip() or "EUR"
 
             new_pid = await db.add_product(
@@ -180,8 +224,8 @@ async def cmd_import(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
                 name=name,
                 domain=domain,
                 initial_price=price,
-                threshold_type=th_type,
-                threshold_value=Decimal(th_value),
+                threshold_type=threshold[0],
+                threshold_value=threshold[1],
                 currency=currency,
             )
             if target is not None:
@@ -197,6 +241,8 @@ async def cmd_import(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         lines.append(f"⏭️ Duplicati saltati: {skipped}")
     if errors:
         lines.append(f"❌ Errori: {errors}")
+    if invalid_thresholds:
+        lines.append(_("❌ Rows with an invalid threshold: {n}").format(n=invalid_thresholds))
     await msg.edit_text(chr(10).join(lines), parse_mode=ParseMode.HTML)
 
 

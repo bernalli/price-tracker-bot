@@ -2300,6 +2300,7 @@ async def scenario_data_import_csv_malformed(w: LegacyWorld) -> None:
 
 @scenario("data.import_csv_semicolon")
 async def scenario_data_import_csv_semicolon(w: LegacyWorld) -> None:
+    w.scraper.script(item_url(21), ProductInfo(name="X", price=Decimal("3.00")))
     content = b"ID;Nome;URL\r\n1;X;https://shop.example.com/item/21\r\n"
     await w.recorder.document(OWNER, "excel.csv", content)
 

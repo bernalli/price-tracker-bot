@@ -7,11 +7,6 @@
    param file_id="doc1"
 -> sendMessage chat=10
    text:
-   | ⏳ Importazione in corso...
--> editMessageText chat=10 message_id=1000
-   param parse_mode="HTML"
-   text:
-   | 📁 <b>Importazione completata</b>
-   | ✅ Importati: 0
+   | ❌ Il file CSV non ha una colonna URL. Invia il file esportato con /esporta, separato da virgole o punti e virgola.
 ## db after step 1
 ~ users user_id=10 display_name: NULL -> "U10"

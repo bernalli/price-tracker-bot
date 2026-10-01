@@ -159,6 +159,7 @@ def test_coordinator_modules_have_the_expected_importers() -> None:
     assert _importers("price_tracker.app.inputs") == [
         "price_tracker.bot.flow_services",
         "price_tracker.bot.flows",
+        "price_tracker.bot.handlers.product_io",
     ]
     assert "price_tracker.db.repository" not in _imported_names(
         _SRC_ROOT / "bot" / "flow_services.py"
