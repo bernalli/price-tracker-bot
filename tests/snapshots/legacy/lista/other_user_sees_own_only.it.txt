@@ -11,12 +11,19 @@
    param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
-   | <b>#2</b> Lamp
-   | 💰 €30.00
-   | 🎯 Soglia: -10%
+   | 📦 <b>⁨Lamp⁩</b>
+   | ⁨example.com⁩ · #2 · attivo
+   |
+   | 💰 Ora: 30,00 €
+   | 📌 Inizio: 30,00 €
+   | 📉 Minimo: 30,00 €
+   | 🔔 Avviso: ribasso del 10% dall'inizio
+   | 🔄 Controlli: ogni 6 h · mai
    keyboard:
-   | [🔍 Check → check_2] [📊 Storico prezzo → chart_2]
+   | [🔍 Controlla ora → check_2] [📊 Storico → chart_2]
    | [⏸ Pausa → pause_2] [🗑 Elimina → remove_2]
-   | [🔗 Apri → url:https://shop.example.com/item/3] [✏️ Modifica → edit_2]
+   | [🔔 Regola avviso → edit_2] [🔄 Intervallo → setrefresh_2]
+   | [🔗 Apri → url:https://shop.example.com/item/3]
+   | [◀️ Lista → menu_prodotti]
 ## db after step 1
 ~ users user_id=11 display_name: NULL -> "U11"

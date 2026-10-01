@@ -11,28 +11,39 @@
    param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
-   | <b>#1</b> Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN...
-   | 💰 €99.50
-   | 📌 Prezzo iniziale: €100.00 (<i>-0.5% dal tracking</i>)
-   | 🎯 Soglia: -10%
-   | 🔄 Check: ogni 1h
-   | ⚠️ 1 letture fallite di recente — dettagli con /errori
+   | 📦 <b>⁨Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN…⁩</b>
+   | ⁨example.com⁩ · #1 · attivo
+   |
+   | 💰 Ora: 99,50 €
+   | 📌 Inizio: 100,00 € · ▼ 0,5%
+   | 📉 Minimo: 100,00 €
+   | 🔔 Avviso: ribasso del 10% dall'inizio
+   | 🔄 Controlli: ogni 1 h · mai
+   | ⚠️ 1 lettura fallita · /errors
    keyboard:
-   | [🔍 Check → check_1] [📊 Storico prezzo → chart_1]
+   | [🔍 Controlla ora → check_1] [📊 Storico → chart_1]
    | [⏸ Pausa → pause_1] [🗑 Elimina → remove_1]
-   | [🔗 Apri → url:https://shop.example.com/item/74] [✏️ Modifica → edit_1]
+   | [🔔 Regola avviso → edit_1] [🔄 Intervallo → setrefresh_1]
+   | [🔗 Apri → url:https://shop.example.com/item/74]
+   | [◀️ Lista → menu_prodotti]
 -> sendMessage chat=10
    param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
-   | <b>#2</b> Sticker
-   | 💰 €0.80
-   | 📌 Prezzo iniziale: €0.90 (<i>-11.1% dal tracking</i>)
-   | 🎯 Soglia: -10%
+   | 📦 <b>⁨Sticker⁩</b>
+   | ⁨example.com⁩ · #2 · attivo
+   |
+   | 💰 Ora: 0,80 €
+   | 📌 Inizio: 0,90 € · ▼ 11,1%
+   | 📉 Minimo: 0,90 €
+   | 🔔 Avviso: ribasso del 10% dall'inizio
+   | 🔄 Controlli: ogni 6 h · mai
    keyboard:
-   | [🔍 Check → check_2] [📊 Storico prezzo → chart_2]
+   | [🔍 Controlla ora → check_2] [📊 Storico → chart_2]
    | [⏸ Pausa → pause_2] [🗑 Elimina → remove_2]
-   | [🔗 Apri → url:https://shop.example.com/item/75] [✏️ Modifica → edit_2]
+   | [🔔 Regola avviso → edit_2] [🔄 Intervallo → setrefresh_2]
+   | [🔗 Apri → url:https://shop.example.com/item/75]
+   | [◀️ Lista → menu_prodotti]
 -> sendMessage chat=10
    param parse_mode="HTML"
    text:
