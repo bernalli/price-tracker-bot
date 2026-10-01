@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, ClassVar, TypedDict
 import httpx
 from bs4 import BeautifulSoup, Tag
 
-from price_tracker.core.http_client import public_request
+from price_tracker.core.fetch import fetch_page
 
 if TYPE_CHECKING:
     from decimal import Decimal
@@ -22,7 +22,6 @@ from price_tracker.core.retry_policy import RetryConfig, with_retry
 from price_tracker.core.scraper_base import (
     AbstractScraper,
     ProductInfo,
-    detect_block_event,
     detect_currency,
     find_microdata_price_el,
     get_headers,
@@ -42,10 +41,10 @@ class StrategyResult(TypedDict, total=False):
 
 
 @with_retry(RetryConfig(max_attempts=3, base_wait=2.0, max_wait=10.0))
-async def _fetch_walmart_html(url: str, client: httpx.AsyncClient) -> httpx.Response:
+async def _fetch_walmart_html(url: str, client: httpx.AsyncClient) -> str:
     headers = get_headers()
-    response = await public_request(client, "GET", url, headers=headers)
-    return response
+    page = await fetch_page(url, client, headers=headers)
+    return page.text
 
 
 class WalmartScraper(AbstractScraper):
@@ -62,14 +61,12 @@ class WalmartScraper(AbstractScraper):
 
     async def scrape(self, url: str, client: httpx.AsyncClient) -> ProductInfo:
         try:
-            response = await _fetch_walmart_html(url, client)
-            detect_block_event(status_code=response.status_code, body=response.text, url=url)
-            response.raise_for_status()
+            html = await _fetch_walmart_html(url, client)
         except (httpx.HTTPError, ValueError) as e:
             logger.debug("Walmart fetch failed for %s: %s", url[:80], e)
             return ProductInfo(error=f"HTTP error: {e}")
 
-        soup = BeautifulSoup(response.text, "lxml")
+        soup = BeautifulSoup(html, "lxml")
         info = ProductInfo()
 
         for strategy_name, strategy_fn in (

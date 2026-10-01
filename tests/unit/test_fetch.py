@@ -946,11 +946,33 @@ async def test_http_to_https_redirect_drops_authorization(client):
 # ── Module boundaries and construction ─────────────────────────────────────────
 
 
-def test_fetch_has_no_callers_yet():
-    """the PR that wires the first adapter replaces this tripwire with an
-    allow-list of callers, as `test_price_core_has_documented_callers_only` did
-    for the price core."""
+def test_fetch_has_documented_callers_only():
+    """Every file outside fetch.py that references it is on this explicit allow-list.
+
+    Replaces ``test_fetch_has_no_callers_yet``: the tripwire's own docstring said
+    the PR that wires the first adapter replaces it with an allow-list of callers.
+    Wired by the scrapers whose fetch was public_request + detect_block_event +
+    raise_for_status (and eBay's, which had no block detection), so that removed
+    listings and blocks are reported the same way everywhere.
+    """
     fetch_file = SRC_ROOT / "core" / "fetch.py"
+    allowed_callers = {
+        SRC_ROOT / "scrapers" / f"{name}.py"
+        for name in (
+            "apple_store",
+            "bestbuy",
+            "ebay",
+            "etsy",
+            "google_store",
+            "mediamarkt",
+            "newegg",
+            "otto",
+            "target",
+            "walmart",
+            "wayfair",
+            "zalando",
+        )
+    }
     pattern = re.compile(
         r"price_tracker\.core\.fetch\b"
         r"|from\s+price_tracker\.core\s+import\s+[^\n]*\bfetch\b"
@@ -960,14 +982,16 @@ def test_fetch_has_no_callers_yet():
         r"|from\s+\.fetch\s+import"
         r"|from\s+\.\.core(?:\.fetch\b|\s+import\s*\(?[^)]*?\bfetch\b)"
     )
-    offenders: list[str] = []
+    callers: set[Path] = set()
     for py in SRC_ROOT.rglob("*.py"):
         if py == fetch_file:
             continue
-        text = py.read_text(encoding="utf-8")
-        if pattern.search(text):
-            offenders.append(str(py.relative_to(SRC_ROOT)))
-    assert not offenders, f"fetch.py already has undocumented callers: {offenders}"
+        if pattern.search(py.read_text(encoding="utf-8")):
+            callers.add(py)
+    undocumented = sorted(str(p.relative_to(SRC_ROOT)) for p in callers - allowed_callers)
+    assert not undocumented, f"fetch.py has undocumented callers: {undocumented}"
+    # Positive control: the scan sees the documented callers.
+    assert callers == allowed_callers
 
 
 def test_fetch_import_is_layer_clean():

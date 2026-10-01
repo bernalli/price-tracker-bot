@@ -9,6 +9,7 @@ import httpx
 import pytest
 import respx
 
+from price_tracker.core.fetch import fetch_page
 from price_tracker.scrapers import target as target_module
 from price_tracker.scrapers.target import TargetScraper
 
@@ -84,8 +85,9 @@ async def test_target_returns_error_on_http_500(
     """5xx response (after retry exhaustion) → ProductInfo with HTTP error."""
     scraper = TargetScraper()
 
-    async def _fast_fetch(url: str, client: httpx.AsyncClient) -> httpx.Response:
-        return await client.get(url)
+    async def _fast_fetch(url: str, client: httpx.AsyncClient) -> str:
+        # The production fetch without its retry wait.
+        return (await fetch_page(url, client)).text
 
     monkeypatch.setattr(target_module, "_fetch_target_html", _fast_fetch)
 
