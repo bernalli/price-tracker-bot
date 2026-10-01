@@ -69,6 +69,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# How often the periodic job runs; equal to the shortest allowed check interval.
+CHECK_TICK_MINUTES = 5
+
 
 class NotifierFn(Protocol):
     """Delivers one formatted message to one user.
@@ -214,6 +217,9 @@ class Scheduler:
 
     def __init__(self, deps: SchedulerDeps) -> None:
         self.deps = deps
+        # When each product was last attempted by this process, whatever the
+        # outcome; run_check_due falls back to the stored timestamps after a restart.
+        self._attempted_at: dict[int, datetime] = {}
 
     async def _scrape_one(self, product: ProductRecord, *, collector: NoticeCollector) -> None:
         """Scrape a single product and persist results (delegates to _check_product).
@@ -392,6 +398,58 @@ class Scheduler:
             collector = NoticeCollector()
             try:
                 await self._run_tick(products, half_open_seen=half_open_seen, collector=collector)
+            finally:
+                await self._flush_guaranteed(collector)
+
+    def _last_attempt(self, product: ProductRecord) -> datetime | None:
+        """The latest known attempt: this process's own, else the stored read or failure."""
+        if product.id in self._attempted_at:
+            return self._attempted_at[product.id]
+        stored = [
+            _parse_db_timestamp(value)
+            for value in (product.last_checked_at, product.last_error_at)
+            if value
+        ]
+        return max(stored) if stored else None
+
+    def _is_due(self, product: ProductRecord, *, global_minutes: int, now: datetime) -> bool:
+        """Whether the product's interval (its own, else the global one) has elapsed.
+
+        Half a tick of slack keeps a product from slipping a whole tick late on
+        every cycle when its interval is a multiple of the tick.
+        """
+        last = self._last_attempt(product)
+        if last is None:
+            return True
+        interval = timedelta(minutes=product.check_interval_minutes or global_minutes)
+        return now - last + timedelta(minutes=CHECK_TICK_MINUTES / 2) >= interval
+
+    async def run_check_due(
+        self, *, global_interval_minutes: int, now: datetime | None = None
+    ) -> None:
+        """Check, across every active user, the active products whose interval has elapsed.
+
+        The periodic job calls this every ``CHECK_TICK_MINUTES``. A product's own
+        ``check_interval_minutes`` overrides ``global_interval_minutes``; a failed
+        read counts as an attempt, so a failing product is not retried every tick.
+        """
+        moment = now or datetime.now(UTC)
+        users = await self.deps.repo.list_active_users()
+        half_open_seen: set[str] = set()
+        for u in users:
+            products = await self.deps.repo.list_products_for_user(
+                user_id=u.user_id, only_active=True
+            )
+            due = [
+                p
+                for p in products
+                if self._is_due(p, global_minutes=global_interval_minutes, now=moment)
+            ]
+            if not due:
+                continue
+            collector = NoticeCollector()
+            try:
+                await self._run_tick(due, half_open_seen=half_open_seen, collector=collector)
             finally:
                 await self._flush_guaranteed(collector)
 
@@ -616,6 +674,7 @@ class Scheduler:
         p = await self.deps.repo.get_product(product_id)
         if p is None or not p.is_active:
             return None
+        self._attempted_at[p.id] = datetime.now(UTC)
 
         scraper = self.deps.registry.resolve(p.url)
         if scraper is None:

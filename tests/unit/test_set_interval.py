@@ -2,7 +2,8 @@
 
 cmd_set_interval did `config.check_interval_minutes = minutes` on a
 @dataclass(frozen=True) Config → FrozenInstanceError, so the interval was never
-persisted nor applied. Fix: persist to DB and reschedule the live job.
+persisted nor applied. Fix: persist to DB. The periodic job ticks at a fixed
+cadence and reads the stored interval on every tick, so it is not rescheduled.
 """
 
 from __future__ import annotations
@@ -30,7 +31,7 @@ def _make_config() -> Config:
     )
 
 
-async def test_set_interval_persists_and_reschedules_without_crashing() -> None:
+async def test_set_interval_persists_without_crashing() -> None:
     db = AsyncMock()
     db.is_user_admin = AsyncMock(return_value=True)
     job_queue = MagicMock()
@@ -47,7 +48,4 @@ async def test_set_interval_persists_and_reschedules_without_crashing() -> None:
     await cmd_set_interval(update, context)  # must NOT raise FrozenInstanceError
 
     db.set_config.assert_awaited_once_with("check_interval_minutes", "120")
-    job_queue.run_repeating.assert_called_once()
-    # rescheduled at the requested cadence (seconds)
-    _, kwargs = job_queue.run_repeating.call_args
-    assert kwargs.get("interval") == 120 * 60
+    job_queue.run_repeating.assert_not_called()

@@ -21,7 +21,7 @@ from price_tracker.core.registry import (
     discover_builtin_scrapers,
     discover_dropin_scrapers,
 )
-from price_tracker.core.scheduler import Scheduler, SchedulerDeps
+from price_tracker.core.scheduler import CHECK_TICK_MINUTES, Scheduler, SchedulerDeps
 from price_tracker.db import apply_runtime_pragmas
 from price_tracker.db.migrator import apply_migrations
 from price_tracker.db.repository import Repository
@@ -120,8 +120,15 @@ async def _combined_post_init(application: Application[Any, Any, Any, Any, Any, 
 
 
 async def scheduled_check_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Check the products whose interval has elapsed; runs every ``CHECK_TICK_MINUTES``.
+
+    The global interval is read on every tick, so /intervallo applies from the next one.
+    """
     scheduler: Scheduler = context.application.bot_data["scheduler"]
-    await scheduler.run_check_all()
+    config: Config = context.application.bot_data["config"]
+    saved = await scheduler.deps.repo.get_config("check_interval_minutes")
+    interval = int(saved) if saved and saved.isdigit() else config.check_interval_minutes
+    await scheduler.run_check_due(global_interval_minutes=max(5, interval))
 
 
 # How often the digest-flush job runs, and the fallback cadence for users with no
@@ -199,18 +206,11 @@ async def amain() -> None:
     register_handlers(application)
 
     if application.job_queue:
-        # Prefer a persisted interval (/intervallo writes bot_config) over the
-        # env default, so a runtime change survives a restart.
-        interval_minutes = config.check_interval_minutes
-        cursor = await db_conn.execute(
-            "SELECT value FROM bot_config WHERE key = ?", ("check_interval_minutes",)
-        )
-        row = await cursor.fetchone()
-        if row and row[0] and str(row[0]).isdigit():
-            interval_minutes = max(5, int(row[0]))
+        # The job ticks at a fixed cadence and checks only the products whose
+        # own interval (else the global one, read on every tick) has elapsed.
         application.job_queue.run_repeating(
             scheduled_check_job,
-            interval=interval_minutes * 60,
+            interval=CHECK_TICK_MINUTES * 60,
             first=60,
             name="periodic_check",
         )
