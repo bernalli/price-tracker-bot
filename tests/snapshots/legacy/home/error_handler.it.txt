@@ -24,7 +24,7 @@
 -> sendMessage chat=10
    text:
    | ❌ Si è verificato un errore. Riprova tra qualche istante.
-   !! error_handler: Forbidden: Forbidden: bot was blocked by the user
+   !! error_handler: Forbidden: bot was blocked by the user
 ## db after step 2
 ~ users user_id=10 display_name: NULL -> "U10"
 ## step 3: call error_handler RuntimeError("boom") user=10
