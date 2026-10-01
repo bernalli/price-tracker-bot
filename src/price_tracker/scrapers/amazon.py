@@ -18,13 +18,15 @@ from typing import ClassVar
 import httpx
 from bs4 import BeautifulSoup
 
-from price_tracker.core.exceptions import CaptchaDetected, HTTPBlockStatus
+from price_tracker.core.exceptions import BlockEvent, CaptchaDetected, ListingGone
 from price_tracker.core.retry_policy import RetryConfig, with_retry
 from price_tracker.core.scraper_base import (
     USER_AGENTS,
     AbstractScraper,
     ProductInfo,
+    detect_block_event,
     detect_currency,
+    detect_listing_gone,
     get_headers,
     parse_price,
     select_jsonld_offer,
@@ -40,6 +42,11 @@ async def _fetch_amazon_html(
     """Single GET attempt with browser-like headers. Tenacity handles retries."""
     headers = get_headers(extra_headers)
     response = await client.get(url, headers=headers, follow_redirects=True)
+    # Surface 403/429/WAF/CAPTCHA as a BlockEvent and 404/410 as ListingGone
+    # BEFORE raise_for_status — same schema as shopify.py (#16), so neither
+    # collapses into a generic httpx.HTTPStatusError further down the chain.
+    detect_block_event(status_code=response.status_code, body=response.text, url=url)
+    detect_listing_gone(status_code=response.status_code, url=url)
     response.raise_for_status()
     return response.text
 
@@ -55,6 +62,10 @@ async def _fetch_with_fresh_client(url: str) -> str | None:
     try:
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as fresh:
             response = await fresh.get(url, headers=headers)
+            # Same schema as the primary fetch: block/gone detection precedes
+            # raise_for_status on this path too (#16).
+            detect_block_event(status_code=response.status_code, body=response.text, url=url)
+            detect_listing_gone(status_code=response.status_code, url=url)
             response.raise_for_status()
             return response.text
     except (httpx.HTTPError, ValueError) as e:
@@ -110,25 +121,38 @@ async def _fetch_amazon_page(
 ) -> str | None:
     """Fetch Amazon page with retry + fallback chain.
 
-    Returns the page HTML, or None on a non-block failure. On a hard block
-    (HTTP 403/429) that survives every fallback, raises :class:`HTTPBlockStatus`
-    so the scheduler quarantines the domain instead of recording a generic error.
+    Returns the page HTML, or None on a non-block, non-gone failure (e.g. a
+    5xx or a network error). On a hard block (403/429/WAF/CAPTCHA) that
+    survives every fallback, re-raises the :class:`BlockEvent` subclass the
+    primary fetch produced, so the scheduler quarantines the domain instead of
+    recording a generic error. On 404/410 raises :class:`ListingGone`
+    immediately: the listing is gone, not blocked, and no fallback fetch
+    changes that, so none is attempted.
     """
     html: str | None = None
-    block_status: int | None = None
+    block_exc: BlockEvent | None = None
     try:
         html = await _fetch_amazon_html(url, client, extra_headers)
+    except BlockEvent as e:
+        block_exc = e
+        logger.warning("Blocked (%s) for %s", e, url[:60])
     except httpx.HTTPStatusError as e:
-        if e.response.status_code in (403, 429):
-            block_status = e.response.status_code
         logger.warning("HTTP %s for %s after retries", e.response.status_code, url[:60])
     except (httpx.HTTPError, ValueError) as e:
         logger.warning("Fetch error for %s: %s", url[:60], e)
 
-    # Fresh-client retry on suspiciously small responses
+    # Fresh-client retry on suspiciously small responses. This call is
+    # enrichment only: we already have SOME html from the primary fetch, so a
+    # block/gone on THIS retry says nothing about the page already in hand —
+    # it must never discard it (same principle as shopify.py's HTML-for-
+    # currency-only fetch swallowing BlockEvent/ListingGone).
     if html and len(html) < 80000 and "application/ld+json" not in html:
         logger.info("Amazon response is small (%d chars), retrying with fresh client", len(html))
-        fresh_html = await _fetch_with_fresh_client(url)
+        try:
+            fresh_html = await _fetch_with_fresh_client(url)
+        except (BlockEvent, ListingGone) as e:
+            logger.debug("Fresh client retry blocked/gone (%s), keeping primary html", e)
+            fresh_html = None
         if fresh_html and len(fresh_html) > len(html):
             logger.info("Fresh client got %d chars (vs %d)", len(fresh_html), len(html))
             html = fresh_html
@@ -136,7 +160,7 @@ async def _fetch_amazon_page(
     if html:
         return html
 
-    if block_status is not None:
+    if block_exc is not None:
         html = await _fetch_via_curl_cffi(url)
         if html:
             return html
@@ -144,7 +168,7 @@ async def _fetch_amazon_page(
         if html:
             return html
         # Hard block survived every fallback → signal quarantine to the scheduler.
-        raise HTTPBlockStatus(status=block_status, url=url)
+        raise block_exc
 
     return None
 
