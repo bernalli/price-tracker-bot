@@ -67,8 +67,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Price charts covered a window measured in readings, not in time. History records every
-  check rather than every price change, so the last 100 rows spanned about four days on a
-  real deployment and nearly every product drew a flat line. Charts now cover 90 days,
+  check rather than every price change, so a fixed row limit could hide earlier price
+  changes when checks were frequent. Charts now cover 90 days,
   with the price changes collapsed in SQL so a long window is never silently truncated.
 - Chart rendering no longer rebuilds a matplotlib cache on every call: `MPLCONFIGDIR`
   points at the writable cache directory, which the read-only root filesystem denied.
@@ -173,23 +173,18 @@ decided what the user was told.
 - **A single bad scrape can no longer raise an alert.** A reading that
   contradicts recent history (a drop below 60% of the median, or a rise above
   2.5x it) is now held and must be confirmed by a run of consecutive agreeing
-  checks before it is persisted or alerted on. Field case: a product steady at
-  ~386 EUR reported 187.95 EUR on isolated checks, each bouncing back to ~386 on
-  the next one, and each firing a "-51.3%" alert. Genuinely deep discounts still
-  alert — a couple of check intervals later — because a real price repeats and a
-  glitch does not. The previous guard could not catch this: it only rejected
-  readings below 1/50th of the median, i.e. under ~7.70 EUR on that product.
+  checks before it is persisted or alerted on. Isolated low readings followed by
+  a return to the previous price no longer trigger alerts. Sustained deep discounts
+  still alert after confirmation. The previous low-side guard only rejected
+  readings below 1/50th of the median, leaving less extreme glitches unchecked.
 
-  The confirmation count was calibrated by replaying the product's real 2424-reading
-  history rather than guessed: it removes every false alert in the incident
-  window (10 of them) while preserving both genuine alerts. Tunable via
-  `READ_CONFIRMATIONS` — it costs `(N-1) × check_interval` of latency on a real
-  steep discount, so long check intervals may want a lower value.
+  The confirmation count is tunable via `READ_CONFIRMATIONS`. More confirmations
+  filter longer runs of transient bad reads at the cost of `(N-1) × check_interval`
+  of alert latency, so long check intervals may need a lower value.
 - **Products no longer get stuck rejecting a real price change forever.** A
   reading rejected as an outlier never entered price history, so the median that
-  rejected it could never move; one product had been rejecting the same
-  legitimate 9.99 → 34.99 repricing on every check for days. Sustained new
-  prices now confirm themselves and are accepted.
+  rejected it could never move. Sustained new prices now confirm themselves
+  and are accepted, allowing history to adapt to a changed price level.
 - **Used and refurbished offers are no longer tracked as the new-product
   price.** Scrapers already reported buy-box condition and the bot already let
   you pin one, but the scheduler read neither. Amazon condition detection also
@@ -314,7 +309,7 @@ Found during the same audit, not addressed here:
 ## [0.1.7] - 2026-05-17
 
 ### Fixed
-- `/checkall` and the menu **🔍 Check all** button took ~5 minutes for 31
+- `/checkall` and the menu **🔍 Check all** button made users wait between
   products because the v0.1.6 pull-mode methods inherited the same
   `delay_between_products = 5s` gentle pacing as the periodic background
   job. The polite 5s is correct when the bot is the one scheduling the
@@ -325,8 +320,8 @@ Found during the same audit, not addressed here:
 - `Scheduler.check_user_products_for_user` accepts an optional
   ``delay_between_products`` kwarg. The periodic job leaves it unset and
   inherits the default 5s (unchanged). Interactive handlers (``/checkall``,
-  menu **🔍 Check all** button) override it to ``0.5s`` — 31 products now
-  finish in ~1–2 minutes instead of ~5.
+  menu **🔍 Check all** button) override it to ``0.5s`` to reduce the wait
+  between products during user-requested checks.
 
 ## [0.1.6] - 2026-05-16
 
