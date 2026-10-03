@@ -533,7 +533,10 @@ class Scheduler:
             if 1 <= half < max_errors and updated.consecutive_errors == half:
                 collector.add(self._event("warning", updated, reason=reason, detail=detail))
             return False
-        await self.deps.repo.suspend_product(product.id, reason=reason)
+        # Concurrent failures on one product can all cross the threshold; only
+        # the caller whose compare-and-swap flips the row reports the suspension.
+        if not await self.deps.repo.suspend_product(product.id, reason=reason):
+            return False
         logger.warning(
             "Product %d auto-disabled after %d consecutive errors "
             "(gone_streak=%d, scraper=%s, domain=%s, reason=%s)",

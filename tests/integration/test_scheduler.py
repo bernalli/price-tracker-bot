@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -2077,3 +2078,45 @@ async def test_scheduler_notifies_once_on_quarantine_entry(
     assert len(errored) == 1
     assert errored[0].last_error is not None
     assert "captcha-form" in errored[0].last_error.lower()
+
+
+@pytest.mark.asyncio
+async def test_concurrent_failures_past_threshold_suspend_and_notify_once(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    """Two checks failing at once on the same product report one suspension, not two."""
+    repo, pid = repo_with_product
+    for _ in range(9):
+        await repo.record_failure(pid, reason="parse_error")
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=ScraperRegistry(),
+                client=client,
+                notifier=AsyncMock(),
+                max_consecutive_errors=10,
+            )
+        )
+        product = await repo.get_product(pid)
+        assert product is not None
+        collector = NoticeCollector()
+
+        results = await asyncio.gather(
+            *(
+                scheduler._record_failure_and_maybe_disable(
+                    product,
+                    scraper_name="stub",
+                    domain="example.com",
+                    reason="parse_error",
+                    collector=collector,
+                )
+                for _ in range(2)
+            )
+        )
+
+    assert sorted(results) == [False, True]
+    assert len(collector) == 1
+    suspended = await repo.get_product(pid)
+    assert suspended is not None
+    assert not suspended.is_active
