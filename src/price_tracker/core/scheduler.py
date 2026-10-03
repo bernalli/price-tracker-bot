@@ -46,6 +46,7 @@ from price_tracker.core.exceptions import (
 from price_tracker.core.health import HealthManager, QuarantineState
 from price_tracker.core.notices import NoticeCollector, NoticeGroup, OperationalEvent, group_key_for
 from price_tracker.core.outlier import (
+    HISTORY_WINDOW,
     MAX_HELD_READS,
     REQUIRED_CONFIRMATIONS,
     ReadVerdict,
@@ -766,7 +767,9 @@ class Scheduler:
             )
             return (p.user_id, None, disabled)
 
-        history = [h.price for h in await self.deps.repo.get_price_history(p.id, limit=50)]
+        history = [
+            h.price for h in await self.deps.repo.get_price_history(p.id, limit=HISTORY_WINDOW)
+        ]
         verdict = classify_read(info.price, history)
 
         if verdict is ReadVerdict.REJECT:

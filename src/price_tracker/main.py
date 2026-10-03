@@ -4,18 +4,20 @@ from __future__ import annotations
 
 import asyncio
 import time
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 import aiosqlite
 import httpx  # noqa: F401  — kept for future direct use; build_client returns AsyncClient
 import structlog
-from telegram.ext import Application, ContextTypes
+from telegram.ext import Application, ContextTypes, JobQueue
 
 from price_tracker.bot.handlers import register_handlers
 from price_tracker.config import Config, parse_bind
 from price_tracker.core.health import HealthManager
 from price_tracker.core.http_client import build_client
+from price_tracker.core.outlier import HISTORY_WINDOW
 from price_tracker.core.registry import (
     ScraperRegistry,
     discover_builtin_scrapers,
@@ -152,6 +154,59 @@ async def digest_flush_job(context: ContextTypes.DEFAULT_TYPE) -> None:
         log.exception("digest_flush_job failed")
 
 
+# Price history is compacted once a day; readings younger than this are left alone.
+HISTORY_COMPACTION_INTERVAL_SECONDS = 24 * 60 * 60
+HISTORY_COMPACTION_FIRST_SECONDS = 10 * 60
+HISTORY_COMPACTION_AFTER_DAYS = 30
+
+
+async def history_compaction_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Keep price history bounded without losing any price movement.
+
+    Every successful check stores a reading, so a product checked hourly adds
+    ~8,800 rows a year, nearly all of them repeats. Compaction keeps every
+    change and one reading per product per day (see
+    ``Repository.compact_price_history``).
+    """
+    repo: Repository | None = context.bot_data.get("repo")
+    if repo is None:
+        return
+    older_than = datetime.now(UTC) - timedelta(days=HISTORY_COMPACTION_AFTER_DAYS)
+    try:
+        deleted = await repo.compact_price_history(
+            older_than=older_than.strftime("%Y-%m-%d %H:%M:%S"),
+            keep_recent=HISTORY_WINDOW,
+        )
+    except Exception:  # noqa: BLE001 — a failed compaction must not kill the job
+        log.exception("history_compaction_job failed")
+        return
+    log.info("history.compacted", deleted=deleted)
+
+
+def schedule_jobs(job_queue: JobQueue[Any]) -> None:
+    """Register the bot's recurring jobs."""
+    # The check job ticks at a fixed cadence and checks only the products whose
+    # own interval (else the global one, read on every tick) has elapsed.
+    job_queue.run_repeating(
+        scheduled_check_job,
+        interval=CHECK_TICK_MINUTES * 60,
+        first=60,
+        name="periodic_check",
+    )
+    job_queue.run_repeating(
+        digest_flush_job,
+        interval=DIGEST_FLUSH_INTERVAL_SECONDS,
+        first=DIGEST_FLUSH_INTERVAL_SECONDS,
+        name="digest_flush",
+    )
+    job_queue.run_repeating(
+        history_compaction_job,
+        interval=HISTORY_COMPACTION_INTERVAL_SECONDS,
+        first=HISTORY_COMPACTION_FIRST_SECONDS,
+        name="history_compaction",
+    )
+
+
 async def bootstrap_database(database_path: str) -> aiosqlite.Connection:
     """Open the SQLite connection with the schema fully applied.
 
@@ -206,20 +261,7 @@ async def amain() -> None:
     register_handlers(application)
 
     if application.job_queue:
-        # The job ticks at a fixed cadence and checks only the products whose
-        # own interval (else the global one, read on every tick) has elapsed.
-        application.job_queue.run_repeating(
-            scheduled_check_job,
-            interval=CHECK_TICK_MINUTES * 60,
-            first=60,
-            name="periodic_check",
-        )
-        application.job_queue.run_repeating(
-            digest_flush_job,
-            interval=DIGEST_FLUSH_INTERVAL_SECONDS,
-            first=DIGEST_FLUSH_INTERVAL_SECONDS,
-            name="digest_flush",
-        )
+        schedule_jobs(application.job_queue)
 
     await application.initialize()
     # PTB ≥22 does not call ``post_init`` from ``initialize()`` — only

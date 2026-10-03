@@ -25,6 +25,9 @@ class OutlierResult:
 # Minimum history points to enable detection (avoid false positives on short series)
 MIN_HISTORY = 5
 
+# How many of a product's newest readings a scraped price is graded against
+HISTORY_WINDOW = 50
+
 # Default tolerance: a price more than `max_ratio` × median is flagged
 DEFAULT_MAX_RATIO = Decimal("2.5")
 

@@ -592,6 +592,58 @@ class Repository:
         await self._conn.commit()
         return int(cursor.rowcount)
 
+    async def compact_price_history(self, *, older_than: str, keep_recent: int) -> int:
+        """Drop the redundant readings of old, unchanged price runs.
+
+        A reading older than ``older_than`` (``YYYY-MM-DD HH:MM:SS``, UTC) is
+        deleted only when it repeats the price of both its neighbours, is not
+        its product's first reading of that UTC day, and is not among its
+        product's ``keep_recent`` newest readings. Every price change, both ends
+        of every run and one reading per product per day therefore survive: the
+        step chart is unchanged, a chart window still starts within a day of its
+        edge, and the outlier gate still sees the same recent readings.
+        """
+        cursor = await self._conn.execute(
+            """
+            DELETE FROM price_history WHERE id IN (
+                WITH normalized AS (
+                    SELECT
+                        id,
+                        product_id,
+                        price,
+                        replace(replace(checked_at, 'T', ' '), 'Z', '') AS ts
+                    FROM price_history
+                ), ranked AS (
+                    SELECT
+                        id,
+                        price,
+                        ts,
+                        LAG(price) OVER by_time AS previous_price,
+                        LEAD(price) OVER by_time AS next_price,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY product_id, substr(ts, 1, 10)
+                            ORDER BY ts ASC, id ASC
+                        ) AS rank_in_day,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY product_id
+                            ORDER BY ts DESC, id DESC
+                        ) AS recency
+                    FROM normalized
+                    WINDOW by_time AS (PARTITION BY product_id ORDER BY ts ASC, id ASC)
+                )
+                SELECT id FROM ranked
+                WHERE ts < ?
+                  AND recency > ?
+                  AND rank_in_day > 1
+                  AND price = previous_price
+                  AND price = next_price
+            )
+            """,
+            (older_than, keep_recent),
+        )
+        await self._conn.commit()
+        return int(cursor.rowcount)
+
     # ── Scraper Health ─────────────────────────────────────────
 
     async def get_scraper_health(self, domain: str) -> ScraperHealth | None:
