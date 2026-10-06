@@ -12,7 +12,7 @@ from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler
 
 from price_tracker.bot.decorators import _db, admin_only, with_locale
-from price_tracker.bot.handlers._helpers import _escape_html
+from price_tracker.bot.handlers._helpers import _escape_html, _parse_id
 from price_tracker.bot.messages import _
 
 if TYPE_CHECKING:
@@ -34,9 +34,8 @@ async def cmd_add_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         )
         return
 
-    try:
-        new_user_id = int(context.args[0])
-    except ValueError:
+    new_user_id = _parse_id(context.args[0])
+    if new_user_id is None:
         await update.message.reply_text(_("❌ Invalid ID. Must be a number."))
         return
 
@@ -76,9 +75,8 @@ async def cmd_remove_user(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         )
         return
 
-    try:
-        target_id = int(context.args[0])
-    except ValueError:
+    target_id = _parse_id(context.args[0])
+    if target_id is None:
         await update.message.reply_text(_("❌ Invalid ID."))
         return
 
@@ -167,9 +165,8 @@ async def cmd_nick(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             parse_mode=ParseMode.HTML,
         )
         return
-    try:
-        target_id = int(context.args[0])
-    except ValueError:
+    target_id = _parse_id(context.args[0])
+    if target_id is None:
         await update.message.reply_text(_("❌ Invalid ID."))
         return
     nickname = " ".join(context.args[1:])
