@@ -26,6 +26,7 @@ from price_tracker.bot.handlers._helpers import (
     _safe_dec,
 )
 from price_tracker.bot.keyboards import menu_back_button
+from price_tracker.bot.ui.width import truncate_to_width
 
 if TYPE_CHECKING:
     from telegram.ext import ContextTypes
@@ -83,7 +84,7 @@ async def handle_menu_navigation(
         rows = []
         if products:
             for p in products[:10]:
-                nm = (p.get("name") or "?")[:28]
+                nm = truncate_to_width(p.get("name") or "?", 28)
                 cur = _safe_dec(p.get("current_price"))
                 tag = f" €{cur:.2f}" if cur else ""
                 rows.append(
@@ -130,7 +131,7 @@ async def handle_menu_navigation(
         paused = [p for p in all_prods if not p.get("is_active")]
         rows = []
         for p in paused[:10]:
-            nm = (p.get("name") or "?")[:35]
+            nm = truncate_to_width(p.get("name") or "?", 35)
             rows.append(
                 [InlineKeyboardButton(f"▶️ #{p['id']} {nm}", callback_data=f"reactivate_{p['id']}")]
             )
@@ -148,7 +149,7 @@ async def handle_menu_navigation(
             [InlineKeyboardButton("🔄 Controlla tutti i prezzi", callback_data="menu_checkall")]
         ]
         for p in products[:8]:
-            nm = (p.get("name") or "?")[:30]
+            nm = truncate_to_width(p.get("name") or "?", 30)
             rows.append(
                 [InlineKeyboardButton(f"🔍 #{p['id']} {nm}", callback_data=f"check_{p['id']}")]
             )
@@ -169,7 +170,7 @@ async def handle_menu_navigation(
         products = await db.get_active_products(user_id)
         rows = []
         for p in products[:10]:
-            nm = (p.get("name") or "?")[:35]
+            nm = truncate_to_width(p.get("name") or "?", 35)
             rows.append(
                 [InlineKeyboardButton(f"📊 #{p['id']} {nm}", callback_data=f"chart_{p['id']}")]
             )
@@ -185,7 +186,7 @@ async def handle_menu_navigation(
         products = await db.get_active_products(user_id)
         rows = []
         for p in products[:10]:
-            nm = (p.get("name") or "?")[:22]
+            nm = truncate_to_width(p.get("name") or "?", 22)
             th = _format_threshold(
                 p.get("threshold_type", "percentage"),
                 p.get("threshold_value", "10"),
@@ -271,7 +272,7 @@ async def _handle_menu_checkall(
     updated = await db.get_active_products(user_id)
     txt_lines = [f"✅ <b>Completato</b> — {len(updated)} prodotti" + chr(10)]
     for p in updated:
-        nm = (p.get("name") or "?")[:35]
+        nm = truncate_to_width(p.get("name") or "?", 35)
         cur = _safe_dec(p.get("current_price"))
         ini = _safe_dec(p.get("initial_price"))
         tag = f"€{cur:.2f}" if cur else "N/D"

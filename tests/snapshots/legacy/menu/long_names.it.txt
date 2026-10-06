@@ -24,7 +24,7 @@
    |
    | Tocca un prodotto per modificarlo.
    keyboard:
-   | [#1 Long NNNNNNNNNNNNNNNNNNNNNNN €80.00 → edit_1]
+   | [#1 Long NNNNNNNNNNNNNNNNNNNNNN… €80.00 → edit_1]
    | [⏸ 1 in pausa → riattiva → menu_paused]
    | [◀️ Menu → menu_main]
 ## db after step 2
@@ -38,7 +38,7 @@
    |
    | Tocca per riattivare.
    keyboard:
-   | [▶️ #2 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNN → reactivate_2]
+   | [▶️ #2 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNN… → reactivate_2]
    | [◀️ Menu → menu_main]
 ## db after step 3
 (no changes)
@@ -65,7 +65,7 @@
    | Tocca un prodotto per controllarlo.
    keyboard:
    | [🔄 Controlla tutti i prezzi → menu_checkall]
-   | [🔍 #1 Long NNNNNNNNNNNNNNNNNNNNNNNNN → check_1]
+   | [🔍 #1 Long NNNNNNNNNNNNNNNNNNNNNNNN… → check_1]
    | [📊 Storico prezzo → menu_storia]
    | [◀️ Menu → menu_main]
 ## db after step 5
@@ -80,7 +80,7 @@
    text:
    | ✅ <b>Completato</b> — 1 prodotti
    |
-   |   #1 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNN — €80.00 <i>(-20.0%)</i>
+   |   #1 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNN… — €80.00 <i>(-20.0%)</i>
    keyboard:
    | [◀️ Menu → menu_main]
 ## db after step 6
@@ -110,7 +110,7 @@
    |
    | Tocca un prodotto per il grafico.
    keyboard:
-   | [📊 #1 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNN → chart_1]
+   | [📊 #1 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNN… → chart_1]
    | [◀️ Menu → menu_main]
 ## db after step 8
 (no changes)
@@ -136,7 +136,7 @@
    |
    | Tocca un prodotto per cambiare soglia o target.
    keyboard:
-   | [#1 Long NNNNNNNNNNNNNNNNN [-10%] → edit_1]
+   | [#1 Long NNNNNNNNNNNNNNNN… [-10%] → edit_1]
    | [◀️ Menu → menu_main]
 ## db after step 10
 (no changes)

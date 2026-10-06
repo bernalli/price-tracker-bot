@@ -118,7 +118,7 @@
    param parse_mode="HTML"
    text:
    | 🔄 Intervallo ripristinato a quello globale (ogni 360 min)
-   | 📦 #2 — Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
+   | 📦 #2 — Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN…
 ## db after step 16
 (no changes)
 ## step 17: command "/refresh 2 30" user=10
@@ -126,6 +126,6 @@
    param parse_mode="HTML"
    text:
    | 🔄 Intervallo check: <b>ogni 30 min</b>
-   | 📦 #2 — Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
+   | 📦 #2 — Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN…
 ## db after step 17
 ~ products id=2 check_interval_minutes: NULL -> 30

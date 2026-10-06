@@ -59,7 +59,7 @@
    keyboard:
    | [#1 Kettle €80.00 → remove_1]
    | [#2 Fan → remove_2]
-   | [#3 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNN €80.00 → remove_3]
+   | [#3 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNN… €80.00 → remove_3]
    | [🗑 Elimina tutti i prodotti → delete_all]
 ## db after step 6
 (no changes)
@@ -69,7 +69,7 @@
    text:
    | ⚠️ Vuoi eliminare <b>definitivamente</b> questo prodotto?
    |
-   | 📦 #3 — Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
+   | 📦 #3 — Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN…
    |
    | Verrà cancellato anche tutto lo storico prezzi.
    keyboard:

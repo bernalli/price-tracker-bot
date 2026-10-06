@@ -79,7 +79,7 @@
    | 📦 <b>Scegli prodotto per impostare target:</b>
    keyboard:
    | [#1 Kettle €80.00 → settarget_1]
-   | [#2 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNN €80.00 → settarget_2]
+   | [#2 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNN… €80.00 → settarget_2]
 ## db after step 10
 (no changes)
 ## step 11: command "/target 2 50" user=10
@@ -87,7 +87,7 @@
    param parse_mode="HTML"
    text:
    | 🎯 Target impostato: <b>€50.00</b>
-   | 📦 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
+   | 📦 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN…
    | 💰 Attuale: €80.00 (-37.5% necessario)
 ## db after step 11
 ~ products id=2 target_price: NULL -> "50"

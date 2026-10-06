@@ -87,6 +87,6 @@
    param parse_mode="HTML"
    text:
    | 🎯 Soglia impostata: <b>-20%</b>
-   | 📦 #2 — Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
+   | 📦 #2 — Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN…
 ## db after step 11
 ~ products id=2 threshold_value: "10" -> "20"

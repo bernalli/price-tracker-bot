@@ -28,6 +28,7 @@ from price_tracker.bot.decorators import (
 )
 from price_tracker.bot.handlers._helpers import _escape_html, _format_relative_time
 from price_tracker.bot.messages import _
+from price_tracker.bot.ui.width import truncate_to_width
 from price_tracker.core.http_client import build_client, public_request
 
 if TYPE_CHECKING:
@@ -442,7 +443,7 @@ async def cmd_errori(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
     lines: list[str] = [f"⚠️ <b>Errori recenti ({len(errored)})</b>", ""]
     for row in errored:
-        name = _escape_html((row.name or "Sconosciuto")[:50])
+        name = _escape_html(truncate_to_width(row.name or "Sconosciuto", 50))
         lines.append(f"<b>#{row.id}</b> {name}")
 
         state_label = ""

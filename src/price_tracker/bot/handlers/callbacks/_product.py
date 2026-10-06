@@ -29,6 +29,7 @@ from price_tracker.bot.handlers._helpers import (
 )
 from price_tracker.bot.handlers.history import _generate_chart
 from price_tracker.bot.keyboards import build_threshold_keyboard
+from price_tracker.bot.ui.width import truncate_to_width
 
 if TYPE_CHECKING:
     from telegram.ext import ContextTypes
@@ -53,7 +54,7 @@ async def handle_delete_flow(
         if product and await db.delete_product(product_id, user_id=product["user_id"]):
             name = product.get("name") or "Sconosciuto"
             await query.edit_message_text(
-                f"🗑 Eliminato definitivamente: <b>{_escape_html(name[:80])}</b>",
+                f"🗑 Eliminato definitivamente: <b>{_escape_html(truncate_to_width(name, 80))}</b>",
                 parse_mode=ParseMode.HTML,
             )
         else:
@@ -138,7 +139,7 @@ async def handle_check_button(
     if product is None:
         await query.edit_message_text("❌ Prodotto non trovato.")
         return True
-    name = (product.get("name") or "Sconosciuto")[:60]
+    name = truncate_to_width(product.get("name") or "Sconosciuto", 60)
     current = _safe_dec(product.get("current_price"))
     initial = _safe_dec(product.get("initial_price"))
     p_currency = product.get("currency", "") or detect_currency(product.get("url", "")) or "EUR"
@@ -183,7 +184,7 @@ async def handle_chart_button(
 
     chart = await _generate_chart(db, product_id, product)
     if chart:
-        name = (product.get("name") or "Prodotto")[:50]
+        name = truncate_to_width(product.get("name") or "Prodotto", 50)
         await query.message.reply_photo(
             photo=InputFile(chart, filename=f"chart_{product_id}.png"),
             caption=f"📊 <b>#{product_id}</b> {_escape_html(name)}",
@@ -220,7 +221,7 @@ async def handle_amazon_pref(
                 await query.edit_message_text("❌ Prodotto non trovato.")
                 return True
             await db.set_product_preferences(product_id, condition=condition, seller=seller)
-            name = (product.get("name") or "Sconosciuto")[:60]
+            name = truncate_to_width(product.get("name") or "Sconosciuto", 60)
             await query.edit_message_text(
                 f"{label} per #{product_id}\n"
                 f"📦 {_escape_html(name)}\n\n"
@@ -246,7 +247,7 @@ async def handle_track_choice(
             await query.edit_message_text("❌ Prodotto non trovato.")
             return True
         await db.set_threshold(product_id, "any_drop", "0")
-        name = (product.get("name") or "Sconosciuto")[:60]
+        name = truncate_to_width(product.get("name") or "Sconosciuto", 60)
         await query.edit_message_text(
             f"🔔 <b>Ogni ribasso</b> attivato per #{product_id}\n"
             f"📦 {_escape_html(name)}\n\n"
@@ -265,7 +266,7 @@ async def handle_track_choice(
             await query.edit_message_text("❌ Prodotto non trovato.")
             return True
         await db.set_threshold(product_id, "percentage", "10")
-        name = (product.get("name") or "Sconosciuto")[:60]
+        name = truncate_to_width(product.get("name") or "Sconosciuto", 60)
         await query.edit_message_text(
             f"👍 <b>Soglia default -10%</b> per #{product_id}\n"
             f"📦 {_escape_html(name)}\n\n"

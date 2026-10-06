@@ -47,7 +47,7 @@
    text:
    | ✅ Prezzo iniziale aggiornato!
    |
-   | 📦 <b>#3</b> Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
+   | 📦 <b>#3</b> Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN…
    | 💰 Nuovo prezzo base: <b>€80.00</b>
 ## db after step 6
 ~ products id=3 initial_price: "100.00" -> "80.00"
