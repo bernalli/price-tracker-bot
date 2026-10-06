@@ -2077,3 +2077,242 @@ async def test_scheduler_notifies_once_on_quarantine_entry(
     assert len(errored) == 1
     assert errored[0].last_error is not None
     assert "captcha-form" in errored[0].last_error.lower()
+
+
+# ── Out-of-stock reads: a recognised sold-out page is state, not failure ──
+
+_SOLD_OUT = ProductInfo(name="Widget", price=None, available=False, error="Prezzo non trovato")
+_LAYOUT_BROKEN = ProductInfo(name="Widget", price=None, error="Prezzo non trovato")
+
+
+async def _run_ticks(
+    repo: Repository,
+    outcomes: list[ProductInfo],
+    *,
+    notifier: AsyncMock,
+    max_errors: int = 3,
+) -> None:
+    """Run one periodic check per scripted outcome against a single scheduler."""
+    registry = ScraperRegistry()
+    registry.register(_ScriptedScraper(list(outcomes)))
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=notifier,
+                max_consecutive_errors=max_errors,
+                delay_between_products=0.0,
+            )
+        )
+        for _ in outcomes:
+            await scheduler.run_check_for_user(user_id=1)
+
+
+@pytest.mark.asyncio
+async def test_out_of_stock_reads_never_suspend_the_product(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    repo, pid = repo_with_product
+    notifier = AsyncMock()
+    await _run_ticks(repo, [_SOLD_OUT] * 5, notifier=notifier, max_errors=3)
+    p = await repo.get_product(pid)
+    assert p is not None
+    assert p.is_active is True
+    assert p.consecutive_errors == 0
+    assert p.is_available is False
+    assert p.current_price == Decimal("100")  # seeded at add, untouched
+    assert await repo.get_price_history(pid) == []
+    assert notifier.await_count == 0
+
+
+@pytest.mark.asyncio
+async def test_back_in_stock_after_out_of_stock_reads_notifies_exactly_once(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    repo, pid = repo_with_product
+    notifier = AsyncMock()
+    restocked = ProductInfo(name="Widget", price=Decimal("100"), currency="EUR", available=True)
+    await _run_ticks(repo, [_SOLD_OUT] * 5 + [restocked, restocked], notifier=notifier)
+    p = await repo.get_product(pid)
+    assert p is not None
+    assert p.is_available is True
+    assert p.current_price == Decimal("100")
+    assert p.consecutive_errors == 0
+    assert notifier.await_count == 1
+    sent = notifier.await_args
+    assert sent is not None
+    assert sent.kwargs["product_id"] == pid
+    assert sent.kwargs["payload"]["kind"] == "price"
+
+
+@pytest.mark.asyncio
+async def test_missing_price_without_out_of_stock_signal_still_suspends(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    """A layout change (price gone, availability not recognised) is a failure."""
+    repo, pid = repo_with_product
+    notifier = AsyncMock()
+    await _run_ticks(repo, [_LAYOUT_BROKEN] * 3, notifier=notifier, max_errors=3)
+    p = await repo.get_product(pid)
+    assert p is not None
+    assert p.is_active is False
+    assert p.consecutive_errors == 3
+    assert p.is_available is True
+
+
+@pytest.mark.asyncio
+async def test_out_of_stock_read_resets_a_streak_of_price_failures(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    repo, pid = repo_with_product
+    notifier = AsyncMock()
+    await _run_ticks(repo, [_LAYOUT_BROKEN] * 5, notifier=notifier, max_errors=10)
+    before = await repo.get_product(pid)
+    assert before is not None
+    assert before.consecutive_errors == 5
+    notifier.reset_mock()
+    await _run_ticks(repo, [_SOLD_OUT], notifier=notifier, max_errors=10)
+    p = await repo.get_product(pid)
+    assert p is not None
+    assert p.consecutive_errors == 0
+    assert p.is_active is True
+    assert p.is_available is False
+    assert notifier.await_count == 0
+
+
+@pytest.mark.asyncio
+async def test_sold_out_flag_with_a_price_is_still_a_price_read(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    """available=False WITH a price (placeholder price on a sold-out listing) is not
+    the out-of-stock short-circuit: the price is persisted as before."""
+    repo, pid = repo_with_product
+    notifier = AsyncMock()
+    priced_sold_out = ProductInfo(
+        name="Widget", price=Decimal("90"), currency="EUR", available=False
+    )
+    await _run_ticks(repo, [priced_sold_out], notifier=notifier)
+    p = await repo.get_product(pid)
+    assert p is not None
+    assert p.current_price == Decimal("90")
+    assert p.is_available is False
+    assert len(await repo.get_price_history(pid)) == 1
+
+
+@pytest.mark.asyncio
+async def test_out_of_stock_read_writes_no_price(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    repo, pid = repo_with_product
+    notifier = AsyncMock()
+    await _run_ticks(repo, [_SOLD_OUT] * 2, notifier=notifier)
+    p = await repo.get_product(pid)
+    assert p is not None
+    assert p.current_price == Decimal("100")  # the price seeded at add, untouched
+    assert await repo.get_price_history(pid) == []
+
+
+@pytest.mark.asyncio
+async def test_out_of_stock_read_clears_a_held_implausible_read(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    repo, pid = repo_with_product
+    await repo.set_pending_read(pid, Decimal("5"), 1, 1)
+    await _run_ticks(repo, [_SOLD_OUT], notifier=AsyncMock())
+    p = await repo.get_product(pid)
+    assert p is not None
+    assert p.pending_read_price is None
+    assert p.pending_read_count == 0
+    assert p.pending_read_streak == 0
+
+
+@pytest.mark.asyncio
+async def test_out_of_stock_read_counts_as_a_domain_success(
+    repo_with_product: tuple[Repository, int],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo, _pid = repo_with_product
+    spy = AsyncMock()
+    monkeypatch.setattr("price_tracker.core.scheduler.handle_success_in_pipeline", spy)
+    await _run_ticks(repo, [_SOLD_OUT], notifier=AsyncMock())
+    assert spy.await_count == 1
+    assert spy.await_args is not None
+    assert spy.await_args.kwargs["domain"] == "example.com"
+
+
+@pytest.mark.asyncio
+async def test_out_of_stock_then_layout_failures_still_suspend(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    """A sold-out read must not buy immunity: later price_none failures count from zero
+    and suspend, and availability stays False through them."""
+    repo, pid = repo_with_product
+    await _run_ticks(
+        repo, [_SOLD_OUT, _LAYOUT_BROKEN, _LAYOUT_BROKEN], notifier=AsyncMock(), max_errors=2
+    )
+    p = await repo.get_product(pid)
+    assert p is not None
+    assert p.is_active is False
+    assert p.consecutive_errors == 2
+    assert p.is_available is False
+
+
+@pytest.mark.asyncio
+async def test_out_of_stock_then_restock_then_sold_out_then_restock_notifies_each_return(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    """Flip-flop: one back-in-stock message per genuine return, none for the sold-out reads."""
+    repo, pid = repo_with_product
+    notifier = AsyncMock()
+    back = ProductInfo(name="Widget", price=Decimal("100"), currency="EUR", available=True)
+    await _run_ticks(repo, [_SOLD_OUT, back, _SOLD_OUT, _SOLD_OUT, back], notifier=notifier)
+    p = await repo.get_product(pid)
+    assert p is not None
+    assert p.is_active is True
+    assert p.is_available is True
+    assert p.consecutive_errors == 0
+    assert notifier.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_out_of_stock_on_a_suspended_product_is_never_read(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    repo, pid = repo_with_product
+    await repo.suspend_product(pid, reason="price_none")
+    scraper = _ScriptedScraper([_SOLD_OUT])
+    registry = ScraperRegistry()
+    registry.register(scraper)
+    notifier = AsyncMock()
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=notifier,
+                delay_between_products=0.0,
+            )
+        )
+        await scheduler.check_user_products_for_user(user_id=1)
+    p = await repo.get_product(pid)
+    assert p is not None
+    assert p.is_active is False
+    assert p.is_available is True
+    assert next(scraper._outcomes, None) is _SOLD_OUT  # never consumed
+
+
+@pytest.mark.asyncio
+async def test_out_of_stock_read_stamps_last_checked(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    repo, pid = repo_with_product
+    before = await repo.get_product(pid)
+    assert before is not None
+    assert before.last_checked_at is None
+    await _run_ticks(repo, [_SOLD_OUT], notifier=AsyncMock())
+    p = await repo.get_product(pid)
+    assert p is not None
+    assert p.last_checked_at is not None
