@@ -19,7 +19,7 @@ from telegram.ext import (
 )
 
 from price_tracker.bot.decorators import _db, restricted, with_locale
-from price_tracker.bot.handlers._helpers import _escape_html
+from price_tracker.bot.handlers._helpers import _escape_html, _parse_id
 from price_tracker.bot.messages import _
 
 if TYPE_CHECKING:
@@ -82,9 +82,8 @@ async def handle_text_input(  # noqa: PLR0915 — verbatim port; not yet split i
     db = _db(context)
 
     if action_type == "admin_adduser":
-        try:
-            new_uid = int(text.strip())
-        except ValueError:
+        new_uid = _parse_id(text.strip())
+        if new_uid is None:
             await update.message.reply_text(_("❌ ID non valido. Deve essere un numero."))
             context.user_data["pending_action"] = pending_action
             return

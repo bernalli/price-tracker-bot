@@ -16,6 +16,7 @@ from unittest.mock import AsyncMock
 
 import aiosqlite
 import httpx
+import pytest
 import pytest_asyncio
 
 from price_tracker.core.registry import ScraperRegistry
@@ -182,3 +183,59 @@ async def test_run_check_all_still_reads_every_active_product(repo: Repository) 
         await _scheduler(repo, scraper, client).run_check_all()
 
     assert scraper.urls == ["https://example.com/p/1"]
+
+
+# ── not-well-formed stored values ─────────────────────────────────────
+
+
+async def _store_raw(repo: Repository, pid: int, column: str, value: object) -> None:
+    assert column in {"check_interval_minutes", "last_checked_at", "last_error_at"}
+    await repo._conn.execute(f"UPDATE products SET {column} = ? WHERE id = ?", (value, pid))
+    await repo._conn.commit()
+
+
+async def test_an_unreadable_timestamp_makes_only_its_product_due(repo: Repository) -> None:
+    damaged = await _add(repo, 1)
+    healthy = await _add(repo, 2)
+    await _store_raw(repo, damaged, "last_checked_at", "not a timestamp")
+    await _set_checked(repo, healthy, minutes_ago=1)
+    scraper = _RecordingScraper()
+    async with httpx.AsyncClient() as client:
+        await _scheduler(repo, scraper, client).run_check_due(
+            global_interval_minutes=GLOBAL_MINUTES
+        )
+
+    assert scraper.urls == ["https://example.com/p/1"]
+
+
+@pytest.mark.parametrize("stored", [0, -5, 10**15, "abc", 10**4 * 7])
+async def test_an_unusable_product_interval_falls_back_to_the_global_one(
+    repo: Repository, stored: object
+) -> None:
+    pid = await _add(repo, 1)
+    await _store_raw(repo, pid, "check_interval_minutes", stored)
+    await _set_checked(repo, pid, minutes_ago=40)
+    scraper = _RecordingScraper()
+    async with httpx.AsyncClient() as client:
+        await _scheduler(repo, scraper, client).run_check_due(
+            global_interval_minutes=GLOBAL_MINUTES
+        )
+
+    assert scraper.urls == []
+
+
+@pytest.mark.parametrize("global_minutes", [0, -60])
+async def test_a_global_interval_below_the_tick_is_raised_to_the_tick(
+    repo: Repository, global_minutes: int
+) -> None:
+    recent = await _add(repo, 1)
+    older = await _add(repo, 2)
+    await _set_checked(repo, recent, minutes_ago=1)
+    await _set_checked(repo, older, minutes_ago=CHECK_TICK_MINUTES)
+    scraper = _RecordingScraper()
+    async with httpx.AsyncClient() as client:
+        await _scheduler(repo, scraper, client).run_check_due(
+            global_interval_minutes=global_minutes
+        )
+
+    assert scraper.urls == ["https://example.com/p/2"]

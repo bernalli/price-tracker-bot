@@ -71,6 +71,9 @@ logger = logging.getLogger(__name__)
 
 # How often the periodic job runs; equal to the shortest allowed check interval.
 CHECK_TICK_MINUTES = 5
+# Longest interval /refresh and /intervallo accept (7 days); a stored value outside
+# 1..MAX_INTERVAL_MINUTES is not a usable interval.
+MAX_INTERVAL_MINUTES = 7 * 24 * 60
 
 
 class NotifierFn(Protocol):
@@ -402,15 +405,30 @@ class Scheduler:
                 await self._flush_guaranteed(collector)
 
     def _last_attempt(self, product: ProductRecord) -> datetime | None:
-        """The latest known attempt: this process's own, else the stored read or failure."""
+        """The latest known attempt: this process's own, else the stored read or failure.
+
+        A stored timestamp that cannot be read is ignored, so one damaged row makes
+        its product due instead of stopping the periodic job for every product.
+        """
         if product.id in self._attempted_at:
             return self._attempted_at[product.id]
-        stored = [
-            _parse_db_timestamp(value)
-            for value in (product.last_checked_at, product.last_error_at)
-            if value
-        ]
+        stored: list[datetime] = []
+        for value in (product.last_checked_at, product.last_error_at):
+            if not value:
+                continue
+            try:
+                stored.append(_parse_db_timestamp(value))
+            except (ValueError, TypeError, AttributeError):
+                logger.warning("Unreadable stored timestamp for product %s: %r", product.id, value)
         return max(stored) if stored else None
+
+    @staticmethod
+    def _interval_minutes(product: ProductRecord, *, global_minutes: int) -> int:
+        """The product's own interval if it is a usable one, else the global interval."""
+        own = product.check_interval_minutes
+        if isinstance(own, int) and not isinstance(own, bool) and 1 <= own <= MAX_INTERVAL_MINUTES:
+            return own
+        return min(max(global_minutes, CHECK_TICK_MINUTES), MAX_INTERVAL_MINUTES)
 
     def _is_due(self, product: ProductRecord, *, global_minutes: int, now: datetime) -> bool:
         """Whether the product's interval (its own, else the global one) has elapsed.
@@ -421,7 +439,7 @@ class Scheduler:
         last = self._last_attempt(product)
         if last is None:
             return True
-        interval = timedelta(minutes=product.check_interval_minutes or global_minutes)
+        interval = timedelta(minutes=self._interval_minutes(product, global_minutes=global_minutes))
         return now - last + timedelta(minutes=CHECK_TICK_MINUTES / 2) >= interval
 
     async def run_check_due(

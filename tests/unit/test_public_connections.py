@@ -592,3 +592,24 @@ async def test_decoding_failure_immediately_closes_response(network: Network) ->
         assert not client._transport._active
         assert client._transport._slots._value == 1
         assert (await client.get("https://shop.example/next")).text == "ok"
+
+
+async def test_amazon_fresh_retry_cannot_reach_a_blocked_address(network: Network) -> None:
+    from price_tracker.scrapers.amazon import _fetch_with_fresh_client
+
+    shared_address = BLOCKED[4]  # RFC 6598 shared address space
+    assert await _fetch_with_fresh_client(f"http://{shared_address}/product") is None
+    assert network.targets == []
+
+
+async def test_amazon_short_link_resolution_cannot_reach_a_blocked_address(
+    network: Network,
+) -> None:
+    from price_tracker.scrapers.amazon import AmazonScraper
+
+    network.answers = [BLOCKED[1]]  # RFC 1918 private address
+    async with httpx.AsyncClient(trust_env=False) as client:
+        info = await AmazonScraper().scrape("https://amzn.eu/d/abc123", client)
+    assert info.price is None
+    assert network.lookups[0] == "amzn.eu"
+    assert network.targets == []

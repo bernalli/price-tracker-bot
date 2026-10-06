@@ -17,6 +17,7 @@ from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler
 
 from price_tracker.bot.decorators import _config, _db, admin_only, restricted, with_locale
+from price_tracker.bot.handlers._helpers import _parse_id
 from price_tracker.bot.messages import _
 from price_tracker.db.models import NotificationPrefs
 
@@ -330,11 +331,13 @@ async def prefs_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     product_id: int | None = None
     if args:
         try:
-            product_id = int(args[0])
+            int(args[0])
         except ValueError:
             await update.message.reply_text("product_id must be an integer")
             return
-        if product_id <= 0:
+        # Positive ASCII digits within SQLite INTEGER range only (no sign, overflow, ...).
+        product_id = _parse_id(args[0])
+        if product_id is None:
             await update.message.reply_text("product_id must be a positive integer")
             return
     prefs_mgr = PreferencesManager(repo=repo)
