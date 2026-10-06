@@ -20,6 +20,7 @@ from price_tracker.bot.handlers._helpers import (
     _parse_id,
     _safe_dec,
 )
+from price_tracker.bot.ui.width import truncate_to_width
 
 if TYPE_CHECKING:
     from telegram.ext import ContextTypes
@@ -43,7 +44,7 @@ async def handle_edit_button(
         await query.edit_message_text("❌ Prodotto non trovato.")
         return True
 
-    name = (product.get("name") or "Sconosciuto")[:60]
+    name = truncate_to_width(product.get("name") or "Sconosciuto", 60)
     threshold_type = product.get("threshold_type", "percentage")
     threshold_value = product.get("threshold_value", "10")
     threshold_str = _format_threshold(threshold_type, threshold_value)
@@ -92,7 +93,7 @@ async def handle_pause_button(
         await query.edit_message_text("❌ Prodotto non trovato.")
         return True
 
-    name = (product.get("name") or "Sconosciuto")[:50]
+    name = truncate_to_width(product.get("name") or "Sconosciuto", 50)
     await db.deactivate_product(product_id)
     await query.edit_message_text(
         f"⏸ <b>In pausa:</b> {_escape_html(name)}\nUsa /riattiva {product_id} per riattivarlo.",
@@ -117,7 +118,7 @@ async def handle_remove_button(
         await query.edit_message_text("❌ Prodotto non trovato.")
         return True
 
-    name = (product.get("name") or "Sconosciuto")[:50]
+    name = truncate_to_width(product.get("name") or "Sconosciuto", 50)
     keyboard = InlineKeyboardMarkup(
         [
             [
@@ -155,7 +156,7 @@ async def handle_reset_button(
         return True
     success = await db.reset_initial_price(product_id)
     if success:
-        name = (product.get("name") or "Sconosciuto")[:60]
+        name = truncate_to_width(product.get("name") or "Sconosciuto", 60)
         current = _safe_dec(product.get("current_price"))
         price_str = f"€{current:.2f}" if current else "N/D"
         await query.edit_message_text(
@@ -185,7 +186,7 @@ async def handle_reactivate_button(
         await query.edit_message_text("❌ Prodotto non trovato.")
         return True
     await db.reactivate_product(product_id)
-    name = (product.get("name") or "Sconosciuto")[:50]
+    name = truncate_to_width(product.get("name") or "Sconosciuto", 50)
     await query.edit_message_text(
         f"▶️ <b>Riattivato:</b> {_escape_html(name)}",
         parse_mode=ParseMode.HTML,

@@ -20,6 +20,6 @@
    keyboard:
    | [#1 Kettle → chart_1]
    | [#2 Fan → chart_2]
-   | [#3 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNN → chart_3]
+   | [#3 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNN… → chart_3]
 ## db after step 2
 (no changes)

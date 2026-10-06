@@ -112,8 +112,14 @@ async def test_product_name_without_a_name_is_the_id(env: Env, name: str | None)
     assert await env.services.product_name(OWNER, product_id) == f"#{product_id}"
 
 
-async def test_product_name_is_truncated_to_sixty_characters(env: Env) -> None:
+async def test_product_name_over_sixty_cells_is_cut_with_an_ellipsis(env: Env) -> None:
     product_id = await env.add_product(OWNER, "x" * 61)
+
+    assert await env.services.product_name(OWNER, product_id) == "x" * 59 + "…"
+
+
+async def test_product_name_of_sixty_cells_is_kept_whole(env: Env) -> None:
+    product_id = await env.add_product(OWNER, "x" * 60)
 
     assert await env.services.product_name(OWNER, product_id) == "x" * 60
 

@@ -41,6 +41,7 @@ from price_tracker.bot.handlers._helpers import (
 )
 from price_tracker.bot.keyboards import build_threshold_keyboard
 from price_tracker.bot.messages import _
+from price_tracker.bot.ui.width import truncate_to_width
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +69,7 @@ async def _product_picker(
 
     buttons = []
     for p in products:
-        name = (p.get("name") or "Sconosciuto")[:35]
+        name = truncate_to_width(p.get("name") or "Sconosciuto", 35)
         current = _safe_dec(p.get("current_price"))
         price_tag = f" €{current:.2f}" if current else ""
         prefix = callback_prefix or action
@@ -121,7 +122,7 @@ async def cmd_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
         buttons = []
         for p in products:
-            name = (p.get("name") or "Sconosciuto")[:35]
+            name = truncate_to_width(p.get("name") or "Sconosciuto", 35)
             price = _safe_dec(p.get("current_price"))
             label = f"#{p['id']} {name}"
             if price:
@@ -160,7 +161,7 @@ async def cmd_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     )
     await update.message.reply_text(
         f"⚠️ Vuoi eliminare <b>definitivamente</b> questo prodotto?\n\n"
-        f"📦 #{product_id} — {_escape_html(name[:80])}\n\n"
+        f"📦 #{product_id} — {_escape_html(truncate_to_width(name, 80))}\n\n"
         f"Verrà cancellato anche tutto lo storico prezzi.",
         parse_mode=ParseMode.HTML,
         reply_markup=keyboard,
@@ -217,7 +218,7 @@ async def cmd_target(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     target_display = _convert_display(target, currency)
     lines = [
         f"🎯 Target impostato: <b>{target_display}</b>",
-        f"📦 {_escape_html(name[:80])}",
+        f"📦 {_escape_html(truncate_to_width(name, 80))}",
     ]
     if current:
         current_display = _convert_display(current, currency)
@@ -273,7 +274,7 @@ async def cmd_threshold(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     threshold_str = _format_threshold(threshold_type, threshold_value)
     await update.message.reply_text(
         f"🎯 Soglia impostata: <b>{threshold_str}</b>\n"
-        f"📦 #{product_id} — {_escape_html(name[:80])}",
+        f"📦 #{product_id} — {_escape_html(truncate_to_width(name, 80))}",
         parse_mode=ParseMode.HTML,
     )
 
@@ -370,7 +371,7 @@ async def _add_product(
     )
 
     name = result.name or "Prodotto"
-    name_short = name[:80] + ("..." if len(name) > 80 else "")
+    name_short = truncate_to_width(name, 80)
 
     lines = [
         f"✅ <b>Prodotto aggiunto!</b> (#{product_id})",

@@ -11,7 +11,7 @@
    text:
    | ✅ <b>Controllo completato</b> — 2 prodotti
    |
-   |   #1 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN — €99.50 <i>(-0.5%)</i>
+   |   #1 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN… — €99.50 <i>(-0.5%)</i>
    |   #2 Sticker — €0.80 <i>(-11.1%)</i>
 ## db after step 1
 + price_history id=1 {product_id=1, price="99.50", checked_at=<now:9999-99-99 99:99:99>}

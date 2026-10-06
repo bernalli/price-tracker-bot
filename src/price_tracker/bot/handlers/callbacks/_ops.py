@@ -15,6 +15,7 @@ from price_tracker.bot.handlers._helpers import (
     _safe_dec,
 )
 from price_tracker.bot.messages import _
+from price_tracker.bot.ui.width import truncate_to_width
 from price_tracker.core.alert import _why
 from price_tracker.core.notices import (
     OPS_DELETE_CONFIRM_PREFIX,
@@ -106,7 +107,7 @@ async def _handle_reactivate(
         product = await db.get_product(original.id)
         name_source = product.get("name") if product is not None else original.get("name")
         url_source = product.get("url") if product is not None else original.get("url")
-        name = _escape_html(str(name_source or url_source)[:60])
+        name = _escape_html(truncate_to_width(str(name_source or url_source), 60))
         result = results[index] if index < len(results) else None
         reason = getattr(result, "reason", None)
         current_price = _safe_dec(product.get("current_price")) if product is not None else None

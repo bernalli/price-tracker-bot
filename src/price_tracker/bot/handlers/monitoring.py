@@ -33,6 +33,7 @@ from price_tracker.bot.handlers._helpers import (
     _safe_dec,
 )
 from price_tracker.bot.messages import _, current_locale
+from price_tracker.bot.ui.width import truncate_to_width
 from price_tracker.i18n.format import duration
 
 if TYPE_CHECKING:
@@ -64,7 +65,7 @@ async def _product_picker(
 
     buttons = []
     for p in products:
-        name = (p.get("name") or _("Unknown"))[:35]
+        name = truncate_to_width(p.get("name") or _("Unknown"), 35)
         current = _safe_dec(p.get("current_price"))
         price_tag = f" €{current:.2f}" if current else ""
         prefix = callback_prefix or action
@@ -132,7 +133,7 @@ async def cmd_refresh(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if minutes <= 0:
         await db.set_product_interval(product_id, None)
         config = _config(context)
-        name_safe = _escape_html((product.get("name") or _("Unknown"))[:80])
+        name_safe = _escape_html(truncate_to_width(product.get("name") or _("Unknown"), 80))
         await update.message.reply_text(
             _("🔄 Interval reset to global (every {min} min)\n📦 #{pid} — {name}").format(
                 min=config.check_interval_minutes, pid=product_id, name=name_safe
@@ -155,7 +156,7 @@ async def cmd_refresh(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
     await update.message.reply_text(
         _("🔄 Check interval: <b>every {display}</b>\n📦 #{pid} — {name}").format(
-            display=display, pid=product_id, name=_escape_html(name[:80])
+            display=display, pid=product_id, name=_escape_html(truncate_to_width(name, 80))
         ),
         parse_mode=ParseMode.HTML,
     )
@@ -204,7 +205,7 @@ async def cmd_check(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     else:
         await msg.edit_text(
             _("✅ <b>{name}</b>\n💰 Price: {price}\n📊 No significant change.").format(
-                name=_escape_html(name[:80]), price=price_str
+                name=_escape_html(truncate_to_width(name, 80)), price=price_str
             ),
             parse_mode=ParseMode.HTML,
         )
@@ -239,7 +240,7 @@ async def cmd_checkall(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         _("✅ <b>Check complete</b> — {n} products").format(n=len(updated_products)) + chr(10)
     ]
     for p in updated_products:
-        name = (p.get("name") or _("Unknown"))[:40]
+        name = truncate_to_width(p.get("name") or _("Unknown"), 40)
         current = _safe_dec(p.get("current_price"))
         initial = _safe_dec(p.get("initial_price"))
         price_str = f"€{current:.2f}" if current else _("N/A")
@@ -286,7 +287,7 @@ async def cmd_reactivate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             return
         buttons = []
         for p in paused:
-            name = (p.get("name") or _("Unknown"))[:35]
+            name = truncate_to_width(p.get("name") or _("Unknown"), 35)
             buttons.append(
                 [InlineKeyboardButton(f"#{p['id']} {name}", callback_data=f"reactivate_{p['id']}")]
             )
@@ -309,7 +310,7 @@ async def cmd_reactivate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await _db(context).reactivate_product(product_id)
     name = product.get("name") or _("Unknown")
     await update.message.reply_text(
-        _("✅ Reactivated: <b>{name}</b>").format(name=_escape_html(name[:80])),
+        _("✅ Reactivated: <b>{name}</b>").format(name=_escape_html(truncate_to_width(name, 80))),
         parse_mode=ParseMode.HTML,
     )
 
@@ -334,7 +335,7 @@ async def cmd_pause(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await _db(context).deactivate_product(product_id)
     name = product.get("name") or _("Unknown")
     await update.message.reply_text(
-        _("⏸ Tracking paused: <b>{name}</b>").format(name=_escape_html(name[:80]))
+        _("⏸ Tracking paused: <b>{name}</b>").format(name=_escape_html(truncate_to_width(name, 80)))
         + "\n"
         + _("Use /reactivate {pid} to resume tracking.").format(pid=product_id),
         parse_mode=ParseMode.HTML,

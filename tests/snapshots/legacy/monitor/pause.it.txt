@@ -38,7 +38,7 @@
 -> sendMessage chat=10
    param parse_mode="HTML"
    text:
-   | ⏸ Tracking in pausa: <b>Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN</b>
+   | ⏸ Tracking in pausa: <b>Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN…</b>
    | Usa /riattiva 3 per riprendere.
 ## db after step 5
 ~ products id=3 is_active: 1 -> 0
