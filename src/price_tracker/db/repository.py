@@ -470,6 +470,14 @@ class Repository:
         )
         await self._conn.commit()
 
+    async def mark_checked(self, product_id: int) -> None:
+        """Stamp ``last_checked_at`` for a check that completed without writing a price."""
+        await self._conn.execute(
+            "UPDATE products SET last_checked_at = datetime('now') WHERE id = ?",
+            (product_id,),
+        )
+        await self._conn.commit()
+
     # ── Held reads (two-read confirmation gate) ────────────────
 
     async def set_pending_read(

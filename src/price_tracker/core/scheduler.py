@@ -720,6 +720,28 @@ class Scheduler:
         else:
             info = await scraper.scrape(p.url, self.deps.client)
 
+        if info.price is None and info.available is False:
+            # The scraper positively recognised a sold-out listing: the retailer
+            # drops the price from the page, so "no price" here is the state
+            # being observed, not a parsing failure. Treating it as one would
+            # suspend the product after max_consecutive_errors and the user would
+            # never hear about the restock. Only an explicit False counts — a
+            # missing price with the default availability is a layout change and
+            # stays a failure below.
+            if p.is_available is not False:
+                await self.deps.repo.set_availability(p.id, available=False)
+            if p.pending_read_count or p.pending_read_streak:
+                await self.deps.repo.clear_pending_read(p.id)
+            await self.deps.repo.reset_errors(p.id)
+            await self.deps.repo.mark_checked(p.id)
+            if domain != "unknown":
+                await handle_success_in_pipeline(health_mgr=self.deps.health_mgr, domain=domain)
+            if metrics is not None:
+                metrics.price_check_total.labels(
+                    scraper=scraper_name, domain=domain, status="success"
+                ).inc()
+            return (p.user_id, None, False)
+
         if info.price is None:
             if metrics is not None:
                 metrics.price_check_total.labels(
