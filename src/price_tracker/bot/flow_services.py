@@ -33,6 +33,7 @@ from price_tracker.bot.flows import (
     PreparedProduct,
     PrepareResult,
 )
+from price_tracker.bot.ui.width import truncate_to_width
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -92,7 +93,7 @@ class RepositoryFlowServices:
         name = product.get("name")
         if not isinstance(name, str) or not name:
             return f"#{product_id}"
-        return name[:NAME_LIMIT]
+        return truncate_to_width(name, NAME_LIMIT)
 
     async def apply_value(
         self, user_id: int, kind: FlowKind, product_id: int, value: object

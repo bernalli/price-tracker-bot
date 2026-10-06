@@ -59,7 +59,7 @@
    |   ❌ 1 letture fallite
    |   🐞 http_error: 503 — 1g fa
    |
-   | <b>#3</b> Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
+   | <b>#3</b> Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN…
    |   🌐 example.com — 🔒 T1 (1h) (riprende tra 1h 00m)
    |   ❌ 1 letture fallite
    |   🐞 parse_error: eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee — 1h fa

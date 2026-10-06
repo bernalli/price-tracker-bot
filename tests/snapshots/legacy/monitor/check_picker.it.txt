@@ -20,6 +20,6 @@
    keyboard:
    | [#1 Kettle €80.00 → check_1]
    | [#2 Fan → check_2]
-   | [#3 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNN €80.00 → check_3]
+   | [#3 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNN… €80.00 → check_3]
 ## db after step 2
 (no changes)

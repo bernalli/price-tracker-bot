@@ -26,6 +26,7 @@ from price_tracker.bot.handlers._helpers import (
     _safe_dec,
 )
 from price_tracker.bot.messages import _
+from price_tracker.bot.ui.width import truncate_to_width
 
 logger = logging.getLogger(__name__)
 
@@ -144,7 +145,7 @@ async def _generate_chart(db: Any, product_id: int, product: dict[str, Any]) -> 
     # The repository orders normalized timestamps and uses id as the tie-breaker.
     dates, prices = zip(*points, strict=True)
 
-    name = (product.get("name") or "Prodotto")[:50]
+    name = truncate_to_width(product.get("name") or "Prodotto", 50)
     return await asyncio.to_thread(
         _render_chart, list(dates), list(prices), product.get("target_price"), name
     )
@@ -165,7 +166,7 @@ async def cmd_history(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
         buttons = []
         for p in products:
-            name = (p.get("name") or "Sconosciuto")[:35]
+            name = truncate_to_width(p.get("name") or "Sconosciuto", 35)
             buttons.append(
                 [InlineKeyboardButton(f"#{p['id']} {name}", callback_data=f"chart_{p['id']}")]
             )
@@ -189,7 +190,7 @@ async def cmd_history(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     db = _db(context)
     chart_buf = await _generate_chart(db, product_id, product)
     if chart_buf:
-        name = (product.get("name") or "Prodotto")[:50]
+        name = truncate_to_width(product.get("name") or "Prodotto", 50)
         lowest = _safe_dec(product.get("lowest_price"))
         highest = _safe_dec(product.get("highest_price"))
         caption = f"📊 <b>#{product_id}</b> {_escape_html(name)}"
@@ -234,7 +235,7 @@ async def cmd_reset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     db = _db(context)
     success = await db.reset_initial_price(product_id)
     if success:
-        name = (product.get("name") or "Sconosciuto")[:60]
+        name = truncate_to_width(product.get("name") or "Sconosciuto", 60)
         current = _safe_dec(product.get("current_price"))
         price_str = f"€{current:.2f}" if current else "N/D"
         await update.message.reply_text(
