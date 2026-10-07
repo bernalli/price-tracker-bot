@@ -9,6 +9,6 @@ text:
    | 
    | Paste a product link to start tracking.
 keyboard:
-   [📦 Products](cb:l:a:1)  [🔍 Check all](cb:menu_checkall)
-   [📊 Statistics](cb:menu_info)  [💾 Data](cb:menu_dati)
-   [⚙️ Settings](cb:s)
+   [📦 Products](cb:l:a:1)  [💶 Prices](cb:menu_prezzi)
+   [🔔 Notifications](cb:menu_notifiche)  [💾 Data](cb:menu_dati)
+   [ℹ️ Status & info](cb:menu_info)  [⚙️ Settings](cb:s)

@@ -104,11 +104,11 @@ def _alert_line(view: ProductView, *, loc: str) -> str:
 def _checks_line(view: ProductView, *, now: datetime, loc: str) -> str:
     interval = duration(view.check_interval_minutes or view.default_interval_minutes, locale=loc)
     if view.last_checked_at is None:
-        return _("🔄 Checks: every {interval} · never").format(interval=interval)
+        return _("⏱ Checks: every {interval} · never").format(interval=interval)
     ago_text = ago(now - view.last_checked_at, locale=loc)
     if ago_text is None:
-        return _("🔄 Checks: every {interval} · just now").format(interval=interval)
-    return _("🔄 Checks: every {interval} · last {ago}").format(interval=interval, ago=ago_text)
+        return _("⏱ Checks: every {interval} · just now").format(interval=interval)
+    return _("⏱ Checks: every {interval} · last {ago}").format(interval=interval, ago=ago_text)
 
 
 def _errors_line(view: ProductView) -> str | None:
@@ -124,12 +124,12 @@ def _errors_line(view: ProductView) -> str | None:
 def _keyboard(view: ProductView, actions: CardActions) -> tuple[tuple[Button, ...], ...]:
     toggle_label = _("⏸ Pause") if view.status == "active" else _("▶️ Reactivate")
     group_1 = [
-        button(_("🔍 Check now"), callback=actions.check),
-        button(_("📊 History"), callback=actions.history),
+        button(_("🔄 Check now"), callback=actions.check),
+        button(_("📈 History"), callback=actions.history),
         button(toggle_label, callback=actions.toggle),
         button(_("🗑 Delete"), callback=actions.delete),
         button(_("🔔 Alert rule"), callback=actions.alert_rule),
-        button(_("🔄 Interval"), callback=actions.interval),
+        button(_("⏱ Interval"), callback=actions.interval),
     ]
     if view.url:
         group_1.append(button(_("🔗 Open"), url=view.url))

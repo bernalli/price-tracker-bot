@@ -211,12 +211,13 @@ def home_screen(view: HomeView) -> Screen:
     ).format(counts=counts)
     areas = [
         button(_("📦 Products"), callback=encode(Action("list.page", ("a", 1)))),
-        button(_("🔍 Check all"), callback="menu_checkall"),
-        button(_("📊 Statistics"), callback="menu_info"),
+        button(_("💶 Prices"), callback="menu_prezzi"),
+        button(_("🔔 Notifications"), callback="menu_notifiche"),
         button(_("💾 Data"), callback="menu_dati"),
+        button(_("ℹ️ Status & info"), callback="menu_info"),
+        button(_("⚙️ Settings"), callback=encode(Action("settings"))),
     ]
-    settings = button(_("⚙️ Settings"), callback=encode(Action("settings")))
-    groups = [areas, [settings]]
+    groups = [areas]
     if view.is_admin:
         groups.append([button(_("👑 Admin"), callback="menu_admin")])
     return Screen(text=text, rows=layout_rows(*groups))

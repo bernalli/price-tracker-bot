@@ -10,13 +10,13 @@ text:
    | [📌 Start: JP¥13,500 · ▼ 5.2% 📌 Start: JP¥13,500 · ▼ 5.2% 📌 Start: JP¥13,500 · ▼ 5.2%]
    | [📉 Lowest: JP¥12,800 📉 Lowest: JP¥12,800 📉 Lowest: JP¥12,800]
    | [🔔 Alert: drop of 5% from start 🔔 Alert: drop of 5% from start 🔔 Alert: drop of 5% from start]
-   | [🔄 Checks: every 30分钟 · last 12分钟前 🔄 Checks: every 30分钟 · last 12分钟前 🔄 Checks: every 30分钟 · last 12分钟前]
+   | [⏱ Checks: every 30分钟 · last 12分钟前 ⏱ Checks: every 30分钟 · last 12分钟前 ⏱ Checks: every 30分钟 · last 12分钟前]
 keyboard:
-   [[🔍 Check now 🔍 Check now 🔍 Che…](cb:p:47:ck)
-   [[📊 History 📊 History 📊 History]](cb:p:47:ch:30d)
+   [[🔄 Check now 🔄 Check now 🔄 Che…](cb:p:47:ck)
+   [[📈 History 📈 History 📈 History]](cb:p:47:ch:30d)
    [[⏸ Pause ⏸ Pause ⏸ Pause]](cb:p:47:pa)
    [[🗑 Delete 🗑 Delete 🗑 Delete]](cb:p:47:rm)
    [[🔔 Alert rule 🔔 Alert rule 🔔 A…](cb:p:47:th)
-   [[🔄 Interval 🔄 Interval 🔄 Inter…](cb:p:47:iv)
+   [[⏱ Interval ⏱ Interval ⏱ Inter…](cb:p:47:iv)
    [[🔗 Open 🔗 Open 🔗 Open]](url:https://shop.example.com/item/47)
    [[◀️ List ◀️ List ◀️ List]](cb:l:a:1)

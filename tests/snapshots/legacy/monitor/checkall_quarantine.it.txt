@@ -13,7 +13,7 @@
 ## step 9: command "/checkall" user=10
 -> sendMessage chat=10
    text:
-   | 🔍 Controllo di 3 prodotti in corso...
+   | 🔄 Controllo di 3 prodotti in corso...
 -> sendMessage chat=10
    param parse_mode="HTML"
    text:

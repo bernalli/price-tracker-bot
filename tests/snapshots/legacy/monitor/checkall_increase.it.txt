@@ -5,7 +5,7 @@
 ## step 1: command "/checkall" user=10
 -> sendMessage chat=10
    text:
-   | 🔍 Controllo di 1 prodotti in corso...
+   | 🔄 Controllo di 1 prodotti in corso...
 -> editMessageText chat=10 message_id=1000
    param parse_mode="HTML"
    text:

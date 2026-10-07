@@ -13,24 +13,24 @@
    |
    | Incolla il link di un prodotto per iniziare a seguirlo.
    keyboard:
-   | [📦 Prodotti → l:a:1] [🔍 Verifica tutti → menu_checkall]
-   | [📊 Statistiche → menu_info] [💾 Dati → menu_dati]
-   | [⚙️ Impostazioni → s]
+   | [📦 Prodotti → l:a:1] [💶 Prezzi → menu_prezzi]
+   | [🔔 Notifiche → menu_notifiche] [💾 Dati → menu_dati]
+   | [ℹ️ Stato e info → menu_info] [⚙️ Impostazioni → s]
 ## db after step 1
 ~ users user_id=10 display_name: NULL -> "U10"
-## step 2: press "menu_prezzi" user=10 on=1 synthetic
+## step 2: press "menu_prezzi" user=10 on=1000
 -> answerCallbackQuery
--> editMessageText chat=10 message_id=1
+-> editMessageText chat=10 message_id=1000
    param parse_mode="HTML"
    text:
-   | 🔍 <b>Controllo prezzi</b>
+   | 💶 <b>Controllo prezzi</b>
    |
    | Tocca un prodotto per controllarlo.
    keyboard:
    | [🔄 Controlla tutti i prezzi → menu_checkall]
-   | [🔍 #1 Kettle → check_1]
-   | [🔍 #2 Fan → check_2]
-   | [📊 Storico prezzo → menu_storia]
+   | [🔄 #1 Kettle → check_1]
+   | [🔄 #2 Fan → check_2]
+   | [📈 Storico prezzo → menu_storia]
    | [◀️ Menu → menu_main]
 ## db after step 2
 (no changes)
@@ -38,7 +38,7 @@
 -> answerCallbackQuery
 -> editMessageText chat=10 message_id=1000
    text:
-   | 🔍 Controllo 2 prodotti...
+   | 🔄 Controllo 2 prodotti...
 -> editMessageText chat=10 message_id=1000
    param parse_mode="HTML"
    text:

@@ -6,7 +6,7 @@
 -> sendPhoto chat=10 photo=png filename=chart_1.png
    param parse_mode="HTML"
    caption:
-   | 📊 <b>#1</b> Cable $\zz xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx…
+   | 📈 <b>#1</b> Cable $\zz xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx…
    | 📉 Min: €40.00  📈 Max: €50.00
 ## db after step 1
 ~ users user_id=10 display_name: NULL -> "U10"
@@ -14,7 +14,7 @@
 -> sendPhoto chat=10 photo=png filename=chart_2.png
    param parse_mode="HTML"
    caption:
-   | 📊 <b>#2</b> Sticker
+   | 📈 <b>#2</b> Sticker
    | 📉 Min: €0.80  📈 Max: €0.90
 ## db after step 2
 (no changes)
@@ -28,7 +28,7 @@
 -> sendPhoto chat=10 photo=png filename=chart_4.png
    param parse_mode="HTML"
    caption:
-   | 📊 <b>#4</b> Cable $\zz$
+   | 📈 <b>#4</b> Cable $\zz$
    | 📉 Min: €40.00  📈 Max: €50.00
 ## db after step 4
 (no changes)

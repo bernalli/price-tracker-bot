@@ -114,13 +114,13 @@ def test_errors_singular_for_one() -> None:
 
 def test_just_now_renders_just_now() -> None:
     screen = _card("just_now")
-    checks_line = next(line for line in screen.text.split("\n") if line.startswith("🔄"))
+    checks_line = next(line for line in screen.text.split("\n") if line.startswith("⏱"))
     assert checks_line.endswith("just now")
 
 
 def test_last_checked_at_none_renders_never() -> None:
     screen = _card("hostile")
-    checks_line = next(line for line in screen.text.split("\n") if line.startswith("🔄"))
+    checks_line = next(line for line in screen.text.split("\n") if line.startswith("⏱"))
     assert checks_line.endswith("never")
 
 

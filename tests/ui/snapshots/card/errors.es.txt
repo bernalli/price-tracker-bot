@@ -10,14 +10,14 @@ text:
    | [📌 Start: 34,50 € 📌 Start: 34,50 € 📌 Start: 34,50 €]
    | [📉 Lowest: 34,50 € 📉 Lowest: 34,50 € 📉 Lowest: 34,50 €]
    | [🔔 Alert: drop of 5,00 € from start 🔔 Alert: drop of 5,00 € from start 🔔 Alert: drop of 5,00 € from start]
-   | [🔄 Checks: every 6 h · last hace 2 días 🔄 Checks: every 6 h · last hace 2 días 🔄 Checks: every 6 h · last hace 2 días]
+   | [⏱ Checks: every 6 h · last hace 2 días ⏱ Checks: every 6 h · last hace 2 días ⏱ Checks: every 6 h · last hace 2 días]
    | [⚠️ 3 failed reads · /errors ⚠️ 3 failed reads · /errors ⚠️ 3 failed reads · /errors]
 keyboard:
-   [[🔍 Check now 🔍 Check now 🔍 Che…](cb:p:51:ck)
-   [[📊 History 📊 History 📊 History]](cb:p:51:ch:30d)
+   [[🔄 Check now 🔄 Check now 🔄 Che…](cb:p:51:ck)
+   [[📈 History 📈 History 📈 History]](cb:p:51:ch:30d)
    [[⏸ Pause ⏸ Pause ⏸ Pause]](cb:p:51:pa)
    [[🗑 Delete 🗑 Delete 🗑 Delete]](cb:p:51:rm)
    [[🔔 Alert rule 🔔 Alert rule 🔔 A…](cb:p:51:th)
-   [[🔄 Interval 🔄 Interval 🔄 Inter…](cb:p:51:iv)
+   [[⏱ Interval ⏱ Interval ⏱ Inter…](cb:p:51:iv)
    [[🔗 Open 🔗 Open 🔗 Open]](url:https://shop.example.com/item/51)
    [[◀️ List ◀️ List ◀️ List]](cb:l:a:1)

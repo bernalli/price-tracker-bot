@@ -310,10 +310,10 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         interval_str = f"{interval}min"
 
     lines = [
-        "📊 <b>Le tue statistiche</b>\n",
+        "ℹ️ <b>Le tue statistiche</b>\n",
         f"📦 Prodotti attivi: {user_stats['active_products']}",
         f"📁 Prodotti totali: {user_stats['total_products']}",
-        f"🔍 Controlli effettuati: {user_stats['total_checks']}",
+        f"🔄 Controlli effettuati: {user_stats['total_checks']}",
         f"⏱ Intervallo check: ogni {interval_str}",
     ]
 
@@ -328,7 +328,7 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
                 "<b>👑 Panoramica admin</b>",
                 f"👥 Utenti attivi: {len(users)}",
                 f"📦 Prodotti totali (globali): {global_stats['active_products']}",
-                f"🔍 Check totali (globali): {global_stats['total_checks']}",
+                f"🔄 Check totali (globali): {global_stats['total_checks']}",
             ]
         )
 
@@ -356,7 +356,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     """
     metrics = context.bot_data.get("metrics")
     start_time = context.bot_data.get("start_time")
-    lines = ["📊 <b>Bot Status</b>", ""]
+    lines = ["ℹ️ <b>Bot Status</b>", ""]
     lines.extend(_render_metrics_lines(metrics, start_time=start_time))
     await update.message.reply_html("\n".join(lines))
 

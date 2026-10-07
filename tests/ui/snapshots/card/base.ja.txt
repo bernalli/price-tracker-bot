@@ -11,13 +11,13 @@ text:
    | [📉 Lowest: €1,249.00 📉 Lowest: €1,249.00 📉 Lowest: €1,249.00]
    | [🎯 Target: €1,199.00 🎯 Target: €1,199.00 🎯 Target: €1,199.00]
    | [🔔 Alert: drop of 10% from start 🔔 Alert: drop of 10% from start 🔔 Alert: drop of 10% from start]
-   | [🔄 Checks: every 6 時間 · last 6 時間前 🔄 Checks: every 6 時間 · last 6 時間前 🔄 Checks: every 6 時間 · last 6 時間前]
+   | [⏱ Checks: every 6 時間 · last 6 時間前 ⏱ Checks: every 6 時間 · last 6 時間前 ⏱ Checks: every 6 時間 · last 6 時間前]
 keyboard:
-   [[🔍 Check now 🔍 Check now 🔍 Che…](cb:p:42:ck)
-   [[📊 History 📊 History 📊 History]](cb:p:42:ch:30d)
+   [[🔄 Check now 🔄 Check now 🔄 Che…](cb:p:42:ck)
+   [[📈 History 📈 History 📈 History]](cb:p:42:ch:30d)
    [[⏸ Pause ⏸ Pause ⏸ Pause]](cb:p:42:pa)
    [[🗑 Delete 🗑 Delete 🗑 Delete]](cb:p:42:rm)
    [[🔔 Alert rule 🔔 Alert rule 🔔 A…](cb:p:42:th)
-   [[🔄 Interval 🔄 Interval 🔄 Inter…](cb:p:42:iv)
+   [[⏱ Interval ⏱ Interval ⏱ Inter…](cb:p:42:iv)
    [[🔗 Open 🔗 Open 🔗 Open]](url:https://shop.example.com/item/42)
    [[◀️ List ◀️ List ◀️ List]](cb:l:a:1)

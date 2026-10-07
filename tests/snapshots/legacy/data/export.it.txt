@@ -5,7 +5,7 @@
 ## step 1: command "/esporta" user=10
 -> sendDocument chat=10 filename=prodotti_20260301.csv
    caption:
-   | 📊 2 prodotti esportati.
+   | 💾 2 prodotti esportati.
    content:
    | ID,Nome,URL,Prezzo Iniziale,Prezzo Attuale,Prezzo Min,Target,Soglia,Attivo,Valuta
    | 1,Kettle,https://shop.example.com/item/1,100.00,80.00,80.00,70.00,percentage:10,Si,EUR
@@ -15,7 +15,7 @@
 ## step 2: command "/export" user=10
 -> sendDocument chat=10 filename=prodotti_20260301.csv
    caption:
-   | 📊 2 prodotti esportati.
+   | 💾 2 prodotti esportati.
    content:
    | ID,Nome,URL,Prezzo Iniziale,Prezzo Attuale,Prezzo Min,Target,Soglia,Attivo,Valuta
    | 1,Kettle,https://shop.example.com/item/1,100.00,80.00,80.00,70.00,percentage:10,Si,EUR

@@ -11,13 +11,13 @@ text:
    | [📉 Lowest: 64,00 € 📉 Lowest: 64,00 € 📉 Lowest: 64,00 €]
    | [🎯 Target: 60,00 € 🎯 Target: 60,00 € 🎯 Target: 60,00 €]
    | [🔔 Alert: drop of 10 % from start 🔔 Alert: drop of 10 % from start 🔔 Alert: drop of 10 % from start]
-   | [🔄 Checks: every 6 Std. · just now 🔄 Checks: every 6 Std. · just now 🔄 Checks: every 6 Std. · just now]
+   | [⏱ Checks: every 6 Std. · just now ⏱ Checks: every 6 Std. · just now ⏱ Checks: every 6 Std. · just now]
 keyboard:
-   [[🔍 Check now 🔍 Check now 🔍 Che…](cb:p:7:ck)
-   [[📊 History 📊 History 📊 History]](cb:p:7:ch:30d)
+   [[🔄 Check now 🔄 Check now 🔄 Che…](cb:p:7:ck)
+   [[📈 History 📈 History 📈 History]](cb:p:7:ch:30d)
    [[⏸ Pause ⏸ Pause ⏸ Pause]](cb:p:7:pa)
    [[🗑 Delete 🗑 Delete 🗑 Delete]](cb:p:7:rm)
    [[🔔 Alert rule 🔔 Alert rule 🔔 A…](cb:p:7:th)
-   [[🔄 Interval 🔄 Interval 🔄 Inter…](cb:p:7:iv)
+   [[⏱ Interval ⏱ Interval ⏱ Inter…](cb:p:7:iv)
    [[🔗 Open 🔗 Open 🔗 Open]](url:https://shop.example.com/item/7)
    [[◀️ List ◀️ List ◀️ List]](cb:l:a:1)

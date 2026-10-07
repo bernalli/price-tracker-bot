@@ -18,8 +18,9 @@ text:
    | Paste a product link to start tracking.]
 keyboard:
    [[📦 Products 📦 Products 📦 Produ…](cb:l:a:1)
-   [[🔍 Check all 🔍 Check all 🔍 Che…](cb:menu_checkall)
-   [[📊 Statistics 📊 Statistics 📊 S…](cb:menu_info)
+   [[💶 Prices 💶 Prices 💶 Prices]](cb:menu_prezzi)
+   [[🔔 Notifications 🔔 Notification…](cb:menu_notifiche)
    [[💾 Data 💾 Data 💾 Data]](cb:menu_dati)
+   [[ℹ️ Status & info ℹ️ Status & inf…](cb:menu_info)
    [[⚙️ Settings ⚙️ Settings ⚙️ Setti…](cb:s)
    [[👑 Admin 👑 Admin 👑 Admin]](cb:menu_admin)

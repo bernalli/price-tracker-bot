@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-10-07
+
+### Changed
+
+- The Home menu is again a tree of categories: Products, Prices, Notifications, Data, Status and
+  info, Settings. Prices and Notifications are reachable again; "Check all" now lives under
+  Prices and the statistics under Status and info.
+- Icons in the Home and its menus now match their entries.
+
 ## [1.4.0] - 2026-10-07
 
 ### Added
@@ -667,7 +676,8 @@ auto-quarantine, and a plugin extension point.
 - osv-scanner dependency vulnerability scan in CI.
 - Pre-commit hooks block secrets at commit time.
 
-[Unreleased]: https://github.com/bernalli/price-tracker-bot/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/bernalli/price-tracker-bot/compare/v1.4.1...HEAD
+[1.4.1]: https://github.com/bernalli/price-tracker-bot/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/bernalli/price-tracker-bot/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/bernalli/price-tracker-bot/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/bernalli/price-tracker-bot/compare/v1.1.0...v1.2.0

@@ -249,10 +249,10 @@ msgstr "❌ Prodotto non trovato."
 #: src/price_tracker/bot/handlers/monitoring.py:136
 #, python-brace-format
 msgid ""
-"🔄 Interval reset to global (every {min} min)\n"
+"⏱ Interval reset to global (every {min} min)\n"
 "📦 #{pid} — {name}"
 msgstr ""
-"🔄 Intervallo ripristinato a quello globale (ogni {min} min)\n"
+"⏱ Intervallo ripristinato a quello globale (ogni {min} min)\n"
 "📦 #{pid} — {name}"
 
 #: src/price_tracker/bot/handlers/monitoring.py:144
@@ -276,10 +276,10 @@ msgstr "{n} minuti"
 #: src/price_tracker/bot/handlers/monitoring.py:162
 #, python-brace-format
 msgid ""
-"🔄 Check interval: <b>every {display}</b>\n"
+"⏱ Check interval: <b>every {display}</b>\n"
 "📦 #{pid} — {name}"
 msgstr ""
-"🔄 Intervallo check: <b>ogni {display}</b>\n"
+"⏱ Intervallo check: <b>ogni {display}</b>\n"
 "📦 #{pid} — {name}"
 
 #: src/price_tracker/bot/handlers/monitoring.py:174
@@ -291,8 +291,8 @@ msgid "❌ Product paused. Use /reactivate to resume tracking."
 msgstr "❌ Prodotto non attivo. Usa /riattiva per riattivarlo."
 
 #: src/price_tracker/bot/handlers/monitoring.py:192
-msgid "🔍 Checking..."
-msgstr "🔍 Controllo in corso..."
+msgid "🔄 Checking..."
+msgstr "🔄 Controllo in corso..."
 
 #: src/price_tracker/bot/handlers/monitoring.py:211
 #, python-brace-format
@@ -311,8 +311,8 @@ msgstr "📭 Nessun prodotto da controllare."
 
 #: src/price_tracker/bot/handlers/monitoring.py:230
 #, python-brace-format
-msgid "🔍 Checking {n} products..."
-msgstr "🔍 Controllo di {n} prodotti in corso..."
+msgid "🔄 Checking {n} products..."
+msgstr "🔄 Controllo di {n} prodotti in corso..."
 
 #: src/price_tracker/bot/handlers/monitoring.py:244
 #, python-brace-format
@@ -919,26 +919,26 @@ msgstr "🔔 Avviso: a {price} o meno"
 
 #: src/price_tracker/bot/ui/cards.py
 #, python-brace-format
-msgid "🔄 Checks: every {interval} · never"
-msgstr "🔄 Controlli: ogni {interval} · mai"
+msgid "⏱ Checks: every {interval} · never"
+msgstr "⏱ Controlli: ogni {interval} · mai"
 
 #: src/price_tracker/bot/ui/cards.py
 #, python-brace-format
-msgid "🔄 Checks: every {interval} · just now"
-msgstr "🔄 Controlli: ogni {interval} · adesso"
+msgid "⏱ Checks: every {interval} · just now"
+msgstr "⏱ Controlli: ogni {interval} · adesso"
 
 #: src/price_tracker/bot/ui/cards.py
 #, python-brace-format
-msgid "🔄 Checks: every {interval} · last {ago}"
-msgstr "🔄 Controlli: ogni {interval} · ultimo {ago}"
+msgid "⏱ Checks: every {interval} · last {ago}"
+msgstr "⏱ Controlli: ogni {interval} · ultimo {ago}"
 
 #: src/price_tracker/bot/ui/cards.py
-msgid "🔍 Check now"
-msgstr "🔍 Controlla ora"
+msgid "🔄 Check now"
+msgstr "🔄 Controlla ora"
 
 #: src/price_tracker/bot/ui/cards.py
-msgid "📊 History"
-msgstr "📊 Storico"
+msgid "📈 History"
+msgstr "📈 Storico"
 
 #: src/price_tracker/bot/ui/cards.py
 msgid "⏸ Pause"
@@ -957,8 +957,8 @@ msgid "🔔 Alert rule"
 msgstr "🔔 Regola avviso"
 
 #: src/price_tracker/bot/ui/cards.py
-msgid "🔄 Interval"
-msgstr "🔄 Intervallo"
+msgid "⏱ Interval"
+msgstr "⏱ Intervallo"
 
 #: src/price_tracker/bot/ui/cards.py
 msgid "🔗 Open"
@@ -1162,16 +1162,20 @@ msgid "📦 Products"
 msgstr "📦 Prodotti"
 
 #: src/price_tracker/bot/ui/panels.py
-msgid "🔍 Check all"
-msgstr "🔍 Verifica tutti"
+msgid "💶 Prices"
+msgstr "💶 Prezzi"
 
 #: src/price_tracker/bot/ui/panels.py
-msgid "📊 Statistics"
-msgstr "📊 Statistiche"
+msgid "🔔 Notifications"
+msgstr "🔔 Notifiche"
 
 #: src/price_tracker/bot/ui/panels.py
 msgid "💾 Data"
 msgstr "💾 Dati"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "ℹ️ Status & info"
+msgstr "ℹ️ Stato e info"
 
 #: src/price_tracker/bot/ui/panels.py
 msgid "⚙️ Settings"

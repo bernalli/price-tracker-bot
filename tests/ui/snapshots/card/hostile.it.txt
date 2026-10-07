@@ -9,10 +9,10 @@ text:
    | 💰 Ora: 0,50 €
    | 📌 Inizio: 0,50 €
    | 🔔 Avviso: ribasso del 10% dall'inizio
-   | 🔄 Controlli: ogni 7 giorni · mai
+   | ⏱ Controlli: ogni 7 giorni · mai
    | ⚠️ 12 letture fallite · /errors
 keyboard:
-   [🔍 Controlla ora](cb:p:9223372036854775807:ck)  [📊 Storico](cb:p:9223372036854775807:ch:30d)
+   [🔄 Controlla ora](cb:p:9223372036854775807:ck)  [📈 Storico](cb:p:9223372036854775807:ch:30d)
    [▶️ Riattiva](cb:p:9223372036854775807:ra)  [🗑 Elimina](cb:p:9223372036854775807:rm)
-   [🔔 Regola avviso](cb:p:9223372036854775807:th)  [🔄 Intervallo](cb:p:9223372036854775807:iv)
+   [🔔 Regola avviso](cb:p:9223372036854775807:th)  [⏱ Intervallo](cb:p:9223372036854775807:iv)
    [◀️ Lista](cb:l:a:1)

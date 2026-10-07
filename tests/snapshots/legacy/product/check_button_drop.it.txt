@@ -29,11 +29,11 @@
    | 📌 Inizio: 100,00 € · ▼ 20%
    | 📉 Minimo: 80,00 €
    | 🔔 Avviso: ribasso del 10% dall'inizio
-   | 🔄 Controlli: ogni 6 h · ultimo 2 ore fa
+   | ⏱ Controlli: ogni 6 h · ultimo 2 ore fa
    keyboard:
-   | [🔍 Controlla ora → check_1] [📊 Storico → chart_1]
+   | [🔄 Controlla ora → check_1] [📈 Storico → chart_1]
    | [⏸ Pausa → pause_1] [🗑 Elimina → remove_1]
-   | [🔔 Regola avviso → edit_1] [🔄 Intervallo → setrefresh_1]
+   | [🔔 Regola avviso → edit_1] [⏱ Intervallo → setrefresh_1]
    | [🔗 Apri → url:https://shop.example.com/item/1]
    | [◀️ Lista → l:a:1]
 ## db after step 2
@@ -53,7 +53,7 @@
    | 🔔 <b>PREZZO APPENA SCESO!</b>
    | 💸 Era: €80.00 → Ora: €64.00
    keyboard:
-   | [📊 Storico prezzo → chart_1]
+   | [📈 Storico prezzo → chart_1]
 ## db after step 3
 + price_history id=6 {product_id=1, price="64.00", checked_at=<now:9999-99-99 99:99:99>}
 ~ products id=1 current_price: "80.00" -> "64.00"

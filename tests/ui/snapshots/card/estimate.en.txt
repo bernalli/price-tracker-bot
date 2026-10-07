@@ -11,10 +11,10 @@ text:
    | 📉 Lowest: $1,199.50
    | 🎯 Target: $999.99
    | 🔔 Alert: at or below $999.99
-   | 🔄 Checks: every 1 day · last 2 hours ago
+   | ⏱ Checks: every 1 day · last 2 hours ago
 keyboard:
-   [🔍 Check now](cb:p:60:ck)  [📊 History](cb:p:60:ch:30d)
+   [🔄 Check now](cb:p:60:ck)  [📈 History](cb:p:60:ch:30d)
    [⏸ Pause](cb:p:60:pa)  [🗑 Delete](cb:p:60:rm)
-   [🔔 Alert rule](cb:p:60:th)  [🔄 Interval](cb:p:60:iv)
+   [🔔 Alert rule](cb:p:60:th)  [⏱ Interval](cb:p:60:iv)
    [🔗 Open](url:https://shop.example.com/item/60)
    [◀️ List](cb:l:a:1)

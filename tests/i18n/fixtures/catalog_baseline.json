@@ -137,8 +137,8 @@
    "string": "❌ Prodotto non trovato."
   },
   {
-   "id": "🔄 Interval reset to global (every {min} min)\n📦 #{pid} — {name}",
-   "string": "🔄 Intervallo ripristinato a quello globale (ogni {min} min)\n📦 #{pid} — {name}"
+   "id": "⏱ Interval reset to global (every {min} min)\n📦 #{pid} — {name}",
+   "string": "⏱ Intervallo ripristinato a quello globale (ogni {min} min)\n📦 #{pid} — {name}"
   },
   {
    "id": "❌ Minimum interval is 5 minutes.",
@@ -157,8 +157,8 @@
    "string": "{n} minuti"
   },
   {
-   "id": "🔄 Check interval: <b>every {display}</b>\n📦 #{pid} — {name}",
-   "string": "🔄 Intervallo check: <b>ogni {display}</b>\n📦 #{pid} — {name}"
+   "id": "⏱ Check interval: <b>every {display}</b>\n📦 #{pid} — {name}",
+   "string": "⏱ Intervallo check: <b>ogni {display}</b>\n📦 #{pid} — {name}"
   },
   {
    "id": "Choose product to check",
@@ -169,8 +169,8 @@
    "string": "❌ Prodotto non attivo. Usa /riattiva per riattivarlo."
   },
   {
-   "id": "🔍 Checking...",
-   "string": "🔍 Controllo in corso..."
+   "id": "🔄 Checking...",
+   "string": "🔄 Controllo in corso..."
   },
   {
    "id": "✅ <b>{name}</b>\n💰 Price: {price}\n📊 No significant change.",
@@ -181,8 +181,8 @@
    "string": "📭 Nessun prodotto da controllare."
   },
   {
-   "id": "🔍 Checking {n} products...",
-   "string": "🔍 Controllo di {n} prodotti in corso..."
+   "id": "🔄 Checking {n} products...",
+   "string": "🔄 Controllo di {n} prodotti in corso..."
   },
   {
    "id": "✅ <b>Check complete</b> — {n} products",
@@ -805,8 +805,8 @@
    "string": "❌ Product not found."
   },
   {
-   "id": "🔄 Interval reset to global (every {min} min)\n📦 #{pid} — {name}",
-   "string": "🔄 Interval reset to global (every {min} min)\n📦 #{pid} — {name}"
+   "id": "⏱ Interval reset to global (every {min} min)\n📦 #{pid} — {name}",
+   "string": "⏱ Interval reset to global (every {min} min)\n📦 #{pid} — {name}"
   },
   {
    "id": "❌ Minimum interval is 5 minutes.",
@@ -825,8 +825,8 @@
    "string": "{n} minutes"
   },
   {
-   "id": "🔄 Check interval: <b>every {display}</b>\n📦 #{pid} — {name}",
-   "string": "🔄 Check interval: <b>every {display}</b>\n📦 #{pid} — {name}"
+   "id": "⏱ Check interval: <b>every {display}</b>\n📦 #{pid} — {name}",
+   "string": "⏱ Check interval: <b>every {display}</b>\n📦 #{pid} — {name}"
   },
   {
    "id": "Choose product to check",
@@ -837,8 +837,8 @@
    "string": "❌ Product paused. Use /reactivate to resume tracking."
   },
   {
-   "id": "🔍 Checking...",
-   "string": "🔍 Checking..."
+   "id": "🔄 Checking...",
+   "string": "🔄 Checking..."
   },
   {
    "id": "✅ <b>{name}</b>\n💰 Price: {price}\n📊 No significant change.",
@@ -849,8 +849,8 @@
    "string": "📭 No products to check."
   },
   {
-   "id": "🔍 Checking {n} products...",
-   "string": "🔍 Checking {n} products..."
+   "id": "🔄 Checking {n} products...",
+   "string": "🔄 Checking {n} products..."
   },
   {
    "id": "✅ <b>Check complete</b> — {n} products",

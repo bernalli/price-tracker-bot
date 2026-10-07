@@ -6,7 +6,7 @@
 -> sendPhoto chat=10 photo=png filename=chart_1.png
    param parse_mode="HTML"
    caption:
-   | 📊 <b>#1</b> Kettle
+   | 📈 <b>#1</b> Kettle
    | 📉 Min: €80.00  📈 Max: €100.00
 ## db after step 1
 ~ users user_id=10 display_name: NULL -> "U10"

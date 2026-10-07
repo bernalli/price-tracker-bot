@@ -161,7 +161,7 @@ async def handle_check_button(
     keyboard = InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("📊 Storico prezzo", callback_data=f"chart_{product_id}"),
+                InlineKeyboardButton("📈 Storico prezzo", callback_data=f"chart_{product_id}"),
             ]
         ]
     )
@@ -190,7 +190,7 @@ async def handle_chart_button(
         name = truncate_to_width(product.get("name") or "Prodotto", 50)
         await query.message.reply_photo(
             photo=InputFile(chart, filename=f"chart_{product_id}.png"),
-            caption=f"📊 <b>#{product_id}</b> {_escape_html(name)}",
+            caption=f"📈 <b>#{product_id}</b> {_escape_html(name)}",
             parse_mode=ParseMode.HTML,
         )
     else:

@@ -9,10 +9,10 @@ text:
    | 💰 Now: €0.50
    | 📌 Start: €0.50
    | 🔔 Alert: drop of 10% from start
-   | 🔄 Checks: every 7 days · never
+   | ⏱ Checks: every 7 days · never
    | ⚠️ 12 failed reads · /errors
 keyboard:
-   [🔍 Check now](cb:p:9223372036854775807:ck)  [📊 History](cb:p:9223372036854775807:ch:30d)
+   [🔄 Check now](cb:p:9223372036854775807:ck)  [📈 History](cb:p:9223372036854775807:ch:30d)
    [▶️ Reactivate](cb:p:9223372036854775807:ra)  [🗑 Delete](cb:p:9223372036854775807:rm)
-   [🔔 Alert rule](cb:p:9223372036854775807:th)  [🔄 Interval](cb:p:9223372036854775807:iv)
+   [🔔 Alert rule](cb:p:9223372036854775807:th)  [⏱ Interval](cb:p:9223372036854775807:iv)
    [◀️ List](cb:l:a:1)

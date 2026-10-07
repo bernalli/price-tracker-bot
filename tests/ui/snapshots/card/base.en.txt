@@ -11,10 +11,10 @@ text:
    | 📉 Lowest: €1,249.00
    | 🎯 Target: €1,199.00
    | 🔔 Alert: drop of 10% from start
-   | 🔄 Checks: every 6 hr · last 6 hours ago
+   | ⏱ Checks: every 6 hr · last 6 hours ago
 keyboard:
-   [🔍 Check now](cb:p:42:ck)  [📊 History](cb:p:42:ch:30d)
+   [🔄 Check now](cb:p:42:ck)  [📈 History](cb:p:42:ch:30d)
    [⏸ Pause](cb:p:42:pa)  [🗑 Delete](cb:p:42:rm)
-   [🔔 Alert rule](cb:p:42:th)  [🔄 Interval](cb:p:42:iv)
+   [🔔 Alert rule](cb:p:42:th)  [⏱ Interval](cb:p:42:iv)
    [🔗 Open](url:https://shop.example.com/item/42)
    [◀️ List](cb:l:a:1)
