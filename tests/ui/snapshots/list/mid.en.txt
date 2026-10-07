@@ -15,5 +15,6 @@ keyboard:
    [#8](cb:l:a:2:8)  [#9](cb:l:a:2:9)
    [#10](cb:l:a:2:10)
    [◀️](cb:l:a:1)  [2/3](cb:noop)  [▶️](cb:l:a:3)
-   [✅ Active ✓](cb:l:a:1)  [⏸ Paused](cb:l:p:1)  [⚠️ Errors](cb:l:e:1)
+   [✅ Active ✓](cb:l:a:1)  [⏸ Paused](cb:l:p:1)
+   [⚠️ Errors](cb:l:e:1)  [🚫 Sold out](cb:l:o:1)
    [🗑 Delete all](cb:delete_all)  [🏠 Home](cb:h)

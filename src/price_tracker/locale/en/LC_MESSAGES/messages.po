@@ -1405,3 +1405,11 @@ msgstr ""
 #: src/price_tracker/bot/handlers/callbacks/_menu.py
 msgid "… {n} more → Products"
 msgstr "… {n} more → Products"
+
+#: src/price_tracker/bot/ui/cards.py
+msgid "🚫 Sold out"
+msgstr "🚫 Sold out"
+
+#: src/price_tracker/bot/ui/cards.py
+msgid "sold out"
+msgstr "sold out"

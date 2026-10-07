@@ -1430,3 +1430,11 @@ msgstr "❌ Valore non valido: {value}"
 #: src/price_tracker/bot/handlers/callbacks/_menu.py
 msgid "… {n} more → Products"
 msgstr "… altri {n} → Prodotti"
+
+#: src/price_tracker/bot/ui/cards.py
+msgid "🚫 Sold out"
+msgstr "🚫 Esaurito"
+
+#: src/price_tracker/bot/ui/cards.py
+msgid "sold out"
+msgstr "esauriti"

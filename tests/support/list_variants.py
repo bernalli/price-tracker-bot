@@ -24,6 +24,7 @@ def view(
     errors: int = 0,
     current: str | None = "19.99",
     currency: str = "EUR",
+    out_of_stock: bool = False,
 ) -> ProductView:
     """A product as the list shows it."""
     return ProductView(
@@ -45,6 +46,7 @@ def view(
         last_checked_at=None,
         reference_estimate=None,
         reference_currency="EUR",
+        out_of_stock=out_of_stock,
     )
 
 
@@ -58,6 +60,7 @@ def record(product_id: int, **fields: Any) -> dict[str, Any]:
         "currency": "EUR",
         "current_price": "10.00",
         "is_active": 1,
+        "is_available": 1,
         "suspension_kind": None,
         "consecutive_errors": 0,
     }
@@ -91,7 +94,16 @@ HOSTILE_PAGE = ListPage(
     ),
 )
 
+SOLD_OUT_PAGE = ListPage(
+    filter="o",
+    page=1,
+    pages=1,
+    total=1,
+    items=(view(11, "Toaster", out_of_stock=True),),
+)
+
 SCREENS: dict[str, Callable[[], Screen]] = {
     "mid": lambda: list_page(MID),
     "hostile": lambda: list_page(HOSTILE_PAGE),
+    "sold_out": lambda: list_page(SOLD_OUT_PAGE),
 }

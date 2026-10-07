@@ -58,6 +58,8 @@ PANEL_SINGULAR: tuple[str, ...] = (
     "🗣 <b>Language</b>",
     "Automatic",
     "Automatic ({language})",
+    "sold out",
+    "🚫 Sold out",
 )
 
 PANEL_PLURAL: tuple[str, str] = ("{n} active", "{n} active")
