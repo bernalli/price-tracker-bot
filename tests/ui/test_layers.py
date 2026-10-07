@@ -26,6 +26,12 @@ _PACKAGE_ROOT = _SRC_ROOT / "price_tracker"
 # exactly that.
 TRANSITIONAL_IMPORTS: Final = frozenset({"price_tracker.bot.messages"})
 
+# The callback codec is plain data (stdlib and Babel only); screens encode their own buttons.
+CODEC_MODULE: Final = "price_tracker.bot.callbacks"
+CODEC_IMPORTERS: Final = frozenset(
+    {"src/price_tracker/bot/ui/panels.py", "src/price_tracker/bot/ui/cards.py"}
+)
+
 _STDLIB: Final = frozenset(sys.stdlib_module_names)
 
 # Modules that import at run time: any import of them, under any alias, is a
@@ -152,6 +158,10 @@ def _check_bot_ui(imports: list[str], label: str) -> list[str]:
             and not (
                 name == "price_tracker.bot.ui"
                 or name.startswith("price_tracker.bot.ui.")
+                or (
+                    label in CODEC_IMPORTERS
+                    and (name == CODEC_MODULE or name.startswith(f"{CODEC_MODULE}."))
+                )
                 or name in TRANSITIONAL_IMPORTS
                 or any(name.startswith(f"{t}.") for t in TRANSITIONAL_IMPORTS)
             )
@@ -195,6 +205,12 @@ def test_i18n_package_is_a_leaf() -> None:
 def test_bot_ui_package_boundaries() -> None:
     violations = _scan(_PACKAGE_ROOT / "bot" / "ui", _check_bot_ui)
     assert violations == []
+
+
+def test_codec_exception_is_scoped_to_the_screens_that_encode_their_buttons() -> None:
+    for importer in CODEC_IMPORTERS:
+        assert _check_bot_ui([CODEC_MODULE], importer) == []
+    assert _check_bot_ui([CODEC_MODULE], "src/price_tracker/bot/ui/labels.py")
 
 
 def test_app_views_boundaries() -> None:

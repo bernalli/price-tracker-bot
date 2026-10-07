@@ -20,12 +20,15 @@ from telegram import (
 from telegram.constants import ParseMode
 
 from price_tracker.bot.decorators import _config
+from price_tracker.bot.handlers._cards import home_view
 from price_tracker.bot.handlers._helpers import (
     _escape_html,
     _format_threshold,
     _safe_dec,
 )
+from price_tracker.bot.handlers.callbacks._nav import _edit
 from price_tracker.bot.keyboards import menu_back_button
+from price_tracker.bot.ui.panels import home_screen
 from price_tracker.bot.ui.width import truncate_to_width
 
 if TYPE_CHECKING:
@@ -59,22 +62,7 @@ async def handle_menu_navigation(
         return True
 
     if data == "menu_main":
-        user = query.from_user
-        is_admin = await db.is_user_admin(user.id)
-        rows = [
-            [InlineKeyboardButton("📦 Prodotti", callback_data="menu_prodotti")],
-            [InlineKeyboardButton("🔍 Controllo prezzi", callback_data="menu_prezzi")],
-            [InlineKeyboardButton("🔔 Notifiche", callback_data="menu_notifiche")],
-            [InlineKeyboardButton("💾 Import / Export", callback_data="menu_dati")],
-            [InlineKeyboardButton("📊 Info e statistiche", callback_data="menu_info")],
-        ]
-        if is_admin:
-            rows.append([InlineKeyboardButton("👑 Admin", callback_data="menu_admin")])
-        await query.edit_message_text(
-            "📋 <b>Menu Price Tracker</b>\n\nScegli una categoria:",
-            parse_mode=ParseMode.HTML,
-            reply_markup=InlineKeyboardMarkup(rows),
-        )
+        await _edit(query, home_screen(await home_view(db, user_id)))
         return True
 
     if data == "menu_prodotti":

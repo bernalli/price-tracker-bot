@@ -1,0 +1,11 @@
+# ui snapshot v1
+# screen: panels.settings_quiet
+# locale: it
+# now: 2026-03-01T12:00:00Z
+text:
+   | 🌙 <b>Ore silenziose</b>
+   | 
+   | Attuale: 22:00–08:00
+keyboard:
+   [22:00–08:00 ✓](cb:s:qh:2208)  [Disattivo](cb:s:qh:off)
+   [◀️ Impostazioni](cb:s)

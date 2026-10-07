@@ -48,6 +48,10 @@ PERIODS: Final = ("7d", "30d", "90d", "1y", "all")
 THEMES: Final = ("light", "dark")
 MUTE_PRESETS: Final = ("1", "8", "24", "0")
 LIST_FILTERS: Final = ("a", "p", "e")
+SETTINGS_SECTIONS: Final = ("mu", "dg", "qh")
+SETTINGS_MUTE: Final = (*MUTE_PRESETS, "off")
+SETTINGS_DIGEST: Final = ("on", "off")
+SETTINGS_QUIET: Final = ("2208", "off")
 OFFER_FILTERS: Final = ("n", "u", "s1", "s0", "0")
 HELP_SECTIONS: Final = ("tracking", "alerts", "prefs", "data", "admin")
 CURRENCY_CHOICE_LITERALS: Final = ("type", "cancel")
@@ -374,6 +378,7 @@ def build_registry() -> ActionRegistry:
         ActionSpec("help.section", (_lit("hp"), Choice("section", HELP_SECTIONS))),
         ActionSpec("back", (_lit("x"), BackArg())),
         ActionSpec("list.page", (_lit("l"), Choice("filter", LIST_FILTERS), IdArg("page"))),
+        ActionSpec("list.open", (_lit("l"), Choice("filter", LIST_FILTERS), IdArg("page"), PID)),
         ActionSpec("list.remove_all", (_lit("l"), _lit("rmall"))),
         ActionSpec("list.remove_all_ok", (_lit("l"), _lit("rmallok"))),
         ActionSpec("product.card", _product("c")),
@@ -407,6 +412,10 @@ def build_registry() -> ActionRegistry:
         ),
         ActionSpec("flow.cancel", (_lit("p"), TOK, _lit("x")), flow=True),
         ActionSpec("settings", (_lit("s"),)),
+        ActionSpec("settings.section", (_lit("s"), Choice("section", SETTINGS_SECTIONS))),
+        ActionSpec("settings.mute", (_lit("s"), _lit("mu"), Choice("hours", SETTINGS_MUTE))),
+        ActionSpec("settings.digest", (_lit("s"), _lit("dg"), Choice("mode", SETTINGS_DIGEST))),
+        ActionSpec("settings.quiet", (_lit("s"), _lit("qh"), Choice("window", SETTINGS_QUIET))),
         ActionSpec("settings.chart_theme", (_lit("s"), _lit("ct"), Choice("theme", THEMES))),
         ActionSpec(
             "settings.language", (_lit("s"), _lit("lang"), Choice("locale", SUPPORTED_LOCALES))

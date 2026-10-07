@@ -1,0 +1,18 @@
+# ui snapshot v1
+# screen: panels.settings
+# locale: it
+# now: 2026-03-01T12:00:00Z
+text:
+   | ⚙️ <b>Impostazioni</b>
+   | 
+   | 🔕 Silenzia: fino a 01/03/26, 21:00
+   | 📬 Digest: attivo, ogni 30 min
+   | 🌙 Ore silenziose: 22:00–08:00
+   | ⏱ Limite: 5 all'ora · cambia con /throttle &lt;N&gt;|off
+   | 🌍 Fuso orario: Europe/Berlin · cambia con /timezone &lt;zona&gt;
+   | 
+   | Altri valori: /digest_mode on|off &lt;minuti&gt;, /quiet_hours HH:MM-HH:MM
+keyboard:
+   [🔕 Silenzia](cb:s:mu)  [📬 Digest](cb:s:dg)
+   [🌙 Ore silenziose](cb:s:qh)
+   [🏠 Home](cb:h)

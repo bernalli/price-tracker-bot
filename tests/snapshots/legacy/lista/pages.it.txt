@@ -1,0 +1,95 @@
+# legacy snapshot v1
+# scenario: lista.pages
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/lista" user=10
+-> sendMessage chat=10
+   param link_preview_options={"is_disabled": true}
+   param parse_mode="HTML"
+   text:
+   | 📦 <b>I tuoi prodotti</b> · attivo (7) · pagina 1/2
+   |
+   | <b>#1</b> Kettle · 18,00 €
+   | <b>#2</b> Fan · 18,00 €
+   | <b>#3</b> Lamp · 18,00 €
+   | <b>#4</b> Heater · 18,00 €
+   | ⚠️ <b>#5</b> Mixer · 18,00 €
+   keyboard:
+   | [#1 → l:a:1:1] [#2 → l:a:1:2]
+   | [#3 → l:a:1:3] [#4 → l:a:1:4]
+   | [#5 → l:a:1:5]
+   | [1/2 → noop] [▶️ → l:a:2]
+   | [✅ Attivi ✓ → l:a:1] [⏸ In pausa → l:p:1] [⚠️ Errori → l:e:1]
+   | [🗑 Elimina tutti → delete_all] [🏠 Home → h]
+## db after step 1
+~ users user_id=10 display_name: NULL -> "U10"
+## step 2: press "l:a:2" user=10 on=1000
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1000
+   param link_preview_options={"is_disabled": true}
+   param parse_mode="HTML"
+   text:
+   | 📦 <b>I tuoi prodotti</b> · attivo (7) · pagina 2/2
+   |
+   | <b>#6</b> Toaster · 18,00 €
+   | <b>#7</b> Blender · 18,00 €
+   keyboard:
+   | [#6 → l:a:2:6] [#7 → l:a:2:7]
+   | [◀️ → l:a:1] [2/2 → noop]
+   | [✅ Attivi ✓ → l:a:1] [⏸ In pausa → l:p:1] [⚠️ Errori → l:e:1]
+   | [🗑 Elimina tutti → delete_all] [🏠 Home → h]
+## db after step 2
+(no changes)
+## step 3: press "l:e:1" user=10 on=1000
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1000
+   param link_preview_options={"is_disabled": true}
+   param parse_mode="HTML"
+   text:
+   | 📦 <b>I tuoi prodotti</b> · errori (1) · pagina 1/1
+   |
+   | ⚠️ <b>#5</b> Mixer · 18,00 €
+   keyboard:
+   | [#5 → l:e:1:5]
+   | [✅ Attivi → l:a:1] [⏸ In pausa → l:p:1] [⚠️ Errori ✓ → l:e:1]
+   | [🏠 Home → h]
+## db after step 3
+(no changes)
+## step 4: press "l:e:1:5" user=10 on=1000
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1000
+   param link_preview_options={"is_disabled": true}
+   param parse_mode="HTML"
+   text:
+   | 📦 <b>⁨Mixer⁩</b>
+   | ⁨example.com⁩ · #5 · attivo
+   |
+   | 💰 Ora: 18,00 €
+   | 📌 Inizio: 20,00 € · ▼ 10%
+   | 📉 Minimo: 20,00 €
+   | 🔔 Avviso: ribasso del 10% dall'inizio
+   | 🔄 Controlli: ogni 6 h · mai
+   | ⚠️ 2 letture fallite · /errors
+   keyboard:
+   | [🔍 Controlla ora → check_5] [📊 Storico → chart_5]
+   | [⏸ Pausa → pause_5] [🗑 Elimina → remove_5]
+   | [🔔 Regola avviso → edit_5] [🔄 Intervallo → setrefresh_5]
+   | [🔗 Apri → url:https://shop.example.com/item/84]
+   | [◀️ Lista → l:e:1]
+## db after step 4
+(no changes)
+## step 5: press "l:e:1" user=10 on=1000
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1000
+   param link_preview_options={"is_disabled": true}
+   param parse_mode="HTML"
+   text:
+   | 📦 <b>I tuoi prodotti</b> · errori (1) · pagina 1/1
+   |
+   | ⚠️ <b>#5</b> Mixer · 18,00 €
+   keyboard:
+   | [#5 → l:e:1:5]
+   | [✅ Attivi → l:a:1] [⏸ In pausa → l:p:1] [⚠️ Errori ✓ → l:e:1]
+   | [🏠 Home → h]
+## db after step 5
+(no changes)
