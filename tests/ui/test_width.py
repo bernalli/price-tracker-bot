@@ -46,11 +46,11 @@ KNOWN_DISAGREEMENTS: dict[str, tuple[int, int]] = {
 # rendered as a visible cell in the first place), so these do not violate
 # it — they are exactly why Cf is stripped.
 KNOWN_CF_UNDERESTIMATES: dict[str, tuple[int, int]] = {
-    "U+00AD soft hyphen (Cf)": (display_width("­"), wcwidth.wcwidth("­")),
-    "U+0600 Arabic number sign (Cf)": (display_width("؀"), wcwidth.wcwidth("؀")),
+    "U+00AD soft hyphen (Cf)": (display_width("\xad"), wcwidth.wcwidth("\xad")),
+    "U+0600 Arabic number sign (Cf)": (display_width("\u0600"), wcwidth.wcwidth("\u0600")),
     "U+070F Syriac abbreviation mark (Cf)": (
-        display_width("܏"),
-        wcwidth.wcwidth("܏"),
+        display_width("\u070f"),
+        wcwidth.wcwidth("\u070f"),
     ),
 }
 
@@ -82,10 +82,10 @@ def wcwidth_oracle(text: str) -> int:
         ("·", 1),  # ·
         ("…", 1),  # …
         ("é", 1),  # é (precomposed)
-        ("é", 1),  # e + combining acute
-        ("‍", 0),  # ZWJ
-        ("⁨", 0),  # FSI
-        (" ", 1),  # NBSP
+        ("e\u0301", 1),  # e + combining acute
+        ("\u200d", 0),  # ZWJ
+        ("\u2068", 0),  # FSI
+        ("\xa0", 1),  # NBSP
         ("￥", 2),  # ￥ fullwidth yen
         ("¥", 1),  # ¥ yen sign
         ("電", 2),  # 電
@@ -115,7 +115,7 @@ def test_display_width_is_additive_unless_the_join_forms_a_cluster(left: str, ri
     if not right:
         return
     first = right[0]
-    if first == "️" or unicodedata.category(first) in ("Mn", "Me", "Cf"):
+    if first == "\ufe0f" or unicodedata.category(first) in ("Mn", "Me", "Cf"):
         return
     assert display_width(left + right) == display_width(left) + display_width(right)
 
@@ -209,7 +209,7 @@ def test_truncate_ellipsis_ends_on_a_cluster_boundary(text: str, budget: int) ->
     assert text.startswith(prefix), (text, budget, out)
     if len(text) > len(prefix):
         next_char = text[len(prefix)]
-        assert next_char != "️"
+        assert next_char != "\ufe0f"
         assert unicodedata.category(next_char) not in ("Mn", "Me", "Cf")
 
 
@@ -229,15 +229,15 @@ def test_truncate_ascii_prefix_width_non_decreasing(prefix_length: int, budget: 
 
 
 def test_sanitize_strips_bidi_isolates() -> None:
-    assert sanitize_label("⁨hi⁩") == "hi"
+    assert sanitize_label("\u2068hi\u2069") == "hi"
 
 
 def test_sanitize_strips_lrm() -> None:
-    assert sanitize_label("‎") == ""
+    assert sanitize_label("\u200e") == ""
 
 
 def test_sanitize_strips_zwj() -> None:
-    assert sanitize_label("a‍b") == "ab"
+    assert sanitize_label("a\u200db") == "ab"
 
 
 def test_sanitize_flattens_newline_and_tab() -> None:

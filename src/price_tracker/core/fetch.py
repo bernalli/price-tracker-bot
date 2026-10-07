@@ -208,11 +208,12 @@ def _decode(body: bytes, encoding: str | None) -> str:
     """Decode ``body`` with ``encoding``, or utf-8 if it is unknown. Never raises.
 
     ``LookupError`` covers unknown and non-text codecs; ``UnicodeError`` covers
-    codecs that refuse ``errors="replace"`` (``idna``, ``undefined``). ``punycode``
-    is checked ahead of decoding instead of relying on that fallback: it is a
-    hostname transform, not a document encoding, and with ``errors="replace"`` it
-    does not always raise — it can turn a WAF or CAPTCHA marker into garbage
-    instead, which hides the block from every fingerprint that looks for it.
+    any other codec that refuses ``errors="replace"``. ``punycode``, ``idna`` and
+    ``undefined`` are not document encodings and are stopped ahead of decoding
+    (``_NOT_DOCUMENT_ENCODINGS``) instead of relying on that fallback. For
+    ``punycode`` this matters: with ``errors="replace"`` it does not always raise,
+    and can turn a WAF or CAPTCHA marker into garbage instead, which hides the
+    block from every fingerprint that looks for it.
     """
     name = encoding or "utf-8"
     try:

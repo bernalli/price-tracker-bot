@@ -40,7 +40,7 @@ def test_button_rejects_empty_url() -> None:
 
 def test_button_rejects_text_that_sanitizes_to_empty() -> None:
     with pytest.raises(ValueError, match=r"."):
-        button("‎\n", callback="a")
+        button("\u200e\n", callback="a")
 
 
 @pytest.mark.parametrize("length", [1, 64])

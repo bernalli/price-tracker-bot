@@ -514,7 +514,7 @@ def test_detect_currency(text, expected):
         pytest.param("1" * 65, id="over_length"),
         pytest.param("12.99*", id="residual_words_markup"),
         pytest.param("12,99 €/Stk.", id="residual_words_markup"),
-        pytest.param("1​299,00", id="control_or_format_char"),
+        pytest.param("1\u200b299,00", id="control_or_format_char"),
     ],
 )
 def test_parse_price_rejects_ambiguous_or_malformed_text(raw):

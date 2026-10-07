@@ -100,7 +100,7 @@ ANSWERS: dict[str, dict[str, Any]] = {
     "annulla": {"threshold": CANCEL, "target": CANCEL, "interval": None},
     "   ": {"threshold": None, "target": None, "interval": None},
     "5\x00": {"threshold": None, "target": None, "interval": None},
-    "2​0": {"threshold": None, "target": None, "interval": None},
+    "2\u200b0": {"threshold": None, "target": None, "interval": None},
     "1e3": {"threshold": None, "target": None, "interval": None},
     "abc": {"threshold": None, "target": None, "interval": None},
     URL: {"threshold": LINK, "target": LINK, "interval": LINK},
@@ -220,6 +220,9 @@ class WiredFlowMachine(RuleBasedStateMachine):
     def _step_calls(self) -> list[Call]:
         return self.w.request.calls[self.step_start :]
 
+    def _answer_count(self) -> int:
+        return sum(1 for c in self._step_calls() if c.method == "answerCallbackQuery")
+
     def _learn_prompt(self, key: tuple[int, int]) -> str:
         token = None
         for call in self._step_calls():
@@ -266,6 +269,7 @@ class WiredFlowMachine(RuleBasedStateMachine):
             product = next(p for p in self.products if (self.owned[p] == user) == (which == "own"))
         self._begin()
         self._run(self.w.press(key[0], user, f"{prefix}_{product}"))
+        assert self._answer_count() == 1, "every entry press is answered exactly once"
         if not self._visible(user, product):
             event("entry refused")
             return
@@ -278,6 +282,7 @@ class WiredFlowMachine(RuleBasedStateMachine):
         self._begin()
         registry_before = self._registry_tokens()
         self._run(self.w.press(key[0], key[1], data))
+        assert self._answer_count() == 1, "a malformed entry button is answered exactly once"
         self.flows.pop(key, None)
         registry_after = self._registry_tokens()
         expected = {k: t for k, t in registry_before.items() if k != key}
@@ -293,6 +298,7 @@ class WiredFlowMachine(RuleBasedStateMachine):
     def press_non_entry_legacy_button(self, key: tuple[int, int], data: str) -> None:
         self._begin()
         self._run(self.w.press(key[0], key[1], data))
+        assert self._answer_count() == 1, "a legacy button is answered exactly once"
         self.flows.pop(key, None)
 
     # -- rules: answers --------------------------------------------------------
@@ -372,6 +378,7 @@ class WiredFlowMachine(RuleBasedStateMachine):
     def _press_cancel(self, key: tuple[int, int], token: str) -> None:
         self._begin()
         self._run(self.w.press(key[0], key[1], f"p:{token}:x"))
+        assert self._answer_count() == 1, "a current or stale cancel press is answered exactly once"
         flow = self.flows.get(key)
         if flow is not None and flow.token == token:
             event("current cancel button")
@@ -432,8 +439,10 @@ class WiredFlowMachine(RuleBasedStateMachine):
 
     @invariant()
     def at_most_one_answer_per_update(self) -> None:
-        answers = [c for c in self._step_calls() if c.method == "answerCallbackQuery"]
-        assert len(answers) <= 1
+        # Text, command and timeout steps answer no callback, so the bound over every step
+        # stays "at most one"; the exact-once contract is asserted in each rule that presses
+        # a button (entry, malformed entry, legacy button, cancel).
+        assert self._answer_count() <= 1
 
     @invariant()
     def within_telegram_limits(self) -> None:
