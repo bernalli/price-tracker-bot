@@ -29,6 +29,6 @@
    |
    | Questa azione <b>non è reversibile</b>.
    keyboard:
-   | [⚠️ Sì, elimina tutti (2) → confirmdeleteall] [❌ Annulla → cancel_delete]
+   | [⚠️ Sì, elimina tutti (2) → confirmdeleteall] [❌ Annulla → l:a:1]
 ## db after step 2
 (no changes)

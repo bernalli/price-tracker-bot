@@ -279,3 +279,18 @@ def test_the_sold_out_row_is_translated(ui_locales) -> None:
     set_locale("it")
     view = product_view(record(7, is_available=0), default_interval_minutes=360)
     assert "🚫 Esaurito" in product_card(view, actions_for(view), now=NOW).text.split("\n")
+
+
+@pytest.mark.parametrize(
+    ("name", "shown"),
+    [("base", True), ("sold_out", True), ("paused", False), ("hostile", False)],
+    ids=["active", "sold-out", "paused", "suspended"],
+)
+def test_check_now_is_only_on_an_active_card(name: str, shown: bool) -> None:
+    view = VARIANTS[name]
+    actions = actions_for(view)
+    screen = product_card(view, actions, now=NOW)
+    callbacks = [btn.callback for row in screen.rows for btn in row]
+    assert (actions.check in callbacks) is shown
+    labels = [btn.label for row in screen.rows for btn in row]
+    assert any("Check now" in label for label in labels) is shown

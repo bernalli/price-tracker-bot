@@ -1438,3 +1438,41 @@ msgstr "🚫 Esaurito"
 #: src/price_tracker/bot/ui/cards.py
 msgid "sold out"
 msgstr "esauriti"
+
+#: src/price_tracker/bot/handlers/callbacks/_actions.py
+msgid "⏸ Tracking paused."
+msgstr "⏸ Monitoraggio in pausa."
+
+#: src/price_tracker/bot/handlers/callbacks/_actions.py
+msgid "▶️ Tracking resumed."
+msgstr "▶️ Monitoraggio riattivato."
+
+#: src/price_tracker/bot/handlers/callbacks/_product.py
+msgid "🔔 Price dropped: {old} → {new}"
+msgstr "🔔 Prezzo sceso: {old} → {new}"
+
+#: src/price_tracker/bot/handlers/callbacks/_product.py
+msgid "✅ Checked: no significant change."
+msgstr "✅ Controllato: nessuna variazione significativa."
+
+#: src/price_tracker/bot/handlers/callbacks/_product.py
+msgid "❌ Not updated: {why}"
+msgstr "❌ Non aggiornato: {why}"
+
+#: src/price_tracker/bot/handlers/callbacks/_product.py
+msgid "❌ Could not check this product. Try again later."
+msgstr "❌ Impossibile controllare il prodotto. Riprova più tardi."
+
+#: src/price_tracker/bot/handlers/callbacks/_product.py
+msgid "⏸ Not checked: tracking is paused. Reactivate it first."
+msgstr "⏸ Non controllato: il monitoraggio è in pausa. Riattivalo prima."
+
+#: src/price_tracker/bot/handlers/callbacks/_product.py
+msgid "🗑 Deleted: {name}"
+msgstr "🗑 Eliminato: {name}"
+
+#: src/price_tracker/bot/handlers/callbacks/_product.py
+msgid "🗑 Deleted {n} product and its price history."
+msgid_plural "🗑 Deleted {n} products and their price history."
+msgstr[0] "🗑 Eliminato {n} prodotto e il suo storico prezzi."
+msgstr[1] "🗑 Eliminati {n} prodotti e il loro storico prezzi."

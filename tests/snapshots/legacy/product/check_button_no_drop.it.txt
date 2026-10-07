@@ -43,14 +43,27 @@
 -> answerCallbackQuery
 -> editMessageText chat=10 message_id=1000
    text:
-   | ⏳ Controllo prezzo in corso...
+   | 🔄 Controllo in corso...
 -> editMessageText chat=10 message_id=1000
+   param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
-   | ✅ <b>#1</b> Kettle
-   | 💰 Prezzo: €100.00
+   | ✅ Controllato: nessuna variazione significativa.
+   |
+   | 📦 <b>⁨Kettle⁩</b>
+   | ⁨example.com⁩ · #1 · attivo
+   |
+   | 💰 Ora: 100,00 €
+   | 📌 Inizio: 100,00 €
+   | 📉 Minimo: 80,00 €
+   | 🔔 Avviso: ribasso del 10% dall'inizio
+   | ⏱ Controlli: ogni 6 h · adesso
    keyboard:
-   | [📈 Storico prezzo → chart_1]
+   | [🔄 Controlla ora → check_1] [📈 Storico → chart_1]
+   | [⏸ Pausa → pause_1] [🗑 Elimina → remove_1]
+   | [🔔 Regola avviso → edit_1] [⏱ Intervallo → setrefresh_1]
+   | [🔗 Apri → url:https://shop.example.com/item/1]
+   | [◀️ Lista → l:a:1]
 ## db after step 3
 + price_history id=6 {product_id=1, price="100.00", checked_at=<now:9999-99-99 99:99:99>}
 ~ products id=1 last_checked_at: "2026-03-01 10:00:00" -> <now:9999-99-99 99:99:99>
@@ -60,14 +73,27 @@
 -> answerCallbackQuery
 -> editMessageText chat=10 message_id=1000
    text:
-   | ⏳ Controllo prezzo in corso...
+   | 🔄 Controllo in corso...
 -> editMessageText chat=10 message_id=1000
+   param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
-   | ✅ <b>#1</b> Kettle
-   | 💰 Prezzo: €120.00
+   | ✅ Controllato: nessuna variazione significativa.
+   |
+   | 📦 <b>⁨Kettle⁩</b>
+   | ⁨example.com⁩ · #1 · attivo
+   |
+   | 💰 Ora: 120,00 €
+   | 📌 Inizio: 100,00 € · ▲ 20%
+   | 📉 Minimo: 80,00 €
+   | 🔔 Avviso: ribasso del 10% dall'inizio
+   | ⏱ Controlli: ogni 6 h · adesso
    keyboard:
-   | [📈 Storico prezzo → chart_1]
+   | [🔄 Controlla ora → check_1] [📈 Storico → chart_1]
+   | [⏸ Pausa → pause_1] [🗑 Elimina → remove_1]
+   | [🔔 Regola avviso → edit_1] [⏱ Intervallo → setrefresh_1]
+   | [🔗 Apri → url:https://shop.example.com/item/1]
+   | [◀️ Lista → l:a:1]
 ## db after step 4
 + price_history id=7 {product_id=1, price="120.00", checked_at=<now:9999-99-99 99:99:99>}
 ~ products id=1 current_price: "100.00" -> "120.00"

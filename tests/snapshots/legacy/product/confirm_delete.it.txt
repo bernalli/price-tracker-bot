@@ -46,15 +46,21 @@
    text:
    | ❓ Cosa vuoi fare con <b>Kettle</b>?
    keyboard:
-   | [🗑 Sì, elimina tutto → confirm_delete_1] [⏸ Solo pausa → pause_1] [❌ Annulla → cancel_delete]
+   | [🗑 Sì, elimina tutto → confirm_delete_1] [⏸ Solo pausa → pause_1] [❌ Annulla → p:1:c]
 ## db after step 3
 (no changes)
 ## step 4: press "confirm_delete_1" user=10 on=1000
 -> answerCallbackQuery
 -> editMessageText chat=10 message_id=1000
+   param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
-   | 🗑 Eliminato definitivamente: <b>Kettle</b>
+   | 🗑 Eliminato: Kettle
+   |
+   | 📭 Non hai prodotti tracciati.
+   | Incollami un link per iniziare!
+   keyboard:
+   | [🏠 Home → h]
 ## db after step 4
 - price_history id=1
 - price_history id=2

@@ -18,19 +18,21 @@ from telegram import (
 )
 from telegram.constants import ParseMode
 
-from price_tracker.bot.decorators import (
-    _convert_display,
-)
+from price_tracker.bot.callbacks import Action, encode
+from price_tracker.bot.handlers._cards import _currency
 from price_tracker.bot.handlers._helpers import (
     _escape_html,
     _get_user_product,
     _parse_id,
-    _safe_dec,
     out_of_stock_line,
 )
+from price_tracker.bot.handlers.callbacks._nav import show_card, show_list
 from price_tracker.bot.handlers.history import _generate_chart
 from price_tracker.bot.keyboards import build_threshold_keyboard
+from price_tracker.bot.messages import _, current_locale, ngettext
 from price_tracker.bot.ui.width import truncate_to_width
+from price_tracker.core.alert import _why
+from price_tracker.i18n.format import money
 
 if TYPE_CHECKING:
     from telegram.ext import ContextTypes
@@ -53,13 +55,11 @@ async def handle_delete_flow(
         # An admin may delete any product (as with every other product action),
         # so the delete is scoped to the owner, and only a deleted row is confirmed.
         if product and await db.delete_product(product_id, user_id=product["user_id"]):
-            name = product.get("name") or "Sconosciuto"
-            await query.edit_message_text(
-                f"🗑 Eliminato definitivamente: <b>{_escape_html(truncate_to_width(name, 80))}</b>",
-                parse_mode=ParseMode.HTML,
-            )
+            name = product.get("name") or _("Product #{product_id}").format(product_id=product_id)
+            notice = _("🗑 Deleted: {name}").format(name=_escape_html(truncate_to_width(name, 60)))
         else:
-            await query.edit_message_text("❌ Prodotto non trovato o non autorizzato.")
+            notice = _("Product not found.")
+        await show_list(query, context, db, user_id, notice=notice)
         return True
 
     if data == "cancel_delete":
@@ -80,7 +80,9 @@ async def handle_delete_flow(
                         f"⚠️ Sì, elimina tutti ({count})",
                         callback_data="confirmdeleteall",
                     ),
-                    InlineKeyboardButton("❌ Annulla", callback_data="cancel_delete"),
+                    InlineKeyboardButton(
+                        "❌ Annulla", callback_data=encode(Action("list.page", ("a", 1)))
+                    ),
                 ]
             ]
         )
@@ -100,10 +102,12 @@ async def handle_delete_flow(
         for p in products:
             await db.delete_product(p["id"], user_id=user_id)
             count += 1
-        await query.edit_message_text(
-            f"🗑 <b>Eliminati {count} prodotti</b> e tutto il loro storico.",
-            parse_mode=ParseMode.HTML,
-        )
+        notice = ngettext(
+            "🗑 Deleted {n} product and its price history.",
+            "🗑 Deleted {n} products and their price history.",
+            count,
+        ).format(n=count)
+        await show_list(query, context, db, user_id, notice=notice)
         return True
 
     return False
@@ -112,7 +116,7 @@ async def handle_delete_flow(
 async def handle_check_button(
     query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, data: str
 ) -> bool:
-    """Handle the per-product 'Check now' button (`check_<id>`)."""
+    """Handle the per-product 'Check now' button (`check_<id>`): the card shows the outcome."""
     if not data.startswith("check_"):
         return False
 
@@ -122,50 +126,42 @@ async def handle_check_button(
         return True
     product = await _get_user_product(context, product_id, user_id)
     if not product:
-        await query.edit_message_text("❌ Prodotto non trovato.")
+        await show_list(query, context, db, user_id, notice=_("Product not found."))
+        return True
+    if not product.get("is_active"):
+        # The scheduler skips an inactive product: nothing would be checked.
+        notice = _("⏸ Not checked: tracking is paused. Reactivate it first.")
+        await show_card(query, context, product, notice=notice)
         return True
 
-    await query.edit_message_text("⏳ Controllo prezzo in corso...")
-    from price_tracker.core.scraper_base import detect_currency  # noqa: PLC0415
-
+    await query.edit_message_text(_("🔄 Checking..."))
     scheduler = context.bot_data["scheduler"]
+    result = None
     try:
         result = await scheduler.check_one_product_for_user(product_id=product_id, user_id=user_id)
-    except Exception as e:  # noqa: BLE001 — surface error to user
-        await query.edit_message_text(f"❌ Errore: {e}")
+    except Exception as exc:  # noqa: BLE001 — the card says the check failed
+        logger.warning("Check now failed for product %s: %s", product_id, exc)
+
+    record = await db.get_product(product_id)
+    if record is None:
+        await show_list(query, context, db, user_id, notice=_("Product not found."))
         return True
-    alert = result.alert
-
-    product = await db.get_product(product_id)
-    if product is None:
-        await query.edit_message_text("❌ Prodotto non trovato.")
-        return True
-    name = truncate_to_width(product.get("name") or "Sconosciuto", 60)
-    current = _safe_dec(product.get("current_price"))
-    initial = _safe_dec(product.get("initial_price"))
-    p_currency = product.get("currency", "") or detect_currency(product.get("url", "")) or "EUR"
-    price_str = _convert_display(current, p_currency) if current else "N/D"
-
-    text = f"✅ <b>#{product_id}</b> {_escape_html(name)}\n💰 Prezzo: {price_str}"
-    if initial and current and initial > 0 and initial != current:
-        diff = (initial - current) / initial * 100
-        if diff > 0:
-            text += f"\n📌 Iniziale: €{initial:.2f} (<i>-{diff:.1f}% dal tracking</i>)"
-
-    if alert:
-        text += "\n\n🔔 <b>PREZZO APPENA SCESO!</b>"
-        text += f"\n💸 Era: €{alert.old_price:.2f} → Ora: €{alert.new_price:.2f}"
+    if result is None:
+        notice = _("❌ Could not check this product. Try again later.")
+    elif result.alert is not None:
+        currency = _currency(record.get("currency"))
+        loc = current_locale()
+        notice = _("🔔 Price dropped: {old} → {new}").format(
+            old=money(result.alert.old_price, currency, locale=loc),
+            new=money(result.alert.new_price, currency, locale=loc),
+        )
     elif result.reason == "out_of_stock":
-        text += f"\n\n{out_of_stock_line()}"
-
-    keyboard = InlineKeyboardMarkup(
-        [
-            [
-                InlineKeyboardButton("📈 Storico prezzo", callback_data=f"chart_{product_id}"),
-            ]
-        ]
-    )
-    await query.edit_message_text(text, parse_mode=ParseMode.HTML, reply_markup=keyboard)
+        notice = out_of_stock_line()
+    elif result.reason is not None:
+        notice = _("❌ Not updated: {why}").format(why=_why(result.reason, None))
+    else:
+        notice = _("✅ Checked: no significant change.")
+    await show_card(query, context, record, notice=notice)
     return True
 
 

@@ -1995,6 +1995,16 @@ async def scenario_product_cancel_delete(w: LegacyWorld) -> None:
     await w.recorder.press(OWNER, "cancel_delete")
 
 
+@scenario("product.remove_cancel")
+async def scenario_product_remove_cancel(w: LegacyWorld) -> None:
+    # Cancel on the delete prompt brings the card back.
+    p1 = await seed_p1(w)
+    await w.recorder.command(OWNER, "/lista")
+    await open_card(w, p1)
+    await w.recorder.press(OWNER, f"remove_{p1}")
+    await w.recorder.press(OWNER, f"p:{p1}:c")
+
+
 @scenario("product.delete_all_prompt")
 async def scenario_product_delete_all_prompt(w: LegacyWorld) -> None:
     await seed_p1(w)

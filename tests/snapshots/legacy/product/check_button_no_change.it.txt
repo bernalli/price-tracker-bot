@@ -43,15 +43,27 @@
 -> answerCallbackQuery
 -> editMessageText chat=10 message_id=1000
    text:
-   | ⏳ Controllo prezzo in corso...
+   | 🔄 Controllo in corso...
 -> editMessageText chat=10 message_id=1000
+   param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
-   | ✅ <b>#1</b> Kettle
-   | 💰 Prezzo: €80.00
-   | 📌 Iniziale: €100.00 (<i>-20.0% dal tracking</i>)
+   | ✅ Controllato: nessuna variazione significativa.
+   |
+   | 📦 <b>⁨Kettle⁩</b>
+   | ⁨example.com⁩ · #1 · attivo
+   |
+   | 💰 Ora: 80,00 €
+   | 📌 Inizio: 100,00 € · ▼ 20%
+   | 📉 Minimo: 80,00 €
+   | 🔔 Avviso: ribasso del 10% dall'inizio
+   | ⏱ Controlli: ogni 6 h · adesso
    keyboard:
-   | [📈 Storico prezzo → chart_1]
+   | [🔄 Controlla ora → check_1] [📈 Storico → chart_1]
+   | [⏸ Pausa → pause_1] [🗑 Elimina → remove_1]
+   | [🔔 Regola avviso → edit_1] [⏱ Intervallo → setrefresh_1]
+   | [🔗 Apri → url:https://shop.example.com/item/1]
+   | [◀️ Lista → l:a:1]
 ## db after step 3
 + price_history id=6 {product_id=1, price="80.00", checked_at=<now:9999-99-99 99:99:99>}
 ~ products id=1 last_checked_at: "2026-03-01 10:00:00" -> <now:9999-99-99 99:99:99>
@@ -102,15 +114,27 @@
 -> answerCallbackQuery
 -> editMessageText chat=10 message_id=1001
    text:
-   | ⏳ Controllo prezzo in corso...
+   | 🔄 Controllo in corso...
 -> editMessageText chat=10 message_id=1001
+   param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
-   | ✅ <b>#2</b> Cheap
-   | 💰 Prezzo: €0.64
-   | 📌 Iniziale: €0.80 (<i>-20.0% dal tracking</i>)
+   | ✅ Controllato: nessuna variazione significativa.
+   |
+   | 📦 <b>⁨Cheap⁩</b>
+   | ⁨example.com⁩ · #2 · attivo
+   |
+   | 💰 Ora: 0,64 €
+   | 📌 Inizio: 0,80 € · ▼ 20%
+   | 📉 Minimo: 0,64 €
+   | 🔔 Avviso: ribasso del 10% dall'inizio
+   | ⏱ Controlli: ogni 6 h · adesso
    keyboard:
-   | [📈 Storico prezzo → chart_2]
+   | [🔄 Controlla ora → check_2] [📈 Storico → chart_2]
+   | [⏸ Pausa → pause_2] [🗑 Elimina → remove_2]
+   | [🔔 Regola avviso → edit_2] [⏱ Intervallo → setrefresh_2]
+   | [🔗 Apri → url:https://shop.example.com/item/72]
+   | [◀️ Lista → l:a:1]
 ## db after step 7
 + price_history id=7 {product_id=2, price="0.64", checked_at=<now:9999-99-99 99:99:99>}
 ~ products id=2 last_checked_at: NULL -> <now:9999-99-99 99:99:99>
@@ -160,15 +184,27 @@
 -> answerCallbackQuery
 -> editMessageText chat=10 message_id=1002
    text:
-   | ⏳ Controllo prezzo in corso...
+   | 🔄 Controllo in corso...
 -> editMessageText chat=10 message_id=1002
+   param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
-   | ✅ <b>#3</b> Near
-   | 💰 Prezzo: €99.50
-   | 📌 Iniziale: €100.00 (<i>-0.5% dal tracking</i>)
+   | ✅ Controllato: nessuna variazione significativa.
+   |
+   | 📦 <b>⁨Near⁩</b>
+   | ⁨example.com⁩ · #3 · attivo
+   |
+   | 💰 Ora: 99,50 €
+   | 📌 Inizio: 100,00 € · ▼ 0,5%
+   | 📉 Minimo: 99,50 €
+   | 🔔 Avviso: ribasso del 10% dall'inizio
+   | ⏱ Controlli: ogni 6 h · adesso
    keyboard:
-   | [📈 Storico prezzo → chart_3]
+   | [🔄 Controlla ora → check_3] [📈 Storico → chart_3]
+   | [⏸ Pausa → pause_3] [🗑 Elimina → remove_3]
+   | [🔔 Regola avviso → edit_3] [⏱ Intervallo → setrefresh_3]
+   | [🔗 Apri → url:https://shop.example.com/item/73]
+   | [◀️ Lista → l:a:1]
 ## db after step 10
 + price_history id=8 {product_id=3, price="99.50", checked_at=<now:9999-99-99 99:99:99>}
 ~ products id=3 last_checked_at: NULL -> <now:9999-99-99 99:99:99>

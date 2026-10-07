@@ -5,8 +5,19 @@
 ## step 1: press "check_999" user=10 on=1 synthetic
 -> answerCallbackQuery
 -> editMessageText chat=10 message_id=1
+   param link_preview_options={"is_disabled": true}
+   param parse_mode="HTML"
    text:
-   | ❌ Prodotto non trovato.
+   | Prodotto non trovato.
+   |
+   | 📦 <b>I tuoi prodotti</b> · attivi (1) · pagina 1/1
+   |
+   | <b>#1</b> Kettle · 80,00 €
+   keyboard:
+   | [#1 → l:a:1:1]
+   | [✅ Attivi ✓ → l:a:1] [⏸ In pausa → l:p:1]
+   | [⚠️ Errori → l:e:1] [🚫 Esaurito → l:o:1]
+   | [🏠 Home → h]
 ## db after step 1
 (no changes)
 ## step 2: press "check_x" user=10 on=1 synthetic

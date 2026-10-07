@@ -29,15 +29,24 @@
    |
    | Questa azione <b>non è reversibile</b>.
    keyboard:
-   | [⚠️ Sì, elimina tutti (2) → confirmdeleteall] [❌ Annulla → cancel_delete]
+   | [⚠️ Sì, elimina tutti (2) → confirmdeleteall] [❌ Annulla → l:a:1]
 ## db after step 2
 (no changes)
 ## step 3: press "confirmdeleteall" user=10 on=1000
 -> answerCallbackQuery
 -> editMessageText chat=10 message_id=1000
+   param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
-   | 🗑 <b>Eliminati 2 prodotti</b> e tutto il loro storico.
+   | 🗑 Eliminati 2 prodotti e il loro storico prezzi.
+   |
+   | 📦 <b>I tuoi prodotti</b> · attivi (0) · pagina 1/1
+   |
+   | Non c'è niente qui.
+   keyboard:
+   | [✅ Attivi ✓ → l:a:1] [⏸ In pausa → l:p:1]
+   | [⚠️ Errori → l:e:1] [🚫 Esaurito → l:o:1]
+   | [🏠 Home → h]
 ## db after step 3
 - price_history id=1
 - price_history id=2

@@ -123,8 +123,9 @@ def _errors_line(view: ProductView) -> str | None:
 
 def _keyboard(view: ProductView, actions: CardActions) -> tuple[tuple[Button, ...], ...]:
     toggle_label = _("⏸ Pause") if view.status == "active" else _("▶️ Reactivate")
-    group_1 = [
-        button(_("🔄 Check now"), callback=actions.check),
+    # The scheduler checks only active products: no button promises a check it skips.
+    group_1 = [button(_("🔄 Check now"), callback=actions.check)] if view.status == "active" else []
+    group_1 += [
         button(_("📈 History"), callback=actions.history),
         button(toggle_label, callback=actions.toggle),
         button(_("🗑 Delete"), callback=actions.delete),

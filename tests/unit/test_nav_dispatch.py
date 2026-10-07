@@ -73,6 +73,7 @@ HANDLED = frozenset(
         "settings.language",
         "list.page",
         "list.open",
+        "product.card",
         "home",
     }
 )
