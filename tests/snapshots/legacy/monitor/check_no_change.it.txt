@@ -5,7 +5,7 @@
 ## step 1: command "/check 1" user=10
 -> sendMessage chat=10
    text:
-   | 🔍 Controllo in corso...
+   | 🔄 Controllo in corso...
 -> editMessageText chat=10 message_id=1000
    param parse_mode="HTML"
    text:
@@ -21,7 +21,7 @@
 ## step 2: command "/check 2" user=10
 -> sendMessage chat=10
    text:
-   | 🔍 Controllo in corso...
+   | 🔄 Controllo in corso...
 -> editMessageText chat=10 message_id=1001
    param parse_mode="HTML"
    text:

@@ -172,7 +172,7 @@ async def cmd_history(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             )
 
         await update.message.reply_text(
-            "📊 <b>Scegli un prodotto per lo storico:</b>",
+            "📈 <b>Scegli un prodotto per lo storico:</b>",
             parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup(buttons),
         )
@@ -193,7 +193,7 @@ async def cmd_history(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         name = truncate_to_width(product.get("name") or "Prodotto", 50)
         lowest = _safe_dec(product.get("lowest_price"))
         highest = _safe_dec(product.get("highest_price"))
-        caption = f"📊 <b>#{product_id}</b> {_escape_html(name)}"
+        caption = f"📈 <b>#{product_id}</b> {_escape_html(name)}"
         if lowest:
             caption += f"\n📉 Min: €{lowest:.2f}"
         if highest:

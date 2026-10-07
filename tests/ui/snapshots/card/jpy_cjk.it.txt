@@ -10,10 +10,10 @@ text:
    | 📌 Inizio: 13.500 JPY · ▼ 5,2%
    | 📉 Minimo: 12.800 JPY
    | 🔔 Avviso: ribasso del 5% dall'inizio
-   | 🔄 Controlli: ogni 30 min · ultimo 12 minuti fa
+   | ⏱ Controlli: ogni 30 min · ultimo 12 minuti fa
 keyboard:
-   [🔍 Controlla ora](cb:p:47:ck)  [📊 Storico](cb:p:47:ch:30d)
+   [🔄 Controlla ora](cb:p:47:ck)  [📈 Storico](cb:p:47:ch:30d)
    [⏸ Pausa](cb:p:47:pa)  [🗑 Elimina](cb:p:47:rm)
-   [🔔 Regola avviso](cb:p:47:th)  [🔄 Intervallo](cb:p:47:iv)
+   [🔔 Regola avviso](cb:p:47:th)  [⏱ Intervallo](cb:p:47:iv)
    [🔗 Apri](url:https://shop.example.com/item/47)
    [◀️ Lista](cb:l:a:1)

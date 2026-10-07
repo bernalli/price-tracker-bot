@@ -11,10 +11,10 @@ text:
    | 📉 Minimo: 64,00 €
    | 🎯 Obiettivo: 60,00 €
    | 🔔 Avviso: ribasso del 10% dall'inizio
-   | 🔄 Controlli: ogni 6 h · adesso
+   | ⏱ Controlli: ogni 6 h · adesso
 keyboard:
-   [🔍 Controlla ora](cb:p:7:ck)  [📊 Storico](cb:p:7:ch:30d)
+   [🔄 Controlla ora](cb:p:7:ck)  [📈 Storico](cb:p:7:ch:30d)
    [⏸ Pausa](cb:p:7:pa)  [🗑 Elimina](cb:p:7:rm)
-   [🔔 Regola avviso](cb:p:7:th)  [🔄 Intervallo](cb:p:7:iv)
+   [🔔 Regola avviso](cb:p:7:th)  [⏱ Intervallo](cb:p:7:iv)
    [🔗 Apri](url:https://shop.example.com/item/7)
    [◀️ Lista](cb:l:a:1)

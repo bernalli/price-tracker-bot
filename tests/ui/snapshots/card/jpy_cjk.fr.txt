@@ -10,13 +10,13 @@ text:
    | [📌 Start: 13 500 JPY · ▼ 5,2 % 📌 Start: 13 500 JPY · ▼ 5,2 % 📌 Start: 13 500 JPY · ▼ 5,2 %]
    | [📉 Lowest: 12 800 JPY 📉 Lowest: 12 800 JPY 📉 Lowest: 12 800 JPY]
    | [🔔 Alert: drop of 5 % from start 🔔 Alert: drop of 5 % from start 🔔 Alert: drop of 5 % from start]
-   | [🔄 Checks: every 30 min · last il y a 12 minutes 🔄 Checks: every 30 min · last il y a 12 minutes 🔄 Checks: every 30 min · last il y a 12 minutes]
+   | [⏱ Checks: every 30 min · last il y a 12 minutes ⏱ Checks: every 30 min · last il y a 12 minutes ⏱ Checks: every 30 min · last il y a 12 minutes]
 keyboard:
-   [[🔍 Check now 🔍 Check now 🔍 Che…](cb:p:47:ck)
-   [[📊 History 📊 History 📊 History]](cb:p:47:ch:30d)
+   [[🔄 Check now 🔄 Check now 🔄 Che…](cb:p:47:ck)
+   [[📈 History 📈 History 📈 History]](cb:p:47:ch:30d)
    [[⏸ Pause ⏸ Pause ⏸ Pause]](cb:p:47:pa)
    [[🗑 Delete 🗑 Delete 🗑 Delete]](cb:p:47:rm)
    [[🔔 Alert rule 🔔 Alert rule 🔔 A…](cb:p:47:th)
-   [[🔄 Interval 🔄 Interval 🔄 Inter…](cb:p:47:iv)
+   [[⏱ Interval ⏱ Interval ⏱ Inter…](cb:p:47:iv)
    [[🔗 Open 🔗 Open 🔗 Open]](url:https://shop.example.com/item/47)
    [[◀️ List ◀️ List ◀️ List]](cb:l:a:1)

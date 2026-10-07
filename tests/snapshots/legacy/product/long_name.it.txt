@@ -73,7 +73,7 @@
    | ✅ <b>#1</b> Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN…
    | 💰 Prezzo: €80.00
    keyboard:
-   | [📊 Storico prezzo → chart_1]
+   | [📈 Storico prezzo → chart_1]
 ## db after step 6
 + price_history id=6 {product_id=1, price="80.00", checked_at=<now:9999-99-99 99:99:99>}
 ~ products id=1 last_checked_at: "2026-03-01 10:00:00" -> <now:9999-99-99 99:99:99>
@@ -83,7 +83,7 @@
 -> sendPhoto chat=10 photo=png filename=chart_1.png
    param parse_mode="HTML"
    caption:
-   | 📊 <b>#1</b> Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN…
+   | 📈 <b>#1</b> Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN…
 ## db after step 7
 (no changes)
 ## step 8: press "pref_new_1" user=10 on=1 synthetic

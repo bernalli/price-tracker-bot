@@ -28,8 +28,8 @@
    |
    | Incolla il link di un prodotto per iniziare a seguirlo.
    keyboard:
-   | [📦 Prodotti → l:a:1] [🔍 Verifica tutti → menu_checkall]
-   | [📊 Statistiche → menu_info] [💾 Dati → menu_dati]
-   | [⚙️ Impostazioni → s]
+   | [📦 Prodotti → l:a:1] [💶 Prezzi → menu_prezzi]
+   | [🔔 Notifiche → menu_notifiche] [💾 Dati → menu_dati]
+   | [ℹ️ Stato e info → menu_info] [⚙️ Impostazioni → s]
 ## db after step 2
 (no changes)

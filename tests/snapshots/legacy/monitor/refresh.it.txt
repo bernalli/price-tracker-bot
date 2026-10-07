@@ -27,7 +27,7 @@
 -> sendMessage chat=10
    param parse_mode="HTML"
    text:
-   | 🔄 Intervallo check: <b>ogni 30 min</b>
+   | ⏱ Intervallo check: <b>ogni 30 min</b>
    | 📦 #1 — Kettle
 ## db after step 3
 ~ products id=1 check_interval_minutes: NULL -> 30
@@ -35,7 +35,7 @@
 -> sendMessage chat=10
    param parse_mode="HTML"
    text:
-   | 🔄 Intervallo check: <b>ogni 90 min</b>
+   | ⏱ Intervallo check: <b>ogni 90 min</b>
    | 📦 #1 — Kettle
 ## db after step 4
 ~ products id=1 check_interval_minutes: 30 -> 90
@@ -43,7 +43,7 @@
 -> sendMessage chat=10
    param parse_mode="HTML"
    text:
-   | 🔄 Intervallo check: <b>ogni 2 h</b>
+   | ⏱ Intervallo check: <b>ogni 2 h</b>
    | 📦 #1 — Kettle
 ## db after step 5
 ~ products id=1 check_interval_minutes: 90 -> 120
@@ -51,7 +51,7 @@
 -> sendMessage chat=10
    param parse_mode="HTML"
    text:
-   | 🔄 Intervallo ripristinato a quello globale (ogni 360 min)
+   | ⏱ Intervallo ripristinato a quello globale (ogni 360 min)
    | 📦 #1 — Kettle
 ## db after step 6
 ~ products id=1 check_interval_minutes: 120 -> NULL
@@ -95,7 +95,7 @@
 -> sendMessage chat=10
    param parse_mode="HTML"
    text:
-   | 🔄 Intervallo check: <b>ogni 5 min</b>
+   | ⏱ Intervallo check: <b>ogni 5 min</b>
    | 📦 #1 — Kettle
 ## db after step 13
 ~ products id=1 check_interval_minutes: NULL -> 5
@@ -109,7 +109,7 @@
 -> sendMessage chat=10
    param parse_mode="HTML"
    text:
-   | 🔄 Intervallo check: <b>ogni 1 h</b>
+   | ⏱ Intervallo check: <b>ogni 1 h</b>
    | 📦 #1 — Kettle
 ## db after step 15
 ~ products id=1 check_interval_minutes: 5 -> 60
@@ -117,7 +117,7 @@
 -> sendMessage chat=10
    param parse_mode="HTML"
    text:
-   | 🔄 Intervallo ripristinato a quello globale (ogni 360 min)
+   | ⏱ Intervallo ripristinato a quello globale (ogni 360 min)
    | 📦 #2 — Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN…
 ## db after step 16
 (no changes)
@@ -125,7 +125,7 @@
 -> sendMessage chat=10
    param parse_mode="HTML"
    text:
-   | 🔄 Intervallo check: <b>ogni 30 min</b>
+   | ⏱ Intervallo check: <b>ogni 30 min</b>
    | 📦 #2 — Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN…
 ## db after step 17
 ~ products id=2 check_interval_minutes: NULL -> 30

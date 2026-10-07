@@ -29,11 +29,11 @@
    | 📌 Inizio: 100,00 €
    | 📉 Minimo: 80,00 €
    | 🔔 Avviso: ribasso del 10% dall'inizio
-   | 🔄 Controlli: ogni 6 h · ultimo 2 ore fa
+   | ⏱ Controlli: ogni 6 h · ultimo 2 ore fa
    keyboard:
-   | [🔍 Controlla ora → check_1] [📊 Storico → chart_1]
+   | [🔄 Controlla ora → check_1] [📈 Storico → chart_1]
    | [⏸ Pausa → pause_1] [🗑 Elimina → remove_1]
-   | [🔔 Regola avviso → edit_1] [🔄 Intervallo → setrefresh_1]
+   | [🔔 Regola avviso → edit_1] [⏱ Intervallo → setrefresh_1]
    | [🔗 Apri → url:https://shop.example.com/item/1]
    | [◀️ Lista → l:a:1]
 ## db after step 2

@@ -251,10 +251,10 @@ msgstr "❌ Product not found."
 #: src/price_tracker/bot/handlers/monitoring.py:136
 #, python-brace-format
 msgid ""
-"🔄 Interval reset to global (every {min} min)\n"
+"⏱ Interval reset to global (every {min} min)\n"
 "📦 #{pid} — {name}"
 msgstr ""
-"🔄 Interval reset to global (every {min} min)\n"
+"⏱ Interval reset to global (every {min} min)\n"
 "📦 #{pid} — {name}"
 
 #: src/price_tracker/bot/handlers/monitoring.py:144
@@ -278,10 +278,10 @@ msgstr "{n} minutes"
 #: src/price_tracker/bot/handlers/monitoring.py:162
 #, python-brace-format
 msgid ""
-"🔄 Check interval: <b>every {display}</b>\n"
+"⏱ Check interval: <b>every {display}</b>\n"
 "📦 #{pid} — {name}"
 msgstr ""
-"🔄 Check interval: <b>every {display}</b>\n"
+"⏱ Check interval: <b>every {display}</b>\n"
 "📦 #{pid} — {name}"
 
 #: src/price_tracker/bot/handlers/monitoring.py:174
@@ -293,8 +293,8 @@ msgid "❌ Product paused. Use /reactivate to resume tracking."
 msgstr "❌ Product paused. Use /reactivate to resume tracking."
 
 #: src/price_tracker/bot/handlers/monitoring.py:192
-msgid "🔍 Checking..."
-msgstr "🔍 Checking..."
+msgid "🔄 Checking..."
+msgstr "🔄 Checking..."
 
 #: src/price_tracker/bot/handlers/monitoring.py:211
 #, python-brace-format
@@ -313,8 +313,8 @@ msgstr "📭 No products to check."
 
 #: src/price_tracker/bot/handlers/monitoring.py:230
 #, python-brace-format
-msgid "🔍 Checking {n} products..."
-msgstr "🔍 Checking {n} products..."
+msgid "🔄 Checking {n} products..."
+msgstr "🔄 Checking {n} products..."
 
 #: src/price_tracker/bot/handlers/monitoring.py:244
 #, python-brace-format
@@ -919,25 +919,25 @@ msgstr ""
 
 #: src/price_tracker/bot/ui/cards.py
 #, python-brace-format
-msgid "🔄 Checks: every {interval} · never"
+msgid "⏱ Checks: every {interval} · never"
 msgstr ""
 
 #: src/price_tracker/bot/ui/cards.py
 #, python-brace-format
-msgid "🔄 Checks: every {interval} · just now"
+msgid "⏱ Checks: every {interval} · just now"
 msgstr ""
 
 #: src/price_tracker/bot/ui/cards.py
 #, python-brace-format
-msgid "🔄 Checks: every {interval} · last {ago}"
+msgid "⏱ Checks: every {interval} · last {ago}"
 msgstr ""
 
 #: src/price_tracker/bot/ui/cards.py
-msgid "🔍 Check now"
+msgid "🔄 Check now"
 msgstr ""
 
 #: src/price_tracker/bot/ui/cards.py
-msgid "📊 History"
+msgid "📈 History"
 msgstr ""
 
 #: src/price_tracker/bot/ui/cards.py
@@ -957,7 +957,7 @@ msgid "🔔 Alert rule"
 msgstr ""
 
 #: src/price_tracker/bot/ui/cards.py
-msgid "🔄 Interval"
+msgid "⏱ Interval"
 msgstr ""
 
 #: src/price_tracker/bot/ui/cards.py
@@ -1160,15 +1160,19 @@ msgid "📦 Products"
 msgstr ""
 
 #: src/price_tracker/bot/ui/panels.py
-msgid "🔍 Check all"
+msgid "💶 Prices"
 msgstr ""
 
 #: src/price_tracker/bot/ui/panels.py
-msgid "📊 Statistics"
+msgid "🔔 Notifications"
 msgstr ""
 
 #: src/price_tracker/bot/ui/panels.py
 msgid "💾 Data"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "ℹ️ Status & info"
 msgstr ""
 
 #: src/price_tracker/bot/ui/panels.py
