@@ -36,7 +36,7 @@ from price_tracker.bot.callbacks import (
     decode,
     encode,
 )
-from price_tracker.bot.handlers import cmd_help, cmd_menu
+from price_tracker.bot.handlers import cmd_menu
 from price_tracker.bot.handlers._cards import list_view, screen_markup
 from price_tracker.bot.handlers.callbacks import _nav, handle_callback
 from price_tracker.bot.handlers.settings import (
@@ -607,14 +607,13 @@ def make_command_update(user_id: int) -> MagicMock:
 
 
 async def home_of(repo: Repository, user_id: int) -> list[tuple[str, Any]]:
-    """What /menu, /help, ``h`` and ``menu_main`` show to ``user_id``."""
+    """What /menu, ``h`` and ``menu_main`` show to ``user_id``."""
     context = make_context(repo)
     shown_by: list[tuple[str, Any]] = []
-    for command in (cmd_menu, cmd_help):
-        update = make_command_update(user_id)
-        await command(update, context)
-        call = update.message.reply_text.await_args
-        shown_by.append((call.args[0], call.kwargs["reply_markup"]))
+    update = make_command_update(user_id)
+    await cmd_menu(update, context)
+    call = update.message.reply_text.await_args
+    shown_by.append((call.args[0], call.kwargs["reply_markup"]))
     for data in ("h", "menu_main"):
         query = make_query(data, user_id=user_id)
         await handle_callback(make_update(query), context)

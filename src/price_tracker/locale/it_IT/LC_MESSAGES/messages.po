@@ -1176,3 +1176,169 @@ msgstr "💾 Dati"
 #: src/price_tracker/bot/ui/panels.py
 msgid "⚙️ Settings"
 msgstr "⚙️ Impostazioni"
+
+#: src/price_tracker/bot/ui/cards.py
+msgid "active ones"
+msgstr "attivi"
+
+#: src/price_tracker/bot/handlers/_helpers.py
+msgid "📦 Out of stock - I will tell you when it is back."
+msgstr "📦 Esaurito - ti avviso quando torna disponibile."
+
+#: src/price_tracker/bot/handlers/monitoring.py
+msgid ""
+"✅ <b>{name}</b>\n"
+"💰 Price: {price}\n"
+"{status}"
+msgstr ""
+"✅ <b>{name}</b>\n"
+"💰 Prezzo: {price}\n"
+"{status}"
+
+#: src/price_tracker/bot/commands.py
+msgid "Start the bot"
+msgstr "Avvia il bot"
+
+#: src/price_tracker/bot/commands.py
+msgid "Open the main menu"
+msgstr "Apri il menu principale"
+
+#: src/price_tracker/bot/commands.py
+msgid "Show every command"
+msgstr "Mostra tutti i comandi"
+
+#: src/price_tracker/bot/commands.py
+msgid "Cancel the current action"
+msgstr "Annulla l'azione in corso"
+
+#: src/price_tracker/bot/commands.py
+msgid "Track a product from a link"
+msgstr "Monitora un prodotto da un link"
+
+#: src/price_tracker/bot/commands.py
+msgid "List your products"
+msgstr "Elenca i tuoi prodotti"
+
+#: src/price_tracker/bot/commands.py
+msgid "Check a product now"
+msgstr "Controlla un prodotto adesso"
+
+#: src/price_tracker/bot/commands.py
+msgid "Check all your products now"
+msgstr "Controlla subito tutti i tuoi prodotti"
+
+#: src/price_tracker/bot/commands.py
+msgid "Set how often a product is checked"
+msgstr "Imposta ogni quanto controllare un prodotto"
+
+#: src/price_tracker/bot/commands.py
+msgid "Pause tracking a product"
+msgstr "Metti in pausa un prodotto"
+
+#: src/price_tracker/bot/commands.py
+msgid "Resume tracking a product"
+msgstr "Riprendi il monitoraggio di un prodotto"
+
+#: src/price_tracker/bot/commands.py
+msgid "Delete a product"
+msgstr "Elimina un prodotto"
+
+#: src/price_tracker/bot/commands.py
+msgid "Show a product's price chart"
+msgstr "Mostra il grafico dei prezzi di un prodotto"
+
+#: src/price_tracker/bot/commands.py
+msgid "Reset a product's starting price"
+msgstr "Azzera il prezzo iniziale di un prodotto"
+
+#: src/price_tracker/bot/commands.py
+msgid "Set or clear a target price"
+msgstr "Imposta o rimuovi un prezzo obiettivo"
+
+#: src/price_tracker/bot/commands.py
+msgid "Set when to alert about a drop"
+msgstr "Imposta quando avvisarti di un ribasso"
+
+#: src/price_tracker/bot/commands.py
+msgid "Mute notifications"
+msgstr "Silenzia le notifiche"
+
+#: src/price_tracker/bot/commands.py
+msgid "Unmute notifications"
+msgstr "Riattiva le notifiche"
+
+#: src/price_tracker/bot/commands.py
+msgid "Turn the notification digest on or off"
+msgstr "Attiva o disattiva il riepilogo delle notifiche"
+
+#: src/price_tracker/bot/commands.py
+msgid "Set quiet hours"
+msgstr "Imposta le ore di silenzio"
+
+#: src/price_tracker/bot/commands.py
+msgid "Set your timezone"
+msgstr "Imposta il tuo fuso orario"
+
+#: src/price_tracker/bot/commands.py
+msgid "Limit notifications per hour"
+msgstr "Limita le notifiche per ora"
+
+#: src/price_tracker/bot/commands.py
+msgid "Show your notification settings"
+msgstr "Mostra le tue impostazioni di notifica"
+
+#: src/price_tracker/bot/commands.py
+msgid "Send the pending digest now"
+msgstr "Invia subito il riepilogo in sospeso"
+
+#: src/price_tracker/bot/commands.py
+msgid "Export your products as CSV"
+msgstr "Esporta i tuoi prodotti in CSV"
+
+#: src/price_tracker/bot/commands.py
+msgid "Import products from a CSV file"
+msgstr "Importa prodotti da un file CSV"
+
+#: src/price_tracker/bot/commands.py
+msgid "Show your statistics"
+msgstr "Mostra le tue statistiche"
+
+#: src/price_tracker/bot/commands.py
+msgid "Show products with errors"
+msgstr "Mostra i prodotti con errori"
+
+#: src/price_tracker/bot/commands.py
+msgid "Authorize a user"
+msgstr "Autorizza un utente"
+
+#: src/price_tracker/bot/commands.py
+msgid "Remove a user"
+msgstr "Rimuovi un utente"
+
+#: src/price_tracker/bot/commands.py
+msgid "List authorized users"
+msgstr "Elenca gli utenti autorizzati"
+
+#: src/price_tracker/bot/commands.py
+msgid "Set a user's nickname"
+msgstr "Imposta il soprannome di un utente"
+
+#: src/price_tracker/bot/commands.py
+msgid "Set the global check interval"
+msgstr "Imposta l'intervallo globale di controllo"
+
+#: src/price_tracker/bot/commands.py
+msgid "Debug the scraping of a link"
+msgstr "Diagnostica la lettura di un link"
+
+#: src/price_tracker/bot/commands.py
+msgid "Show scraper health"
+msgstr "Mostra lo stato degli scraper"
+
+#: src/price_tracker/bot/commands.py
+msgid "🔔 Alerts"
+msgstr "🔔 Avvisi"
+
+#: src/price_tracker/bot/commands.py
+msgid "❓ <b>Commands</b>"
+msgstr "❓ <b>Comandi</b>"

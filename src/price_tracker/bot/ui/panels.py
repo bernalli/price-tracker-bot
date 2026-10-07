@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Final
 
 from price_tracker.bot.callbacks import MUTE_PRESETS, Action, encode
+from price_tracker.bot.commands import COMMANDS, GROUP_TITLES, GROUPS, HELP_HEADER
 from price_tracker.bot.messages import _, current_locale, ngettext
 from price_tracker.bot.ui.escape import escape_html
 from price_tracker.bot.ui.labels import button, layout_rows
@@ -186,3 +187,16 @@ def home_screen(view: HomeView) -> Screen:
     if view.is_admin:
         groups.append([button(_("👑 Admin"), callback="menu_admin")])
     return Screen(text=text, rows=layout_rows(*groups))
+
+
+def help_screen(is_admin: bool) -> Screen:
+    """Every command by area, the admin area only for administrators."""
+    lines = [_(HELP_HEADER)]
+    for group in GROUPS:
+        if group == "admin" and not is_admin:
+            continue
+        lines += ["", f"<b>{_(GROUP_TITLES[group])}</b>"]
+        lines += [
+            f"/{spec.name} — {_(spec.description)}" for spec in COMMANDS if spec.group == group
+        ]
+    return Screen(text="\n".join(lines), rows=layout_rows([home_button()]))

@@ -12,6 +12,7 @@ import httpx  # noqa: F401  — kept for future direct use; build_client returns
 import structlog
 from telegram.ext import Application, ContextTypes
 
+from price_tracker.bot.command_menus import sync_command_menus
 from price_tracker.bot.handlers import register_handlers
 from price_tracker.config import Config, parse_bind
 from price_tracker.core.health import HealthManager
@@ -37,6 +38,23 @@ PLUGIN_DIR_DEFAULT = Path("/app/plugins")
 log = structlog.get_logger(__name__)
 
 
+async def reconcile_admins(repo: Repository, admin_ids: tuple[int, ...]) -> None:
+    """Make ``ALLOWED_USERS`` the source of the stored administrators.
+
+    Listed ids are inserted or promoted, and stored admins no longer listed lose the flag
+    (their ``is_active`` is left alone). An empty list changes nothing, so a missing variable
+    cannot lock the owner out.
+    """
+    if not admin_ids:
+        log.warning("admins.reconcile_skipped", reason="ALLOWED_USERS is empty")
+        return
+    for uid in admin_ids:
+        await repo.ensure_user(user_id=uid, is_admin=True)
+    for user in await repo.list_users():
+        if user.is_admin and user.user_id not in admin_ids:
+            await repo.set_admin(user.user_id, False)
+
+
 async def post_init(application: Application[Any, Any, Any, Any, Any, Any]) -> None:
     config: Config = application.bot_data["config"]
     db_conn: aiosqlite.Connection = application.bot_data["db_conn"]
@@ -60,8 +78,7 @@ async def post_init(application: Application[Any, Any, Any, Any, Any, Any]) -> N
     # handlers expect ``"scraper"``.
     application.bot_data["scraper"] = application.bot_data["registry"]
 
-    for uid in config.admin_users:
-        await repo.ensure_user(user_id=uid, is_admin=True)
+    await reconcile_admins(repo, config.admin_users)
 
     application.bot_data["http_client"] = build_client(timeout=float(config.request_timeout))
 
@@ -74,6 +91,8 @@ async def post_init(application: Application[Any, Any, Any, Any, Any, Any]) -> N
         metrics=metrics,
         lang=config.lang,
     )
+
+    await sync_command_menus(application.bot, repo)
 
 
 async def _setup_scheduler(application: Application[Any, Any, Any, Any, Any, Any]) -> None:

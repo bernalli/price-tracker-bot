@@ -23,6 +23,13 @@ from telegram.ext import (
     ContextTypes,
 )
 
+from price_tracker.app.inputs import (
+    SCALAR_MAX_CHARS,
+    Absolute,
+    AnyDrop,
+    Percentage,
+    parse_threshold,
+)
 from price_tracker.bot.decorators import (
     _client,
     _convert_display,
@@ -36,12 +43,12 @@ from price_tracker.bot.handlers._helpers import (
     _format_threshold,
     _get_user_product,
     _parse_id,
-    _parse_threshold_input,
     _safe_dec,
 )
 from price_tracker.bot.keyboards import build_threshold_keyboard
 from price_tracker.bot.messages import _
 from price_tracker.bot.ui.width import truncate_to_width
+from price_tracker.core.textlimits import truncate_visible
 
 logger = logging.getLogger(__name__)
 
@@ -258,10 +265,16 @@ async def cmd_threshold(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     if product_id is None:
         await update.message.reply_text(_("❌ ID non valido."))
         return
-    try:
-        threshold_type, threshold_value = _parse_threshold_input(context.args[1])
-    except ValueError as e:
-        await update.message.reply_text(f"❌ {e}")
+    parsed = parse_threshold(context.args[1])
+    if isinstance(parsed, Percentage):
+        threshold_type, threshold_value = "percentage", str(parsed.value)
+    elif isinstance(parsed, Absolute):
+        threshold_type, threshold_value = "absolute", str(parsed.amount)
+    elif isinstance(parsed, AnyDrop):
+        threshold_type, threshold_value = "any_drop", "0"
+    else:
+        rejected = truncate_visible(context.args[1], SCALAR_MAX_CHARS)
+        await update.message.reply_text(f"❌ Valore non valido: {rejected}")
         return
 
     product = await _get_user_product(context, product_id, update.effective_user.id)

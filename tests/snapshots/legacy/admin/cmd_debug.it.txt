@@ -91,7 +91,7 @@
    | 🔎 Regex €: ❌ nessun match
    |
    | 🤖 <b>Risultato scraper:</b>
-   |    Nome: Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
+   |    Nome: Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN…
    |    Prezzo: €80.00
 ## db after step 5
 (no changes)

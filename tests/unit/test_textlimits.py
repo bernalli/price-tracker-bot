@@ -5,9 +5,13 @@ from __future__ import annotations
 import re
 
 import pytest
+from hypothesis import given
+from hypothesis import strategies as st
 
 from price_tracker.core.textlimits import (
     SAFE_LIMIT,
+    _is_valid_telegram_markup,
+    fit_html,
     paginate,
     split_message,
     truncate_visible,
@@ -209,3 +213,34 @@ def test_paginate_degrades_a_header_or_footer_with_malformed_markup() -> None:
     assert "</i>" not in pages[0][0]
     assert "broken header" in pages[0][0]
     assert "footer" in pages[0][0]
+
+
+@given(
+    pieces=st.lists(
+        st.sampled_from(["a", "b", " ", "&", "<", ">", "😀", "\n", "<b>", "</b>", "&amp;"]),
+        max_size=200,
+    ),
+    limit=st.integers(min_value=1, max_value=200),
+)
+def test_fit_html_stays_within_limit_and_valid(pieces: list[str], limit: int) -> None:
+    text = "".join(pieces)
+    fitted = fit_html(text, limit)
+    assert visible_length(fitted) <= limit
+    if visible_length(text) <= limit:
+        assert fitted == text
+    else:
+        assert _is_valid_telegram_markup(fitted)
+
+
+def test_fit_html_keeps_markup_that_fits_and_degrades_what_does_not() -> None:
+    fits = '<b>Kettle</b> &amp; <a href="https://shop.example/p">link</a>'
+    assert fit_html(fits, 100) == fits
+    cut = fit_html("<b>" + "x" * 300 + "</b>", 50)
+    assert cut == "x" * 49 + "…"
+
+
+def test_fit_html_never_splits_an_entity() -> None:
+    fitted = fit_html("&amp;" * 100, 10)
+    assert visible_length(fitted) == 10
+    assert "&amp;&amp;" in fitted
+    assert not re.search(r"&(?!amp;)", fitted)

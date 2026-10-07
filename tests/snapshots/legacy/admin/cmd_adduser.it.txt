@@ -27,8 +27,13 @@
    text:
    | 🎉 Sei stato autorizzato a usare il Price Tracker Bot!
    | Invia /start per iniziare.
+-> deleteMyCommands
+   param scope={"chat_id": 99, "type": "chat"}
+-> deleteMyCommands
+   param language_code="it"
+   param scope={"chat_id": 99, "type": "chat"}
 ## db after step 3
-+ users user_id=99 {is_admin=0, is_active=1, created_at=<now:9999-99-99 99:99:99>, display_name=NULL, username=NULL}
++ users user_id=99 {is_admin=0, is_active=1, created_at=<now:9999-99-99 99:99:99>, display_name=NULL, username=NULL, language=NULL, telegram_language_tag=NULL}
 ## step 4: command "/adduser 10" user=1
 -> sendMessage chat=1
    param parse_mode="HTML"
@@ -46,5 +51,10 @@
    text:
    | 🎉 Sei stato autorizzato a usare il Price Tracker Bot!
    | Invia /start per iniziare.
+-> deleteMyCommands
+   param scope={"chat_id": 98, "type": "chat"}
+-> deleteMyCommands
+   param language_code="it"
+   param scope={"chat_id": 98, "type": "chat"}
 ## db after step 5
-+ users user_id=98 {is_admin=0, is_active=1, created_at=<now:9999-99-99 99:99:99>, display_name=NULL, username=NULL}
++ users user_id=98 {is_admin=0, is_active=1, created_at=<now:9999-99-99 99:99:99>, display_name=NULL, username=NULL, language=NULL, telegram_language_tag=NULL}

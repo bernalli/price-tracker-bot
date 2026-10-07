@@ -7,7 +7,7 @@
    param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
-   | 📦 <b>I tuoi prodotti</b> · attivo (1) · pagina 1/1
+   | 📦 <b>I tuoi prodotti</b> · attivi (1) · pagina 1/1
    |
    | <b>#1</b> Kettle · 100,00 €
    keyboard:
