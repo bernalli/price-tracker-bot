@@ -153,7 +153,7 @@ def _estimate() -> ProductView:
 
 def _hostile() -> ProductView:
     name = '<b>&"Deal"</b> 👨\u200d👩\u200d👧 \u202eRTL\u202c line\nbreak <script>x</script> ' + (
-        "é" * 40
+        "e\u0301" * 40
     )
     return ProductView(
         id=9_223_372_036_854_775_807,

@@ -282,6 +282,7 @@ class WiredFlowMachine(RuleBasedStateMachine):
         self._begin()
         registry_before = self._registry_tokens()
         self._run(self.w.press(key[0], key[1], data))
+        assert self._answer_count() == 1, "a malformed entry button is answered exactly once"
         self.flows.pop(key, None)
         registry_after = self._registry_tokens()
         expected = {k: t for k, t in registry_before.items() if k != key}
@@ -297,6 +298,7 @@ class WiredFlowMachine(RuleBasedStateMachine):
     def press_non_entry_legacy_button(self, key: tuple[int, int], data: str) -> None:
         self._begin()
         self._run(self.w.press(key[0], key[1], data))
+        assert self._answer_count() == 1, "a legacy button is answered exactly once"
         self.flows.pop(key, None)
 
     # -- rules: answers --------------------------------------------------------
@@ -437,9 +439,9 @@ class WiredFlowMachine(RuleBasedStateMachine):
 
     @invariant()
     def at_most_one_answer_per_update(self) -> None:
-        # Text, command and timeout steps answer no callback, and a malformed or legacy
-        # button may go unanswered, so the bound over every step stays "at most one"; the
-        # exact-once contract is asserted in the rules that press an entry or a cancel button.
+        # Text, command and timeout steps answer no callback, so the bound over every step
+        # stays "at most one"; the exact-once contract is asserted in each rule that presses
+        # a button (entry, malformed entry, legacy button, cancel).
         assert self._answer_count() <= 1
 
     @invariant()

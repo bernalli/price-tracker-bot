@@ -82,7 +82,7 @@ def wcwidth_oracle(text: str) -> int:
         ("·", 1),  # ·
         ("…", 1),  # …
         ("é", 1),  # é (precomposed)
-        ("é", 1),  # e + combining acute
+        ("e\u0301", 1),  # e + combining acute
         ("\u200d", 0),  # ZWJ
         ("\u2068", 0),  # FSI
         ("\xa0", 1),  # NBSP
@@ -115,7 +115,7 @@ def test_display_width_is_additive_unless_the_join_forms_a_cluster(left: str, ri
     if not right:
         return
     first = right[0]
-    if first == "️" or unicodedata.category(first) in ("Mn", "Me", "Cf"):
+    if first == "\ufe0f" or unicodedata.category(first) in ("Mn", "Me", "Cf"):
         return
     assert display_width(left + right) == display_width(left) + display_width(right)
 
@@ -209,7 +209,7 @@ def test_truncate_ellipsis_ends_on_a_cluster_boundary(text: str, budget: int) ->
     assert text.startswith(prefix), (text, budget, out)
     if len(text) > len(prefix):
         next_char = text[len(prefix)]
-        assert next_char != "️"
+        assert next_char != "\ufe0f"
         assert unicodedata.category(next_char) not in ("Mn", "Me", "Cf")
 
 
