@@ -309,6 +309,7 @@ async def _add_product(
     from price_tracker.core.scraper_base import detect_currency  # noqa: PLC0415
     from price_tracker.core.url_utils import (  # noqa: PLC0415
         UnsafeURLError,
+        UnsupportedSchemeError,
         extract_etld_plus_one,
         validate_public_url,
     )
@@ -317,6 +318,12 @@ async def _add_product(
     # before the URL is stored or fetched. Runs in a thread (getaddrinfo blocks).
     try:
         await asyncio.to_thread(validate_public_url, url)
+    except UnsupportedSchemeError as e:
+        logger.warning("Rejected non-http(s) product URL from user %d: %s", user_id, e)
+        await update.message.reply_text(
+            "❌ URL non consentito: sono supportati solo link http:// e https://."
+        )
+        return
     except UnsafeURLError as e:
         logger.warning("Rejected unsafe product URL from user %d: %s", user_id, e)
         await update.message.reply_text(

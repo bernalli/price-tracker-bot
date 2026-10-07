@@ -37,7 +37,7 @@ async def handle_admin_menu(
     if data == "menu_admin":
         if not await db.is_user_admin(user_id):
             return True  # silent reject — handled
-        users = await db.get_all_users()
+        users = await db.list_active_users()
         config = _config(context)
         saved = await db.get_config("check_interval_minutes")
         interval = int(saved) if saved else config.check_interval_minutes
@@ -69,8 +69,8 @@ async def handle_admin_menu(
     if data == "menu_admin_users":
         if not await db.is_user_admin(user_id):
             return True
-        users = await db.get_all_users()
-        txt = ["👥 <b>Utenti</b>\n"]
+        users = await db.list_active_users()
+        txt = ["👥 <b>Utenti attivi</b>\n"]
         for u in users:
             uid = u["user_id"]
             nm = u.get("display_name") or u.get("username") or "N/D"
@@ -99,7 +99,7 @@ async def handle_admin_menu(
     if data == "menu_admin_removeuser":
         if not await db.is_user_admin(user_id):
             return True
-        users = await db.get_all_users()
+        users = await db.list_active_users()
         removable = [u for u in users if not u.get("is_admin") and u["user_id"] != user_id]
         if not removable:
             await query.edit_message_text(
@@ -151,7 +151,7 @@ async def handle_admin_menu(
     if data == "menu_admin_nick":
         if not await db.is_user_admin(user_id):
             return True
-        users = await db.get_all_users()
+        users = await db.list_active_users()
         rows = []
         for u in users:
             nm = u.get("display_name") or u.get("username") or str(u["user_id"])

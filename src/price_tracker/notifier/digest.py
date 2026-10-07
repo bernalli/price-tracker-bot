@@ -38,15 +38,22 @@ def _safe_text(value: object, *, fallback: str, budget: int | None = None) -> st
     return escape(text)
 
 
-def _positive_int(value: object, *, fallback: int) -> int:
-    """Return a positive integer payload value, or a conservative fallback."""
-    if not isinstance(value, (int, float, str)):
-        return fallback
+def _optional_positive_int(value: object) -> int | None:
+    """Return a strictly positive integral payload value, else ``None``."""
+    if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+        return None
+    if isinstance(value, float) and not value.is_integer():
+        return None
     try:
         parsed = int(value)
-    except (TypeError, ValueError):
-        return fallback
-    return parsed if parsed > 0 else fallback
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return parsed if parsed > 0 else None
+
+
+def _positive_int(value: object, *, fallback: int) -> int:
+    """Return a positive integer payload value, or a conservative fallback."""
+    return _optional_positive_int(value) or fallback
 
 
 def _price_block(entry: DigestEntry, payload: dict[str, Any]) -> str:
@@ -79,10 +86,20 @@ def _operational_block(payload: dict[str, Any], *, include_heading: bool) -> str
     domain = _safe_text(payload.get("domain"), fallback=_("unknown"), budget=DOMAIN_BUDGET)
     event = payload.get("event")
     if event == "warning":
-        count = _positive_int(payload.get("count"), fallback=1)
-        maximum = _positive_int(payload.get("max"), fallback=1)
+        products = _positive_int(payload.get("count"), fallback=1)
+        errors = _optional_positive_int(payload.get("error_count"))
+        maximum = _optional_positive_int(payload.get("max_errors"))
+        if errors is None or maximum is None or errors > maximum:
+            errors_display: int | str = "?"
+            maximum_display: int | str = "?"
+        else:
+            errors_display = errors
+            maximum_display = maximum
         row = _("{domain} — {n} products: checks failing ({count}/{max})").format(
-            domain=domain, n=count, count=count, max=maximum
+            domain=domain,
+            n=products,
+            count=errors_display,
+            max=maximum_display,
         )
     elif event == "quarantine":
         row = _("{domain} — quarantined").format(domain=domain)

@@ -50,7 +50,7 @@
    | 🔻 Ultra Quiet Stainless Steel Electric Kettle With Temperatur… — EUR40.00 → EUR30.00 — example.com
    | 🔻 Prodotto #1 — EUR80.00 → EUR64.00 — example.com
    | ⚠️ Avvisi operativi
-   | example.com — 1 prodotti: controlli in errore (1/1)
+   | example.com — 1 prodotti: controlli in errore (?/?)
    | example.com — 1 prodotti: tracking sospeso (prezzo non leggibile)
    | Usa /reactivate o /errori per i dettagli.
    | Usa /lista per lo stato completo.

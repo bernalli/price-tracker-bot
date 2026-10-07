@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.2] - 2026-10-07
+
+### Fixed
+
+- In the digest, the "checks failing" notice shows the real count of consecutive failed checks
+  against the limit (for example 5/10).
+- `/utenti` lists only active users; users removed with `/removeuser` no longer appear.
+- `/add` with a link that is not http:// or https:// (for example ftp://) now says that only
+  http and https links are supported, instead of calling it a private or internal address.
+- `/debug` without a link answers with its usage line instead of a generic error.
+
 ## [1.4.1] - 2026-10-07
 
 ### Changed
@@ -676,7 +687,8 @@ auto-quarantine, and a plugin extension point.
 - osv-scanner dependency vulnerability scan in CI.
 - Pre-commit hooks block secrets at commit time.
 
-[Unreleased]: https://github.com/bernalli/price-tracker-bot/compare/v1.4.1...HEAD
+[Unreleased]: https://github.com/bernalli/price-tracker-bot/compare/v1.4.2...HEAD
+[1.4.2]: https://github.com/bernalli/price-tracker-bot/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/bernalli/price-tracker-bot/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/bernalli/price-tracker-bot/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/bernalli/price-tracker-bot/compare/v1.2.0...v1.3.0

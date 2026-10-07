@@ -352,10 +352,10 @@ async def _handle_menu_info(
     )
     if is_admin:
         gs = await db.get_stats()
-        users = await db.get_all_users()
+        users = await db.list_active_users()
         text += (
             f"\n\n👑 <b>Admin</b>\n"
-            f"👥 Utenti: {len(users)}\n"
+            f"👥 Utenti attivi: {len(users)}\n"
             f"📦 Prodotti globali: {gs['active_products']}\n"
             f"🔄 Check globali: {gs['total_checks']}"
         )

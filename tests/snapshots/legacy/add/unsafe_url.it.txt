@@ -11,6 +11,6 @@
 ## step 2: command "/add ftp://shop.example.com/x" user=10
 -> sendMessage chat=10
    text:
-   | ❌ URL non consentito: punta a un indirizzo privato o interno.
+   | ❌ URL non consentito: sono supportati solo link http:// e https://.
 ## db after step 2
 (no changes)

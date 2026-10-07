@@ -32,7 +32,7 @@
    | ⏱ Intervallo: ogni 90min
    |
    | 👑 <b>Admin</b>
-   | 👥 Utenti: 3
+   | 👥 Utenti attivi: 3
    | 📦 Prodotti globali: 2
    | 🔄 Check globali: 5
    keyboard:
