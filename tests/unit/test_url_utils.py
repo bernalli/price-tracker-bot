@@ -5,8 +5,14 @@ from __future__ import annotations
 import socket
 
 import pytest
+from hypothesis import given
+from hypothesis import strategies as st
 
-from price_tracker.core.url_utils import UnsafeURLError, validate_public_url
+from price_tracker.core.url_utils import (
+    UnsafeURLError,
+    UnsupportedSchemeError,
+    validate_public_url,
+)
 
 
 def _fake_getaddrinfo(ip: str):
@@ -34,6 +40,66 @@ def _fake_getaddrinfo(ip: str):
 def test_validate_public_url_rejects_unsafe(url: str) -> None:
     with pytest.raises(UnsafeURLError):
         validate_public_url(url)
+
+
+@pytest.mark.parametrize("url", ["ftp://example.com/file", "file:///etc/passwd"])
+def test_disallowed_scheme_is_an_unsafe_url_with_its_own_type(url: str) -> None:
+    with pytest.raises(UnsupportedSchemeError) as excinfo:
+        validate_public_url(url)
+    assert isinstance(excinfo.value, UnsafeURLError)
+
+
+UNSUPPORTED_SCHEMES = st.from_regex(r"[A-Za-z][A-Za-z0-9+.-]{0,20}", fullmatch=True).filter(
+    lambda scheme: scheme.lower() not in {"http", "https"}
+)
+
+
+@given(scheme=UNSUPPORTED_SCHEMES)
+def test_every_non_http_scheme_remains_fail_closed(scheme: str) -> None:
+    """Defect: a future scheme branch could bypass the generic SSRF contract."""
+    with pytest.raises(UnsupportedSchemeError) as excinfo:
+        validate_public_url(f"{scheme}://example.com/product")
+    assert isinstance(excinfo.value, UnsafeURLError)
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        " ftp://example.com/file",
+        "example.com/product",
+        "javascript:alert(1)",
+        "data:text/plain,x",
+        "http:/x",
+        "https:///no-host",
+        "://bad",
+        "",
+    ],
+)
+def test_not_well_formed_destinations_remain_rejected(url: str) -> None:
+    """Defect: malformed or schemeless input must never reach DNS or scraping."""
+    with pytest.raises(UnsafeURLError):
+        validate_public_url(url)
+
+
+def test_allowed_http_scheme_is_case_insensitive(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Defect: mixed-case HTTP must not be misclassified as unsupported."""
+    monkeypatch.setattr(
+        socket,
+        "getaddrinfo",
+        _fake_getaddrinfo("93.184.216.34"),
+    )
+    validate_public_url("hTTp://example.com/product")
+
+
+@pytest.mark.parametrize(
+    "url", ["http://127.0.0.1/", "http://169.254.169.254/", "https:///no-host"]
+)
+def test_non_scheme_rejections_are_not_scheme_errors(url: str) -> None:
+    with pytest.raises(UnsafeURLError) as excinfo:
+        validate_public_url(url)
+    assert not isinstance(excinfo.value, UnsupportedSchemeError)
 
 
 def test_validate_public_url_rejects_localhost_via_dns(monkeypatch: pytest.MonkeyPatch) -> None:

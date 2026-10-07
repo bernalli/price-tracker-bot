@@ -115,7 +115,7 @@ def _tier_label(state: str) -> str:
 async def cmd_debug(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Debug scraping for a URL — shows what each strategy finds."""
     if not context.args:
-        await update.message.reply_text("❌ Uso: /debug <url>", parse_mode=ParseMode.HTML)
+        await update.message.reply_text("❌ Uso: /debug &lt;url&gt;", parse_mode=ParseMode.HTML)
         return
 
     url = context.args[0]
@@ -320,7 +320,7 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     products_tracked: int | None = None
     if is_admin:
         global_stats = await db.get_stats()
-        users = await db.get_all_users()
+        users = await db.list_active_users()
         products_tracked = int(global_stats["active_products"])
         lines.extend(
             [

@@ -4,11 +4,16 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from freezegun import freeze_time
+from hypothesis import example, given
+from hypothesis import strategies as st
 
+from price_tracker.core.notices import NoticeGroup, OperationalEvent
+from price_tracker.core.scheduler import Scheduler, SchedulerDeps
 from price_tracker.core.textlimits import visible_length
 from price_tracker.db.models import DigestEntry
 from price_tracker.notifier.digest import DigestService, _digest_blocks
@@ -115,6 +120,38 @@ def _entry(*, entry_id: int, product_id: int | None, payload: object) -> DigestE
     )
 
 
+def _warning_payload(*, products: int) -> dict[str, Any]:
+    """Build a warning payload the way the scheduler persists it for the digest."""
+    events = tuple(
+        OperationalEvent(
+            event="warning",
+            user_id=42,
+            product_id=product_id,
+            product_name=f"Product {product_id}",
+            url=f"https://shop.example/p/{product_id}",
+            group_key="shop.example",
+            reason="parse_error",
+            detail=None,
+            last_error=None,
+            error_count=5,
+            max_errors=10,
+            last_price=None,
+            currency=None,
+            last_checked_at=None,
+        )
+        for product_id in range(1, products + 1)
+    )
+    scheduler = Scheduler(
+        SchedulerDeps(
+            repo=MagicMock(), registry=MagicMock(), client=MagicMock(), notifier=AsyncMock()
+        )
+    )
+    group = NoticeGroup("warning", 42, "shop.example", events)
+    payload = scheduler._operational_payload(group, datetime(2026, 5, 9, 12, 0, tzinfo=UTC))
+    loaded: dict[str, Any] = json.loads(json.dumps(payload))
+    return loaded
+
+
 def test_digest_renders_operational_section() -> None:
     """Price changes and operational notices render in separate digest sections."""
     header, blocks, footer, unrenderable_ids = _digest_blocks(
@@ -141,17 +178,7 @@ def test_digest_renders_operational_section() -> None:
                     "reason": "listing_gone",
                 },
             ),
-            _entry(
-                entry_id=3,
-                product_id=None,
-                payload={
-                    "kind": "operational",
-                    "event": "warning",
-                    "domain": "shop.example",
-                    "count": 2,
-                    "max": 10,
-                },
-            ),
+            _entry(entry_id=3, product_id=None, payload=_warning_payload(products=2)),
         ]
     )
 
@@ -159,7 +186,7 @@ def test_digest_renders_operational_section() -> None:
     assert "1 price change" in header
     assert "⚠️ Operational notices" in text
     assert "shop.example — 2 products: tracking suspended (page not found (HTTP 404))" in text
-    assert "shop.example — 2 products: checks failing (2/10)" in text
+    assert "shop.example — 2 products: checks failing (5/10)" in text
     assert "Use /reactivate or /errori for details." in footer
     assert unrenderable_ids == []
 
@@ -320,3 +347,84 @@ async def test_flush_user_paginates_and_marks_only_sent_pages(
 
     assert repo_mock.mark_digest_flushed.await_count == 1
     assert repo_mock.mark_digest_flushed.await_args.args[0] != list(range(1, 51))
+
+
+def test_warning_without_counters_does_not_invent_one_of_one() -> None:
+    """Defect: missing producer fields were rendered as the false value 1/1."""
+    _, blocks, _, _ = _digest_blocks(
+        [
+            _entry(
+                entry_id=1,
+                product_id=None,
+                payload={
+                    "kind": "operational",
+                    "event": "warning",
+                    "domain": "shop.example",
+                    "count": 2,
+                },
+            )
+        ]
+    )
+    assert "checks failing (?/?)" in blocks[0][1]
+
+
+@given(
+    error_count=st.one_of(
+        st.none(),
+        st.booleans(),
+        st.integers(),
+        st.floats(allow_nan=True, allow_infinity=True),
+        st.text(max_size=32),
+        st.lists(st.integers(), max_size=3),
+    ),
+    max_errors=st.one_of(
+        st.none(),
+        st.booleans(),
+        st.integers(),
+        st.floats(allow_nan=True, allow_infinity=True),
+        st.text(max_size=32),
+        st.lists(st.integers(), max_size=3),
+    ),
+)
+@example(error_count=float("inf"), max_errors=10)
+def test_warning_counter_rendering_is_total(error_count: object, max_errors: object) -> None:
+    """Defect: Infinity raised OverflowError and aborted the whole digest flush."""
+    _, blocks, _, unrenderable_ids = _digest_blocks(
+        [
+            _entry(
+                entry_id=1,
+                product_id=None,
+                payload={
+                    "kind": "operational",
+                    "event": "warning",
+                    "domain": "shop.example",
+                    "count": 2,
+                    "error_count": error_count,
+                    "max_errors": max_errors,
+                },
+            )
+        ]
+    )
+    assert "checks failing" in blocks[0][1]
+    assert unrenderable_ids == []
+
+
+def test_warning_rejects_counter_ordering_above_the_limit() -> None:
+    """Defect: malformed progress such as 11/10 was reported as genuine."""
+    _, blocks, _, _ = _digest_blocks(
+        [
+            _entry(
+                entry_id=1,
+                product_id=None,
+                payload={
+                    "kind": "operational",
+                    "event": "warning",
+                    "domain": "shop.example",
+                    "count": 2,
+                    "error_count": 11,
+                    "max_errors": 10,
+                },
+            )
+        ]
+    )
+    assert "checks failing (?/?)" in blocks[0][1]

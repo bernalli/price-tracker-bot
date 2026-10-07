@@ -120,7 +120,7 @@ async def cmd_remove_user(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 async def cmd_users(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """List all authorized users."""
     db = _db(context)
-    users = await db.get_all_users()
+    users = await db.list_active_users()
 
     if not users:
         await update.message.reply_text(_("📭 No registered users."))

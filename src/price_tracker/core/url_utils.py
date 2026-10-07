@@ -17,6 +17,10 @@ class UnsafeURLError(ValueError):
     """Raised when a URL targets a non-public destination (SSRF guard)."""
 
 
+class UnsupportedSchemeError(UnsafeURLError):
+    """Raised when a URL uses a scheme other than http or https."""
+
+
 def _is_blocked_ip(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
     """True for loopback/private/link-local/reserved/multicast/unspecified/non-global addresses."""
     return (
@@ -47,7 +51,7 @@ def validate_public_url(url: str) -> None:
     except (httpx.InvalidURL, TypeError) as exc:
         raise UnsafeURLError("URL is not a valid HTTPX destination") from exc
     if parsed.scheme not in _ALLOWED_SCHEMES:
-        raise UnsafeURLError(f"scheme {parsed.scheme!r} not allowed")
+        raise UnsupportedSchemeError(f"scheme {parsed.scheme!r} not allowed")
     if not parsed.raw_host:
         raise UnsafeURLError("URL has no host")
     if parsed.port is not None and not 0 <= parsed.port <= 65535:
