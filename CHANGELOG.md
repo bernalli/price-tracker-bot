@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-10-07
+
+### Added
+
+- `/lista` has a filter for products that are sold out, and the product card shows when a
+  product is sold out.
+
+### Changed
+
+- After Pause, Reactivate, Check now and Delete the product card (or the list) stays in place
+  with a one-line result, and Cancel on the delete prompt brings the card back.
+- The Prices menu points to the product list when there are more than 8 products.
+- The Check now button is shown only for active products.
+
+### Fixed
+
+- Check now on a paused product no longer reports a check that did not happen.
+
 ## [1.4.2] - 2026-10-07
 
 ### Fixed
@@ -687,7 +705,8 @@ auto-quarantine, and a plugin extension point.
 - osv-scanner dependency vulnerability scan in CI.
 - Pre-commit hooks block secrets at commit time.
 
-[Unreleased]: https://github.com/bernalli/price-tracker-bot/compare/v1.4.2...HEAD
+[Unreleased]: https://github.com/bernalli/price-tracker-bot/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/bernalli/price-tracker-bot/compare/v1.4.2...v1.5.0
 [1.4.2]: https://github.com/bernalli/price-tracker-bot/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/bernalli/price-tracker-bot/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/bernalli/price-tracker-bot/compare/v1.3.0...v1.4.0
