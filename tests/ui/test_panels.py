@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 HALF_WIDTH = 17
 ROW_WIDTH = 34
 LOCALES = ("en", "it", "zh_Hans", "fr", "es", "de", "uk", "pt_BR", "ja")
-HOSTILE = "<b>&\"'‮‍\n</b> "
+HOSTILE = "<b>&\"'\u202e\u200d\n</b>\u2028"
 
 
 def _callbacks(screen: Screen) -> list[str]:

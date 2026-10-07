@@ -217,8 +217,9 @@ def test_n1_truncated_corpus_is_rejected(tmp_path: Path, valid: dict[str, Any]) 
     path = _dump(tmp_path, "corpus.json", valid["corpus"])
     text = path.read_text(encoding="utf-8")
     path.write_text(text[: len(text) // 2], encoding="utf-8")
-    with pytest.raises(rp.ParityFormatError):
+    with pytest.raises(rp.ParityFormatError) as exc_info:
         rp.load_corpus(path)
+    assert exc_info.value.code == "corpus_invalid_json"
 
 
 # ── N2: rows: [] with count: 0 ──────────────────────────────────────────────
@@ -227,8 +228,9 @@ def test_n1_truncated_corpus_is_rejected(tmp_path: Path, valid: dict[str, Any]) 
 def test_n2_empty_rows_with_zero_count_is_rejected(tmp_path: Path, valid: dict[str, Any]) -> None:
     bad = _mutated(valid["frozen_pp"], rows=[], count=0)
     path = _dump(tmp_path, "parse_price.frozen.json", bad)
-    with pytest.raises(rp.ParityFormatError):
+    with pytest.raises(rp.ParityFormatError) as exc_info:
         rp.load_frozen(path)
+    assert exc_info.value.code == "frozen_count_mismatch"
 
 
 # ── N3: count != len(rows) ───────────────────────────────────────────────────
@@ -237,8 +239,9 @@ def test_n2_empty_rows_with_zero_count_is_rejected(tmp_path: Path, valid: dict[s
 def test_n3_count_mismatch_is_rejected(tmp_path: Path, valid: dict[str, Any]) -> None:
     bad = _mutated(valid["frozen_pp"], count=valid["frozen_pp"]["count"] + 1)
     path = _dump(tmp_path, "parse_price.frozen.json", bad)
-    with pytest.raises(rp.ParityFormatError):
+    with pytest.raises(rp.ParityFormatError) as exc_info:
         rp.load_frozen(path)
+    assert exc_info.value.code == "frozen_count_mismatch"
 
 
 # ── N4: duplicate row ────────────────────────────────────────────────────────
@@ -249,8 +252,9 @@ def test_n4_duplicate_row_is_rejected(tmp_path: Path, valid: dict[str, Any]) -> 
     rows.append(copy.deepcopy(rows[-1]))
     bad = _mutated(valid["frozen_pp"], rows=rows, count=len(rows))
     path = _dump(tmp_path, "parse_price.frozen.json", bad)
-    with pytest.raises(rp.ParityFormatError):
+    with pytest.raises(rp.ParityFormatError) as exc_info:
         rp.load_frozen(path)
+    assert exc_info.value.code == "frozen_rows_duplicate"
 
 
 # ── N5: two rows swapped (unordered) ────────────────────────────────────────
@@ -262,8 +266,9 @@ def test_n5_unordered_rows_are_rejected(tmp_path: Path, valid: dict[str, Any]) -
     rows[0], rows[1] = rows[1], rows[0]
     bad = _mutated(valid["frozen_pp"], rows=rows)
     path = _dump(tmp_path, "parse_price.frozen.json", bad)
-    with pytest.raises(rp.ParityFormatError):
+    with pytest.raises(rp.ParityFormatError) as exc_info:
         rp.load_frozen(path)
+    assert exc_info.value.code == "frozen_rows_unordered"
 
 
 # ── N6/N7: input is not str|None ────────────────────────────────────────────
@@ -274,8 +279,9 @@ def test_n6_integer_input_is_rejected(tmp_path: Path, valid: dict[str, Any]) -> 
     rows[-1]["input"] = 12
     bad = _mutated(valid["frozen_pp"], rows=rows)
     path = _dump(tmp_path, "parse_price.frozen.json", bad)
-    with pytest.raises(rp.ParityFormatError):
+    with pytest.raises(rp.ParityFormatError) as exc_info:
         rp.load_frozen(path)
+    assert exc_info.value.code == "frozen_row_input_not_str_or_none"
 
 
 def test_n7_list_input_is_rejected(tmp_path: Path, valid: dict[str, Any]) -> None:
@@ -283,8 +289,9 @@ def test_n7_list_input_is_rejected(tmp_path: Path, valid: dict[str, Any]) -> Non
     rows[-1]["input"] = ["12"]
     bad = _mutated(valid["frozen_pp"], rows=rows)
     path = _dump(tmp_path, "parse_price.frozen.json", bad)
-    with pytest.raises(rp.ParityFormatError):
+    with pytest.raises(rp.ParityFormatError) as exc_info:
         rp.load_frozen(path)
+    assert exc_info.value.code == "frozen_row_input_not_str_or_none"
 
 
 # ── N8: old is a float ───────────────────────────────────────────────────────
@@ -295,8 +302,9 @@ def test_n8_float_old_is_rejected(tmp_path: Path, valid: dict[str, Any]) -> None
     rows[-1]["old"] = 12.5
     bad = _mutated(valid["frozen_pp"], rows=rows)
     path = _dump(tmp_path, "parse_price.frozen.json", bad)
-    with pytest.raises(rp.ParityFormatError):
+    with pytest.raises(rp.ParityFormatError) as exc_info:
         rp.load_frozen(path)
+    assert exc_info.value.code == "frozen_row_old_not_str_or_none"
 
 
 # ── N9: old is a string but not a canonical value ───────────────────────────
@@ -314,8 +322,9 @@ def test_n9_non_canonical_parse_price_old_is_rejected(
     non_none[0]["old"] = bad_value
     bad = _mutated(valid["frozen_pp"], rows=rows)
     path = _dump(tmp_path, "parse_price.frozen.json", bad)
-    with pytest.raises(rp.ParityFormatError):
+    with pytest.raises(rp.ParityFormatError) as exc_info:
         rp.load_frozen(path)
+    assert exc_info.value.code == "frozen_row_old_not_canonical"
 
 
 @pytest.mark.parametrize("bad_value", ["eur", "EURO"])
@@ -326,8 +335,9 @@ def test_n9_non_canonical_detect_currency_old_is_rejected(
     rows[-1]["old"] = bad_value
     bad = _mutated(valid["frozen_dc"], rows=rows)
     path = _dump(tmp_path, "detect_currency.frozen.json", bad)
-    with pytest.raises(rp.ParityFormatError):
+    with pytest.raises(rp.ParityFormatError) as exc_info:
         rp.load_frozen(path)
+    assert exc_info.value.code == "frozen_row_old_not_canonical"
 
 
 # ── N10: extra key, at file level and at row level ──────────────────────────
@@ -336,8 +346,9 @@ def test_n9_non_canonical_detect_currency_old_is_rejected(
 def test_n10_extra_key_at_file_level_is_rejected(tmp_path: Path, valid: dict[str, Any]) -> None:
     bad = _mutated(valid["frozen_pp"], extra="unexpected")
     path = _dump(tmp_path, "parse_price.frozen.json", bad)
-    with pytest.raises(rp.ParityFormatError):
+    with pytest.raises(rp.ParityFormatError) as exc_info:
         rp.load_frozen(path)
+    assert exc_info.value.code == "frozen_keys"
 
 
 def test_n10_extra_key_at_row_level_is_rejected(tmp_path: Path, valid: dict[str, Any]) -> None:
@@ -345,8 +356,9 @@ def test_n10_extra_key_at_row_level_is_rejected(tmp_path: Path, valid: dict[str,
     rows[-1]["extra"] = "unexpected"
     bad = _mutated(valid["frozen_pp"], rows=rows)
     path = _dump(tmp_path, "parse_price.frozen.json", bad)
-    with pytest.raises(rp.ParityFormatError):
+    with pytest.raises(rp.ParityFormatError) as exc_info:
         rp.load_frozen(path)
+    assert exc_info.value.code == "frozen_row_keys"
 
 
 # ── N11: missing key (count, rows, old) ──────────────────────────────────────
@@ -356,16 +368,18 @@ def test_n11_missing_count_key_is_rejected(tmp_path: Path, valid: dict[str, Any]
     bad = copy.deepcopy(valid["frozen_pp"])
     del bad["count"]
     path = _dump(tmp_path, "parse_price.frozen.json", bad)
-    with pytest.raises(rp.ParityFormatError):
+    with pytest.raises(rp.ParityFormatError) as exc_info:
         rp.load_frozen(path)
+    assert exc_info.value.code == "frozen_keys"
 
 
 def test_n11_missing_rows_key_is_rejected(tmp_path: Path, valid: dict[str, Any]) -> None:
     bad = copy.deepcopy(valid["frozen_pp"])
     del bad["rows"]
     path = _dump(tmp_path, "parse_price.frozen.json", bad)
-    with pytest.raises(rp.ParityFormatError):
+    with pytest.raises(rp.ParityFormatError) as exc_info:
         rp.load_frozen(path)
+    assert exc_info.value.code == "frozen_keys"
 
 
 def test_n11_missing_old_key_is_rejected(tmp_path: Path, valid: dict[str, Any]) -> None:
@@ -373,8 +387,9 @@ def test_n11_missing_old_key_is_rejected(tmp_path: Path, valid: dict[str, Any]) 
     del rows[-1]["old"]
     bad = _mutated(valid["frozen_pp"], rows=rows)
     path = _dump(tmp_path, "parse_price.frozen.json", bad)
-    with pytest.raises(rp.ParityFormatError):
+    with pytest.raises(rp.ParityFormatError) as exc_info:
         rp.load_frozen(path)
+    assert exc_info.value.code == "frozen_row_keys"
 
 
 # ── N12: schema: 2 ───────────────────────────────────────────────────────────
@@ -383,8 +398,9 @@ def test_n11_missing_old_key_is_rejected(tmp_path: Path, valid: dict[str, Any]) 
 def test_n12_wrong_schema_version_is_rejected(tmp_path: Path, valid: dict[str, Any]) -> None:
     bad = _mutated(valid["corpus"], schema=2)
     path = _dump(tmp_path, "corpus.json", bad)
-    with pytest.raises(rp.ParityFormatError):
+    with pytest.raises(rp.ParityFormatError) as exc_info:
         rp.load_corpus(path)
+    assert exc_info.value.code == "corpus_schema_version"
 
 
 # ── N13: isolated surrogate string ──────────────────────────────────────────
@@ -400,8 +416,9 @@ def test_n13_isolated_surrogate_is_rejected(tmp_path: Path, valid: dict[str, Any
     assert marker in text
     text = text.replace(marker, '"\\ud800 12"', 1)
     path.write_text(text, encoding="utf-8")
-    with pytest.raises(rp.ParityFormatError):
+    with pytest.raises(rp.ParityFormatError) as exc_info:
         rp.load_frozen(path)
+    assert exc_info.value.code == "frozen_row_input_not_utf8"
 
 
 # ── N14: exceptions row old diverges from the frozen file ──────────────────
@@ -419,8 +436,9 @@ def test_n14_exceptions_old_diverging_from_frozen_is_rejected(
     rows[0]["old"] = "9999.00"
     bad = _mutated(valid["exceptions_pp"], rows=rows)
     path = _dump(tmp_path, "parse_price.exceptions.json", bad)
-    with pytest.raises(rp.ParityFormatError):
+    with pytest.raises(rp.ParityFormatError) as exc_info:
         rp.load_exceptions(path, manifest=manifest, frozen=frozen)
+    assert exc_info.value.code == "exceptions_row_old_diverges_from_frozen"
 
 
 # ── N15: old == new ──────────────────────────────────────────────────────────
@@ -436,8 +454,9 @@ def test_n15_old_equals_new_is_rejected(tmp_path: Path, valid: dict[str, Any]) -
     rows[0]["new"] = rows[0]["old"]
     bad = _mutated(valid["exceptions_pp"], rows=rows)
     path = _dump(tmp_path, "parse_price.exceptions.json", bad)
-    with pytest.raises(rp.ParityFormatError):
+    with pytest.raises(rp.ParityFormatError) as exc_info:
         rp.load_exceptions(path, manifest=manifest, frozen=frozen)
+    assert exc_info.value.code == "exceptions_row_old_equals_new"
 
 
 # ── N16: exceptions input outside the corpus (not in frozen) ────────────────
@@ -465,8 +484,9 @@ def test_n16_exceptions_input_outside_corpus_is_rejected(
     rows.sort(key=lambda r: rp.sort_key(r["input"]))
     bad = _mutated(valid["exceptions_pp"], rows=rows, count=len(rows))
     path = _dump(tmp_path, "parse_price.exceptions.json", bad)
-    with pytest.raises(rp.ParityFormatError):
+    with pytest.raises(rp.ParityFormatError) as exc_info:
         rp.load_exceptions(path, manifest=manifest, frozen=frozen)
+    assert exc_info.value.code == "exceptions_row_input_not_in_corpus"
 
 
 # ── N17: unknown class, and a class not admitted for that kind ─────────────
@@ -482,8 +502,9 @@ def test_n17_unknown_class_is_rejected(tmp_path: Path, valid: dict[str, Any]) ->
     rows[0]["class"] = "not_a_real_class"
     bad = _mutated(valid["exceptions_pp"], rows=rows)
     path = _dump(tmp_path, "parse_price.exceptions.json", bad)
-    with pytest.raises(rp.ParityFormatError):
+    with pytest.raises(rp.ParityFormatError) as exc_info:
         rp.load_exceptions(path, manifest=manifest, frozen=frozen)
+    assert exc_info.value.code == "exceptions_row_class_invalid"
 
 
 def test_n17_class_not_admitted_for_kind_is_rejected(tmp_path: Path, valid: dict[str, Any]) -> None:
@@ -501,8 +522,9 @@ def test_n17_class_not_admitted_for_kind_is_rejected(tmp_path: Path, valid: dict
             break
     bad = _mutated(valid["exceptions_pp"], rows=rows)
     path = _dump(tmp_path, "parse_price.exceptions.json", bad)
-    with pytest.raises(rp.ParityFormatError):
+    with pytest.raises(rp.ParityFormatError) as exc_info:
         rp.load_exceptions(path, manifest=manifest, frozen=frozen)
+    assert exc_info.value.code == "exceptions_row_class_invalid"
 
 
 # ── N18: class ending in _other requires a non-empty string note ───────────
@@ -520,8 +542,9 @@ def test_n18_other_class_with_empty_note_is_rejected(tmp_path: Path, valid: dict
     loss_row["note"] = ""
     bad = _mutated(valid["exceptions_pp"], rows=rows)
     path = _dump(tmp_path, "parse_price.exceptions.json", bad)
-    with pytest.raises(rp.ParityFormatError):
+    with pytest.raises(rp.ParityFormatError) as exc_info:
         rp.load_exceptions(path, manifest=manifest, frozen=frozen)
+    assert exc_info.value.code == "exceptions_row_note_required"
 
 
 def test_n18_other_class_with_non_string_note_is_rejected(
@@ -538,8 +561,9 @@ def test_n18_other_class_with_non_string_note_is_rejected(
     loss_row["note"] = 3
     bad = _mutated(valid["exceptions_pp"], rows=rows)
     path = _dump(tmp_path, "parse_price.exceptions.json", bad)
-    with pytest.raises(rp.ParityFormatError):
+    with pytest.raises(rp.ParityFormatError) as exc_info:
         rp.load_exceptions(path, manifest=manifest, frozen=frozen)
+    assert exc_info.value.code == "exceptions_row_note_not_str"
 
 
 # ── N19: manifest subject unresolvable / not callable ───────────────────────
@@ -549,16 +573,18 @@ def test_n19_unresolvable_module_subject_is_rejected(tmp_path: Path, valid: dict
     bad = copy.deepcopy(valid["manifest"])
     bad["functions"]["parse_price"]["subject"] = "price_tracker.core.nope:fn"
     path = _dump(tmp_path, "manifest.json", bad)
-    with pytest.raises(rp.ParityFormatError):
+    with pytest.raises(rp.ParityFormatError) as exc_info:
         rp.load_manifest(path)
+    assert exc_info.value.code == "manifest_function_parse_price_subject_unresolvable"
 
 
 def test_n19_not_callable_subject_is_rejected(tmp_path: Path, valid: dict[str, Any]) -> None:
     bad = copy.deepcopy(valid["manifest"])
     bad["functions"]["parse_price"]["subject"] = "price_tracker.core.scraper_base:USER_AGENTS"
     path = _dump(tmp_path, "manifest.json", bad)
-    with pytest.raises(rp.ParityFormatError):
+    with pytest.raises(rp.ParityFormatError) as exc_info:
         rp.load_manifest(path)
+    assert exc_info.value.code == "manifest_function_parse_price_subject_not_callable"
 
 
 # ── N20: kind incoherent with old/new ───────────────────────────────────────
@@ -575,8 +601,9 @@ def test_n20_incoherent_kind_is_rejected(tmp_path: Path, valid: dict[str, Any]) 
     loss_row["kind"] = "gain"
     bad = _mutated(valid["exceptions_pp"], rows=rows)
     path = _dump(tmp_path, "parse_price.exceptions.json", bad)
-    with pytest.raises(rp.ParityFormatError):
+    with pytest.raises(rp.ParityFormatError) as exc_info:
         rp.load_exceptions(path, manifest=manifest, frozen=frozen)
+    assert exc_info.value.code == "exceptions_row_kind_incoherent"
 
 
 # ── N21: corpus sections not disjoint / None in curated / non-reproducible ──
@@ -588,8 +615,9 @@ def test_n21_overlapping_sections_are_rejected(tmp_path: Path, valid: dict[str, 
     bad["curated"] = sorted([*bad["curated"], dupe], key=rp.sort_key)
     bad["count"] += 1
     path = _dump(tmp_path, "corpus.json", bad)
-    with pytest.raises(rp.ParityFormatError):
+    with pytest.raises(rp.ParityFormatError) as exc_info:
         rp.load_corpus(path)
+    assert exc_info.value.code == "corpus_sections_overlap"
 
 
 def test_n21_none_in_curated_is_rejected(tmp_path: Path, valid: dict[str, Any]) -> None:
@@ -597,8 +625,9 @@ def test_n21_none_in_curated_is_rejected(tmp_path: Path, valid: dict[str, Any]) 
     bad["curated"] = [None, *bad["curated"]]
     bad["count"] += 1
     path = _dump(tmp_path, "corpus.json", bad)
-    with pytest.raises(rp.ParityFormatError):
+    with pytest.raises(rp.ParityFormatError) as exc_info:
         rp.load_corpus(path)
+    assert exc_info.value.code == "corpus_curated_item_none_not_allowed"
 
 
 def test_n21_generated_not_reproducible_is_rejected(tmp_path: Path, valid: dict[str, Any]) -> None:
@@ -608,8 +637,9 @@ def test_n21_generated_not_reproducible_is_rejected(tmp_path: Path, valid: dict[
     )
     bad["count"] += 1
     path = _dump(tmp_path, "corpus.json", bad)
-    with pytest.raises(rp.ParityFormatError):
+    with pytest.raises(rp.ParityFormatError) as exc_info:
         rp.load_corpus(path)
+    assert exc_info.value.code == "corpus_generated_not_reproducible"
 
 
 # ── N22: None twice ──────────────────────────────────────────────────────────
@@ -623,8 +653,9 @@ def test_n22_none_twice_is_rejected(tmp_path: Path, valid: dict[str, Any]) -> No
     text = path.read_text(encoding="utf-8")
     text = text.replace('"harvested": [\n  null,', '"harvested": [\n  null,\n  null,', 1)
     path.write_text(text, encoding="utf-8")
-    with pytest.raises(rp.ParityFormatError):
+    with pytest.raises(rp.ParityFormatError) as exc_info:
         rp.load_corpus(path)
+    assert exc_info.value.code == "corpus_harvested_duplicate"
 
 
 # ── N23: count with wrong scalar types ───────────────────────────────────────
@@ -633,15 +664,17 @@ def test_n22_none_twice_is_rejected(tmp_path: Path, valid: dict[str, Any]) -> No
 def test_n23_float_count_is_rejected(tmp_path: Path, valid: dict[str, Any]) -> None:
     bad = _mutated(valid["frozen_pp"], count=float(valid["frozen_pp"]["count"]))
     path = _dump(tmp_path, "parse_price.frozen.json", bad)
-    with pytest.raises(rp.ParityFormatError):
+    with pytest.raises(rp.ParityFormatError) as exc_info:
         rp.load_frozen(path)
+    assert exc_info.value.code == "frozen_count_not_int"
 
 
 def test_n23_bool_count_is_rejected(tmp_path: Path, valid: dict[str, Any]) -> None:
     bad = _mutated(valid["frozen_pp"], count=True)
     path = _dump(tmp_path, "parse_price.frozen.json", bad)
-    with pytest.raises(rp.ParityFormatError):
+    with pytest.raises(rp.ParityFormatError) as exc_info:
         rp.load_frozen(path)
+    assert exc_info.value.code == "frozen_count_not_int"
 
 
 # ── N24: schema as a string ──────────────────────────────────────────────────
@@ -650,8 +683,9 @@ def test_n23_bool_count_is_rejected(tmp_path: Path, valid: dict[str, Any]) -> No
 def test_n24_string_schema_is_rejected(tmp_path: Path, valid: dict[str, Any]) -> None:
     bad = _mutated(valid["corpus"], schema="1")
     path = _dump(tmp_path, "corpus.json", bad)
-    with pytest.raises(rp.ParityFormatError):
+    with pytest.raises(rp.ParityFormatError) as exc_info:
         rp.load_corpus(path)
+    assert exc_info.value.code == "corpus_schema_not_int"
 
 
 # ── N25: wired as a non-bool ─────────────────────────────────────────────────
@@ -661,16 +695,18 @@ def test_n25_string_wired_is_rejected(tmp_path: Path, valid: dict[str, Any]) -> 
     bad = copy.deepcopy(valid["manifest"])
     bad["functions"]["parse_price"]["wired"] = "true"
     path = _dump(tmp_path, "manifest.json", bad)
-    with pytest.raises(rp.ParityFormatError):
+    with pytest.raises(rp.ParityFormatError) as exc_info:
         rp.load_manifest(path)
+    assert exc_info.value.code == "manifest_function_parse_price_wired_not_bool"
 
 
 def test_n25_int_wired_is_rejected(tmp_path: Path, valid: dict[str, Any]) -> None:
     bad = copy.deepcopy(valid["manifest"])
     bad["functions"]["parse_price"]["wired"] = 1
     path = _dump(tmp_path, "manifest.json", bad)
-    with pytest.raises(rp.ParityFormatError):
+    with pytest.raises(rp.ParityFormatError) as exc_info:
         rp.load_manifest(path)
+    assert exc_info.value.code == "manifest_function_parse_price_wired_not_bool"
 
 
 # ── N26: rows as a non-list ──────────────────────────────────────────────────
@@ -679,15 +715,17 @@ def test_n25_int_wired_is_rejected(tmp_path: Path, valid: dict[str, Any]) -> Non
 def test_n26_dict_rows_is_rejected(tmp_path: Path, valid: dict[str, Any]) -> None:
     bad = _mutated(valid["frozen_pp"], rows={})
     path = _dump(tmp_path, "parse_price.frozen.json", bad)
-    with pytest.raises(rp.ParityFormatError):
+    with pytest.raises(rp.ParityFormatError) as exc_info:
         rp.load_frozen(path)
+    assert exc_info.value.code == "frozen_rows_not_list"
 
 
 def test_n26_string_rows_is_rejected(tmp_path: Path, valid: dict[str, Any]) -> None:
     bad = _mutated(valid["frozen_pp"], rows="not a list")
     path = _dump(tmp_path, "parse_price.frozen.json", bad)
-    with pytest.raises(rp.ParityFormatError):
+    with pytest.raises(rp.ParityFormatError) as exc_info:
         rp.load_frozen(path)
+    assert exc_info.value.code == "frozen_rows_not_list"
 
 
 # ── N27/N28: the two class vocabularies do not cross ────────────────────────

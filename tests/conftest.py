@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -10,11 +11,20 @@ import httpx
 import pytest
 import pytest_asyncio
 import respx
+from hypothesis import settings
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
+
+# Continuous integration replays the same examples on every run, so a failure is
+# reproducible from the commit alone; local runs keep exploring with a fresh seed.
+# This module is imported before any test module builds its own ``settings``, which
+# inherit from the profile loaded here.
+settings.register_profile("ci", derandomize=True)
+if os.environ.get("CI"):
+    settings.load_profile("ci")
 
 
 @pytest.fixture

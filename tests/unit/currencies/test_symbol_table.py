@@ -65,22 +65,22 @@ PROTOTYPE_SYMBOLS: dict[str, frozenset[str]] = {
 # admission rule runs. Pinned here, not derived from generate_symbols(), because that
 # function already applies the admission rule and never exposes the raw candidates.
 _RLM_RAW_KEYS = (
-    "ج.م.‏",
-    "د.أ.‏",
-    "د.إ.‏",
-    "د.ب.‏",
-    "د.ت.‏",
-    "د.ج.‏",
-    "د.ع.‏",
-    "د.ك.‏",
-    "د.ل.‏",
-    "د.م.‏",
-    "ر.س.‏",
-    "ر.ع.‏",
-    "ر.ق.‏",
-    "ر.ي.‏",
-    "ل.س.‏",
-    "ل.ل.‏",
+    "ج.م.\u200f",
+    "د.أ.\u200f",
+    "د.إ.\u200f",
+    "د.ب.\u200f",
+    "د.ت.\u200f",
+    "د.ج.\u200f",
+    "د.ع.\u200f",
+    "د.ك.\u200f",
+    "د.ل.\u200f",
+    "د.م.\u200f",
+    "ر.س.\u200f",
+    "ر.ع.\u200f",
+    "ر.ق.\u200f",
+    "ر.ي.\u200f",
+    "ل.س.\u200f",
+    "ل.ل.\u200f",
 )
 
 
@@ -114,27 +114,27 @@ def test_admission_rule() -> None:
 
 def test_dangerous_symbols_never_admitted() -> None:
     dangerous = {
-        "​",  # ZERO WIDTH SPACE (raw key for CVE)
+        "\u200b",  # ZERO WIDTH SPACE (raw key for CVE)
         "R",
         "L",
         "K",
         "P",
         "S",
         "FCFA",
-        "F CFA",  # NARROW NO-BREAK SPACE between F and CFA: the real Babel key
+        "F\u202fCFA",  # NARROW NO-BREAK SPACE between F and CFA: the real Babel key
         *_RLM_RAW_KEYS,
     }
     for key in dangerous:
         assert key not in SYMBOLS, f"{key!r} must never be admitted"
     # Negative control, not a raw key: ordinary U+0020 space between F and CFA.
-    # Different bytes from "F CFA" above — not to be confused for a transcription
+    # Different bytes from "F\u202fCFA" above — not to be confused for a transcription
     # error. Babel never generates this variant; it must still be absent from SYMBOLS.
     assert "F CFA" not in SYMBOLS
 
 
 def test_new_symbols_extend_conservatively() -> None:
     curated_only = MappingProxyType(dict(CURATED_SYMBOLS))
-    alphabet = sorted({*"0123456789.,'’    "} | {c for key in SYMBOLS for c in key})
+    alphabet = sorted({*"0123456789.,'’ \xa0\u202f\u2009"} | {c for key in SYMBOLS for c in key})
 
     @given(text=st.text(alphabet=alphabet, max_size=20))
     @settings(max_examples=300, deadline=None)
