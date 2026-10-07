@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
     from price_tracker.bot.ui.screens import Screen
 
-HOSTILE = "<b>&\"'‮‍\n</b> " + "x" * 80
+HOSTILE = "<b>&\"'\u202e\u200d\n</b> " + "x" * 80
 
 
 def view(
@@ -87,7 +87,7 @@ HOSTILE_PAGE = ListPage(
     items=(
         view(1, HOSTILE, status="paused"),
         view(2, HOSTILE, status="suspended", errors=1),
-        view(3, "⁧" + HOSTILE),
+        view(3, "\u2067" + HOSTILE),
     ),
 )
 

@@ -21,13 +21,13 @@ def test_flattens_newlines_and_tabs() -> None:
 
 
 def test_flattens_line_and_paragraph_separators() -> None:
-    assert escape_html("a b") == "a b"
-    assert escape_html("a b") == "a b"
+    assert escape_html("a\u2028b") == "a b"
+    assert escape_html("a\u2029b") == "a b"
 
 
 def test_leaves_cf_characters_intact() -> None:
-    assert escape_html("a‍b") == "a‍b"  # ZWJ
-    assert escape_html("a⁦b⁩c") == "a⁦b⁩c"  # FSI/PDI
+    assert escape_html("a\u200db") == "a\u200db"  # ZWJ
+    assert escape_html("a\u2066b\u2069c") == "a\u2066b\u2069c"  # FSI/PDI
 
 
 def test_rejects_non_str() -> None:

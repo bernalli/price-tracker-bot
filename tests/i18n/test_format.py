@@ -26,7 +26,7 @@ CURRENCIES = tuple(sorted(list_currencies()))
         ("it", "1.299,99\xa0€"),
         ("es", "1.299,99\xa0€"),
         ("de", "1.299,99\xa0€"),
-        ("fr", "1 299,99\xa0€"),
+        ("fr", "1\u202f299,99\xa0€"),
         ("uk", "1\xa0299,99\xa0EUR"),
         ("pt_BR", "€\xa01.299,99"),
         ("zh_Hans", "€1,299.99"),
@@ -359,7 +359,7 @@ def test_duration_ninety_minutes_pinned_examples(locale: str, expected: str) -> 
         ("en", "6 hr"),
         ("it", "6 h"),
         ("de", "6 Std."),
-        ("fr", "6 h"),
+        ("fr", "6\u202fh"),
         ("es", "6 h"),
         ("pt_BR", "6 h"),
     ],
@@ -373,7 +373,7 @@ def test_duration_six_hours_pinned_examples(locale: str, expected: str) -> None:
     [
         ("en", "7 days"),
         ("it", "7 giorni"),
-        ("fr", "7 j"),
+        ("fr", "7\u202fj"),
         ("de", "7 Tg."),
     ],
 )
@@ -401,7 +401,7 @@ _WHEN_INSTANT = datetime(2026, 9, 23, 14, 5, tzinfo=UTC)
 @pytest.mark.parametrize(
     ("locale", "expected"),
     [
-        ("en", "9/23/26, 4:05 PM"),
+        ("en", "9/23/26, 4:05\u202fPM"),
         ("it", "23/09/26, 16:05"),
         ("ja", "2026/09/23 16:05"),
         ("de", "23.09.26, 16:05"),

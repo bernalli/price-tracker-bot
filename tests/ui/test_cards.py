@@ -36,8 +36,8 @@ def _card(name: str):
 def test_name_row_wraps_the_truncated_escaped_name_in_bidi_isolates() -> None:
     screen = _card("base")
     first_line = screen.text.split("\n")[0]
-    assert first_line.startswith("📦 <b>⁨")
-    assert first_line.endswith("⁩</b>")
+    assert first_line.startswith("📦 <b>\u2068")
+    assert first_line.endswith("\u2069</b>")
 
 
 def test_hostile_name_never_leaks_raw_markup() -> None:
@@ -81,7 +81,7 @@ def test_paused_and_suspended_show_reactivate(name: str) -> None:
     screen = _card(name)
     labels = [btn.label for row in screen.rows for btn in row]
     assert any("Reactivate" in label for label in labels)
-    assert not any(label.strip("⁨⁩") == "⏸ Pause" for label in labels)
+    assert not any(label.strip("\u2068\u2069") == "⏸ Pause" for label in labels)
 
 
 def test_estimate_same_currency_has_no_approx_row() -> None:
