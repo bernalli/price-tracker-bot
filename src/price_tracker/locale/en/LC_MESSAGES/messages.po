@@ -1174,3 +1174,226 @@ msgstr ""
 #: src/price_tracker/bot/ui/panels.py
 msgid "⚙️ Settings"
 msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+msgid "active ones"
+msgstr ""
+
+#: src/price_tracker/bot/handlers/_helpers.py
+msgid "📦 Out of stock - I will tell you when it is back."
+msgstr ""
+
+#: src/price_tracker/bot/handlers/monitoring.py
+msgid ""
+"✅ <b>{name}</b>\n"
+"💰 Price: {price}\n"
+"{status}"
+msgstr ""
+
+#: src/price_tracker/bot/commands.py
+msgid "Start the bot"
+msgstr ""
+
+#: src/price_tracker/bot/commands.py
+msgid "Open the main menu"
+msgstr ""
+
+#: src/price_tracker/bot/commands.py
+msgid "Show every command"
+msgstr ""
+
+#: src/price_tracker/bot/commands.py
+msgid "Cancel the current action"
+msgstr ""
+
+#: src/price_tracker/bot/commands.py
+msgid "Track a product from a link"
+msgstr ""
+
+#: src/price_tracker/bot/commands.py
+msgid "List your products"
+msgstr ""
+
+#: src/price_tracker/bot/commands.py
+msgid "Check a product now"
+msgstr ""
+
+#: src/price_tracker/bot/commands.py
+msgid "Check all your products now"
+msgstr ""
+
+#: src/price_tracker/bot/commands.py
+msgid "Set how often a product is checked"
+msgstr ""
+
+#: src/price_tracker/bot/commands.py
+msgid "Pause tracking a product"
+msgstr ""
+
+#: src/price_tracker/bot/commands.py
+msgid "Resume tracking a product"
+msgstr ""
+
+#: src/price_tracker/bot/commands.py
+msgid "Delete a product"
+msgstr ""
+
+#: src/price_tracker/bot/commands.py
+msgid "Show a product's price chart"
+msgstr ""
+
+#: src/price_tracker/bot/commands.py
+msgid "Reset a product's starting price"
+msgstr ""
+
+#: src/price_tracker/bot/commands.py
+msgid "Set or clear a target price"
+msgstr ""
+
+#: src/price_tracker/bot/commands.py
+msgid "Set when to alert about a drop"
+msgstr ""
+
+#: src/price_tracker/bot/commands.py
+msgid "Mute notifications"
+msgstr ""
+
+#: src/price_tracker/bot/commands.py
+msgid "Unmute notifications"
+msgstr ""
+
+#: src/price_tracker/bot/commands.py
+msgid "Turn the notification digest on or off"
+msgstr ""
+
+#: src/price_tracker/bot/commands.py
+msgid "Set quiet hours"
+msgstr ""
+
+#: src/price_tracker/bot/commands.py
+msgid "Set your timezone"
+msgstr ""
+
+#: src/price_tracker/bot/commands.py
+msgid "Limit notifications per hour"
+msgstr ""
+
+#: src/price_tracker/bot/commands.py
+msgid "Show your notification settings"
+msgstr ""
+
+#: src/price_tracker/bot/commands.py
+msgid "Send the pending digest now"
+msgstr ""
+
+#: src/price_tracker/bot/commands.py
+msgid "Export your products as CSV"
+msgstr ""
+
+#: src/price_tracker/bot/commands.py
+msgid "Import products from a CSV file"
+msgstr ""
+
+#: src/price_tracker/bot/commands.py
+msgid "Show your statistics"
+msgstr ""
+
+#: src/price_tracker/bot/commands.py
+msgid "Show products with errors"
+msgstr ""
+
+#: src/price_tracker/bot/commands.py
+msgid "Authorize a user"
+msgstr ""
+
+#: src/price_tracker/bot/commands.py
+msgid "Remove a user"
+msgstr ""
+
+#: src/price_tracker/bot/commands.py
+msgid "List authorized users"
+msgstr ""
+
+#: src/price_tracker/bot/commands.py
+msgid "Set a user's nickname"
+msgstr ""
+
+#: src/price_tracker/bot/commands.py
+msgid "Set the global check interval"
+msgstr ""
+
+#: src/price_tracker/bot/commands.py
+msgid "Debug the scraping of a link"
+msgstr ""
+
+#: src/price_tracker/bot/commands.py
+msgid "Show scraper health"
+msgstr ""
+
+#: src/price_tracker/bot/commands.py
+msgid "🔔 Alerts"
+msgstr ""
+
+#: src/price_tracker/bot/commands.py
+msgid "❓ <b>Commands</b>"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "Automatic ({language})"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "🗣 Language: {language}"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "🗣 Language"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "🗣 <b>Language</b>"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "Automatic"
+msgstr ""
+
+#: src/price_tracker/core/alert.py
+msgid ""
+"📉 <b>Price drop!</b>\n"
+"\n"
+"<b>{name}</b>\n"
+"<a href=\"{url}\">View product</a>\n"
+"\n"
+"Was: <s>{old} {symbol}</s>\n"
+"Now: <b>{new} {symbol}</b>\n"
+"Drop: -{drop} {symbol} ({percent}%)"
+msgstr ""
+
+#: src/price_tracker/core/alert.py
+msgid ""
+"📦 <b>Back in stock!</b>\n"
+"\n"
+"<b>{name}</b>\n"
+"<a href=\"{url}\">View product</a>\n"
+"\n"
+"Price: <b>{price} {symbol}</b>"
+msgstr ""
+
+#: src/price_tracker/core/alert.py
+msgid "🔁 I will retry by myself after: {when} UTC"
+msgstr ""
+
+#: src/price_tracker/core/alert.py
+msgid ""
+"🔒 <b>Site paused automatically</b>\n"
+"\n"
+"<b>{domain}</b> failed too many checks ({reason}).\n"
+"I am pausing the checks on this site for a while, so as not to push against a block.{until}\n"
+"\n"
+"Details with /errori."
+msgstr ""
+
+#: src/price_tracker/bot/handlers/product.py
+msgid "❌ Invalid value: {value}"
+msgstr ""

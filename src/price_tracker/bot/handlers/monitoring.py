@@ -31,9 +31,11 @@ from price_tracker.bot.handlers._helpers import (
     _get_user_product,
     _parse_id,
     _safe_dec,
+    out_of_stock_line,
 )
 from price_tracker.bot.messages import _, current_locale
 from price_tracker.bot.ui.width import truncate_to_width
+from price_tracker.core.textlimits import fit_html
 from price_tracker.i18n.format import duration
 
 if TYPE_CHECKING:
@@ -203,12 +205,16 @@ async def cmd_check(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             await msg.delete()
         await _send_alert(context.bot, alert, _db(context), chat_id=update.effective_user.id)
     else:
-        await msg.edit_text(
-            _("✅ <b>{name}</b>\n💰 Price: {price}\n📊 No significant change.").format(
-                name=_escape_html(truncate_to_width(name, 80)), price=price_str
-            ),
-            parse_mode=ParseMode.HTML,
-        )
+        name_html = _escape_html(truncate_to_width(name, 80))
+        if result.reason == "out_of_stock":
+            text = _("✅ <b>{name}</b>\n💰 Price: {price}\n{status}").format(
+                name=name_html, price=price_str, status=out_of_stock_line()
+            )
+        else:
+            text = _("✅ <b>{name}</b>\n💰 Price: {price}\n📊 No significant change.").format(
+                name=name_html, price=price_str
+            )
+        await msg.edit_text(text, parse_mode=ParseMode.HTML)
 
 
 @with_locale
@@ -384,11 +390,10 @@ async def _send_alert(bot: Any, alert: Any, db: Any, *, chat_id: int | None = No
             logger.warning("chart build failed for product %s: %s", alert.product_id, e)
 
     if png:
-        # Telegram caption limit = 1024 chars; alert text fits comfortably.
         await bot.send_photo(
             chat_id=target_chat,
             photo=png,
-            caption=text[:1024],
+            caption=fit_html(text, 1024),
             parse_mode=ParseMode.HTML,
         )
     else:

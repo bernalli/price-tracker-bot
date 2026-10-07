@@ -48,6 +48,7 @@ SCREENS: dict[str, Callable[[], Screen]] = {
     "settings_mute": lambda: settings_section_screen("mu", BUSY, now=NOW),
     "settings_digest": lambda: settings_section_screen("dg", BUSY, now=NOW),
     "settings_quiet": lambda: settings_section_screen("qh", BUSY, now=NOW),
+    "settings_language": lambda: settings_section_screen("lang", BUSY, now=NOW, language="it"),
     "home_user": lambda: home_screen(HomeView(active=3, paused=1, is_admin=False)),
     "home_admin": lambda: home_screen(HomeView(active=3, paused=1, is_admin=True)),
 }

@@ -10,13 +10,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
-from telegram.ext import Application
 
 from price_tracker.config import Config
 from price_tracker.core.health import HealthManager
 from price_tracker.core.registry import ScraperRegistry, discover_builtin_scrapers
 from price_tracker.core.scheduler import Scheduler
 from price_tracker.main import _combined_post_init
+from tests.support.fake_telegram import FakeRequest, make_application
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -56,7 +56,7 @@ async def test_post_init_wires_health_manager_into_bot_data(
     db_conn = await aiosqlite.connect(fake_config.database_path)
     db_conn.row_factory = aiosqlite.Row
 
-    application = Application.builder().token(fake_config.telegram_bot_token).build()
+    application = make_application(FakeRequest())
     application.bot_data["config"] = fake_config
     application.bot_data["db_conn"] = db_conn
 

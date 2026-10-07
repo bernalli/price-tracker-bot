@@ -38,11 +38,12 @@ def _actions(screen: Screen) -> list[Action]:
     return [item for item in decoded if isinstance(item, Action)]
 
 
-def test_main_panel_offers_the_three_sections_and_home() -> None:
+def test_main_panel_offers_the_four_sections_and_home() -> None:
     assert _actions(settings_screen(BUSY, now=NOW)) == [
         Action("settings.section", ("mu",)),
         Action("settings.section", ("dg",)),
         Action("settings.section", ("qh",)),
+        Action("settings.section", ("lang",)),
         Action("home"),
     ]
 
@@ -53,6 +54,7 @@ def test_main_panel_offers_the_three_sections_and_home() -> None:
         ("mu", ["1", "8", "24", "0", "off"], "settings.mute"),
         ("dg", ["on", "off"], "settings.digest"),
         ("qh", ["2208", "off"], "settings.quiet"),
+        ("lang", ["auto", "en", "it"], "settings.language"),
     ],
 )
 def test_section_offers_its_presets_and_a_way_back(

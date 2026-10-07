@@ -90,12 +90,12 @@ MODEL: dict[str, tuple[Any, ...]] = {
     "flow.scope": ("p", TOK, "sc", _enum("store", *LEVELS)),
     "flow.cancel": ("p", TOK, "x"),
     "settings": ("s",),
-    "settings.section": ("s", _enum("mu", "dg", "qh")),
+    "settings.section": ("s", _enum("mu", "dg", "qh", "lang")),
     "settings.mute": ("s", "mu", _enum("1", "8", "24", "0", "off")),
     "settings.digest": ("s", "dg", _enum("on", "off")),
     "settings.quiet": ("s", "qh", _enum("2208", "off")),
     "settings.chart_theme": ("s", "ct", _enum("light", "dark")),
-    "settings.language": ("s", "lang", _enum(*LOCALES)),
+    "settings.language": ("s", "lang", _enum(*LOCALES, "auto")),
     "data": ("d",),
     "data.export": ("d", "x"),
     "data.import": ("d", "i"),
@@ -279,8 +279,17 @@ def test_list_open_and_settings_round_trip_with_every_value() -> None:
         assert decode(f"s:dg:{value}") == Action("settings.digest", (value,))
     for value in ("2208", "off"):
         assert decode(f"s:qh:{value}") == Action("settings.quiet", (value,))
-    for section in ("mu", "dg", "qh"):
+    for section in ("mu", "dg", "qh", "lang"):
         assert decode(f"s:{section}") == Action("settings.section", (section,))
+        assert encode(Action("settings.section", (section,))) == f"s:{section}"
+
+
+@pytest.mark.parametrize("value", [*LOCALES, "auto"])
+def test_every_language_choice_round_trips_within_64_bytes(value: str) -> None:
+    wire = f"s:lang:{value}"
+    assert decode(wire) == Action("settings.language", (value,))
+    assert encode(Action("settings.language", (value,))) == wire
+    assert len(wire.encode("ascii")) <= 64
 
 
 def test_longest_encodings_fit_64_bytes() -> None:
@@ -417,6 +426,19 @@ REJECTED_WITH_REASON = [
     ("s:th", InvalidReason.UNKNOWN_ACTION),
     ("s:tz:Europe/Rome", InvalidReason.UNKNOWN_ACTION),
     ("s:th:3", InvalidReason.UNKNOWN_ACTION),
+    ("s:lang:xx", InvalidReason.UNKNOWN_ACTION),
+    ("s:lang:AUTO", InvalidReason.UNKNOWN_ACTION),
+    ("s:lang:IT", InvalidReason.UNKNOWN_ACTION),
+    ("s:lang:it_IT", InvalidReason.UNKNOWN_ACTION),
+    ("s:lang:zh-Hans", InvalidReason.UNKNOWN_ACTION),
+    ("s:lang:it:x", InvalidReason.UNKNOWN_ACTION),
+    ("s:lang:auto:x", InvalidReason.UNKNOWN_ACTION),
+    ("s:LANG", InvalidReason.UNKNOWN_ACTION),
+    ("s:lang:", InvalidReason.BAD_TOKENS),
+    ("s:lang:it\n", InvalidReason.BAD_TOKENS),
+    ("s:lang:it\x00", InvalidReason.BAD_TOKENS),
+    ("s:lang:\u0438\u0442", InvalidReason.NOT_ASCII),
+    ("s:lang:" + "a" * 58, InvalidReason.TOO_LONG),
 ]
 
 
@@ -426,6 +448,24 @@ def test_list_and_settings_not_well_formed_carry_their_reason(
 ) -> None:
     assert decode(data) == InvalidCallback(reason)
     assert oracle(data) is None
+
+
+@settings(max_examples=2000, deadline=None)
+@given(
+    st.one_of(
+        st.text().map(lambda tail: f"s:lang:{tail}"),
+        st.binary().map(lambda raw: "s:lang:" + raw.decode("latin-1")),
+        st.none(),
+        st.integers(),
+    )
+)
+def test_language_payloads_never_raise_and_agree_with_oracle(data: object) -> None:
+    got = decode(data)
+    expected = oracle(data)
+    if expected is None:
+        assert isinstance(got, InvalidCallback)
+    else:
+        assert got == expected
 
 
 @pytest.mark.parametrize("data", REJECTED, ids=repr)

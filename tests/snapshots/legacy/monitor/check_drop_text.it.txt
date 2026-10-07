@@ -11,14 +11,14 @@
    param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
-   | 📉 <b>Price drop!</b>
+   | 📉 <b>Prezzo in calo!</b>
    |
    | <b>Kettle</b>
-   | <a href="https://shop.example.com/item/1">View product</a>
+   | <a href="https://shop.example.com/item/1">Vedi il prodotto</a>
    |
-   | Was: <s>80.00 €</s>
-   | Now: <b>64.00 €</b>
-   | Drop: -16.00 € (20.0%)
+   | Prima: <s>80.00 €</s>
+   | Ora: <b>64.00 €</b>
+   | Calo: -16.00 € (20.0%)
 ## db after step 1
 + price_history id=1 {product_id=1, price="64.00", checked_at=<now:9999-99-99 99:99:99>}
 ~ products id=1 current_price: "80.00" -> "64.00"

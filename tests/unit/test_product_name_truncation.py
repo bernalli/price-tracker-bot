@@ -101,7 +101,9 @@ def _env(name: str, *, active: bool = True) -> tuple[Surfaces, MagicMock, MagicM
     db.reset_initial_price.return_value = True
 
     scheduler = MagicMock()
-    scheduler.check_one_product_for_user = AsyncMock(return_value=SimpleNamespace(alert=None))
+    scheduler.check_one_product_for_user = AsyncMock(
+        return_value=SimpleNamespace(alert=None, reason=None)
+    )
     scheduler.check_user_products_for_user = AsyncMock(return_value=[])
     scheduler.check_products_for_user = AsyncMock(return_value=[])
 

@@ -32,6 +32,10 @@ CODEC_IMPORTERS: Final = frozenset(
     {"src/price_tracker/bot/ui/panels.py", "src/price_tracker/bot/ui/cards.py"}
 )
 
+# The command registry is plain data; only the help screen renders it.
+COMMANDS_MODULE: Final = "price_tracker.bot.commands"
+COMMANDS_IMPORTERS: Final = frozenset({"src/price_tracker/bot/ui/panels.py"})
+
 _STDLIB: Final = frozenset(sys.stdlib_module_names)
 
 # Modules that import at run time: any import of them, under any alias, is a
@@ -162,6 +166,7 @@ def _check_bot_ui(imports: list[str], label: str) -> list[str]:
                     label in CODEC_IMPORTERS
                     and (name == CODEC_MODULE or name.startswith(f"{CODEC_MODULE}."))
                 )
+                or (label in COMMANDS_IMPORTERS and name.startswith(f"{COMMANDS_MODULE}."))
                 or name in TRANSITIONAL_IMPORTS
                 or any(name.startswith(f"{t}.") for t in TRANSITIONAL_IMPORTS)
             )
@@ -211,6 +216,15 @@ def test_codec_exception_is_scoped_to_the_screens_that_encode_their_buttons() ->
     for importer in CODEC_IMPORTERS:
         assert _check_bot_ui([CODEC_MODULE], importer) == []
     assert _check_bot_ui([CODEC_MODULE], "src/price_tracker/bot/ui/labels.py")
+
+
+def test_registry_exception_is_scoped_to_the_help_screen() -> None:
+    for importer in COMMANDS_IMPORTERS:
+        assert _check_bot_ui([f"{COMMANDS_MODULE}.COMMANDS"], importer) == []
+    assert _check_bot_ui([f"{COMMANDS_MODULE}.COMMANDS"], "src/price_tracker/bot/ui/cards.py")
+    assert _check_bot_ui(
+        ["price_tracker.bot.command_menus.menu_commands"], next(iter(COMMANDS_IMPORTERS))
+    )
 
 
 def test_app_views_boundaries() -> None:

@@ -10,6 +10,8 @@ from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from typing import TYPE_CHECKING, Any, Final, cast
 
+from price_tracker.bot.messages import _
+
 if TYPE_CHECKING:
     from telegram.ext import ContextTypes
 
@@ -47,28 +49,9 @@ def _escape_html(text: str) -> str:
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-def _parse_threshold_input(text: str) -> tuple[str, str]:
-    """Parse a user threshold string into (type, value).
-
-    Returns (`any_drop`, `0`) for sentinel words, (`percentage`, `<n>`) for
-    `<n>%`, or (`absolute`, `<n>`) for plain numerics.
-    """
-    text = text.strip().lstrip("-")
-    if text.lower() in ("ogni", "any", "sempre", "all"):
-        return ("any_drop", "0")
-    if text.endswith("%"):
-        value = text.rstrip("%").strip()
-        try:
-            Decimal(value)
-        except InvalidOperation as exc:
-            raise ValueError(f"Valore non valido: {value}") from exc
-        return ("percentage", value)
-    value = text.replace(",", ".").replace("€", "").strip()
-    try:
-        Decimal(value)
-    except InvalidOperation as exc:
-        raise ValueError(f"Valore non valido: {value}") from exc
-    return ("absolute", value)
+def out_of_stock_line() -> str:
+    """The line /check shows when the listing is sold out instead of a price read."""
+    return _("📦 Out of stock - I will tell you when it is back.")
 
 
 def _format_threshold(threshold_type: str, threshold_value: str) -> str:

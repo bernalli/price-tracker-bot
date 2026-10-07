@@ -2039,6 +2039,8 @@ async def test_scheduler_notifies_once_on_quarantine_entry(
     """A domain crossing into LOCKED (T1 threshold = 3 blocks) pushes exactly one
     quarantine alert — on the CLOSED→LOCKED transition, not on every block."""
     repo, pid = repo_with_product
+    # The notice is written in the recipient's language.
+    await repo.set_user_language(1, "it")
     registry = ScraperRegistry()
     registry.register(_CaptchaScraper())
     notifier = AsyncMock()
@@ -2183,11 +2185,11 @@ async def test_out_of_stock_read_resets_a_streak_of_price_failures(
 
 
 @pytest.mark.asyncio
-async def test_sold_out_flag_with_a_price_is_still_a_price_read(
+async def test_sold_out_flag_with_a_price_writes_no_price_and_no_history(
     repo_with_product: tuple[Repository, int],
 ) -> None:
-    """available=False WITH a price (placeholder price on a sold-out listing) is not
-    the out-of-stock short-circuit: the price is persisted as before."""
+    """available=False is the out-of-stock state whatever the price on the page:
+    a placeholder price is neither persisted nor added to the history."""
     repo, pid = repo_with_product
     notifier = AsyncMock()
     priced_sold_out = ProductInfo(
@@ -2196,9 +2198,10 @@ async def test_sold_out_flag_with_a_price_is_still_a_price_read(
     await _run_ticks(repo, [priced_sold_out], notifier=notifier)
     p = await repo.get_product(pid)
     assert p is not None
-    assert p.current_price == Decimal("90")
+    assert p.current_price == Decimal("100")  # the price seeded at add, untouched
     assert p.is_available is False
-    assert len(await repo.get_price_history(pid)) == 1
+    assert await repo.get_price_history(pid) == []
+    assert notifier.await_count == 0
 
 
 @pytest.mark.asyncio

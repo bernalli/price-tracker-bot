@@ -15,11 +15,12 @@
    | 🌙 Ore silenziose: off
    | ⏱ Limite: illimitato · cambia con /throttle &lt;N&gt;|off
    | 🌍 Fuso orario: Europe/Rome · cambia con /timezone &lt;zona&gt;
+   | 🗣 Lingua: Automatica (Italiano)
    |
    | Altri valori: /digest_mode on|off &lt;minuti&gt;, /quiet_hours HH:MM-HH:MM
    keyboard:
    | [🔕 Silenzia → s:mu] [📬 Digest → s:dg]
-   | [🌙 Ore silenziose → s:qh]
+   | [🌙 Ore silenziose → s:qh] [🗣 Lingua → s:lang]
    | [🏠 Home → h]
 ## db after step 1
 (no changes)

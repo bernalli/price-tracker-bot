@@ -71,14 +71,14 @@
 -> sendMessage chat=10
    param parse_mode="HTML"
    text:
-   | 📉 <b>Price drop!</b>
+   | 📉 <b>Prezzo in calo!</b>
    |
    | <b>Kettle</b>
-   | <a href="https://shop.example.com/item/1">View product</a>
+   | <a href="https://shop.example.com/item/1">Vedi il prodotto</a>
    |
-   | Was: <s>80.00 €</s>
-   | Now: <b>40.00 €</b>
-   | Drop: -40.00 € (50.0%)
+   | Prima: <s>80.00 €</s>
+   | Ora: <b>40.00 €</b>
+   | Calo: -40.00 € (50.0%)
 ## db after step 5
 + price_history id=70 {product_id=1, price="40.00", checked_at=<now:9999-99-99 99:99:99>}
 + price_history id=71 {product_id=4, price="100.00", checked_at=<now:9999-99-99 99:99:99>}
@@ -115,14 +115,14 @@
 -> sendMessage chat=10
    param parse_mode="HTML"
    text:
-   | 📉 <b>Price drop!</b>
+   | 📉 <b>Prezzo in calo!</b>
    |
    | <b>Swinging</b>
-   | <a href="https://shop.example.com/item/4">View product</a>
+   | <a href="https://shop.example.com/item/4">Vedi il prodotto</a>
    |
-   | Was: <s>80.00 €</s>
-   | Now: <b>30.00 €</b>
-   | Drop: -50.00 € (62.5%)
+   | Prima: <s>80.00 €</s>
+   | Ora: <b>30.00 €</b>
+   | Calo: -50.00 € (62.5%)
 ## db after step 8
 + price_history id=74 {product_id=1, price="40.00", checked_at=<now:9999-99-99 99:99:99>}
 + price_history id=75 {product_id=2, price="30.00", checked_at=<now:9999-99-99 99:99:99>}

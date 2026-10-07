@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-10-07
+
+### Added
+
+- Settings has a Language section: Automatic (the language of the Telegram app), English or
+  Italiano. The choice is stored per user and applies to translated command replies, the
+  threshold, target and interval prompts, `/cancel`, price-drop and back-in-stock messages, operational and
+  site-pause notices, and the digest.
+- `/help` lists the commands by area; administrators also see the admin commands.
+- The Telegram command menu shows every command with a description, in English or Italian
+  following the language of the Telegram app. Active administrators also get the admin
+  commands in their menu; the menu is refreshed on start and by `/adduser` and `/removeuser`.
+  The menu grants nothing: admin commands still check who runs them.
+- Settings has buttons for mute, digest and quiet hours, each with its current value marked.
+- Migration 016 adds two columns to the user table: the chosen language and the last
+  Telegram language seen. It only adds columns, so the previous release still runs on the
+  migrated database.
+
+### Changed
+
+- `/lista` is one paginated message with filters for active, paused and failing products;
+  a product opens as its card in place and the back button returns to the same page and
+  filter. `/menu` and the Home button show one Home screen with a Settings entry.
+- Price-drop and back-in-stock messages and the site-pause notice are written in the
+  recipient's language, or in the configured default when none is known.
+- A listing reported as out of stock is recorded as unavailable whether or not the page
+  still shows a price: the price is not stored and no alert is sent. `/check` and the Check
+  button say the product is out of stock.
+- `/soglia` accepts the thresholds of the threshold prompt and of `/importa`: an integer
+  percentage 1-99, an amount above 0 with at most 9 digits and 4 decimals (one dot or
+  comma), or `ogni`, `any`, `sempre`, `all` for any drop. It now rejects decimal
+  percentages, `0%`, percentages from 100, `0`, negative amounts (the sign used to be
+  dropped), exponents, `nan` and `inf`, the `€` sign, invisible characters, values longer
+  than 64 characters, and `-`, `no`, `skip`, `salta`, `annulla`.
+- On start, `ALLOWED_USERS` decides who is an administrator: listed ids are added or
+  promoted, and stored administrators no longer listed lose admin rights but keep their
+  access. An empty `ALLOWED_USERS` changes no one and logs a warning.
+- `ALLOWED_USERS` takes positive ASCII integers separated by commas; repeats are ignored,
+  and an invalid entry stops the start with an error that names its position.
+- A user counts as administrator or active only when the stored flag is exactly 1.
+
+### Fixed
+
+- `/debug` shortens a long product name with an ellipsis instead of cutting it mid-character.
+- A price alert too long for a photo caption is shortened without breaking its formatting.
+- The `/lista` header uses the plural for active products.
+- A rejected `/soglia` value is echoed shortened and in the user's language.
+
 ## [1.3.0] - 2026-10-01
 
 ### Added
@@ -619,7 +667,8 @@ auto-quarantine, and a plugin extension point.
 - osv-scanner dependency vulnerability scan in CI.
 - Pre-commit hooks block secrets at commit time.
 
-[Unreleased]: https://github.com/bernalli/price-tracker-bot/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/bernalli/price-tracker-bot/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/bernalli/price-tracker-bot/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/bernalli/price-tracker-bot/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/bernalli/price-tracker-bot/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/bernalli/price-tracker-bot/compare/v1.0.0...v1.1.0

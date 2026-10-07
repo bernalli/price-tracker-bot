@@ -7,7 +7,7 @@
    param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
-   | 📦 <b>I tuoi prodotti</b> · attivo (2) · pagina 1/1
+   | 📦 <b>I tuoi prodotti</b> · attivi (2) · pagina 1/1
    |
    | <b>#1</b> Kettle · 80,00 €
    | <b>#2</b> Fan · —
@@ -26,7 +26,7 @@
    text:
    | Prodotto non trovato.
    |
-   | 📦 <b>I tuoi prodotti</b> · attivo (1) · pagina 1/1
+   | 📦 <b>I tuoi prodotti</b> · attivi (1) · pagina 1/1
    |
    | <b>#2</b> Fan · —
    keyboard:
@@ -43,7 +43,7 @@
    text:
    | Prodotto non trovato.
    |
-   | 📦 <b>I tuoi prodotti</b> · attivo (1) · pagina 1/1
+   | 📦 <b>I tuoi prodotti</b> · attivi (1) · pagina 1/1
    |
    | <b>#2</b> Fan · —
    keyboard:

@@ -3,7 +3,7 @@
 # locale: fr
 # now: 2026-03-01T12:00:00Z
 text:
-   | [📦 <b>Your products</b> · [active active active] (12) · page 2/3 📦 <b>Your products</b> · [active active active] (12) · page 2/3 📦 <b>Your products</b> · [active active active] (12) · page 2/3]
+   | [📦 <b>Your products</b> · [active ones active ones active ones] (12) · page 2/3 📦 <b>Your products</b> · [active ones active ones active ones] (12) · page 2/3 📦 <b>Your products</b> · [active ones active ones active ones] (12) · page 2/3]
    | 
    | [<b>#6</b> Kettle · 19,99 € <b>#6</b> Kettle · 19,99 € <b>#6</b> Kettle · 19,99 €]
    | [⚠️ <b>#7</b> Fan · 19,99 € ⚠️ <b>#7</b> Fan · 19,99 € ⚠️ <b>#7</b> Fan · 19,99 €]

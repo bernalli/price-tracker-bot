@@ -26,6 +26,7 @@ from price_tracker.bot.handlers._helpers import (
     _get_user_product,
     _parse_id,
     _safe_dec,
+    out_of_stock_line,
 )
 from price_tracker.bot.handlers.history import _generate_chart
 from price_tracker.bot.keyboards import build_threshold_keyboard
@@ -154,6 +155,8 @@ async def handle_check_button(
     if alert:
         text += "\n\n🔔 <b>PREZZO APPENA SCESO!</b>"
         text += f"\n💸 Era: €{alert.old_price:.2f} → Ora: €{alert.new_price:.2f}"
+    elif result.reason == "out_of_stock":
+        text += f"\n\n{out_of_stock_line()}"
 
     keyboard = InlineKeyboardMarkup(
         [

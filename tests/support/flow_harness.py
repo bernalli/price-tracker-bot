@@ -16,10 +16,12 @@ from telegram.ext import CallbackQueryHandler, CommandHandler, filters
 from price_tracker.bot.callbacks import Action, decode
 from price_tracker.bot.flows import (
     FlowConfig,
+    FlowRegistry,
     GuidedFlow,
     is_registered_non_flow,
     register_guided_flow,
 )
+from price_tracker.bot.messages import user_locale
 from tests.support.fake_telegram import (
     Call,
     FakeRequest,
@@ -48,8 +50,10 @@ class Harness:
         request: FakeRequest | None = None,
         legacy_handlers_present: bool = False,
         concurrent_updates: int = 1,
+        registry: FlowRegistry | None = None,
     ) -> None:
         self.concurrent_updates = concurrent_updates
+        self.registry = registry
         self.request = request or FakeRequest()
         self.services = services or FakeServices(active={10, 11})
         self.config = config
@@ -63,7 +67,15 @@ class Harness:
             self.request, concurrent_updates=self.concurrent_updates
         )
         self.timer = ManualTimer()
-        self.flow = GuidedFlow(self.services, self.timer, config=self.config)
+        # The services double is also the stored-user boundary, wired as in production.
+        self.app.bot_data["db"] = self.services
+        self.flow = GuidedFlow(
+            self.services,
+            self.timer,
+            config=self.config,
+            registry=self.registry,
+            locale_resolver=self._language,
+        )
         register_guided_flow(
             self.app, self.flow, legacy_handlers_present=self.legacy_handlers_present
         )
@@ -74,6 +86,9 @@ class Harness:
             CommandHandler(["help", "menu"], self._help, filters=filters.UpdateType.MESSAGE),
             group=1,
         )
+
+    async def _language(self, user_id: int, fallback: str | None) -> str | None:
+        return await user_locale(self.app.bot_data["db"], user_id, fallback)
 
     async def _route(self, update: Update, context: CallbackContext[Any, Any, Any, Any]) -> None:
         del context

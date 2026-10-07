@@ -7,7 +7,7 @@
    param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
-   | 📦 <b>I tuoi prodotti</b> · attivo (2) · pagina 1/1
+   | 📦 <b>I tuoi prodotti</b> · attivi (2) · pagina 1/1
    |
    | ⚠️ <b>#1</b> Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN… · 99,50 €
    | <b>#2</b> Sticker · 0,80 €

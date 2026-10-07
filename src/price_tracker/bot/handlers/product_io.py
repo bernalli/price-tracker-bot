@@ -256,3 +256,4 @@ def register(app: Application) -> None:
         )
     )
     app.add_handler(CommandHandler("importa", cmd_import))
+    app.add_handler(CommandHandler("import", cmd_import))

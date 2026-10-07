@@ -12,3 +12,13 @@
    | I prodotti duplicati (stesso URL) verranno saltati.
 ## db after step 1
 ~ users user_id=10 display_name: NULL -> "U10"
+## step 2: command "/import" user=10
+-> sendMessage chat=10
+   param parse_mode="HTML"
+   text:
+   | 📁 <b>Importa prodotti da CSV</b>
+   |
+   | Invia un file CSV (esportato con /esporta) come allegato.
+   | I prodotti duplicati (stesso URL) verranno saltati.
+## db after step 2
+(no changes)

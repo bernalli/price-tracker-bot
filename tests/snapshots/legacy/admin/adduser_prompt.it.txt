@@ -62,7 +62,7 @@
    text:
    | 🎉 Sei stato autorizzato! Invia /start.
 ## db after step 5
-+ users user_id=99 {is_admin=0, is_active=1, created_at=<now:9999-99-99 99:99:99>, display_name=NULL, username=NULL}
++ users user_id=99 {is_admin=0, is_active=1, created_at=<now:9999-99-99 99:99:99>, display_name=NULL, username=NULL, language=NULL, telegram_language_tag=NULL}
 ## step 6: press "menu_admin_adduser" user=1 on=1 synthetic
 -> answerCallbackQuery
 -> editMessageText chat=1 message_id=1
@@ -82,4 +82,4 @@
    text:
    | 🎉 Sei stato autorizzato! Invia /start.
 ## db after step 7
-+ users user_id=98 {is_admin=0, is_active=1, created_at=<now:9999-99-99 99:99:99>, display_name=NULL, username=NULL}
++ users user_id=98 {is_admin=0, is_active=1, created_at=<now:9999-99-99 99:99:99>, display_name=NULL, username=NULL, language=NULL, telegram_language_tag=NULL}

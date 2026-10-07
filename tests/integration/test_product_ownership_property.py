@@ -234,6 +234,8 @@ async def wired() -> AsyncIterator[Wired]:
     await repo.ensure_user(ADMIN, is_admin=True)
     await repo.ensure_user(OWNER)
     await repo.ensure_user(OTHER)
+    # Already seen with the language the fake updates carry: a press stores nothing new.
+    await repo.set_user_telegram_tag(OTHER, "en")
     bot = Wired(conn, repo)
     # Every field a button can write starts at a value no button writes, so any
     # write to the victim shows in the snapshot.
