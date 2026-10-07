@@ -30,10 +30,12 @@ from price_tracker.bot.callbacks import (
     FlowTokenArg,
     IdArg,
     InvalidCallback,
+    InvalidReason,
     Literal,
     decode,
     encode,
 )
+from tests.integration.test_legacy_snapshots import CALLBACK_GRAMMAR
 from tests.support.fake_telegram import FakeServices, callback_update
 from tests.support.flow_harness import Harness
 
@@ -62,6 +64,7 @@ MODEL: dict[str, tuple[Any, ...]] = {
     "help.section": ("hp", _enum("tracking", "alerts", "prefs", "data", "admin")),
     "back": ("x", BACK),
     "list.page": ("l", _enum("a", "p", "e"), ID),
+    "list.open": ("l", _enum("a", "p", "e"), ID, ID),
     "list.remove_all": ("l", "rmall"),
     "list.remove_all_ok": ("l", "rmallok"),
     "product.card": ("p", ID, "c"),
@@ -87,6 +90,10 @@ MODEL: dict[str, tuple[Any, ...]] = {
     "flow.scope": ("p", TOK, "sc", _enum("store", *LEVELS)),
     "flow.cancel": ("p", TOK, "x"),
     "settings": ("s",),
+    "settings.section": ("s", _enum("mu", "dg", "qh")),
+    "settings.mute": ("s", "mu", _enum("1", "8", "24", "0", "off")),
+    "settings.digest": ("s", "dg", _enum("on", "off")),
+    "settings.quiet": ("s", "qh", _enum("2208", "off")),
     "settings.chart_theme": ("s", "ct", _enum("light", "dark")),
     "settings.language": ("s", "lang", _enum(*LOCALES)),
     "data": ("d",),
@@ -263,6 +270,19 @@ def test_currency_callback_belongs_to_the_grammar() -> None:
     assert isinstance(decode(f"p:{token.upper()}:cur:USD"), InvalidCallback)
 
 
+def test_list_open_and_settings_round_trip_with_every_value() -> None:
+    assert encode(Action("list.open", ("e", ID_MAX, ID_MAX))) == f"l:e:{ID_MAX}:{ID_MAX}"
+    assert decode("l:p:3:42") == Action("list.open", ("p", 3, 42))
+    for value in ("1", "8", "24", "0", "off"):
+        assert decode(f"s:mu:{value}") == Action("settings.mute", (value,))
+    for value in ("on", "off"):
+        assert decode(f"s:dg:{value}") == Action("settings.digest", (value,))
+    for value in ("2208", "off"):
+        assert decode(f"s:qh:{value}") == Action("settings.quiet", (value,))
+    for section in ("mu", "dg", "qh"):
+        assert decode(f"s:{section}") == Action("settings.section", (section,))
+
+
 def test_longest_encodings_fit_64_bytes() -> None:
     for name in REGISTRY.names:
         assert REGISTRY.spec(name).max_bytes <= 64, name
@@ -357,6 +377,56 @@ REJECTED = [
     42,
 ]
 
+# Not-well-formed shapes of the list and settings actions, each with the reason
+# decode reports. ``s:tz`` and ``s:th`` are rejected on purpose: timezone and
+# throttle have no preset, so no button may carry them.
+_PAGE_20_DIGITS = "1" * 20
+REJECTED_WITH_REASON = [
+    ("l:a:0", InvalidReason.UNKNOWN_ACTION),
+    ("l:a:-1", InvalidReason.UNKNOWN_ACTION),
+    ("l:a:+1", InvalidReason.UNKNOWN_ACTION),
+    ("l:a:01", InvalidReason.UNKNOWN_ACTION),
+    ("l:a:1.0", InvalidReason.UNKNOWN_ACTION),
+    ("l:a:\u0661", InvalidReason.NOT_ASCII),
+    ("l:a:", InvalidReason.BAD_TOKENS),
+    ("l::1", InvalidReason.BAD_TOKENS),
+    ("l:x:1", InvalidReason.UNKNOWN_ACTION),
+    ("l:A:1", InvalidReason.UNKNOWN_ACTION),
+    ("l:a:1:", InvalidReason.BAD_TOKENS),
+    ("l:a:1:0", InvalidReason.UNKNOWN_ACTION),
+    ("l:a:1:+3", InvalidReason.UNKNOWN_ACTION),
+    ("l:a:1:2:3", InvalidReason.BAD_TOKENS),
+    (f"l:a:{_PAGE_20_DIGITS}", InvalidReason.UNKNOWN_ACTION),
+    (f"l:a:1:{_PAGE_20_DIGITS}", InvalidReason.UNKNOWN_ACTION),
+    (f"l:a:{ID_MAX + 1}", InvalidReason.UNKNOWN_ACTION),
+    (f"l:a:1:{ID_MAX + 1}", InvalidReason.UNKNOWN_ACTION),
+    ("l:a:1\n", InvalidReason.BAD_TOKENS),
+    ("l:a:1:42 ", InvalidReason.BAD_TOKENS),
+    ("l:a:1\x00", InvalidReason.BAD_TOKENS),
+    ("l:a:1:" + "9" * 60, InvalidReason.TOO_LONG),
+    ("s:mu:2", InvalidReason.UNKNOWN_ACTION),
+    ("s:mu:", InvalidReason.BAD_TOKENS),
+    ("s:MU", InvalidReason.UNKNOWN_ACTION),
+    ("s:", InvalidReason.BAD_TOKENS),
+    ("s:zz", InvalidReason.UNKNOWN_ACTION),
+    ("s:dg:30", InvalidReason.UNKNOWN_ACTION),
+    ("s:dg:ON", InvalidReason.UNKNOWN_ACTION),
+    ("s:qh:2208:x", InvalidReason.UNKNOWN_ACTION),
+    ("s:qh:0007", InvalidReason.UNKNOWN_ACTION),
+    ("s:tz", InvalidReason.UNKNOWN_ACTION),
+    ("s:th", InvalidReason.UNKNOWN_ACTION),
+    ("s:tz:Europe/Rome", InvalidReason.UNKNOWN_ACTION),
+    ("s:th:3", InvalidReason.UNKNOWN_ACTION),
+]
+
+
+@pytest.mark.parametrize(("data", "reason"), REJECTED_WITH_REASON, ids=repr)
+def test_list_and_settings_not_well_formed_carry_their_reason(
+    data: str, reason: InvalidReason
+) -> None:
+    assert decode(data) == InvalidCallback(reason)
+    assert oracle(data) is None
+
 
 @pytest.mark.parametrize("data", REJECTED, ids=repr)
 def test_not_well_formed_is_rejected(data: object) -> None:
@@ -377,6 +447,17 @@ def test_not_well_formed_is_rejected(data: object) -> None:
         Action("flow.cancel", ("ABC",)),
         Action("back", ("p0",)),
         Action("home", (1,)),
+        Action("list.page", ("a", 0)),
+        Action("list.page", ("a", True)),
+        Action("list.page", ("a", "1")),
+        Action("list.page", ("x", 1)),
+        Action("list.open", ("a", 1)),
+        Action("list.open", ("a", 1, 0)),
+        Action("settings.section", ("zz",)),
+        Action("settings.mute", ("2",)),
+        Action("settings.digest", ("30",)),
+        Action("settings.quiet", ("0007",)),
+        Action("settings.quiet", ()),
     ],
     ids=repr,
 )
@@ -420,6 +501,40 @@ def test_id_and_token_positions_never_overlap() -> None:
             ActionSpec("d", (Literal("x"), IdArg("id"))),
         ]
     )
+
+
+def _legacy_samples() -> list[str]:
+    """One concrete string per legacy grammar entry; prefixes take an id and a long tail."""
+    samples = [value for kind, value in CALLBACK_GRAMMAR if kind == "exact"]
+    for kind, value in CALLBACK_GRAMMAR:
+        if kind == "prefix":
+            samples += [f"{value}7", f"{value}{ID_MAX}"]
+    return samples
+
+
+def test_no_legacy_callback_decodes_in_the_registry() -> None:
+    samples = _legacy_samples()
+    assert len(samples) > len(CALLBACK_GRAMMAR)
+    assert [data for data in samples if not isinstance(decode(data), InvalidCallback)] == []
+
+
+def test_no_new_wire_starts_with_a_legacy_entry() -> None:
+    new_names = (
+        "list.open",
+        "settings.section",
+        "settings.mute",
+        "settings.digest",
+        "settings.quiet",
+    )
+    wires = [
+        render(
+            name, tuple(1 if t == ID else t[1][0] for t in MODEL[name] if not isinstance(t, str))
+        )
+        for name in new_names
+    ]
+    for kind, value in CALLBACK_GRAMMAR:
+        for wire in wires:
+            assert not wire.startswith(value), (kind, value, wire)
 
 
 # --- through Application.process_update ------------------------------------------

@@ -12,8 +12,9 @@ from typing import TYPE_CHECKING
 
 from telegram.ext import Application, CallbackQueryHandler
 
+from price_tracker.bot.callbacks import Action, decode
 from price_tracker.bot.decorators import _db, with_locale
-from price_tracker.bot.handlers.callbacks import _actions, _admin, _menu, _ops, _product
+from price_tracker.bot.handlers.callbacks import _actions, _admin, _menu, _nav, _ops, _product
 
 if TYPE_CHECKING:
     from telegram import Update
@@ -34,6 +35,11 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return
 
     data = query.data
+
+    # Registered navigation actions first; legacy strings never decode.
+    action = decode(data)
+    if isinstance(action, Action) and await _nav.handle_action(query, context, db, user_id, action):
+        return
 
     # Order matters — earlier handlers have higher specificity. Each helper
     # returns True when it handled the callback; on False we fall through.

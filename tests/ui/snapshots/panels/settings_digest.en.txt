@@ -1,0 +1,11 @@
+# ui snapshot v1
+# screen: panels.settings_digest
+# locale: en
+# now: 2026-03-01T12:00:00Z
+text:
+   | 📬 <b>Digest</b>
+   | 
+   | Current: on, every 30 min
+keyboard:
+   [On ✓](cb:s:dg:on)  [Off](cb:s:dg:off)
+   [◀️ Settings](cb:s)

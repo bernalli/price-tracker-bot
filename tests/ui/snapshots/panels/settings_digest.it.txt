@@ -1,0 +1,11 @@
+# ui snapshot v1
+# screen: panels.settings_digest
+# locale: it
+# now: 2026-03-01T12:00:00Z
+text:
+   | 📬 <b>Digest</b>
+   | 
+   | Attuale: attivo, ogni 30 min
+keyboard:
+   [Attivo ✓](cb:s:dg:on)  [Disattivo](cb:s:dg:off)
+   [◀️ Impostazioni](cb:s)

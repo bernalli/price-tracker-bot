@@ -1,0 +1,19 @@
+# ui snapshot v1
+# screen: panels.settings
+# locale: pt_BR
+# now: 2026-03-01T12:00:00Z
+text:
+   | [⚙️ <b>Settings</b> ⚙️ <b>Settings</b> ⚙️ <b>Settings</b>]
+   | 
+   | [🔕 Mute: [until 01/03/2026 21:00 until 01/03/2026 21:00 until 01/03/2026 21:00] 🔕 Mute: [until 01/03/2026 21:00 until 01/03/2026 21:00 until 01/03/2026 21:00] 🔕 Mute: [until 01/03/2026 21:00 until 01/03/2026 21:00 until 01/03/2026 21:00]]
+   | [📬 Digest: [on, every 30 min on, every 30 min on, every 30 min] 📬 Digest: [on, every 30 min on, every 30 min on, every 30 min] 📬 Digest: [on, every 30 min on, every 30 min on, every 30 min]]
+   | [🌙 Quiet hours: 22:00–08:00 🌙 Quiet hours: 22:00–08:00 🌙 Quiet hours: 22:00–08:00]
+   | [⏱ Throttle: [5 per hour 5 per hour 5 per hour] · change with /throttle &lt;N&gt;|off ⏱ Throttle: [5 per hour 5 per hour 5 per hour] · change with /throttle &lt;N&gt;|off ⏱ Throttle: [5 per hour 5 per hour 5 per hour] · change with /throttle &lt;N&gt;|off]
+   | [🌍 Timezone: Europe/Berlin · change with /timezone &lt;zone&gt; 🌍 Timezone: Europe/Berlin · change with /timezone &lt;zone&gt; 🌍 Timezone: Europe/Berlin · change with /timezone &lt;zone&gt;]
+   | 
+   | [Other values: /digest_mode on|off &lt;minutes&gt;, /quiet_hours HH:MM-HH:MM Other values: /digest_mode on|off &lt;minutes&gt;, /quiet_hours HH:MM-HH:MM Other values: /digest_mode on|off &lt;minutes&gt;, /quiet_hours HH:MM-HH:MM]
+keyboard:
+   [[🔕 Mute 🔕 Mute 🔕 Mute]](cb:s:mu)
+   [[📬 Digest 📬 Digest 📬 Digest]](cb:s:dg)
+   [[🌙 Quiet hours 🌙 Quiet hours 🌙…](cb:s:qh)
+   [[🏠 Home 🏠 Home 🏠 Home]](cb:h)

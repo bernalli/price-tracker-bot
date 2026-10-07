@@ -13,6 +13,7 @@ import re
 from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, Final, Literal, get_args
+from zoneinfo import ZoneInfo
 
 from babel.numbers import list_currencies
 
@@ -53,6 +54,24 @@ def _check_optional_int(name: str, value: object, *, minimum: int) -> int | None
     if value is None:
         return None
     return _check_int(name, value, minimum=minimum)
+
+
+def _check_bool(name: str, value: object) -> None:
+    if not isinstance(value, bool):
+        raise ValueError(f"{name}: must be a bool, got {value!r}")
+
+
+def _check_optional_str(name: str, value: object) -> None:
+    if value is not None:
+        _check_str(name, value)
+
+
+def _check_timezone(name: str, value: object) -> None:
+    text = _check_str(name, value)
+    try:
+        ZoneInfo(text)
+    except (KeyError, ValueError, OSError) as exc:
+        raise ValueError(f"{name}: not a zoneinfo key, got {value!r}") from exc
 
 
 def _check_literal(name: str, value: object, allowed: tuple[str, ...]) -> None:
@@ -109,3 +128,27 @@ class ProductView:
         _check_optional_int("check_interval_minutes", self.check_interval_minutes, minimum=1)
         _check_int("default_interval_minutes", self.default_interval_minutes, minimum=1)
         _check_aware_datetime("last_checked_at", self.last_checked_at)
+
+
+@dataclass(frozen=True, slots=True)
+class PrefsView:
+    """A user's effective global notification preferences, as the settings panel shows them."""
+
+    mute: bool
+    mute_until: datetime | None
+    digest_mode: bool
+    digest_interval_minutes: int
+    quiet_hours_start: str | None
+    quiet_hours_end: str | None
+    throttle_per_hour: int | None
+    timezone: str
+
+    def __post_init__(self) -> None:
+        _check_bool("mute", self.mute)
+        _check_aware_datetime("mute_until", self.mute_until)
+        _check_bool("digest_mode", self.digest_mode)
+        _check_int("digest_interval_minutes", self.digest_interval_minutes, minimum=1)
+        _check_optional_str("quiet_hours_start", self.quiet_hours_start)
+        _check_optional_str("quiet_hours_end", self.quiet_hours_end)
+        _check_optional_int("throttle_per_hour", self.throttle_per_hour, minimum=1)
+        _check_timezone("timezone", self.timezone)
