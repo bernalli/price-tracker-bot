@@ -18,13 +18,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
 import httpx
 
-from price_tracker.bot.messages import reset_locale, set_locale
+from price_tracker.bot.messages import reset_locale, set_locale, user_locale
 from price_tracker.core.alert import (
     PriceAlert,
     ThresholdType,
@@ -60,6 +61,7 @@ from price_tracker.core.textlimits import NAME_BUDGET, WHY_BUDGET, truncate_visi
 from price_tracker.core.url_utils import extract_etld_plus_one
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
     from decimal import Decimal
 
     from price_tracker.core.registry import ScraperRegistry
@@ -479,11 +481,12 @@ class Scheduler:
         Called only on the CLOSED → LOCKED transition. The notifier runs under a
         broad try/except so a flaky transport never aborts the scheduler tick.
         """
-        message = format_quarantine_notification(
-            domain=domain,
-            reason=reason,
-            locked_until=self.deps.health_mgr.locked_until(domain),
-        )
+        async with self._recipient_locale(product.user_id):
+            message = format_quarantine_notification(
+                domain=domain,
+                reason=reason,
+                locked_until=self.deps.health_mgr.locked_until(domain),
+            )
         product_name = truncate_visible(product.name or product.url, NAME_BUDGET)
         await self._notify(
             product.user_id,
@@ -621,40 +624,44 @@ class Scheduler:
             "buttons": operational_buttons(group),
         }
 
+    @asynccontextmanager
+    async def _recipient_locale(self, user_id: int) -> AsyncIterator[None]:
+        """Render in the language of ``user_id``; ``deps.lang`` when none is known."""
+        token = set_locale(await user_locale(self.deps.repo, user_id, self.deps.lang))
+        try:
+            yield
+        finally:
+            reset_locale(token)
+
     async def _flush_notices(self, collector: NoticeCollector) -> None:
         """Render and send every group, isolating failures per group."""
-        token = set_locale(self.deps.lang)
         sweep_started_at = datetime.now(UTC)
-        try:
-            for group in collector.groups():
-                try:
+        for group in collector.groups():
+            try:
+                async with self._recipient_locale(group.user_id):
                     text = (
                         format_operational_notice(group)
                         if group.event == "suspended"
                         else format_warning_notice(group)
                     )
-                    delivered = await self._notify(
-                        group.user_id,
-                        text,
-                        product_id=None,
-                        payload=self._operational_payload(group, sweep_started_at),
-                    )
-                    if not delivered:
-                        logger.warning(
-                            "Operational notice was not delivered (user_id=%d, group_key=%s, "
-                            "product_ids=%s)",
-                            group.user_id,
-                            group.group_key,
-                            [event.product_id for event in group.events],
-                        )
-                except Exception:  # noqa: BLE001 — one group must not block the remaining groups
-                    logger.exception(
-                        "Failed to render or deliver operational notice (user_id=%d, group_key=%s)",
+                    payload = self._operational_payload(group, sweep_started_at)
+                delivered = await self._notify(
+                    group.user_id, text, product_id=None, payload=payload
+                )
+                if not delivered:
+                    logger.warning(
+                        "Operational notice was not delivered (user_id=%d, group_key=%s, "
+                        "product_ids=%s)",
                         group.user_id,
                         group.group_key,
+                        [event.product_id for event in group.events],
                     )
-        finally:
-            reset_locale(token)
+            except Exception:  # noqa: BLE001 — one group must not block the remaining groups
+                logger.exception(
+                    "Failed to render or deliver operational notice (user_id=%d, group_key=%s)",
+                    group.user_id,
+                    group.group_key,
+                )
 
     async def _flush_guaranteed(self, collector: NoticeCollector) -> None:
         """Flush once; cancellation cannot cancel the independently shielded flush task."""
@@ -869,14 +876,16 @@ class Scheduler:
             # hours and digest settings as a price drop — it is the same kind of
             # message to the user, and a mute that leaked restocks would be a
             # mute in name only.
-            await self._notify(
-                p.user_id,
-                format_back_in_stock(
+            async with self._recipient_locale(p.user_id):
+                text = format_back_in_stock(
                     product_name=p.name or p.url,
                     url=p.url,
                     price=info.price,
                     currency=p.currency,
-                ),
+                )
+            await self._notify(
+                p.user_id,
+                text,
                 product_id=p.id,
                 payload={
                     "kind": "price",
@@ -1035,9 +1044,11 @@ class Scheduler:
             if self.deps.metrics is not None:
                 self.deps.metrics.notification_skipped_total.labels(reason="cooldown").inc()
             return
+        async with self._recipient_locale(user_id):
+            text = format_alert(alert)
         if await self._notify(
             user_id,
-            format_alert(alert),
+            text,
             product_id=alert.product_id,
             payload=_alert_payload(alert, domain=domain),
         ):

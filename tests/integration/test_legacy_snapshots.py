@@ -2713,6 +2713,13 @@ async def scenario_settings_panel(w: LegacyWorld) -> None:
         await w.recorder.press(OWNER, data)
 
 
+@scenario("settings.language")
+async def scenario_settings_language(w: LegacyWorld) -> None:
+    # The choice changes every later reply; Automatic returns to the Telegram language.
+    for data in ("s:lang", "s:lang:en", "s", "s:lang:de", "s:lang:auto", "s"):
+        await w.recorder.press(OWNER, data)
+
+
 @scenario("settings.interval")
 async def scenario_settings_interval(w: LegacyWorld) -> None:
     for text in ("/intervallo", "/intervallo 120", "/setinterval 3", "/intervallo 99999"):

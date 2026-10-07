@@ -280,32 +280,42 @@ def crosses_threshold(
 
 
 def format_alert(alert: PriceAlert) -> str:
-    """Format a price-drop alert as Telegram HTML."""
+    """Format a price-drop alert as Telegram HTML, in the current language."""
     sym = _currency_symbol(alert.currency)
-    name = _escape_html(alert.product_name)
-    url = _escape_html(alert.url)
     old = alert.old_price
     new = alert.new_price
     drop = old - new
     drop_pct = (drop / old * 100) if old > 0 else Decimal("0")
-
-    return (
-        f"📉 <b>Price drop!</b>\n\n"
-        f"<b>{name}</b>\n"
-        f'<a href="{url}">View product</a>\n\n'
-        f"Was: <s>{old} {sym}</s>\n"
-        f"Now: <b>{new} {sym}</b>\n"
-        f"Drop: -{drop} {sym} ({drop_pct:.1f}%)"
+    return _(
+        "📉 <b>Price drop!</b>\n\n"
+        "<b>{name}</b>\n"
+        '<a href="{url}">View product</a>\n\n'
+        "Was: <s>{old} {symbol}</s>\n"
+        "Now: <b>{new} {symbol}</b>\n"
+        "Drop: -{drop} {symbol} ({percent}%)"
+    ).format(
+        name=_escape_html(alert.product_name),
+        url=_escape_html(alert.url),
+        old=old,
+        new=new,
+        drop=drop,
+        symbol=sym,
+        percent=f"{drop_pct:.1f}",
     )
 
 
 def format_back_in_stock(*, product_name: str, url: str, price: Decimal, currency: str) -> str:
-    """Announce that a previously sold-out listing is purchasable again."""
-    return (
-        f"📦 <b>Back in stock!</b>\n\n"
-        f"<b>{_escape_html(product_name)}</b>\n"
-        f'<a href="{_escape_html(url)}">View product</a>\n\n'
-        f"Price: <b>{price} {_currency_symbol(currency)}</b>"
+    """Announce, in the current language, that a sold-out listing is purchasable again."""
+    return _(
+        "📦 <b>Back in stock!</b>\n\n"
+        "<b>{name}</b>\n"
+        '<a href="{url}">View product</a>\n\n'
+        "Price: <b>{price} {symbol}</b>"
+    ).format(
+        name=_escape_html(product_name),
+        url=_escape_html(url),
+        price=price,
+        symbol=_currency_symbol(currency),
     )
 
 
@@ -339,12 +349,13 @@ def format_quarantine_notification(
     """
     until = ""
     if locked_until is not None:
-        until = f"\n🔁 Riprovo da solo dopo: {locked_until:%Y-%m-%d %H:%M} UTC"
-    return (
-        f"🔒 <b>Sito in pausa automatica</b>\n\n"
-        f"<b>{_escape_html(domain)}</b> ha fallito troppi controlli "
-        f"({_escape_html(reason)}).\n"
-        f"Sospendo temporaneamente i check su questo sito per non insistere "
-        f"contro un blocco.{until}\n\n"
-        f"Dettagli con /errori."
-    )
+        until = "\n" + _("🔁 I will retry by myself after: {when} UTC").format(
+            when=f"{locked_until:%Y-%m-%d %H:%M}"
+        )
+    return _(
+        "🔒 <b>Site paused automatically</b>\n\n"
+        "<b>{domain}</b> failed too many checks ({reason}).\n"
+        "I am pausing the checks on this site for a while, so as not to push "
+        "against a block.{until}\n\n"
+        "Details with /errori."
+    ).format(domain=_escape_html(domain), reason=_escape_html(reason), until=until)

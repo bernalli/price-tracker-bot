@@ -41,6 +41,8 @@ ID_MAX_DIGITS: Final = len(str(ID_MAX))
 FLOW_TOKEN_CHARS: Final = 32
 
 SUPPORTED_LOCALES: Final = ("en", "it", "zh_Hans", "fr", "es", "de", "uk", "pt_BR", "ja")
+# "auto" clears the stored choice: replies follow the Telegram app language.
+LANGUAGE_CHOICES: Final = (*SUPPORTED_LOCALES, "auto")
 SCOPE_LEVELS: Final = ("own_country", "customs_area", "world")
 FLOW_SCOPE_CHOICES: Final = ("store", *SCOPE_LEVELS)
 CARD_SCOPE_CHOICES: Final = ("store", *SCOPE_LEVELS, "default")
@@ -48,7 +50,7 @@ PERIODS: Final = ("7d", "30d", "90d", "1y", "all")
 THEMES: Final = ("light", "dark")
 MUTE_PRESETS: Final = ("1", "8", "24", "0")
 LIST_FILTERS: Final = ("a", "p", "e")
-SETTINGS_SECTIONS: Final = ("mu", "dg", "qh")
+SETTINGS_SECTIONS: Final = ("mu", "dg", "qh", "lang")
 SETTINGS_MUTE: Final = (*MUTE_PRESETS, "off")
 SETTINGS_DIGEST: Final = ("on", "off")
 SETTINGS_QUIET: Final = ("2208", "off")
@@ -418,7 +420,7 @@ def build_registry() -> ActionRegistry:
         ActionSpec("settings.quiet", (_lit("s"), _lit("qh"), Choice("window", SETTINGS_QUIET))),
         ActionSpec("settings.chart_theme", (_lit("s"), _lit("ct"), Choice("theme", THEMES))),
         ActionSpec(
-            "settings.language", (_lit("s"), _lit("lang"), Choice("locale", SUPPORTED_LOCALES))
+            "settings.language", (_lit("s"), _lit("lang"), Choice("locale", LANGUAGE_CHOICES))
         ),
         ActionSpec("data", (_lit("d"),)),
         ActionSpec("data.export", (_lit("d"), _lit("x"))),

@@ -2039,6 +2039,8 @@ async def test_scheduler_notifies_once_on_quarantine_entry(
     """A domain crossing into LOCKED (T1 threshold = 3 blocks) pushes exactly one
     quarantine alert — on the CLOSED→LOCKED transition, not on every block."""
     repo, pid = repo_with_product
+    # The notice is written in the recipient's language.
+    await repo.set_user_language(1, "it")
     registry = ScraperRegistry()
     registry.register(_CaptchaScraper())
     notifier = AsyncMock()

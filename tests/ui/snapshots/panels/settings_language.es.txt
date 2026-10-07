@@ -1,0 +1,12 @@
+# ui snapshot v1
+# screen: panels.settings_language
+# locale: es
+# now: 2026-03-01T12:00:00Z
+text:
+   | [🗣 <b>Language</b> 🗣 <b>Language</b> 🗣 <b>Language</b>]
+   | 
+   | [Current: Italiano Current: Italiano Current: Italiano]
+keyboard:
+   [[Automatic Automatic Automatic]](cb:s:lang:auto)
+   [English](cb:s:lang:en)  [Italiano ✓](cb:s:lang:it)
+   [[◀️ Settings ◀️ Settings ◀️ Setti…](cb:s)

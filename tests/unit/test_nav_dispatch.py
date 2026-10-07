@@ -70,6 +70,7 @@ HANDLED = frozenset(
         "settings.mute",
         "settings.digest",
         "settings.quiet",
+        "settings.language",
         "list.page",
         "list.open",
         "home",
@@ -94,6 +95,7 @@ def make_query(data: str | None, user_id: int = USER) -> MagicMock:
     query = MagicMock()
     query.data = data
     query.from_user.id = user_id
+    query.from_user.language_code = "en"
     query.answer = AsyncMock()
     query.edit_message_text = AsyncMock()
     return query
@@ -113,6 +115,7 @@ def make_context(db: Any) -> MagicMock:
 def make_update(query: MagicMock) -> MagicMock:
     update = MagicMock()
     update.callback_query = query
+    update.effective_user.id = query.from_user.id
     update.effective_user.language_code = "en"
     return update
 
@@ -186,12 +189,14 @@ async def test_a_disallowed_user_reads_nothing_beyond_the_allow_check(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     db = AsyncMock()
+    db.get_user = AsyncMock(return_value=None)
     db.is_user_allowed = AsyncMock(return_value=False)
     handler = AsyncMock(return_value=True)
     monkeypatch.setattr(_nav, "handle_action", handler)
     query = make_query(encode(Action("settings")))
     await handle_callback(make_update(query), make_context(db))
-    assert db.method_calls == [call.is_user_allowed(USER)]
+    # The reply language is read first; an unknown user gets no row written.
+    assert db.method_calls == [call.get_user(USER), call.is_user_allowed(USER)]
     handler.assert_not_called()
     query.edit_message_text.assert_not_called()
 
@@ -643,3 +648,87 @@ async def test_the_admin_button_is_only_for_admins_on_every_path(
     for _text, markup in await home_of(repo, user_id):
         wires = {b.callback_data for row in markup.inline_keyboard for b in row}
         assert ("menu_admin" in wires) is admin
+
+
+# --- the language section: the choice is stored and the section redrawn in it ---
+
+
+async def stored_language(repo: Repository, user_id: int = USER) -> str | None:
+    row = await repo.get_user(user_id)
+    assert row is not None
+    return row.language
+
+
+def edited_text(query: MagicMock) -> str:
+    text, _ = shown(query)
+    return str(text)
+
+
+async def test_choosing_italian_stores_it_and_redraws_the_section_in_italian(
+    repo: Repository,
+) -> None:
+    query = await press(repo, "s:lang:it")
+    assert await stored_language(repo) == "it"
+    text = edited_text(query)
+    assert text.startswith("🗣 <b>Lingua</b>")
+    assert text.endswith("Attuale: Italiano")
+    set_locale("en")
+
+
+async def test_choosing_automatic_clears_the_choice(repo: Repository) -> None:
+    await repo.set_user_language(USER, "it")
+    query = await press(repo, "s:lang:auto")
+    assert await stored_language(repo) is None
+    assert edited_text(query).endswith("Current: Automatic (English)")
+
+
+async def test_a_registered_language_without_a_catalogue_writes_nothing_and_redraws(
+    repo: Repository,
+) -> None:
+    await repo.set_user_language(USER, "it")
+    query = await press(repo, "s:lang:de")
+    assert await stored_language(repo) == "it"
+    query.edit_message_text.assert_awaited_once()
+    assert edited_text(query).endswith("Attuale: Italiano")
+    set_locale("en")
+
+
+async def test_the_render_language_does_not_leak_past_the_press(repo: Repository) -> None:
+    set_locale("en")
+    await press(repo, "s:lang:it")
+    await press(repo, "s:lang:auto")
+    assert edited_text(await press(repo, "s")).startswith("⚙️ <b>Settings</b>")
+
+
+@pytest.mark.parametrize(
+    "wires",
+    [
+        ["s:lang:it", "s:lang:it"],
+        ["s:lang:en", "s:lang:it", "s:lang:auto", "s:lang:it"],
+        ["s:lang:it", "s:lang", "s:lang:de", "s"],
+    ],
+)
+async def test_double_and_out_of_order_taps_end_on_the_last_written_choice(
+    repo: Repository, wires: list[str]
+) -> None:
+    for wire in wires:
+        query = await press(repo, wire)
+        query.edit_message_text.assert_awaited_once()
+    assert await stored_language(repo) == "it"
+    set_locale("en")
+
+
+async def test_the_overview_and_the_section_show_the_stored_choice(repo: Repository) -> None:
+    await repo.set_user_language(USER, "en")
+    assert "🗣 Language: English" in edited_text(await press(repo, "s"))
+    section = edited_text(await press(repo, "s:lang"))
+    assert section.endswith("Current: English")
+
+
+async def test_a_user_who_is_not_allowed_changes_nothing(repo: Repository) -> None:
+    stranger = 404
+    query = make_query("s:lang:it", user_id=stranger)
+    await handle_callback(make_update(query), make_context(repo))
+    query.edit_message_text.assert_not_called()
+    assert await repo.get_user(stranger) is None
+    assert await stored_language(repo) is None

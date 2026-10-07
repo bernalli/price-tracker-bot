@@ -274,7 +274,7 @@ async def cmd_threshold(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         threshold_type, threshold_value = "any_drop", "0"
     else:
         rejected = truncate_visible(context.args[1], SCALAR_MAX_CHARS)
-        await update.message.reply_text(f"❌ Valore non valido: {rejected}")
+        await update.message.reply_text(_("❌ Invalid value: {value}").format(value=rejected))
         return
 
     product = await _get_user_product(context, product_id, update.effective_user.id)

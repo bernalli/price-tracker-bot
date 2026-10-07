@@ -34,6 +34,7 @@ from price_tracker.bot.handlers import (
 )
 from price_tracker.bot.handlers._cards import home_view, reply_screen
 from price_tracker.bot.handlers._helpers import _escape_html
+from price_tracker.bot.messages import user_locale
 from price_tracker.bot.ui.panels import help_screen, home_screen
 
 logger = logging.getLogger(__name__)
@@ -140,6 +141,10 @@ def register_handlers(app: Application) -> None:
         RepositoryFlowServices(lambda: app.bot_data["db"]),
         JobQueueTimer(app.job_queue),
         config=FlowConfig(add_entry=False),
+        # The repository is read when an update arrives: post_init stores it later.
+        locale_resolver=lambda user_id, fallback: user_locale(
+            app.bot_data["db"], user_id, fallback
+        ),
     )
     register_guided_flow(app, flow, legacy_handlers_present=True)
 

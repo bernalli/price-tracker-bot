@@ -65,7 +65,7 @@ REJECTED = [
 ]
 
 
-def _run(arg: str) -> tuple[AsyncMock, AsyncMock]:
+def _run(arg: str, language_code: str = "it") -> tuple[AsyncMock, AsyncMock]:
     """Run ``/soglia 3 <arg>`` and return the ``set_threshold`` and ``reply_text`` mocks."""
     db = AsyncMock()
     db.is_user_allowed.return_value = True
@@ -76,7 +76,7 @@ def _run(arg: str) -> tuple[AsyncMock, AsyncMock]:
     context.args = ["3", arg]
     update = MagicMock()
     update.effective_user.id = 7
-    update.effective_user.language_code = "it"
+    update.effective_user.language_code = language_code
     update.message.reply_text = AsyncMock()
 
     async def call() -> None:
@@ -107,6 +107,12 @@ def test_an_oversized_rejected_input_produces_a_bounded_error() -> None:
     assert reply.await_args.args[0] == (
         "❌ Valore non valido: " + "1" * (SCALAR_MAX_CHARS - 1) + "…"
     )
+
+
+def test_the_rejection_is_translated() -> None:
+    _set, reply = _run("150%", language_code="en")
+    assert reply.await_args is not None
+    assert reply.await_args.args[0] == "❌ Invalid value: 150%"
 
 
 def _expected(text: str) -> tuple[str, str] | None:

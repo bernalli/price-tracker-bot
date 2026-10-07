@@ -10,10 +10,12 @@ text:
    | [🌙 Quiet hours: 22:00–08:00 🌙 Quiet hours: 22:00–08:00 🌙 Quiet hours: 22:00–08:00]
    | [⏱ Throttle: [5 per hour 5 per hour 5 per hour] · change with /throttle &lt;N&gt;|off ⏱ Throttle: [5 per hour 5 per hour 5 per hour] · change with /throttle &lt;N&gt;|off ⏱ Throttle: [5 per hour 5 per hour 5 per hour] · change with /throttle &lt;N&gt;|off]
    | [🌍 Timezone: Europe/Berlin · change with /timezone &lt;zone&gt; 🌍 Timezone: Europe/Berlin · change with /timezone &lt;zone&gt; 🌍 Timezone: Europe/Berlin · change with /timezone &lt;zone&gt;]
+   | [🗣 Language: [Automatic (中文) Automatic (中文) Automatic (中文)] 🗣 Language: [Automatic (中文) Automatic (中文) Automatic (中文)] 🗣 Language: [Automatic (中文) Automatic (中文) Automatic (中文)]]
    | 
    | [Other values: /digest_mode on|off &lt;minutes&gt;, /quiet_hours HH:MM-HH:MM Other values: /digest_mode on|off &lt;minutes&gt;, /quiet_hours HH:MM-HH:MM Other values: /digest_mode on|off &lt;minutes&gt;, /quiet_hours HH:MM-HH:MM]
 keyboard:
    [[🔕 Mute 🔕 Mute 🔕 Mute]](cb:s:mu)
    [[📬 Digest 📬 Digest 📬 Digest]](cb:s:dg)
    [[🌙 Quiet hours 🌙 Quiet hours 🌙…](cb:s:qh)
+   [[🗣 Language 🗣 Language 🗣 Langu…](cb:s:lang)
    [[🏠 Home 🏠 Home 🏠 Home]](cb:h)

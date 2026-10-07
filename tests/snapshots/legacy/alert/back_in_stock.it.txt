@@ -6,12 +6,12 @@
 -> sendMessage chat=10
    param parse_mode="HTML"
    text:
-   | 📦 <b>Back in stock!</b>
+   | 📦 <b>Di nuovo disponibile!</b>
    |
    | <b>Kettle</b>
-   | <a href="https://shop.example.com/item/1">View product</a>
+   | <a href="https://shop.example.com/item/1">Vedi il prodotto</a>
    |
-   | Price: <b>80.00 €</b>
+   | Prezzo: <b>80.00 €</b>
 ## db after step 1
 + price_history id=6 {product_id=1, price="80.00", checked_at=<now:9999-99-99 99:99:99>}
 ~ products id=1 last_checked_at: "2026-03-01 10:00:00" -> <now:9999-99-99 99:99:99>
@@ -23,6 +23,6 @@
 ## step 4: job run_check_all
 (no calls)
 ## db after step 4
-+ digest_queue id=1 {user_id=10, product_id=1, alert_payload_json="{\"kind\": \"price\", \"product_id\": 1, \"product_name\": \"Kettle\", \"url\": \"https://shop.example.com/item/1\", \"old_price\": \"80.00\", \"new_price\": \"80.00\", \"currency\": \"EUR\", \"domain\": \"example.com\", \"text\": \"\\ud83d\\udce6 <b>Back in stock!</b>\\n\\n<b>Kettle</b>\\n<a href=\\\"https://shop.example.com/item/1\\\">View product</a>\\n\\nPrice: <b>80.00 \\u20ac</b>\"}", enqueued_at=<now:9999-99-99 99:99:99>, flushed_at=NULL}
++ digest_queue id=1 {user_id=10, product_id=1, alert_payload_json="{\"kind\": \"price\", \"product_id\": 1, \"product_name\": \"Kettle\", \"url\": \"https://shop.example.com/item/1\", \"old_price\": \"80.00\", \"new_price\": \"80.00\", \"currency\": \"EUR\", \"domain\": \"example.com\", \"text\": \"\\ud83d\\udce6 <b>Di nuovo disponibile!</b>\\n\\n<b>Kettle</b>\\n<a href=\\\"https://shop.example.com/item/1\\\">Vedi il prodotto</a>\\n\\nPrezzo: <b>80.00 \\u20ac</b>\"}", enqueued_at=<now:9999-99-99 99:99:99>, flushed_at=NULL}
 + price_history id=7 {product_id=1, price="80.00", checked_at=<now:9999-99-99 99:99:99>}
 ~ products id=1 is_available: 0 -> 1

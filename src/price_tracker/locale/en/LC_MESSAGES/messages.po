@@ -1337,3 +1337,63 @@ msgstr ""
 #: src/price_tracker/bot/commands.py
 msgid "❓ <b>Commands</b>"
 msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "Automatic ({language})"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "🗣 Language: {language}"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "🗣 Language"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "🗣 <b>Language</b>"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "Automatic"
+msgstr ""
+
+#: src/price_tracker/core/alert.py
+msgid ""
+"📉 <b>Price drop!</b>\n"
+"\n"
+"<b>{name}</b>\n"
+"<a href=\"{url}\">View product</a>\n"
+"\n"
+"Was: <s>{old} {symbol}</s>\n"
+"Now: <b>{new} {symbol}</b>\n"
+"Drop: -{drop} {symbol} ({percent}%)"
+msgstr ""
+
+#: src/price_tracker/core/alert.py
+msgid ""
+"📦 <b>Back in stock!</b>\n"
+"\n"
+"<b>{name}</b>\n"
+"<a href=\"{url}\">View product</a>\n"
+"\n"
+"Price: <b>{price} {symbol}</b>"
+msgstr ""
+
+#: src/price_tracker/core/alert.py
+msgid "🔁 I will retry by myself after: {when} UTC"
+msgstr ""
+
+#: src/price_tracker/core/alert.py
+msgid ""
+"🔒 <b>Site paused automatically</b>\n"
+"\n"
+"<b>{domain}</b> failed too many checks ({reason}).\n"
+"I am pausing the checks on this site for a while, so as not to push against a block.{until}\n"
+"\n"
+"Details with /errori."
+msgstr ""
+
+#: src/price_tracker/bot/handlers/product.py
+msgid "❌ Invalid value: {value}"
+msgstr ""

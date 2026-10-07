@@ -9,14 +9,14 @@
 -> sendMessage chat=10
    param parse_mode="HTML"
    text:
-   | 📉 <b>Price drop!</b>
+   | 📉 <b>Prezzo in calo!</b>
    |
    | <b>Lamp</b>
-   | <a href="https://shop.example.com/item/4">View product</a>
+   | <a href="https://shop.example.com/item/4">Vedi il prodotto</a>
    |
-   | Was: <s>40.00 €</s>
-   | Now: <b>30.00 €</b>
-   | Drop: -10.00 € (25.0%)
+   | Prima: <s>40.00 €</s>
+   | Ora: <b>30.00 €</b>
+   | Calo: -10.00 € (25.0%)
 ## db after step 4
 + price_history id=6 {product_id=1, price="64.00", checked_at=<now:9999-99-99 99:99:99>}
 + price_history id=7 {product_id=2, price="30.00", checked_at=<now:9999-99-99 99:99:99>}
