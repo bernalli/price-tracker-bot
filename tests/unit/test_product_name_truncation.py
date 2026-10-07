@@ -100,6 +100,7 @@ def _env(name: str, *, active: bool = True) -> tuple[Surfaces, MagicMock, MagicM
     db.get_all_products.return_value = [row]
     db.delete_product.return_value = True
     db.reset_initial_price.return_value = True
+    db.get_config.return_value = None
 
     scheduler = MagicMock()
     scheduler.check_one_product_for_user = AsyncMock(

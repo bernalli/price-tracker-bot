@@ -403,6 +403,23 @@ async def test_check_with_a_drop_in_italian(repo: Repository) -> None:
     assert shown(query)[0].startswith("🔔 Prezzo sceso: 80,00\xa0€ → 64,00\xa0€\n\n")
 
 
+async def test_a_drop_money_cannot_render_still_redraws_the_card(repo: Repository) -> None:
+    pid = await add_product(repo, "Kettle")
+    alert = PriceAlert(
+        product_id=pid,
+        product_name="Kettle",
+        url="https://shop.example.com/Kettle",
+        old_price=Decimal("1e20"),
+        new_price=Decimal("64"),
+        currency="EUR",
+        threshold_type="percentage",
+        threshold_value=Decimal("10"),
+    )
+    scheduler = FakeScheduler(CheckResult(product_id=pid, user_id=USER, alert=alert))
+    query, card = await check(repo, pid, scheduler)
+    assert_shows(query, with_notice(card, "🔔 Price dropped: — → €64.00"))
+
+
 async def test_check_out_of_stock_says_so(repo: Repository) -> None:
     pid = await add_product(repo, "Kettle")
     scheduler = FakeScheduler(CheckResult(product_id=pid, user_id=USER, reason="out_of_stock"))
@@ -410,11 +427,43 @@ async def test_check_out_of_stock_says_so(repo: Repository) -> None:
     assert_shows(query, with_notice(card, "📦 Out of stock - I will tell you when it is back."))
 
 
+async def test_the_drop_is_shown_in_the_product_currency(repo: Repository) -> None:
+    pid = await repo.add_product(
+        user_id=USER,
+        url="https://shop.example.com/lamp",
+        name="Lamp",
+        domain="shop.example.com",
+        initial_price=Decimal("80"),
+        currency="USD",
+    )
+    alert = PriceAlert(
+        product_id=pid,
+        product_name="Lamp",
+        url="https://shop.example.com/lamp",
+        old_price=Decimal("80"),
+        new_price=Decimal("64"),
+        currency="USD",
+        threshold_type="percentage",
+        threshold_value=Decimal("10"),
+    )
+    scheduler = FakeScheduler(CheckResult(product_id=pid, user_id=USER, alert=alert))
+    query, _ = await check(repo, pid, scheduler)
+    assert shown(query)[0].startswith("🔔 Price dropped: $80.00 → $64.00\n\n")
+
+
 async def test_check_that_could_not_read_says_why(repo: Repository) -> None:
     pid = await add_product(repo, "Kettle")
     scheduler = FakeScheduler(CheckResult(product_id=pid, user_id=USER, reason="parse_error"))
     query, card = await check(repo, pid, scheduler)
     assert_shows(query, with_notice(card, "❌ Not updated: price not readable"))
+
+
+async def test_a_gone_listing_reports_the_status_the_check_saw(repo: Repository) -> None:
+    pid = await add_product(repo, "Kettle")
+    await repo.record_failure(pid, reason="listing_gone", detail="HTTP 410")
+    scheduler = FakeScheduler(CheckResult(product_id=pid, user_id=USER, reason="listing_gone"))
+    query, card = await check(repo, pid, scheduler)
+    assert_shows(query, with_notice(card, "❌ Not updated: page not found (HTTP 410)"))
 
 
 async def test_a_failing_check_does_not_show_the_error_text(
@@ -427,6 +476,18 @@ async def test_a_failing_check_does_not_show_the_error_text(
     assert_shows(query, with_notice(card, "❌ Could not check this product. Try again later."))
     assert not any("secret boom" in text for text in edited_texts(query))
     assert [r.levelno for r in caplog.records if r.levelno >= logging.WARNING] == [logging.WARNING]
+
+
+async def test_a_failing_check_logs_its_traceback(
+    repo: Repository, caplog: pytest.LogCaptureFixture
+) -> None:
+    pid = await add_product(repo, "Kettle")
+    scheduler = FakeScheduler(error=TypeError("a programming bug"))
+    with caplog.at_level(logging.WARNING):
+        await check(repo, pid, scheduler)
+    warnings = [r for r in caplog.records if r.levelno >= logging.WARNING]
+    assert len(warnings) == 1
+    assert warnings[0].exc_info is not None
 
 
 @pytest.mark.parametrize("kind", ["manual", "automatic"])

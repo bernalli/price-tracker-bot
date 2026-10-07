@@ -35,6 +35,8 @@ from price_tracker.core.alert import _why
 from price_tracker.i18n.format import money
 
 if TYPE_CHECKING:
+    from decimal import Decimal
+
     from telegram.ext import ContextTypes
 
 logger = logging.getLogger(__name__)
@@ -113,6 +115,14 @@ async def handle_delete_flow(
     return False
 
 
+def _price_or_dash(amount: Decimal, currency: str, loc: str) -> str:
+    """``amount`` as money, or the card's dash for a value money() refuses."""
+    try:
+        return money(amount, currency, locale=loc)
+    except ValueError:
+        return "—"
+
+
 async def handle_check_button(
     query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, data: str
 ) -> bool:
@@ -140,7 +150,7 @@ async def handle_check_button(
     try:
         result = await scheduler.check_one_product_for_user(product_id=product_id, user_id=user_id)
     except Exception as exc:  # noqa: BLE001 — the card says the check failed
-        logger.warning("Check now failed for product %s: %s", product_id, exc)
+        logger.warning("Check now failed for product %s: %s", product_id, exc, exc_info=True)
 
     record = await db.get_product(product_id)
     if record is None:
@@ -152,13 +162,14 @@ async def handle_check_button(
         currency = _currency(record.get("currency"))
         loc = current_locale()
         notice = _("🔔 Price dropped: {old} → {new}").format(
-            old=money(result.alert.old_price, currency, locale=loc),
-            new=money(result.alert.new_price, currency, locale=loc),
+            old=_price_or_dash(result.alert.old_price, currency, loc),
+            new=_price_or_dash(result.alert.new_price, currency, loc),
         )
     elif result.reason == "out_of_stock":
         notice = out_of_stock_line()
     elif result.reason is not None:
-        notice = _("❌ Not updated: {why}").format(why=_why(result.reason, None))
+        why = _why(result.reason, record.get("last_error"))
+        notice = _("❌ Not updated: {why}").format(why=why)
     else:
         notice = _("✅ Checked: no significant change.")
     await show_card(query, context, record, notice=notice)
