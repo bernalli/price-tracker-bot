@@ -1401,3 +1401,7 @@ msgstr ""
 #: src/price_tracker/bot/handlers/product.py
 msgid "❌ Invalid value: {value}"
 msgstr ""
+
+#: src/price_tracker/bot/handlers/callbacks/_menu.py
+msgid "… {n} more → Products"
+msgstr "… {n} more → Products"
