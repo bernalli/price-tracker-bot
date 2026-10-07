@@ -4,27 +4,16 @@
 # frozen_now: 2026-03-01T12:00:00Z
 ## step 1: command "/lista" user=10
 -> sendMessage chat=10
-   param parse_mode="HTML"
-   text:
-   | <b>📦 I tuoi prodotti (1)</b>
--> sendMessage chat=10
    param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
-   | 📦 <b>⁨Kettle⁩</b>
-   | ⁨example.com⁩ · #1 · attivo
+   | 📦 <b>I tuoi prodotti</b> · attivo (1) · pagina 1/1
    |
-   | 💰 Ora: 80,00 €
-   | 📌 Inizio: 100,00 € · ▼ 20%
-   | 📉 Minimo: 80,00 €
-   | 🔔 Avviso: ribasso del 10% dall'inizio
-   | 🔄 Controlli: ogni 6 h · ultimo 2 ore fa
+   | <b>#1</b> Kettle · 80,00 €
    keyboard:
-   | [🔍 Controlla ora → check_1] [📊 Storico → chart_1]
-   | [⏸ Pausa → pause_1] [🗑 Elimina → remove_1]
-   | [🔔 Regola avviso → edit_1] [🔄 Intervallo → setrefresh_1]
-   | [🔗 Apri → url:https://shop.example.com/item/1]
-   | [◀️ Lista → menu_prodotti]
+   | [#1 → l:a:1:1]
+   | [✅ Attivi ✓ → l:a:1] [⏸ In pausa → l:p:1] [⚠️ Errori → l:e:1]
+   | [🏠 Home → h]
 ## db after step 1
 ~ users user_id=10 display_name: NULL -> "U10"
 ## step 2: press "edit_999" user=10 on=1 synthetic

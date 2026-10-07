@@ -1,0 +1,18 @@
+# ui snapshot v1
+# screen: panels.settings
+# locale: en
+# now: 2026-03-01T12:00:00Z
+text:
+   | ⚙️ <b>Settings</b>
+   | 
+   | 🔕 Mute: until 3/1/26, 9:00 PM
+   | 📬 Digest: on, every 30 min
+   | 🌙 Quiet hours: 22:00–08:00
+   | ⏱ Throttle: 5 per hour · change with /throttle &lt;N&gt;|off
+   | 🌍 Timezone: Europe/Berlin · change with /timezone &lt;zone&gt;
+   | 
+   | Other values: /digest_mode on|off &lt;minutes&gt;, /quiet_hours HH:MM-HH:MM
+keyboard:
+   [🔕 Mute](cb:s:mu)  [📬 Digest](cb:s:dg)
+   [🌙 Quiet hours](cb:s:qh)
+   [🏠 Home](cb:h)

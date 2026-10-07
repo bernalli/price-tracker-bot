@@ -985,3 +985,192 @@ msgstr ""
 #, python-brace-format
 msgid "❌ Rows with an invalid threshold: {n}"
 msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "⚙️ <b>Settings</b>"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+#, python-brace-format
+msgid "🔕 Mute: {mute}"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+#, python-brace-format
+msgid "📬 Digest: {digest}"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+#, python-brace-format
+msgid "🌙 Quiet hours: {quiet}"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+#, python-brace-format
+msgid "⏱ Throttle: {throttle} · change with /throttle &lt;N&gt;|off"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+#, python-brace-format
+msgid "🌍 Timezone: {timezone} · change with /timezone &lt;zone&gt;"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "Other values: /digest_mode on|off &lt;minutes&gt;, /quiet_hours HH:MM-HH:MM"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "off"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "forever"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+#, python-brace-format
+msgid "until {when}"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+#, python-brace-format
+msgid "on, every {interval}"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+#, python-brace-format
+msgid "{n} per hour"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "unlimited"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "🔕 Mute"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "📬 Digest"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "🌙 Quiet hours"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "🏠 Home"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "🔕 <b>Mute</b>"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "📬 <b>Digest</b>"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "🌙 <b>Quiet hours</b>"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+#, python-brace-format
+msgid "Current: {value}"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "Forever"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "🔔 Unmute"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "On"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "Off"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "◀️ Settings"
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+#, python-brace-format
+msgid "📦 <b>Your products</b> · {filter} ({total}) · page {page}/{pages}"
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+msgid "errors"
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+#, python-brace-format
+msgid "{mark}<b>#{id}</b> {name} · {price}"
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+msgid "Nothing here."
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+msgid "✅ Active"
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+msgid "⏸ Paused"
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+msgid "⚠️ Errors"
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+msgid "🗑 Delete all"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+#, python-brace-format
+msgid "📦 {active} · ⏸ {paused}"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+#, python-brace-format
+msgid "{n} active"
+msgid_plural "{n} active"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/price_tracker/bot/ui/panels.py
+#, python-brace-format
+msgid "{n} paused"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+#, python-brace-format
+msgid "🏠 <b>Price Tracker</b>\n\n{counts}\n\nPaste a product link to start tracking."
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "📦 Products"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "🔍 Check all"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "📊 Statistics"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "💾 Data"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "⚙️ Settings"
+msgstr ""

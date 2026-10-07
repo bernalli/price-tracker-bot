@@ -1,0 +1,13 @@
+# ui snapshot v1
+# screen: panels.settings_mute
+# locale: it
+# now: 2026-03-01T12:00:00Z
+text:
+   | 🔕 <b>Silenzia</b>
+   | 
+   | Attuale: fino a 01/03/26, 21:00
+keyboard:
+   [1 h](cb:s:mu:1)  [8 h](cb:s:mu:8)
+   [1 giorno](cb:s:mu:24)  [Per sempre](cb:s:mu:0)
+   [🔔 Riattiva](cb:s:mu:off)
+   [◀️ Impostazioni](cb:s)

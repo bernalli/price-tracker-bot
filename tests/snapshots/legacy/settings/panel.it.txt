@@ -1,0 +1,114 @@
+# legacy snapshot v1
+# scenario: settings.panel
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: press "s" user=10 on=1 synthetic
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1
+   param link_preview_options={"is_disabled": true}
+   param parse_mode="HTML"
+   text:
+   | ⚙️ <b>Impostazioni</b>
+   |
+   | 🔕 Silenzia: off
+   | 📬 Digest: off
+   | 🌙 Ore silenziose: off
+   | ⏱ Limite: illimitato · cambia con /throttle &lt;N&gt;|off
+   | 🌍 Fuso orario: Europe/Rome · cambia con /timezone &lt;zona&gt;
+   |
+   | Altri valori: /digest_mode on|off &lt;minuti&gt;, /quiet_hours HH:MM-HH:MM
+   keyboard:
+   | [🔕 Silenzia → s:mu] [📬 Digest → s:dg]
+   | [🌙 Ore silenziose → s:qh]
+   | [🏠 Home → h]
+## db after step 1
+(no changes)
+## step 2: press "s:mu" user=10 on=1
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1
+   param link_preview_options={"is_disabled": true}
+   param parse_mode="HTML"
+   text:
+   | 🔕 <b>Silenzia</b>
+   |
+   | Attuale: off
+   keyboard:
+   | [1 h → s:mu:1] [8 h → s:mu:8]
+   | [1 giorno → s:mu:24] [Per sempre → s:mu:0]
+   | [🔔 Riattiva ✓ → s:mu:off]
+   | [◀️ Impostazioni → s]
+## db after step 2
+(no changes)
+## step 3: press "s:mu:8" user=10 on=1
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1
+   param link_preview_options={"is_disabled": true}
+   param parse_mode="HTML"
+   text:
+   | 🔕 <b>Silenzia</b>
+   |
+   | Attuale: fino a 01/03/26, 21:00
+   keyboard:
+   | [1 h → s:mu:1] [8 h → s:mu:8]
+   | [1 giorno → s:mu:24] [Per sempre → s:mu:0]
+   | [🔔 Riattiva → s:mu:off]
+   | [◀️ Impostazioni → s]
+## db after step 3
++ notification_prefs user_id=10,product_id=NULL {mute=1, mute_until="2026-03-01T20:00:00+00:00", digest_mode=0, digest_interval_minutes=60, quiet_hours_start=NULL, quiet_hours_end=NULL, throttle_per_hour=NULL, timezone="Europe/Rome", throttle_state_json=NULL, updated_at=<now:9999-99-99 99:99:99>}
+## step 4: press "s:dg" user=10 on=1 synthetic
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1
+   param link_preview_options={"is_disabled": true}
+   param parse_mode="HTML"
+   text:
+   | 📬 <b>Digest</b>
+   |
+   | Attuale: off
+   keyboard:
+   | [Attivo → s:dg:on] [Disattivo ✓ → s:dg:off]
+   | [◀️ Impostazioni → s]
+## db after step 4
+(no changes)
+## step 5: press "s:dg:on" user=10 on=1
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1
+   param link_preview_options={"is_disabled": true}
+   param parse_mode="HTML"
+   text:
+   | 📬 <b>Digest</b>
+   |
+   | Attuale: attivo, ogni 1 h
+   keyboard:
+   | [Attivo ✓ → s:dg:on] [Disattivo → s:dg:off]
+   | [◀️ Impostazioni → s]
+## db after step 5
+~ notification_prefs user_id=10,product_id=NULL digest_mode: 0 -> 1
+## step 6: press "s:qh" user=10 on=1 synthetic
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1
+   param link_preview_options={"is_disabled": true}
+   param parse_mode="HTML"
+   text:
+   | 🌙 <b>Ore silenziose</b>
+   |
+   | Attuale: off
+   keyboard:
+   | [22:00–08:00 → s:qh:2208] [Disattivo ✓ → s:qh:off]
+   | [◀️ Impostazioni → s]
+## db after step 6
+(no changes)
+## step 7: press "s:qh:2208" user=10 on=1
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1
+   param link_preview_options={"is_disabled": true}
+   param parse_mode="HTML"
+   text:
+   | 🌙 <b>Ore silenziose</b>
+   |
+   | Attuale: 22:00–08:00
+   keyboard:
+   | [22:00–08:00 ✓ → s:qh:2208] [Disattivo → s:qh:off]
+   | [◀️ Impostazioni → s]
+## db after step 7
+~ notification_prefs user_id=10,product_id=NULL quiet_hours_start: NULL -> "22:00"
+~ notification_prefs user_id=10,product_id=NULL quiet_hours_end: NULL -> "08:00"

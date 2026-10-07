@@ -12,7 +12,6 @@ import logging
 
 from telegram import (
     InlineKeyboardButton,
-    InlineKeyboardMarkup,
     Update,
 )
 from telegram.constants import ParseMode
@@ -33,7 +32,9 @@ from price_tracker.bot.handlers import (
     settings,
     text_input,
 )
+from price_tracker.bot.handlers._cards import home_view, reply_screen
 from price_tracker.bot.handlers._helpers import _escape_html
+from price_tracker.bot.ui.panels import home_screen
 
 logger = logging.getLogger(__name__)
 
@@ -60,36 +61,13 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 @with_locale
 @restricted
 async def cmd_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """`/menu` — render the main menu."""
-    db = _db(context)
-    is_admin = await db.is_user_admin(update.effective_user.id)
-    await _send_main_menu(update.message, is_admin)
+    """`/menu` — render the Home screen."""
+    view = await home_view(_db(context), update.effective_user.id)
+    await reply_screen(update.message, home_screen(view))
 
 
 # Alias
 cmd_help = cmd_menu
-
-
-async def _send_main_menu(message: object, is_admin: bool = False) -> None:
-    """Render the main menu inline keyboard."""
-    rows = [
-        [
-            InlineKeyboardButton("📦 Prodotti", callback_data="menu_prodotti"),
-            InlineKeyboardButton("🔍 Prezzi", callback_data="menu_prezzi"),
-        ],
-        [
-            InlineKeyboardButton("🔔 Notifiche", callback_data="menu_notifiche"),
-            InlineKeyboardButton("💾 Dati", callback_data="menu_dati"),
-        ],
-        [InlineKeyboardButton("📊 Stato e info", callback_data="menu_info")],
-    ]
-    if is_admin:
-        rows.append([InlineKeyboardButton("👑 Impostazioni (admin)", callback_data="menu_admin")])
-    await message.reply_text(  # type: ignore[attr-defined]
-        "📋 <b>Menu</b>\n\nCosa vuoi fare?",
-        parse_mode=ParseMode.HTML,
-        reply_markup=InlineKeyboardMarkup(rows),
-    )
 
 
 def _menu_back_button() -> list[InlineKeyboardButton]:
@@ -166,7 +144,6 @@ def register_handlers(app: Application) -> None:
 
 
 __all__ = [
-    "_send_main_menu",
     "cmd_help",
     "cmd_menu",
     "cmd_start",

@@ -4,26 +4,15 @@
 # frozen_now: 2026-03-01T12:00:00Z
 ## step 1: command "/lista" user=11
 -> sendMessage chat=11
-   param parse_mode="HTML"
-   text:
-   | <b>📦 I tuoi prodotti (1)</b>
--> sendMessage chat=11
    param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
-   | 📦 <b>⁨Lamp⁩</b>
-   | ⁨example.com⁩ · #2 · attivo
+   | 📦 <b>I tuoi prodotti</b> · attivo (1) · pagina 1/1
    |
-   | 💰 Ora: 30,00 €
-   | 📌 Inizio: 30,00 €
-   | 📉 Minimo: 30,00 €
-   | 🔔 Avviso: ribasso del 10% dall'inizio
-   | 🔄 Controlli: ogni 6 h · mai
+   | <b>#2</b> Lamp · 30,00 €
    keyboard:
-   | [🔍 Controlla ora → check_2] [📊 Storico → chart_2]
-   | [⏸ Pausa → pause_2] [🗑 Elimina → remove_2]
-   | [🔔 Regola avviso → edit_2] [🔄 Intervallo → setrefresh_2]
-   | [🔗 Apri → url:https://shop.example.com/item/3]
-   | [◀️ Lista → menu_prodotti]
+   | [#2 → l:a:1:2]
+   | [✅ Attivi ✓ → l:a:1] [⏸ In pausa → l:p:1] [⚠️ Errori → l:e:1]
+   | [🏠 Home → h]
 ## db after step 1
 ~ users user_id=11 display_name: NULL -> "U11"

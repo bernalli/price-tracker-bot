@@ -1,0 +1,14 @@
+# ui snapshot v1
+# screen: panels.settings_mute
+# locale: es
+# now: 2026-03-01T12:00:00Z
+text:
+   | [🔕 <b>Mute</b> 🔕 <b>Mute</b> 🔕 <b>Mute</b>]
+   | 
+   | [Current: [until 1/3/26, 21:00 until 1/3/26, 21:00 until 1/3/26, 21:00] Current: [until 1/3/26, 21:00 until 1/3/26, 21:00 until 1/3/26, 21:00] Current: [until 1/3/26, 21:00 until 1/3/26, 21:00 until 1/3/26, 21:00]]
+keyboard:
+   [1 horas](cb:s:mu:1)  [8 h](cb:s:mu:8)
+   [1 d](cb:s:mu:24)
+   [[Forever Forever Forever]](cb:s:mu:0)
+   [[🔔 Unmute 🔔 Unmute 🔔 Unmute]](cb:s:mu:off)
+   [[◀️ Settings ◀️ Settings ◀️ Setti…](cb:s)

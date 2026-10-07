@@ -4,10 +4,21 @@
 # frozen_now: 2026-03-01T12:00:00Z
 ## step 1: command "/lista" user=10
 -> sendMessage chat=10
+   param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
-   | <b>📦 I tuoi prodotti (1)</b>
--> sendMessage chat=10
+   | 📦 <b>I tuoi prodotti</b> · attivo (1) · pagina 1/1
+   |
+   | <b>#1</b> Kettle · 80,00 €
+   keyboard:
+   | [#1 → l:a:1:1]
+   | [✅ Attivi ✓ → l:a:1] [⏸ In pausa → l:p:1] [⚠️ Errori → l:e:1]
+   | [🏠 Home → h]
+## db after step 1
+~ users user_id=10 display_name: NULL -> "U10"
+## step 2: press "l:a:1:1" user=10 on=1000
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1000
    param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
@@ -24,10 +35,10 @@
    | [⏸ Pausa → pause_1] [🗑 Elimina → remove_1]
    | [🔔 Regola avviso → edit_1] [🔄 Intervallo → setrefresh_1]
    | [🔗 Apri → url:https://shop.example.com/item/1]
-   | [◀️ Lista → menu_prodotti]
-## db after step 1
-~ users user_id=10 display_name: NULL -> "U10"
-## step 2: press "edit_1" user=10 on=1001
+   | [◀️ Lista → l:a:1]
+## db after step 2
+(no changes)
+## step 3: press "edit_1" user=10 on=1000
 -> answerCallbackQuery
 -> sendMessage chat=10
    param parse_mode="HTML"
@@ -44,17 +55,17 @@
    | [📉 Soglia % o € → track_threshold_1]
    | [💰 Prezzo target → track_target_1]
    | [🔄 Azzera prezzo base → reset_1]
-## db after step 2
+## db after step 3
 (no changes)
-## step 3: press "reset_1" user=10 on=1002
+## step 4: press "reset_1" user=10 on=1001
 -> answerCallbackQuery
--> editMessageText chat=10 message_id=1002
+-> editMessageText chat=10 message_id=1001
    param parse_mode="HTML"
    text:
    | ✅ Prezzo base aggiornato!
    |
    | 📦 <b>#1</b> Kettle
    | 💰 Nuovo base: <b>€80.00</b>
-## db after step 3
+## db after step 4
 ~ products id=1 initial_price: "100.00" -> "80.00"
 ~ products id=1 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>

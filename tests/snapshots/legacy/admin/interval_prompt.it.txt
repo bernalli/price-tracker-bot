@@ -96,16 +96,19 @@
 ~ bot_config key="check_interval_minutes" value: "5" -> "60"
 ## step 13: command "/menu" user=1
 -> sendMessage chat=1
+   param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
-   | 📋 <b>Menu</b>
+   | 🏠 <b>Price Tracker</b>
    |
-   | Cosa vuoi fare?
+   | 📦 0 attivi · ⏸ 0 in pausa
+   |
+   | Incolla il link di un prodotto per iniziare a seguirlo.
    keyboard:
-   | [📦 Prodotti → menu_prodotti] [🔍 Prezzi → menu_prezzi]
-   | [🔔 Notifiche → menu_notifiche] [💾 Dati → menu_dati]
-   | [📊 Stato e info → menu_info]
-   | [👑 Impostazioni (admin) → menu_admin]
+   | [📦 Prodotti → l:a:1] [🔍 Verifica tutti → menu_checkall]
+   | [📊 Statistiche → menu_info] [💾 Dati → menu_dati]
+   | [⚙️ Impostazioni → s]
+   | [👑 Admin → menu_admin]
 ## db after step 13
 (no changes)
 ## step 14: press "menu_info" user=1 on=1008
