@@ -124,7 +124,7 @@
    | ⏱ Intervallo: ogni 1h
    |
    | 👑 <b>Admin</b>
-   | 👥 Utenti: 3
+   | 👥 Utenti attivi: 3
    | 📦 Prodotti globali: 0
    | 🔄 Check globali: 0
    keyboard:

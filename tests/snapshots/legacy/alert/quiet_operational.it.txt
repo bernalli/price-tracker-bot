@@ -21,7 +21,7 @@
    text:
    | 📊 <b>Riepilogo — 0 variazioni di prezzo</b>
    | ⚠️ Avvisi operativi
-   | example.com — 1 prodotti: controlli in errore (1/1)
+   | example.com — 1 prodotti: controlli in errore (2/4)
    | Usa /reactivate o /errori per i dettagli.
    | Usa /lista per lo stato completo.
 -> sendMessage chat=10

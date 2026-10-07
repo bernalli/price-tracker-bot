@@ -42,7 +42,7 @@
 -> editMessageText chat=1 message_id=1000
    param parse_mode="HTML"
    text:
-   | 👥 <b>Utenti</b>
+   | 👥 <b>Utenti attivi</b>
    |
    | 👑 <code>1</code> U1 — 0 prod.
    | 👤 <code>10</code> N/D — 1 prod.

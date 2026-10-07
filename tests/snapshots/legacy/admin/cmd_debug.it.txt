@@ -6,7 +6,7 @@
 -> sendMessage chat=1
    param parse_mode="HTML"
    text:
-   | ❌ Uso: /debug <url>
+   | ❌ Uso: /debug &lt;url&gt;
 ## db after step 1
 (no changes)
 ## step 2: command "/debug https://shop.example.com/item/1" user=1
