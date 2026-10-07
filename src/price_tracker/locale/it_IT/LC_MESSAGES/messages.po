@@ -1100,3 +1100,79 @@ msgstr "Disattivo"
 #: src/price_tracker/bot/ui/panels.py
 msgid "◀️ Settings"
 msgstr "◀️ Impostazioni"
+
+#: src/price_tracker/bot/ui/cards.py
+#, python-brace-format
+msgid "📦 <b>Your products</b> · {filter} ({total}) · page {page}/{pages}"
+msgstr "📦 <b>I tuoi prodotti</b> · {filter} ({total}) · pagina {page}/{pages}"
+
+#: src/price_tracker/bot/ui/cards.py
+msgid "errors"
+msgstr "errori"
+
+#: src/price_tracker/bot/ui/cards.py
+#, python-brace-format
+msgid "{mark}<b>#{id}</b> {name} · {price}"
+msgstr "{mark}<b>#{id}</b> {name} · {price}"
+
+#: src/price_tracker/bot/ui/cards.py
+msgid "Nothing here."
+msgstr "Non c'è niente qui."
+
+#: src/price_tracker/bot/ui/cards.py
+msgid "✅ Active"
+msgstr "✅ Attivi"
+
+#: src/price_tracker/bot/ui/cards.py
+msgid "⏸ Paused"
+msgstr "⏸ In pausa"
+
+#: src/price_tracker/bot/ui/cards.py
+msgid "⚠️ Errors"
+msgstr "⚠️ Errori"
+
+#: src/price_tracker/bot/ui/cards.py
+msgid "🗑 Delete all"
+msgstr "🗑 Elimina tutti"
+
+#: src/price_tracker/bot/ui/panels.py
+#, python-brace-format
+msgid "📦 {active} · ⏸ {paused}"
+msgstr "📦 {active} · ⏸ {paused}"
+
+#: src/price_tracker/bot/ui/panels.py
+#, python-brace-format
+msgid "{n} active"
+msgid_plural "{n} active"
+msgstr[0] "{n} attivo"
+msgstr[1] "{n} attivi"
+
+#: src/price_tracker/bot/ui/panels.py
+#, python-brace-format
+msgid "{n} paused"
+msgstr "{n} in pausa"
+
+#: src/price_tracker/bot/ui/panels.py
+#, python-brace-format
+msgid "🏠 <b>Price Tracker</b>\n\n{counts}\n\nPaste a product link to start tracking."
+msgstr "🏠 <b>Price Tracker</b>\n\n{counts}\n\nIncolla il link di un prodotto per iniziare a seguirlo."
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "📦 Products"
+msgstr "📦 Prodotti"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "🔍 Check all"
+msgstr "🔍 Verifica tutti"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "📊 Statistics"
+msgstr "📊 Statistiche"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "💾 Data"
+msgstr "💾 Dati"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "⚙️ Settings"
+msgstr "⚙️ Impostazioni"

@@ -1,4 +1,4 @@
-"""The settings panels: pure screens built from a ``PrefsView``.
+"""The Home screen and the settings panels: pure screens built from a view.
 
 Only the values the code already has presets for get buttons (mute, digest and
 quiet hours); timezone and throttle are shown with the command that changes them.
@@ -10,14 +10,14 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Final
 
 from price_tracker.bot.callbacks import MUTE_PRESETS, Action, encode
-from price_tracker.bot.messages import _, current_locale
+from price_tracker.bot.messages import _, current_locale, ngettext
 from price_tracker.bot.ui.escape import escape_html
 from price_tracker.bot.ui.labels import button, layout_rows
 from price_tracker.bot.ui.screens import Button, Screen
 from price_tracker.i18n.format import duration, when
 
 if TYPE_CHECKING:
-    from price_tracker.app.views import PrefsView
+    from price_tracker.app.views import HomeView, PrefsView
 
 # Wire value of the quiet-hours preset -> the HH:MM window it stands for.
 QUIET_WINDOWS: Final = {"2208": ("22:00", "08:00")}
@@ -67,7 +67,8 @@ def _throttle_value(view: PrefsView) -> str:
     return _("{n} per hour").format(n=view.throttle_per_hour)
 
 
-def _home() -> Button:
+def home_button() -> Button:
+    """The button that returns to the Home screen."""
     return button(_("🏠 Home"), callback=encode(Action("home")))
 
 
@@ -104,7 +105,7 @@ def settings_screen(view: PrefsView, *, now: datetime) -> Screen:
         button(_("📬 Digest"), callback=encode(Action("settings.section", ("dg",)))),
         button(_("🌙 Quiet hours"), callback=encode(Action("settings.section", ("qh",)))),
     ]
-    return Screen(text="\n".join(lines), rows=layout_rows(sections, [_home()]))
+    return Screen(text="\n".join(lines), rows=layout_rows(sections, [home_button()]))
 
 
 def _mute_presets(view: PrefsView, now: datetime, loc: str) -> list[Button]:
@@ -161,3 +162,27 @@ def settings_section_screen(section: str, view: PrefsView, *, now: datetime) -> 
     back = button(_("◀️ Settings"), callback=encode(Action("settings")))
     current = _("Current: {value}").format(value=value)
     return Screen(text=f"{title}\n\n{current}", rows=layout_rows(presets, [back]))
+
+
+def home_screen(view: HomeView) -> Screen:
+    """The Home screen: counts, and a way into every area. Legacy buttons stay for the areas
+    that have no screen of their own yet."""
+    counts = _("📦 {active} · ⏸ {paused}").format(
+        # The English adjective does not change; other languages inflect it.
+        active=ngettext("{n} active", "{n} active", view.active).format(n=view.active),
+        paused=_("{n} paused").format(n=view.paused),
+    )
+    text = _(
+        "🏠 <b>Price Tracker</b>\n\n{counts}\n\nPaste a product link to start tracking."
+    ).format(counts=counts)
+    areas = [
+        button(_("📦 Products"), callback=encode(Action("list.page", ("a", 1)))),
+        button(_("🔍 Check all"), callback="menu_checkall"),
+        button(_("📊 Statistics"), callback="menu_info"),
+        button(_("💾 Data"), callback="menu_dati"),
+    ]
+    settings = button(_("⚙️ Settings"), callback=encode(Action("settings")))
+    groups = [areas, [settings]]
+    if view.is_admin:
+        groups.append([button(_("👑 Admin"), callback="menu_admin")])
+    return Screen(text=text, rows=layout_rows(*groups))

@@ -1,0 +1,15 @@
+# ui snapshot v1
+# screen: panels.home_admin
+# locale: en
+# now: 2026-03-01T12:00:00Z
+text:
+   | 🏠 <b>Price Tracker</b>
+   | 
+   | 📦 3 active · ⏸ 1 paused
+   | 
+   | Paste a product link to start tracking.
+keyboard:
+   [📦 Products](cb:l:a:1)  [🔍 Check all](cb:menu_checkall)
+   [📊 Statistics](cb:menu_info)  [💾 Data](cb:menu_dati)
+   [⚙️ Settings](cb:s)
+   [👑 Admin](cb:menu_admin)

@@ -8,7 +8,9 @@ import asyncio
 import dataclasses
 import logging
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock, call
 
@@ -21,7 +23,9 @@ from hypothesis import strategies as st
 from telegram.error import BadRequest, RetryAfter
 
 import price_tracker
+from price_tracker.app.views import HomeView
 from price_tracker.bot.callbacks import (
+    ID_MAX,
     REGISTRY,
     Action,
     BackArg,
@@ -32,6 +36,8 @@ from price_tracker.bot.callbacks import (
     decode,
     encode,
 )
+from price_tracker.bot.handlers import cmd_help, cmd_menu
+from price_tracker.bot.handlers._cards import list_view, screen_markup
 from price_tracker.bot.handlers.callbacks import _nav, handle_callback
 from price_tracker.bot.handlers.settings import (
     digest_mode_command,
@@ -39,12 +45,18 @@ from price_tracker.bot.handlers.settings import (
     quiet_hours_command,
     unmute_command,
 )
+from price_tracker.bot.messages import set_locale
+from price_tracker.bot.ui.cards import list_page
+from price_tracker.bot.ui.panels import home_screen
 from price_tracker.db.migrator import apply_migrations
 from price_tracker.db.models import NotificationPrefs
 from price_tracker.db.repository import Repository
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
+
+    from price_tracker.app.views import ListFilter
+    from price_tracker.bot.ui.screens import Screen
 
 MIGRATIONS_DIR = Path(price_tracker.__file__).resolve().parent / "db" / "migrations"
 USER = 10
@@ -58,6 +70,9 @@ HANDLED = frozenset(
         "settings.mute",
         "settings.digest",
         "settings.quiet",
+        "list.page",
+        "list.open",
+        "home",
     }
 )
 
@@ -86,7 +101,11 @@ def make_query(data: str | None, user_id: int = USER) -> MagicMock:
 
 def make_context(db: Any) -> MagicMock:
     context = MagicMock()
-    context.bot_data = {"db": db, "repository": db}
+    context.bot_data = {
+        "db": db,
+        "repository": db,
+        "config": SimpleNamespace(check_interval_minutes=360),
+    }
     context.user_data = {}
     return context
 
@@ -398,3 +417,230 @@ def test_any_sequence_of_presses_matches_the_model(wires: list[str]) -> None:
     assert count == 1
     assert row is not None
     assert dataclasses.asdict(row) == {**state, "updated_at": None}
+
+
+# --- the list: pages, cards in place, stale buttons ---------------------------
+
+OTHER_USER = 12
+ADMIN = 13
+NAMES = [f"Item {i}" for i in range(1, 13)]
+
+
+async def add_product(repo: Repository, user_id: int, name: str) -> int:
+    return await repo.add_product(
+        user_id=user_id,
+        url=f"https://shop.example.com/{name.replace(' ', '-')}",
+        name=name,
+        domain="shop.example.com",
+        initial_price=Decimal("10"),
+        currency="EUR",
+    )
+
+
+@pytest_asyncio.fixture
+async def twelve(repo: Repository) -> list[int]:
+    return [await add_product(repo, USER, name) for name in NAMES]
+
+
+async def render_list(repo: Repository, list_filter: ListFilter, page: int) -> Screen:
+    records = await repo.get_all_products(USER)
+    set_locale("en")
+    return list_page(list_view(records, list_filter, page, default_interval_minutes=360))
+
+
+def shown(query: MagicMock) -> tuple[str, Any]:
+    """The text and keyboard of the last edit of ``query``."""
+    call = query.edit_message_text.await_args
+    return call.args[0], call.kwargs["reply_markup"]
+
+
+def assert_shows(query: MagicMock, screen: Screen) -> None:
+    text, markup = shown(query)
+    assert text == screen.text
+    assert markup == screen_markup(screen)
+
+
+async def test_walking_the_pages_renders_each_one_and_keeps_no_state(
+    repo: Repository, twelve: list[int]
+) -> None:
+    context = make_context(repo)
+    bot_data = dict(context.bot_data)
+    for page in (1, 2, 3):
+        query = make_query(f"l:a:{page}")
+        await handle_callback(make_update(query), context)
+        assert_shows(query, await render_list(repo, "a", page))
+    assert context.user_data == {}
+    assert context.bot_data == bot_data
+
+
+async def test_a_card_opened_from_the_list_returns_to_the_same_page_and_filter(
+    repo: Repository, twelve: list[int]
+) -> None:
+    for pid in twelve[:3]:
+        await repo.increment_errors(pid)
+    query = await press(repo, f"l:e:2:{twelve[1]}")
+    _, markup = shown(query)
+    back = [b for row in markup.inline_keyboard for b in row if b.text == "◀️ List"]
+    assert [decode(b.callback_data) for b in back] == [Action("list.page", ("e", 2))]
+    returned = await press(repo, back[0].callback_data)
+    assert_shows(returned, await render_list(repo, "e", 2))
+
+
+@pytest.mark.parametrize("viewer", [USER, ADMIN], ids=["user", "admin"])
+async def test_a_product_of_another_user_is_not_found_and_not_revealed(
+    repo: Repository, monkeypatch: pytest.MonkeyPatch, viewer: int
+) -> None:
+    await repo.ensure_user(OTHER_USER)
+    await repo.ensure_user(ADMIN, is_admin=True)
+    await add_product(repo, viewer, "Mine")
+    foreign = await add_product(repo, OTHER_USER, "Secret Fan")
+    asked: list[tuple[int, int]] = []
+    original = repo.get_product_for_user
+
+    async def spy(product_id: int, user_id: int) -> Any:
+        asked.append((product_id, user_id))
+        return await original(product_id, user_id)
+
+    monkeypatch.setattr(repo, "get_product_for_user", spy)
+    query = make_query(f"l:a:1:{foreign}", user_id=viewer)
+    await handle_callback(make_update(query), make_context(repo))
+    text, markup = shown(query)
+    assert asked == [(foreign, viewer)]
+    assert text.startswith("Product not found.")
+    assert "Secret Fan" not in text
+    assert f"check_{foreign}" not in {b.callback_data for r in markup.inline_keyboard for b in r}
+    assert "Mine" in text
+
+
+async def test_a_product_deleted_after_the_page_was_drawn_gives_a_notice_and_the_page(
+    repo: Repository, twelve: list[int]
+) -> None:
+    await repo.delete_product(twelve[0], user_id=USER)
+    query = await press(repo, f"l:a:1:{twelve[0]}")
+    text, _ = shown(query)
+    expected = await render_list(repo, "a", 1)
+    assert text == f"Product not found.\n\n{expected.text}"
+
+
+@pytest.mark.parametrize("asked", [4, ID_MAX])
+async def test_a_page_past_the_end_is_clamped_to_the_last(
+    repo: Repository, twelve: list[int], asked: int
+) -> None:
+    query = await press(repo, f"l:a:{asked}")
+    assert_shows(query, await render_list(repo, "a", 3))
+    assert "page 3/3" in shown(query)[0]
+
+
+async def test_a_filter_that_emptied_says_so(repo: Repository) -> None:
+    only = await add_product(repo, USER, "Kettle")
+    await repo.pause_product(only)
+    query = await press(repo, "l:a:1")
+    text, _ = shown(query)
+    assert text.endswith("Nothing here.")
+
+
+async def test_nothing_left_shows_the_empty_text_and_home(repo: Repository) -> None:
+    query = await press(repo, "l:a:1")
+    text, markup = shown(query)
+    assert "Non hai prodotti tracciati" in text
+    assert [b.callback_data for r in markup.inline_keyboard for b in r] == ["h"]
+
+
+async def test_pressing_pages_out_of_order_always_renders_the_page_asked(
+    repo: Repository, twelve: list[int]
+) -> None:
+    for page in (3, 1, 3):
+        query = await press(repo, f"l:a:{page}")
+        assert_shows(query, await render_list(repo, "a", page))
+
+
+async def test_a_double_tap_is_two_edits_and_the_second_failure_is_ignored(
+    repo: Repository, twelve: list[int]
+) -> None:
+    context = make_context(repo)
+    first = make_query("l:a:2")
+    second = make_query("l:a:2")
+    second.edit_message_text = AsyncMock(side_effect=BadRequest("Message is not modified"))
+    await handle_callback(make_update(first), context)
+    await handle_callback(make_update(second), context)
+    first.edit_message_text.assert_awaited_once()
+    second.edit_message_text.assert_awaited_once()
+    assert_shows(first, await render_list(repo, "a", 2))
+
+
+@pytest.mark.parametrize(
+    ("error", "levels"),
+    [
+        (BadRequest("Message is not modified: the same"), []),
+        (BadRequest("Message to edit not found"), [logging.WARNING]),
+        (RetryAfter(3), [logging.WARNING]),
+    ],
+    ids=["not-modified", "not-found", "retry-after"],
+)
+async def test_the_list_tolerates_what_telegram_answers_to_an_edit(
+    repo: Repository,
+    twelve: list[int],
+    caplog: pytest.LogCaptureFixture,
+    error: Exception,
+    levels: list[int],
+) -> None:
+    query = make_query("l:a:1")
+    query.edit_message_text = AsyncMock(side_effect=error)
+    with caplog.at_level(logging.WARNING):
+        await handle_callback(make_update(query), make_context(repo))
+    query.edit_message_text.assert_awaited_once()
+    query.message.reply_text.assert_not_called()
+    assert [record.levelno for record in caplog.records] == levels
+
+
+# --- Home ----------------------------------------------------------------------
+
+
+def make_command_update(user_id: int) -> MagicMock:
+    update = MagicMock()
+    update.effective_user.id = user_id
+    update.effective_user.language_code = "en"
+    update.effective_user.first_name = "U"
+    update.effective_user.username = "u"
+    update.message.reply_text = AsyncMock()
+    return update
+
+
+async def home_of(repo: Repository, user_id: int) -> list[tuple[str, Any]]:
+    """What /menu, /help, ``h`` and ``menu_main`` show to ``user_id``."""
+    context = make_context(repo)
+    shown_by: list[tuple[str, Any]] = []
+    for command in (cmd_menu, cmd_help):
+        update = make_command_update(user_id)
+        await command(update, context)
+        call = update.message.reply_text.await_args
+        shown_by.append((call.args[0], call.kwargs["reply_markup"]))
+    for data in ("h", "menu_main"):
+        query = make_query(data, user_id=user_id)
+        await handle_callback(make_update(query), context)
+        shown_by.append(shown(query))
+    return shown_by
+
+
+async def test_every_way_to_the_home_shows_the_same_screen(repo: Repository) -> None:
+    await add_product(repo, USER, "Kettle")
+    paused = await add_product(repo, USER, "Fan")
+    await add_product(repo, USER, "Lamp")
+    await repo.pause_product(paused)
+    screens = await home_of(repo, USER)
+    assert len({text for text, _ in screens}) == 1
+    assert len({str(markup) for _, markup in screens}) == 1
+    set_locale("en")
+    expected = home_screen(HomeView(active=2, paused=1, is_admin=False))
+    assert screens[0][0] == expected.text
+    assert screens[0][1] == screen_markup(expected)
+
+
+@pytest.mark.parametrize(("user_id", "admin"), [(USER, False), (ADMIN, True)])
+async def test_the_admin_button_is_only_for_admins_on_every_path(
+    repo: Repository, user_id: int, admin: bool
+) -> None:
+    await repo.ensure_user(ADMIN, is_admin=True)
+    for _text, markup in await home_of(repo, user_id):
+        wires = {b.callback_data for row in markup.inline_keyboard for b in row}
+        assert ("menu_admin" in wires) is admin

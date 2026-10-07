@@ -28,7 +28,9 @@ TRANSITIONAL_IMPORTS: Final = frozenset({"price_tracker.bot.messages"})
 
 # The callback codec is plain data (stdlib and Babel only); screens encode their own buttons.
 CODEC_MODULE: Final = "price_tracker.bot.callbacks"
-CODEC_IMPORTERS: Final = frozenset({"src/price_tracker/bot/ui/panels.py"})
+CODEC_IMPORTERS: Final = frozenset(
+    {"src/price_tracker/bot/ui/panels.py", "src/price_tracker/bot/ui/cards.py"}
+)
 
 _STDLIB: Final = frozenset(sys.stdlib_module_names)
 
@@ -205,9 +207,10 @@ def test_bot_ui_package_boundaries() -> None:
     assert violations == []
 
 
-def test_codec_exception_is_scoped_to_panels() -> None:
-    assert _check_bot_ui([CODEC_MODULE], "src/price_tracker/bot/ui/panels.py") == []
-    assert _check_bot_ui([CODEC_MODULE], "src/price_tracker/bot/ui/cards.py")
+def test_codec_exception_is_scoped_to_the_screens_that_encode_their_buttons() -> None:
+    for importer in CODEC_IMPORTERS:
+        assert _check_bot_ui([CODEC_MODULE], importer) == []
+    assert _check_bot_ui([CODEC_MODULE], "src/price_tracker/bot/ui/labels.py")
 
 
 def test_app_views_boundaries() -> None:

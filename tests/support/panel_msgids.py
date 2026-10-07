@@ -1,4 +1,4 @@
-"""The closed list of msgids the settings panels added.
+"""The closed list of msgids the settings panels, the list and the Home screen added.
 
 Shared between ``tests/i18n/test_nav_catalog.py`` (verifies the source and
 compiled catalogs) and ``tests/ui/test_snapshots.py`` (verifies the pseudo
@@ -34,8 +34,37 @@ PANEL_SINGULAR: tuple[str, ...] = (
     "On",
     "Off",
     "◀️ Settings",
+    "📦 <b>Your products</b> · {filter} ({total}) · page {page}/{pages}",
+    "errors",
+    "{mark}<b>#{id}</b> {name} · {price}",
+    "Nothing here.",
+    "✅ Active",
+    "⏸ Paused",
+    "⚠️ Errors",
+    "🗑 Delete all",
+    "📦 {active} · ⏸ {paused}",
+    "{n} paused",
+    "🏠 <b>Price Tracker</b>\n\n{counts}\n\nPaste a product link to start tracking.",
+    "📦 Products",
+    "🔍 Check all",
+    "📊 Statistics",
+    "💾 Data",
+    "⚙️ Settings",
+    "👑 Admin",
+    "Product not found.",
 )
 
+PANEL_PLURAL: tuple[str, str] = ("{n} active", "{n} active")
+
 PANEL_IDENTICAL: frozenset[str] = frozenset(
-    {"📬 Digest: {digest}", "off", "📬 Digest", "🏠 Home", "📬 <b>Digest</b>"}
+    {
+        "📬 Digest: {digest}",
+        "off",
+        "📬 Digest",
+        "🏠 Home",
+        "📬 <b>Digest</b>",
+        "{mark}<b>#{id}</b> {name} · {price}",
+        "📦 {active} · ⏸ {paused}",
+        "👑 Admin",
+    }
 )

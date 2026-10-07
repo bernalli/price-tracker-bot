@@ -887,7 +887,7 @@ async def test_h13_seed_commands_are_listed_but_not_captured(frozen_world: Legac
     await w.recorder.seed('"/digest_mode on"', w.run_command(OWNER, "/digest_mode on"))
     await w.recorder.seed('"/menu"', w.run_command(OWNER, "/menu"))
     menu = w.request.calls_of("sendMessage")[-1]
-    assert "menu_prodotti" in menu.callback_data()
+    assert "l:a:1" in menu.callback_data()
     await w.recorder.seed('press "menu_dati"', w.run_press(OWNER, "menu_dati"))
     await w.recorder.press(OWNER, "menu_importa_info")
 
@@ -1504,6 +1504,11 @@ async def open_menu(w: LegacyWorld, user: int) -> Call:
     return w.request.calls_of("sendMessage")[-1]
 
 
+async def open_card(w: LegacyWorld, product_id: int) -> None:
+    """Open the card of ``product_id`` from the list page showing it, as its button does."""
+    await w.recorder.press(OWNER, f"l:a:1:{product_id}")
+
+
 async def seed_lock_until(w: LegacyWorld, domain: str, until: str) -> None:
     """Move the lock expiry of ``domain`` and reload the health manager (seed steps)."""
     await w.recorder.seed(
@@ -1557,6 +1562,13 @@ async def scenario_home_menu_admin(w: LegacyWorld) -> None:
 @scenario("home.help_alias")
 async def scenario_home_help_alias(w: LegacyWorld) -> None:
     await w.recorder.command(OWNER, "/help")
+
+
+@scenario("home.menu_button")
+async def scenario_home_menu_button(w: LegacyWorld) -> None:
+    await seed_p1(w)
+    await w.recorder.command(OWNER, "/lista")
+    await w.recorder.press(OWNER, "h")
 
 
 @scenario("home.unauthorized")
@@ -1641,6 +1653,42 @@ async def scenario_lista_edges(w: LegacyWorld) -> None:
     )
     await seed_product(w, OWNER, item_url(75), "Sticker", initial="0.90", current="0.80")
     await w.recorder.command(OWNER, "/lista")
+
+
+@scenario("lista.pages")
+async def scenario_lista_pages(w: LegacyWorld) -> None:
+    # Seven products, one with errors: first page, next page, the errors filter,
+    # a card opened in place and its way back.
+    names = ("Kettle", "Fan", "Lamp", "Heater", "Mixer", "Toaster", "Blender")
+    flaky = 0
+    for n, name in enumerate(names, start=80):
+        product = await seed_product(
+            w,
+            OWNER,
+            item_url(n),
+            name,
+            initial="20.00",
+            current="18.00",
+            errors=2 if name == "Mixer" else 0,
+        )
+        flaky = product if name == "Mixer" else flaky
+    await w.recorder.command(OWNER, "/lista")
+    await w.recorder.press(OWNER, "l:a:2")
+    await w.recorder.press(OWNER, "l:e:1")
+    await w.recorder.press(OWNER, f"l:e:1:{flaky}")
+    await w.recorder.press(OWNER, "l:e:1")
+
+
+@scenario("lista.stale")
+async def scenario_lista_stale(w: LegacyWorld) -> None:
+    # A card of a product deleted after the page was drawn, and the id of another user's product.
+    gone = await seed_p1(w)
+    await seed_p2(w)
+    foreign = await seed_p3(w)
+    await w.recorder.command(OWNER, "/lista")
+    await w.recorder.seed("delete product", w.repo.delete_product(gone, user_id=OWNER))
+    await w.recorder.press(OWNER, f"l:a:1:{gone}")
+    await w.recorder.press(OWNER, f"l:a:1:{foreign}")
 
 
 # menu ─────────────────────────────────────────────────────────────────
@@ -1872,6 +1920,7 @@ async def scenario_menu_long_names(w: LegacyWorld) -> None:
 async def scenario_product_edit(w: LegacyWorld) -> None:
     p1 = await seed_p1(w)
     await w.recorder.command(OWNER, "/lista")
+    await open_card(w, p1)
     await w.recorder.press(OWNER, f"edit_{p1}")
 
 
@@ -1879,6 +1928,7 @@ async def scenario_product_edit(w: LegacyWorld) -> None:
 async def scenario_product_edit_no_reset(w: LegacyWorld) -> None:
     p1 = await seed_p1(w, current="100.00")
     await w.recorder.command(OWNER, "/lista")
+    await open_card(w, p1)
     await w.recorder.press(OWNER, f"edit_{p1}")
 
 
@@ -1902,6 +1952,7 @@ async def scenario_product_ownership(w: LegacyWorld) -> None:
 async def scenario_product_pause_button(w: LegacyWorld) -> None:
     p1 = await seed_p1(w)
     await w.recorder.command(OWNER, "/lista")
+    await open_card(w, p1)
     await w.recorder.press(OWNER, f"pause_{p1}")
 
 
@@ -1909,6 +1960,7 @@ async def scenario_product_pause_button(w: LegacyWorld) -> None:
 async def scenario_product_remove_button(w: LegacyWorld) -> None:
     p1 = await seed_p1(w)
     await w.recorder.command(OWNER, "/lista")
+    await open_card(w, p1)
     await w.recorder.press(OWNER, f"remove_{p1}")
 
 
@@ -1916,6 +1968,7 @@ async def scenario_product_remove_button(w: LegacyWorld) -> None:
 async def scenario_product_confirm_delete(w: LegacyWorld) -> None:
     p1 = await seed_p1(w)
     await w.recorder.command(OWNER, "/lista")
+    await open_card(w, p1)
     await w.recorder.press(OWNER, f"remove_{p1}")
     await w.recorder.press(OWNER, f"confirm_delete_{p1}")
 
@@ -1931,6 +1984,7 @@ async def scenario_product_confirm_delete_not_found(w: LegacyWorld) -> None:
 async def scenario_product_cancel_delete(w: LegacyWorld) -> None:
     p1 = await seed_p1(w)
     await w.recorder.command(OWNER, "/lista")
+    await open_card(w, p1)
     await w.recorder.press(OWNER, f"remove_{p1}")
     await w.recorder.press(OWNER, "cancel_delete")
 
@@ -1962,6 +2016,7 @@ async def scenario_product_confirmdeleteall(w: LegacyWorld) -> None:
 async def scenario_product_reset_button(w: LegacyWorld) -> None:
     p1 = await seed_p1(w)
     await w.recorder.command(OWNER, "/lista")
+    await open_card(w, p1)
     await w.recorder.press(OWNER, f"edit_{p1}")
     await w.recorder.press(OWNER, f"reset_{p1}")
 
@@ -1984,6 +2039,7 @@ async def scenario_product_check_button_drop(w: LegacyWorld) -> None:
     p1 = await seed_p1(w)
     script_drop(w)
     await w.recorder.command(OWNER, "/lista")
+    await open_card(w, p1)
     await w.recorder.press(OWNER, f"check_{p1}")
 
 
@@ -1992,6 +2048,7 @@ async def scenario_product_check_button_no_change(w: LegacyWorld) -> None:
     p1 = await seed_p1(w)
     w.scraper.script(KETTLE_URL, info("80.00"))
     await w.recorder.command(OWNER, "/lista")
+    await open_card(w, p1)
     await w.recorder.press(OWNER, f"check_{p1}")
     cheap, near = await seed_cheap_and_near(w)
     # The press above wrote SQLite's real clock; the card below prints its age.
@@ -2000,7 +2057,10 @@ async def scenario_product_check_button_no_change(w: LegacyWorld) -> None:
         reanchor(w, "products", {"id": p1}, "last_checked_at", "2026-03-01 11:00:00"),
     )
     await w.recorder.command(OWNER, "/lista")
+    await open_card(w, cheap)
     await w.recorder.press(OWNER, f"check_{cheap}")
+    await w.recorder.command(OWNER, "/lista")
+    await open_card(w, near)
     await w.recorder.press(OWNER, f"check_{near}")
 
 
@@ -2009,6 +2069,7 @@ async def scenario_product_check_button_scrape_error(w: LegacyWorld) -> None:
     p1 = await seed_p1(w)
     w.scraper.script(KETTLE_URL, ParseError("no price"))
     await w.recorder.command(OWNER, "/lista")
+    await open_card(w, p1)
     await w.recorder.press(OWNER, f"check_{p1}")
 
 
@@ -2023,6 +2084,7 @@ async def scenario_product_check_button_not_found(w: LegacyWorld) -> None:
 async def scenario_product_chart_button(w: LegacyWorld) -> None:
     p1 = await seed_p1(w)
     await w.recorder.command(OWNER, "/lista")
+    await open_card(w, p1)
     await w.recorder.press(OWNER, f"chart_{p1}")
 
 
@@ -2124,7 +2186,8 @@ async def scenario_product_check_button_no_drop(w: LegacyWorld) -> None:
     p1 = await seed_p1(w, current="100.00")
     w.scraper.script(KETTLE_URL, info("100.00"), info("120.00"))
     await w.recorder.command(OWNER, "/lista")
-    card = next(c for c in w.request.calls_of("sendMessage") if f"check_{p1}" in c.callback_data())
+    await open_card(w, p1)
+    card = w.request.calls_of("editMessageText")[-1]
     await w.recorder.press(OWNER, f"check_{p1}", on=card)
     await w.recorder.press(OWNER, f"check_{p1}", on=card)
 
@@ -2635,6 +2698,12 @@ async def reanchor_digest(w: LegacyWorld, *stamps: str) -> None:
             "reanchor enqueued_at",
             reanchor(w, "digest_queue", {"id": row_id}, "enqueued_at", stamp),
         )
+
+
+@scenario("settings.panel")
+async def scenario_settings_panel(w: LegacyWorld) -> None:
+    for data in ("s", "s:mu", "s:mu:8", "s:dg", "s:dg:on", "s:qh", "s:qh:2208"):
+        await w.recorder.press(OWNER, data)
 
 
 @scenario("settings.interval")

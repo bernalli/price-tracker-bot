@@ -6,8 +6,8 @@ import dataclasses
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
-from price_tracker.app.views import PrefsView
-from price_tracker.bot.ui.panels import settings_screen, settings_section_screen
+from price_tracker.app.views import HomeView, PrefsView
+from price_tracker.bot.ui.panels import home_screen, settings_screen, settings_section_screen
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -48,4 +48,6 @@ SCREENS: dict[str, Callable[[], Screen]] = {
     "settings_mute": lambda: settings_section_screen("mu", BUSY, now=NOW),
     "settings_digest": lambda: settings_section_screen("dg", BUSY, now=NOW),
     "settings_quiet": lambda: settings_section_screen("qh", BUSY, now=NOW),
+    "home_user": lambda: home_screen(HomeView(active=3, paused=1, is_admin=False)),
+    "home_admin": lambda: home_screen(HomeView(active=3, paused=1, is_admin=True)),
 }

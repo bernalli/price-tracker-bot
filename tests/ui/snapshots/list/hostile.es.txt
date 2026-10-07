@@ -1,0 +1,15 @@
+# ui snapshot v1
+# screen: list.hostile
+# locale: es
+# now: 2026-03-01T12:00:00Z
+text:
+   | [📦 <b>Your products</b> · [paused paused paused] (3) · page 1/1 📦 <b>Your products</b> · [paused paused paused] (3) · page 1/1 📦 <b>Your products</b> · [paused paused paused] (3) · page 1/1]
+   | 
+   | [⏸ <b>#1</b> &lt;b&gt;&amp;&quot;&#x27; &lt;/b&gt; xxxxxxxxxxxxxxxxxxxxxxxxxxx… · 19,99 € ⏸ <b>#1</b> &lt;b&gt;&amp;&quot;&#x27; &lt;/b&gt; xxxxxxxxxxxxxxxxxxxxxxxxxxx… · 19,99 € ⏸ <b>#1</b> &lt;b&gt;&amp;&quot;&#x27; &lt;/b&gt; xxxxxxxxxxxxxxxxxxxxxxxxxxx… · 19,99 €]
+   | [⏸ <b>#2</b> &lt;b&gt;&amp;&quot;&#x27; &lt;/b&gt; xxxxxxxxxxxxxxxxxxxxxxxxxxx… · 19,99 € ⏸ <b>#2</b> &lt;b&gt;&amp;&quot;&#x27; &lt;/b&gt; xxxxxxxxxxxxxxxxxxxxxxxxxxx… · 19,99 € ⏸ <b>#2</b> &lt;b&gt;&amp;&quot;&#x27; &lt;/b&gt; xxxxxxxxxxxxxxxxxxxxxxxxxxx… · 19,99 €]
+   | [<b>#3</b> &lt;b&gt;&amp;&quot;&#x27; &lt;/b&gt; xxxxxxxxxxxxxxxxxxxxxxxxxxx… · 19,99 € <b>#3</b> &lt;b&gt;&amp;&quot;&#x27; &lt;/b&gt; xxxxxxxxxxxxxxxxxxxxxxxxxxx… · 19,99 € <b>#3</b> &lt;b&gt;&amp;&quot;&#x27; &lt;/b&gt; xxxxxxxxxxxxxxxxxxxxxxxxxxx… · 19,99 €]
+keyboard:
+   [#1](cb:l:p:1:1)  [#2](cb:l:p:1:2)
+   [#3](cb:l:p:1:3)
+   [[✅ Active ✅ Active ✅ Active]](cb:l:a:1)  [[⏸ Paused ⏸ Paused ⏸ Paused] ✓](cb:l:p:1)  [[⚠️ Errors ⚠️ Errors ⚠️ Errors]](cb:l:e:1)
+   [[🏠 Home 🏠 Home 🏠 Home]](cb:h)

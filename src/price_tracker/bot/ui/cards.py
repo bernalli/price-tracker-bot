@@ -1,4 +1,4 @@
-"""The product card: the one screen this foundation renders end to end."""
+"""The product card and the paginated product list."""
 
 from __future__ import annotations
 
@@ -6,16 +6,18 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING
 
+from price_tracker.bot.callbacks import Action, encode
 from price_tracker.bot.messages import _, current_locale, ngettext
 from price_tracker.bot.ui.escape import escape_html
 from price_tracker.bot.ui.labels import button, layout_rows
+from price_tracker.bot.ui.panels import home_button
 from price_tracker.bot.ui.screens import Button, Screen
-from price_tracker.bot.ui.width import truncate_to_width
+from price_tracker.bot.ui.width import sanitize_label, truncate_to_width
 from price_tracker.core.textlimits import DOMAIN_BUDGET, NAME_BUDGET
 from price_tracker.i18n.format import ago, change, duration, money, percent
 
 if TYPE_CHECKING:
-    from price_tracker.app.views import ProductView
+    from price_tracker.app.views import ListPage, ProductView
 
 
 @dataclass(frozen=True, slots=True)
@@ -169,3 +171,72 @@ def product_card(view: ProductView, actions: CardActions, *, now: datetime) -> S
         lines.append(errors_line)
 
     return Screen(text="\n".join(lines), rows=_keyboard(view, actions))
+
+
+_LIST_NAME_WIDTH = 40
+
+
+def _filter_word(list_filter: str) -> str:
+    if list_filter == "a":
+        return _("active")
+    return _("paused") if list_filter == "p" else _("errors")
+
+
+def _list_row(view: ProductView, *, loc: str) -> str:
+    if view.status != "active":
+        mark = "⏸ "
+    elif view.consecutive_errors > 0:
+        mark = "⚠️ "
+    else:
+        mark = ""
+    name = escape_html(truncate_to_width(sanitize_label(view.name), _LIST_NAME_WIDTH))
+    price = "—" if view.current is None else money(view.current, view.currency, locale=loc)
+    return _("{mark}<b>#{id}</b> {name} · {price}").format(
+        mark=mark, id=view.id, name=name, price=price
+    )
+
+
+def _list_keyboard(page: ListPage) -> tuple[tuple[Button, ...], ...]:
+    def go(target: int) -> str:
+        return encode(Action("list.page", (page.filter, target)))
+
+    opens = [
+        button(
+            f"#{item.id}", callback=encode(Action("list.open", (page.filter, page.page, item.id)))
+        )
+        for item in page.items
+    ]
+    rows = list(layout_rows(opens))
+    if page.pages > 1:
+        nav = []
+        if page.page > 1:
+            nav.append(button("◀️", callback=go(page.page - 1)))
+        nav.append(button(f"{page.page}/{page.pages}", callback=encode(Action("noop"))))
+        if page.page < page.pages:
+            nav.append(button("▶️", callback=go(page.page + 1)))
+        rows.append(tuple(nav))
+    labels = {"a": _("✅ Active"), "p": _("⏸ Paused"), "e": _("⚠️ Errors")}
+    rows.append(
+        tuple(
+            button(
+                f"{label} ✓" if key == page.filter else label,
+                callback=encode(Action("list.page", (key, 1))),
+            )
+            for key, label in labels.items()
+        )
+    )
+    footer = []
+    if page.filter == "a" and page.total > 1:
+        footer.append(button(_("🗑 Delete all"), callback="delete_all"))
+    footer.append(home_button())
+    return (*rows, *layout_rows(footer))
+
+
+def list_page(page: ListPage) -> Screen:
+    """Render one page of the product list. Pure: the locale is the current one."""
+    loc = current_locale()
+    header = _("📦 <b>Your products</b> · {filter} ({total}) · page {page}/{pages}").format(
+        filter=_filter_word(page.filter), total=page.total, page=page.page, pages=page.pages
+    )
+    body = [_list_row(item, loc=loc) for item in page.items] or [_("Nothing here.")]
+    return Screen(text="\n".join([header, "", *body]), rows=_list_keyboard(page))

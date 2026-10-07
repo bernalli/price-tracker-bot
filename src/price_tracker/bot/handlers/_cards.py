@@ -7,19 +7,34 @@ the card buttons trigger, and turns the `Screen` rows into an inline keyboard.
 
 from __future__ import annotations
 
+import math
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from typing import TYPE_CHECKING, Any, Protocol, get_args
 
 from babel.numbers import list_currencies
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.constants import ParseMode
 
-from price_tracker.app.views import ProductStatus, ProductView, ThresholdType
-from price_tracker.bot.decorators import _get_conversion_rate
+from price_tracker.app.views import (
+    PAGE_SIZE,
+    HomeView,
+    ListFilter,
+    ListPage,
+    ProductStatus,
+    ProductView,
+    ThresholdType,
+)
+from price_tracker.bot.decorators import _config, _db, _get_conversion_rate
+from price_tracker.bot.messages import _
 from price_tracker.bot.ui.cards import CardActions
 from price_tracker.core.url_utils import extract_etld_plus_one
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from telegram.ext import ContextTypes
+
     from price_tracker.bot.ui.screens import Screen
 
 
@@ -111,8 +126,8 @@ def product_view(record: _Record, *, default_interval_minutes: int) -> ProductVi
     )
 
 
-def card_actions(view: ProductView) -> CardActions:
-    """The legacy callbacks the card buttons trigger for this product."""
+def card_actions(view: ProductView, *, back: str) -> CardActions:
+    """The legacy callbacks the card buttons trigger for this product, and ``back`` to the list."""
     pid = view.id
     toggle = f"pause_{pid}" if view.status == "active" else f"reactivate_{pid}"
     return CardActions(
@@ -122,7 +137,62 @@ def card_actions(view: ProductView) -> CardActions:
         delete=f"remove_{pid}",
         alert_rule=f"edit_{pid}",
         interval=f"setrefresh_{pid}",
-        back="menu_prodotti",
+        back=back,
+    )
+
+
+async def default_interval(context: ContextTypes.DEFAULT_TYPE) -> int:
+    """The global check interval in minutes: the saved setting, else the configured one."""
+    saved = await _db(context).get_config("check_interval_minutes")
+    return int(saved) if saved and saved.isdigit() else _config(context).check_interval_minutes
+
+
+def empty_list_text() -> str:
+    """What the list says when the user tracks nothing at all."""
+    return _("📭 Non hai prodotti tracciati.\nIncollami un link per iniziare!")
+
+
+_FILTERS = {
+    "a": lambda record: bool(record.get("is_active")),
+    "p": lambda record: not record.get("is_active"),
+    "e": lambda record: int(record.get("consecutive_errors") or 0) > 0,
+}
+
+
+def list_view(
+    records: Sequence[_Record],
+    list_filter: ListFilter,
+    page: int,
+    *,
+    default_interval_minutes: int,
+) -> ListPage:
+    """The ``page`` of the products matching ``list_filter``, clamped to the last page."""
+    matching = [record for record in records if _FILTERS[list_filter](record)]
+    pages = max(1, math.ceil(len(matching) / PAGE_SIZE))
+    page = min(page, pages)
+    shown = matching[(page - 1) * PAGE_SIZE : page * PAGE_SIZE]
+    items = tuple(product_view(r, default_interval_minutes=default_interval_minutes) for r in shown)
+    return ListPage(list_filter, page, pages, len(matching), items)
+
+
+async def home_view(db: Any, user_id: int) -> HomeView:
+    """The Home counts of ``user_id`` and whether they are an admin."""
+    stats = await db.get_stats(user_id)
+    active = stats["active_products"]
+    return HomeView(
+        active=active,
+        paused=stats["total_products"] - active,
+        is_admin=await db.is_user_admin(user_id),
+    )
+
+
+async def reply_screen(message: Any, screen: Screen) -> None:
+    """Send ``screen`` as a new message."""
+    await message.reply_text(
+        screen.text,
+        parse_mode=ParseMode.HTML,
+        disable_web_page_preview=screen.disable_link_preview,
+        reply_markup=screen_markup(screen),
     )
 
 

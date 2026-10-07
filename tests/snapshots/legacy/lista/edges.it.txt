@@ -4,52 +4,16 @@
 # frozen_now: 2026-03-01T12:00:00Z
 ## step 1: command "/lista" user=10
 -> sendMessage chat=10
-   param parse_mode="HTML"
-   text:
-   | <b>📦 I tuoi prodotti (2)</b>
--> sendMessage chat=10
    param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
-   | 📦 <b>⁨Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN…⁩</b>
-   | ⁨example.com⁩ · #1 · attivo
+   | 📦 <b>I tuoi prodotti</b> · attivo (2) · pagina 1/1
    |
-   | 💰 Ora: 99,50 €
-   | 📌 Inizio: 100,00 € · ▼ 0,5%
-   | 📉 Minimo: 100,00 €
-   | 🔔 Avviso: ribasso del 10% dall'inizio
-   | 🔄 Controlli: ogni 1 h · mai
-   | ⚠️ 1 lettura fallita · /errors
+   | ⚠️ <b>#1</b> Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN… · 99,50 €
+   | <b>#2</b> Sticker · 0,80 €
    keyboard:
-   | [🔍 Controlla ora → check_1] [📊 Storico → chart_1]
-   | [⏸ Pausa → pause_1] [🗑 Elimina → remove_1]
-   | [🔔 Regola avviso → edit_1] [🔄 Intervallo → setrefresh_1]
-   | [🔗 Apri → url:https://shop.example.com/item/74]
-   | [◀️ Lista → menu_prodotti]
--> sendMessage chat=10
-   param link_preview_options={"is_disabled": true}
-   param parse_mode="HTML"
-   text:
-   | 📦 <b>⁨Sticker⁩</b>
-   | ⁨example.com⁩ · #2 · attivo
-   |
-   | 💰 Ora: 0,80 €
-   | 📌 Inizio: 0,90 € · ▼ 11,1%
-   | 📉 Minimo: 0,90 €
-   | 🔔 Avviso: ribasso del 10% dall'inizio
-   | 🔄 Controlli: ogni 6 h · mai
-   keyboard:
-   | [🔍 Controlla ora → check_2] [📊 Storico → chart_2]
-   | [⏸ Pausa → pause_2] [🗑 Elimina → remove_2]
-   | [🔔 Regola avviso → edit_2] [🔄 Intervallo → setrefresh_2]
-   | [🔗 Apri → url:https://shop.example.com/item/75]
-   | [◀️ Lista → menu_prodotti]
--> sendMessage chat=10
-   param parse_mode="HTML"
-   text:
-   | ───────────────
-   | 📦 <b>2</b> prodotti tracciati
-   keyboard:
-   | [🗑 Elimina tutti i prodotti → delete_all]
+   | [#1 → l:a:1:1] [#2 → l:a:1:2]
+   | [✅ Attivi ✓ → l:a:1] [⏸ In pausa → l:p:1] [⚠️ Errori → l:e:1]
+   | [🗑 Elimina tutti → delete_all] [🏠 Home → h]
 ## db after step 1
 ~ users user_id=10 display_name: NULL -> "U10"

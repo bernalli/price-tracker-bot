@@ -1,0 +1,35 @@
+# legacy snapshot v1
+# scenario: home.menu_button
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: command "/lista" user=10
+-> sendMessage chat=10
+   param link_preview_options={"is_disabled": true}
+   param parse_mode="HTML"
+   text:
+   | 📦 <b>I tuoi prodotti</b> · attivo (1) · pagina 1/1
+   |
+   | <b>#1</b> Kettle · 80,00 €
+   keyboard:
+   | [#1 → l:a:1:1]
+   | [✅ Attivi ✓ → l:a:1] [⏸ In pausa → l:p:1] [⚠️ Errori → l:e:1]
+   | [🏠 Home → h]
+## db after step 1
+~ users user_id=10 display_name: NULL -> "U10"
+## step 2: press "h" user=10 on=1000
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1000
+   param link_preview_options={"is_disabled": true}
+   param parse_mode="HTML"
+   text:
+   | 🏠 <b>Price Tracker</b>
+   |
+   | 📦 1 attivo · ⏸ 0 in pausa
+   |
+   | Incolla il link di un prodotto per iniziare a seguirlo.
+   keyboard:
+   | [📦 Prodotti → l:a:1] [🔍 Verifica tutti → menu_checkall]
+   | [📊 Statistiche → menu_info] [💾 Dati → menu_dati]
+   | [⚙️ Impostazioni → s]
+## db after step 2
+(no changes)

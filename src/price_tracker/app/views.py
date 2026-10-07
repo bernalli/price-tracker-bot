@@ -24,6 +24,9 @@ if TYPE_CHECKING:
 
 ProductStatus = Literal["active", "paused", "suspended"]
 ThresholdType = Literal["percentage", "absolute", "target", "any_drop"]
+ListFilter = Literal["a", "p", "e"]
+
+PAGE_SIZE: Final = 5
 
 _CURRENCY_CODE_RE: Final = re.compile(r"[A-Z]{3}")
 
@@ -152,3 +155,38 @@ class PrefsView:
         _check_optional_str("quiet_hours_end", self.quiet_hours_end)
         _check_optional_int("throttle_per_hour", self.throttle_per_hour, minimum=1)
         _check_timezone("timezone", self.timezone)
+
+
+@dataclass(frozen=True, slots=True)
+class ListPage:
+    """One page of the product list: ``items`` are the ``total`` matches of ``filter``, sliced."""
+
+    filter: ListFilter
+    page: int
+    pages: int
+    total: int
+    items: tuple[ProductView, ...]
+
+    def __post_init__(self) -> None:
+        _check_literal("filter", self.filter, get_args(ListFilter))
+        _check_int("pages", self.pages, minimum=1)
+        _check_int("page", self.page, minimum=1)
+        if self.page > self.pages:
+            raise ValueError(f"page: must be <= pages ({self.pages}), got {self.page!r}")
+        _check_int("total", self.total, minimum=0)
+        if len(self.items) > PAGE_SIZE:
+            raise ValueError(f"items: at most {PAGE_SIZE}, got {len(self.items)}")
+
+
+@dataclass(frozen=True, slots=True)
+class HomeView:
+    """What the Home screen shows: the user's product counts and whether they are an admin."""
+
+    active: int
+    paused: int
+    is_admin: bool
+
+    def __post_init__(self) -> None:
+        _check_int("active", self.active, minimum=0)
+        _check_int("paused", self.paused, minimum=0)
+        _check_bool("is_admin", self.is_admin)

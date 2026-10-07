@@ -36,7 +36,7 @@ def _msgids() -> set[str]:
     ids = [m.id for m in extract_messages(_UI_ROOT)]
     ids += [
         message
-        for _line, _func, message, _comments in extract_from_file(
+        for _line, message, _comments, _context in extract_from_file(
             "python", str(_NAV), keywords={"_": None}
         )
     ]

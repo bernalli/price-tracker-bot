@@ -1098,3 +1098,79 @@ msgstr ""
 #: src/price_tracker/bot/ui/panels.py
 msgid "◀️ Settings"
 msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+#, python-brace-format
+msgid "📦 <b>Your products</b> · {filter} ({total}) · page {page}/{pages}"
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+msgid "errors"
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+#, python-brace-format
+msgid "{mark}<b>#{id}</b> {name} · {price}"
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+msgid "Nothing here."
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+msgid "✅ Active"
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+msgid "⏸ Paused"
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+msgid "⚠️ Errors"
+msgstr ""
+
+#: src/price_tracker/bot/ui/cards.py
+msgid "🗑 Delete all"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+#, python-brace-format
+msgid "📦 {active} · ⏸ {paused}"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+#, python-brace-format
+msgid "{n} active"
+msgid_plural "{n} active"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/price_tracker/bot/ui/panels.py
+#, python-brace-format
+msgid "{n} paused"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+#, python-brace-format
+msgid "🏠 <b>Price Tracker</b>\n\n{counts}\n\nPaste a product link to start tracking."
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "📦 Products"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "🔍 Check all"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "📊 Statistics"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "💾 Data"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "⚙️ Settings"
+msgstr ""

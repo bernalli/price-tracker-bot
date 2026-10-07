@@ -15,8 +15,26 @@ from telegram.constants import ParseMode
 from telegram.error import BadRequest, RetryAfter
 
 from price_tracker.app.views import PrefsView
-from price_tracker.bot.handlers._cards import screen_markup
-from price_tracker.bot.ui.panels import QUIET_WINDOWS, settings_screen, settings_section_screen
+from price_tracker.bot.callbacks import Action, encode
+from price_tracker.bot.handlers._cards import (
+    card_actions,
+    default_interval,
+    empty_list_text,
+    home_view,
+    list_view,
+    product_view,
+    screen_markup,
+)
+from price_tracker.bot.messages import _
+from price_tracker.bot.ui.cards import list_page, product_card
+from price_tracker.bot.ui.panels import (
+    QUIET_WINDOWS,
+    home_button,
+    home_screen,
+    settings_screen,
+    settings_section_screen,
+)
+from price_tracker.bot.ui.screens import Screen
 from price_tracker.db.models import NotificationPrefs
 from price_tracker.notifier.preferences import PreferencesManager
 
@@ -24,9 +42,6 @@ if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
     from telegram.ext import ContextTypes
-
-    from price_tracker.bot.callbacks import Action
-    from price_tracker.bot.ui.screens import Screen
 
 logger = logging.getLogger(__name__)
 
@@ -114,6 +129,45 @@ async def _set_quiet(
     await _show_section(query, db, user_id, "qh")
 
 
+async def _list_screen(
+    context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, list_filter: str, page: int
+) -> Screen:
+    records = await db.get_all_products(user_id)
+    if not records:
+        return Screen(text=empty_list_text(), rows=((home_button(),),))
+    interval = await default_interval(context)
+    return list_page(list_view(records, list_filter, page, default_interval_minutes=interval))
+
+
+async def _list_page(
+    query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, action: Action
+) -> None:
+    list_filter, page = action.args
+    await _edit(query, await _list_screen(context, db, user_id, str(list_filter), int(page)))
+
+
+async def _list_open(
+    query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, action: Action
+) -> None:
+    list_filter, page, product_id = action.args
+    # The list is personal: no admin exception, a foreign id is an unknown id.
+    record = await db.get_product_for_user(int(product_id), user_id)
+    if record is None:
+        screen = await _list_screen(context, db, user_id, str(list_filter), int(page))
+        notice = _("Product not found.")
+        await _edit(query, dataclasses.replace(screen, text=f"{notice}\n\n{screen.text}"))
+        return
+    view = product_view(record, default_interval_minutes=await default_interval(context))
+    back = encode(Action("list.page", (list_filter, page)))
+    await _edit(query, product_card(view, card_actions(view, back=back), now=datetime.now(UTC)))
+
+
+async def _home(
+    query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, action: Action
+) -> None:
+    await _edit(query, home_screen(await home_view(db, user_id)))
+
+
 _HANDLERS: Final[dict[str, Callable[..., Awaitable[None]]]] = {
     "noop": _noop,
     "settings": _settings,
@@ -121,6 +175,9 @@ _HANDLERS: Final[dict[str, Callable[..., Awaitable[None]]]] = {
     "settings.mute": _set_mute,
     "settings.digest": _set_digest,
     "settings.quiet": _set_quiet,
+    "list.page": _list_page,
+    "list.open": _list_open,
+    "home": _home,
 }
 
 

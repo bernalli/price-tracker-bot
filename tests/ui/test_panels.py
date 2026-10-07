@@ -8,10 +8,10 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from price_tracker.app.views import PrefsView
+from price_tracker.app.views import HomeView, PrefsView
 from price_tracker.bot.callbacks import Action, InvalidCallback, decode
 from price_tracker.bot.messages import set_locale
-from price_tracker.bot.ui.panels import settings_screen, settings_section_screen
+from price_tracker.bot.ui.panels import home_screen, settings_screen, settings_section_screen
 from price_tracker.bot.ui.width import display_width
 from price_tracker.core.textlimits import SAFE_LIMIT, _is_valid_telegram_markup, visible_length
 from tests.support.panel_variants import BUSY, NOW, SCREENS, prefs
@@ -191,3 +191,33 @@ def test_the_view_is_frozen() -> None:
     assert isinstance(view, PrefsView)
     with pytest.raises(AttributeError):
         view.mute = True  # type: ignore[misc]
+
+
+# --- Home ----------------------------------------------------------------------
+
+HOME_LEGACY = ["menu_checkall", "menu_info", "menu_dati"]
+
+
+@pytest.mark.parametrize(("is_admin", "extra"), [(False, []), (True, ["menu_admin"])])
+def test_home_offers_the_areas_and_only_admins_get_the_admin_button(
+    is_admin: bool, extra: list[str]
+) -> None:
+    screen = home_screen(HomeView(active=2, paused=0, is_admin=is_admin))
+    assert _callbacks(screen) == ["l:a:1", "menu_checkall", "menu_info", "menu_dati", "s", *extra]
+    for data in _callbacks(screen):
+        assert data in [*HOME_LEGACY, "menu_admin"] or isinstance(decode(data), Action)
+
+
+def test_home_shows_the_counts(ui_locales: Path) -> None:
+    set_locale("en")
+    text = home_screen(HomeView(active=7, paused=2, is_admin=False)).text
+    assert "7 active" in text
+    assert "2 paused" in text
+
+
+@pytest.mark.parametrize(
+    "changes", [{"active": -1}, {"paused": -1}, {"active": True}, {"is_admin": 1}]
+)
+def test_the_home_view_refuses_malformed_values(changes: dict[str, object]) -> None:
+    with pytest.raises(ValueError, match=r"."):
+        HomeView(**{"active": 1, "paused": 1, "is_admin": False, **changes})  # type: ignore[arg-type]

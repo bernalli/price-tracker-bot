@@ -1,0 +1,20 @@
+# ui snapshot v1
+# screen: list.mid
+# locale: ja
+# now: 2026-03-01T12:00:00Z
+text:
+   | [📦 <b>Your products</b> · [active active active] (12) · page 2/3 📦 <b>Your products</b> · [active active active] (12) · page 2/3 📦 <b>Your products</b> · [active active active] (12) · page 2/3]
+   | 
+   | [<b>#6</b> Kettle · €19.99 <b>#6</b> Kettle · €19.99 <b>#6</b> Kettle · €19.99]
+   | [⚠️ <b>#7</b> Fan · €19.99 ⚠️ <b>#7</b> Fan · €19.99 ⚠️ <b>#7</b> Fan · €19.99]
+   | [<b>#8</b> Lamp · — <b>#8</b> Lamp · — <b>#8</b> Lamp · —]
+   | [<b>#9</b> Heater · CHF1,299.50 <b>#9</b> Heater · CHF1,299.50 <b>#9</b> Heater · CHF1,299.50]
+   | [<b>#10</b> Wireless Headphones X200 Pro Edition wi… · €19.99 <b>#10</b> Wireless Headphones X200 Pro Edition wi… · €19.99 <b>#10</b> Wireless Headphones X200 Pro Edition wi… · €19.99]
+keyboard:
+   [#6](cb:l:a:2:6)  [#7](cb:l:a:2:7)
+   [#8](cb:l:a:2:8)  [#9](cb:l:a:2:9)
+   [#10](cb:l:a:2:10)
+   [◀️](cb:l:a:1)  [2/3](cb:noop)  [▶️](cb:l:a:3)
+   [[✅ Active ✅ Active ✅ Active] ✓](cb:l:a:1)  [[⏸ Paused ⏸ Paused ⏸ Paused]](cb:l:p:1)  [[⚠️ Errors ⚠️ Errors ⚠️ Errors]](cb:l:e:1)
+   [[🗑 Delete all 🗑 Delete all 🗑 D…](cb:delete_all)
+   [[🏠 Home 🏠 Home 🏠 Home]](cb:h)

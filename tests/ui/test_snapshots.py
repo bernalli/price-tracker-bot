@@ -14,7 +14,7 @@ from price_tracker.bot.ui.width import display_width
 from price_tracker.core.textlimits import SAFE_LIMIT, _is_valid_telegram_markup, visible_length
 from tests.support.card_msgids import CARD_PLURAL, CARD_SINGULAR
 from tests.support.card_variants import NOW, VARIANTS, actions_for
-from tests.support.panel_msgids import PANEL_SINGULAR
+from tests.support.panel_msgids import PANEL_PLURAL, PANEL_SINGULAR
 from tests.support.pseudo_locale import extract_messages, write_pseudo_catalog
 from tests.support.ui_snapshot import compare_or_update, render_snapshot
 
@@ -139,7 +139,7 @@ def test_pseudo_catalog_contains_exactly_the_29_card_msgids() -> None:
     # of the 29 msgids the card adds.
     singular_ids -= {"Product #{product_id}", *PANEL_SINGULAR}
     assert singular_ids == set(CARD_SINGULAR)
-    assert plural_ids == {CARD_PLURAL}
+    assert plural_ids == {CARD_PLURAL, PANEL_PLURAL}
 
 
 def test_pseudo_catalog_msgstr_keeps_the_same_placeholders(tmp_path: Path) -> None:
