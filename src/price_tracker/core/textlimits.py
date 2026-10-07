@@ -70,6 +70,13 @@ def _degrade_line(line: str, limit: int) -> str:
     return html.escape(truncate_visible(plain, limit), quote=True)
 
 
+def fit_html(text: str, limit: int) -> str:
+    """Return ``text`` if it fits ``limit`` visibly, else escaped plain text ending in ``…``."""
+    if visible_length(text) <= limit:
+        return text
+    return _degrade_line(text, limit)
+
+
 def _is_valid_telegram_markup(fragment: str) -> bool:
     """Return whether ``fragment`` is well-formed Telegram HTML.
 

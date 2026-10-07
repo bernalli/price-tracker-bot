@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 from dotenv import load_dotenv
 
+from price_tracker.app.inputs import InputError, parse_user_id
 from price_tracker.core.outlier import REQUIRED_CONFIRMATIONS
 
 load_dotenv()
@@ -22,6 +23,21 @@ def _parse_bool(value: str, *, default: bool) -> bool:
     if not value:
         return default
     return value.strip().lower() in _TRUTHY
+
+
+def _parse_allowed_users(raw: str) -> tuple[int, ...]:
+    """Parse the comma-separated ``ALLOWED_USERS`` with the user-id grammar, dropping repeats.
+
+    Raises ``ValueError`` naming the position (never the value) of the first bad entry.
+    """
+    users: dict[int, None] = {}
+    entries = [token for token in raw.split(",") if token.strip()]
+    for position, token in enumerate(entries, start=1):
+        parsed = parse_user_id(token)
+        if isinstance(parsed, InputError):
+            raise ValueError(f"ALLOWED_USERS entry {position} is not a valid user id")
+        users[parsed] = None
+    return tuple(users)
 
 
 @dataclass(frozen=True)
@@ -49,8 +65,7 @@ class Config:
         if not token:
             raise ValueError("TELEGRAM_BOT_TOKEN is required in .env")
 
-        raw_users = os.getenv("ALLOWED_USERS", "")
-        admin_users = tuple(int(x.strip()) for x in raw_users.split(",") if x.strip())
+        admin_users = _parse_allowed_users(os.getenv("ALLOWED_USERS", ""))
 
         metrics_enabled_raw = os.getenv("METRICS_ENABLED")
         metrics_enabled = (

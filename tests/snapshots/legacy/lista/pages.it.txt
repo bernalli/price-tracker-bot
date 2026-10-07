@@ -7,7 +7,7 @@
    param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
-   | 📦 <b>I tuoi prodotti</b> · attivo (7) · pagina 1/2
+   | 📦 <b>I tuoi prodotti</b> · attivi (7) · pagina 1/2
    |
    | <b>#1</b> Kettle · 18,00 €
    | <b>#2</b> Fan · 18,00 €
@@ -29,7 +29,7 @@
    param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
-   | 📦 <b>I tuoi prodotti</b> · attivo (7) · pagina 2/2
+   | 📦 <b>I tuoi prodotti</b> · attivi (7) · pagina 2/2
    |
    | <b>#6</b> Toaster · 18,00 €
    | <b>#7</b> Blender · 18,00 €

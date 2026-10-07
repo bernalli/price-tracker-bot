@@ -1,0 +1,108 @@
+# legacy snapshot v1
+# scenario: settings.language
+# locale: it
+# frozen_now: 2026-03-01T12:00:00Z
+## step 1: press "s:lang" user=10 on=1 synthetic
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1
+   param link_preview_options={"is_disabled": true}
+   param parse_mode="HTML"
+   text:
+   | 🗣 <b>Lingua</b>
+   |
+   | Attuale: Automatica (Italiano)
+   keyboard:
+   | [Automatica ✓ → s:lang:auto] [English → s:lang:en]
+   | [Italiano → s:lang:it]
+   | [◀️ Impostazioni → s]
+## db after step 1
+(no changes)
+## step 2: press "s:lang:en" user=10 on=1
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1
+   param link_preview_options={"is_disabled": true}
+   param parse_mode="HTML"
+   text:
+   | 🗣 <b>Language</b>
+   |
+   | Current: English
+   keyboard:
+   | [Automatic → s:lang:auto] [English ✓ → s:lang:en]
+   | [Italiano → s:lang:it]
+   | [◀️ Settings → s]
+## db after step 2
+~ users user_id=10 language: NULL -> "en"
+## step 3: press "s" user=10 on=1
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1
+   param link_preview_options={"is_disabled": true}
+   param parse_mode="HTML"
+   text:
+   | ⚙️ <b>Settings</b>
+   |
+   | 🔕 Mute: off
+   | 📬 Digest: off
+   | 🌙 Quiet hours: off
+   | ⏱ Throttle: unlimited · change with /throttle &lt;N&gt;|off
+   | 🌍 Timezone: Europe/Rome · change with /timezone &lt;zone&gt;
+   | 🗣 Language: English
+   |
+   | Other values: /digest_mode on|off &lt;minutes&gt;, /quiet_hours HH:MM-HH:MM
+   keyboard:
+   | [🔕 Mute → s:mu] [📬 Digest → s:dg]
+   | [🌙 Quiet hours → s:qh] [🗣 Language → s:lang]
+   | [🏠 Home → h]
+## db after step 3
+(no changes)
+## step 4: press "s:lang:de" user=10 on=1 synthetic
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1
+   param link_preview_options={"is_disabled": true}
+   param parse_mode="HTML"
+   text:
+   | 🗣 <b>Language</b>
+   |
+   | Current: English
+   keyboard:
+   | [Automatic → s:lang:auto] [English ✓ → s:lang:en]
+   | [Italiano → s:lang:it]
+   | [◀️ Settings → s]
+## db after step 4
+(no changes)
+## step 5: press "s:lang:auto" user=10 on=1
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1
+   param link_preview_options={"is_disabled": true}
+   param parse_mode="HTML"
+   text:
+   | 🗣 <b>Lingua</b>
+   |
+   | Attuale: Automatica (Italiano)
+   keyboard:
+   | [Automatica ✓ → s:lang:auto] [English → s:lang:en]
+   | [Italiano → s:lang:it]
+   | [◀️ Impostazioni → s]
+## db after step 5
+~ users user_id=10 language: "en" -> NULL
+## step 6: press "s" user=10 on=1
+-> answerCallbackQuery
+-> editMessageText chat=10 message_id=1
+   param link_preview_options={"is_disabled": true}
+   param parse_mode="HTML"
+   text:
+   | ⚙️ <b>Impostazioni</b>
+   |
+   | 🔕 Silenzia: off
+   | 📬 Digest: off
+   | 🌙 Ore silenziose: off
+   | ⏱ Limite: illimitato · cambia con /throttle &lt;N&gt;|off
+   | 🌍 Fuso orario: Europe/Rome · cambia con /timezone &lt;zona&gt;
+   | 🗣 Lingua: Automatica (Italiano)
+   |
+   | Altri valori: /digest_mode on|off &lt;minuti&gt;, /quiet_hours HH:MM-HH:MM
+   keyboard:
+   | [🔕 Silenzia → s:mu] [📬 Digest → s:dg]
+   | [🌙 Ore silenziose → s:qh] [🗣 Lingua → s:lang]
+   | [🏠 Home → h]
+## db after step 6
+(no changes)

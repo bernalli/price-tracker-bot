@@ -13,10 +13,16 @@ isolated. Translations are cached LRU(8) to keep file I/O off the hot path.
 from __future__ import annotations
 
 import gettext
+import logging
 import os
 from contextvars import ContextVar, Token
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
+
+from price_tracker.i18n.locales import effective_language
+
+logger = logging.getLogger(__name__)
 
 _LOCALE_DIR: Path = Path(__file__).parent.parent / "locale"
 _DEFAULT_LOCALE: str = os.getenv("LOCALE", "en")
@@ -139,3 +145,19 @@ def current_locale() -> str:
     """
     active = _translation_var.get()
     return active.code if isinstance(active, _Catalog) else "en"
+
+
+async def user_locale(repo: Any, user_id: int, fallback: str | None) -> str | None:
+    """The language to answer ``user_id`` in, read from their stored row.
+
+    Their chosen language when it has a catalogue, else the Telegram language last
+    seen from them, else ``fallback``. A failed read is logged and gives ``fallback``.
+    """
+    try:
+        user = await repo.get_user(user_id)
+    except Exception:  # noqa: BLE001 - a failed read must never stop a reply
+        logger.warning("could not read the language of user %s", user_id, exc_info=True)
+        return fallback
+    if user is None:
+        return fallback
+    return effective_language(user.language, user.telegram_language_tag) or fallback

@@ -15,7 +15,7 @@ from datetime import UTC, datetime
 from html import escape
 from typing import TYPE_CHECKING, Any
 
-from price_tracker.bot.messages import _, ngettext, reset_locale, set_locale
+from price_tracker.bot.messages import _, ngettext, reset_locale, set_locale, user_locale
 from price_tracker.core.alert import _why
 from price_tracker.core.textlimits import DOMAIN_BUDGET, NAME_BUDGET, paginate, truncate_visible
 from price_tracker.notifier.preferences import EffectivePrefs, is_quiet_now
@@ -191,7 +191,11 @@ class DigestService:
         entries = await self._repo.list_pending_digest(user_id=user_id)
         if not entries:
             return 0
-        header, blocks, footer, unrenderable_ids = _digest_blocks(entries)
+        token = set_locale(await user_locale(self._repo, user_id, self._lang))
+        try:
+            header, blocks, footer, unrenderable_ids = _digest_blocks(entries)
+        finally:
+            reset_locale(token)
         pages = paginate(header, blocks, footer)
         flushed_count = 0
         unrenderable_pending = unrenderable_ids.copy()
@@ -224,23 +228,19 @@ class DigestService:
         Per-user ``digest_interval_minutes`` is honoured; ``interval_minutes`` is the
         fallback when a user has no stored preference.
         """
-        token = set_locale(self._lang)
-        try:
-            flushed_total = 0
-            users = await self._repo.list_users_with_pending_digest()
-            now = datetime.now(UTC)
-            for user_id, oldest_enqueued_at in users:
-                prefs = await self._repo.get_notification_prefs(user_id=user_id, product_id=None)
-                threshold = (
-                    prefs.digest_interval_minutes
-                    if prefs is not None and prefs.digest_interval_minutes
-                    else interval_minutes
-                )
-                age = (now - oldest_enqueued_at).total_seconds() / 60.0
-                if _row_is_quiet(prefs, now=now) if prefs is not None else False:
-                    continue
-                if age >= threshold:
-                    flushed_total += await self.flush_user(user_id=user_id)
-            return flushed_total
-        finally:
-            reset_locale(token)
+        flushed_total = 0
+        users = await self._repo.list_users_with_pending_digest()
+        now = datetime.now(UTC)
+        for user_id, oldest_enqueued_at in users:
+            prefs = await self._repo.get_notification_prefs(user_id=user_id, product_id=None)
+            threshold = (
+                prefs.digest_interval_minutes
+                if prefs is not None and prefs.digest_interval_minutes
+                else interval_minutes
+            )
+            age = (now - oldest_enqueued_at).total_seconds() / 60.0
+            if _row_is_quiet(prefs, now=now) if prefs is not None else False:
+                continue
+            if age >= threshold:
+                flushed_total += await self.flush_user(user_id=user_id)
+        return flushed_total

@@ -238,3 +238,60 @@ async def test_removeuser_confirms_the_removal(repo: Repository) -> None:
 
     assert not await repo.is_user_allowed(PLAIN_USER_ID)
     assert "removed" in str(update.message.reply_text.await_args.args[0])
+
+
+# ── the command menu is presentation, never authorization ─────────────
+
+
+def _bot_context(repo: Repository, args: list[str]) -> MagicMock:
+    context = _context()
+    context.args = args
+    context.bot_data = {"db": repo}
+    context.bot.send_message = AsyncMock()
+    context.bot.set_my_commands = AsyncMock()
+    context.bot.delete_my_commands = AsyncMock()
+    return context
+
+
+async def test_a_demoted_admin_with_a_stale_menu_is_still_refused(repo: Repository) -> None:
+    """The menu may still list /adduser: typing it must be refused by the handler."""
+    await repo.set_admin(ADMIN_ID, False)
+    update = _command_update(ADMIN_ID, f"/adduser {PLAIN_USER_ID + 1}")
+    context = _bot_context(repo, [str(PLAIN_USER_ID + 1)])
+
+    await cmd_add_user(update, context)
+
+    assert await repo.get_user(PLAIN_USER_ID + 1) is None
+    assert [str(c.args[0]) for c in update.message.reply_text.await_args_list] == [
+        "⛔ Admin-only command."
+    ]
+    context.bot.set_my_commands.assert_not_awaited()
+    context.bot.delete_my_commands.assert_not_awaited()
+
+
+async def test_adduser_and_removeuser_resync_only_the_touched_chat(repo: Repository) -> None:
+    target = PLAIN_USER_ID + 7
+    context = _bot_context(repo, [str(target)])
+    await cmd_add_user(_command_update(ADMIN_ID, f"/adduser {target}"), context)
+    scopes = [c.kwargs["scope"].chat_id for c in context.bot.delete_my_commands.await_args_list]
+    assert scopes
+    assert set(scopes) == {target}
+    context.bot.set_my_commands.assert_not_awaited()
+
+    context.bot.delete_my_commands.reset_mock()
+    await cmd_remove_user(_command_update(ADMIN_ID, f"/removeuser {target}"), context)
+    scopes = [c.kwargs["scope"].chat_id for c in context.bot.delete_my_commands.await_args_list]
+    assert scopes
+    assert set(scopes) == {target}
+
+
+async def test_a_failing_menu_sync_does_not_change_the_reply(repo: Repository) -> None:
+    target = PLAIN_USER_ID + 8
+    context = _bot_context(repo, [str(target)])
+    context.bot.delete_my_commands = AsyncMock(side_effect=RuntimeError("down"))
+    update = _command_update(ADMIN_ID, f"/adduser {target}")
+
+    await cmd_add_user(update, context)
+
+    assert "added" in str(update.message.reply_text.await_args.args[0])
+    assert await repo.is_user_allowed(target)

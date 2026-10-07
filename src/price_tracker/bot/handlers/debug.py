@@ -283,7 +283,7 @@ async def cmd_debug(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         lines.append("   ❌ nessuno scraper conosciuto per questo dominio")
     else:
         result = await scraper_for_url.scrape(url, client)
-        lines.append(f"   Nome: {_escape_html((result.name or '❌')[:60])}")
+        lines.append(f"   Nome: {_escape_html(truncate_to_width(result.name or '❌', 60))}")
         price_repr = "€" + str(result.price) if result.price else "❌ " + (result.error or "")
         lines.append(f"   Prezzo: {price_repr}")
 

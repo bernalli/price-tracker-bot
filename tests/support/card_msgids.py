@@ -11,6 +11,7 @@ CARD_SINGULAR: tuple[str, ...] = (
     "📦 <b>{name}</b>",
     "{domain} · #{id} · {status}",
     "active",
+    "active ones",
     "paused",
     "suspended",
     "💰 Now: —",

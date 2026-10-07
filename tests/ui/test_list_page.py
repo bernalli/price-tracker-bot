@@ -185,7 +185,7 @@ def test_the_header_and_the_rows(ui_locales: Path) -> None:
         ),
     )
     lines = list_page(page).text.split("\n")
-    assert lines[0] == "📦 <b>Your products</b> · active (3) · page 1/1"
+    assert lines[0] == "📦 <b>Your products</b> · active ones (3) · page 1/1"
     assert lines[2:] == [
         "<b>#1</b> Kettle · €19.99",
         "⏸ <b>#2</b> Fan · €19.99",

@@ -10,9 +10,10 @@ text:
    | 🌙 Quiet hours: 22:00–08:00
    | ⏱ Throttle: 5 per hour · change with /throttle &lt;N&gt;|off
    | 🌍 Timezone: Europe/Berlin · change with /timezone &lt;zone&gt;
+   | 🗣 Language: Automatic (English)
    | 
    | Other values: /digest_mode on|off &lt;minutes&gt;, /quiet_hours HH:MM-HH:MM
 keyboard:
    [🔕 Mute](cb:s:mu)  [📬 Digest](cb:s:dg)
-   [🌙 Quiet hours](cb:s:qh)
+   [🌙 Quiet hours](cb:s:qh)  [🗣 Language](cb:s:lang)
    [🏠 Home](cb:h)

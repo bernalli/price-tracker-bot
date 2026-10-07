@@ -34,6 +34,7 @@ from price_tracker.bot.flows import (
     PrepareResult,
     PrepareStatus,
 )
+from price_tracker.db.models import UserRecord
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -324,6 +325,20 @@ class FakeServices:
     writes: list[tuple[Any, ...]] = field(default_factory=list)
     calls: list[tuple[Any, ...]] = field(default_factory=list)
     next_product_id: int = 1000
+    languages: dict[int, str] = field(default_factory=dict)
+    language_reads: list[int] = field(default_factory=list)
+
+    async def get_user(self, user_id: int) -> UserRecord | None:
+        """The stored row the reply language is read from; a row only when a language is set.
+
+        The harness stores this object as ``bot_data["db"]``, so the coordinator and the
+        ``/cancel`` fallback read the language through the production ``user_locale``.
+        """
+        self.language_reads.append(user_id)
+        language = self.languages.get(user_id)
+        if language is None:
+            return None
+        return UserRecord(user_id=user_id, is_admin=False, is_active=True, language=language)
 
     async def is_active(self, user_id: int) -> bool:
         self.calls.append(("is_active", user_id))

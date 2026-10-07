@@ -109,6 +109,7 @@ COMMANDS_IN: Final = frozenset(
         "esporta",
         "export",
         "importa",
+        "import",
         "check",
         "controlla",
         "checkall",
@@ -1559,9 +1560,14 @@ async def scenario_home_menu_admin(w: LegacyWorld) -> None:
     await w.recorder.command(ADMIN, "/menu")
 
 
-@scenario("home.help_alias")
-async def scenario_home_help_alias(w: LegacyWorld) -> None:
+@scenario("home.help")
+async def scenario_home_help(w: LegacyWorld) -> None:
     await w.recorder.command(OWNER, "/help")
+
+
+@scenario("home.help_admin")
+async def scenario_home_help_admin(w: LegacyWorld) -> None:
+    await w.recorder.command(ADMIN, "/help")
 
 
 @scenario("home.menu_button")
@@ -2341,6 +2347,7 @@ async def scenario_data_export_empty(w: LegacyWorld) -> None:
 @scenario("data.import_help")
 async def scenario_data_import_help(w: LegacyWorld) -> None:
     await w.recorder.command(OWNER, "/importa")
+    await w.recorder.command(OWNER, "/import")
 
 
 @scenario("data.import_csv")
@@ -2703,6 +2710,13 @@ async def reanchor_digest(w: LegacyWorld, *stamps: str) -> None:
 @scenario("settings.panel")
 async def scenario_settings_panel(w: LegacyWorld) -> None:
     for data in ("s", "s:mu", "s:mu:8", "s:dg", "s:dg:on", "s:qh", "s:qh:2208"):
+        await w.recorder.press(OWNER, data)
+
+
+@scenario("settings.language")
+async def scenario_settings_language(w: LegacyWorld) -> None:
+    # The choice changes every later reply; Automatic returns to the Telegram language.
+    for data in ("s:lang", "s:lang:en", "s", "s:lang:de", "s:lang:auto", "s"):
         await w.recorder.press(OWNER, data)
 
 
@@ -3780,8 +3794,8 @@ def test_c1_registered_commands_match_the_inventory() -> None:
     legacy = app.handlers[2]
     commands = {c for h in legacy if isinstance(h, CommandHandler) for c in h.commands}
     assert commands == COMMANDS_IN
-    assert len(COMMANDS_IN) == 48
-    assert len(legacy) == 52
+    assert len(COMMANDS_IN) == 49
+    assert len(legacy) == 53
     assert all(h.callback is not status_command for h in legacy)
 
 

@@ -1,7 +1,8 @@
 """The Home screen and the settings panels: pure screens built from a view.
 
-Only the values the code already has presets for get buttons (mute, digest and
-quiet hours); timezone and throttle are shown with the command that changes them.
+Only the values the code already has presets for get buttons (mute, digest,
+quiet hours and language); timezone and throttle are shown with the command that
+changes them.
 """
 
 from __future__ import annotations
@@ -10,11 +11,13 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Final
 
 from price_tracker.bot.callbacks import MUTE_PRESETS, Action, encode
+from price_tracker.bot.commands import COMMANDS, GROUP_TITLES, GROUPS, HELP_HEADER
 from price_tracker.bot.messages import _, current_locale, ngettext
 from price_tracker.bot.ui.escape import escape_html
 from price_tracker.bot.ui.labels import button, layout_rows
 from price_tracker.bot.ui.screens import Button, Screen
 from price_tracker.i18n.format import duration, when
+from price_tracker.i18n.locales import AVAILABLE_LANGUAGES, endonym
 
 if TYPE_CHECKING:
     from price_tracker.app.views import HomeView, PrefsView
@@ -67,6 +70,14 @@ def _throttle_value(view: PrefsView) -> str:
     return _("{n} per hour").format(n=view.throttle_per_hour)
 
 
+def _language_value(language: str | None) -> str:
+    if language is not None and language in AVAILABLE_LANGUAGES:
+        return endonym(language)
+    # Automatic: name the language the replies are in right now.
+    active = endonym(current_locale().partition("_")[0])
+    return _("Automatic ({language})").format(language=active)
+
+
 def home_button() -> Button:
     """The button that returns to the Home screen."""
     return button(_("🏠 Home"), callback=encode(Action("home")))
@@ -81,8 +92,11 @@ def _check_now(now: datetime) -> None:
         raise ValueError(f"now: must be an aware datetime, got {now!r}")
 
 
-def settings_screen(view: PrefsView, *, now: datetime) -> Screen:
-    """The settings overview. Pure: the caller supplies the clock."""
+def settings_screen(view: PrefsView, *, now: datetime, language: str | None = None) -> Screen:
+    """The settings overview. Pure: the caller supplies the clock and the stored language.
+
+    ``language`` is the stored choice; ``None`` (or a code without a catalogue) is Automatic.
+    """
     _check_now(now)
     loc = current_locale()
     lines = [
@@ -97,6 +111,7 @@ def settings_screen(view: PrefsView, *, now: datetime) -> Screen:
         _("🌍 Timezone: {timezone} · change with /timezone &lt;zone&gt;").format(
             timezone=escape_html(view.timezone)
         ),
+        _("🗣 Language: {language}").format(language=_language_value(language)),
         "",
         _("Other values: /digest_mode on|off &lt;minutes&gt;, /quiet_hours HH:MM-HH:MM"),
     ]
@@ -104,6 +119,7 @@ def settings_screen(view: PrefsView, *, now: datetime) -> Screen:
         button(_("🔕 Mute"), callback=encode(Action("settings.section", ("mu",)))),
         button(_("📬 Digest"), callback=encode(Action("settings.section", ("dg",)))),
         button(_("🌙 Quiet hours"), callback=encode(Action("settings.section", ("qh",)))),
+        button(_("🗣 Language"), callback=encode(Action("settings.section", ("lang",)))),
     ]
     return Screen(text="\n".join(lines), rows=layout_rows(sections, [home_button()]))
 
@@ -144,8 +160,23 @@ def _quiet_presets(view: PrefsView) -> list[Button]:
     return presets
 
 
-def settings_section_screen(section: str, view: PrefsView, *, now: datetime) -> Screen:
-    """One preference's presets, the current one marked. ``section``: ``mu``, ``dg`` or ``qh``."""
+def _language_presets(language: str | None) -> list[Button]:
+    automatic = language not in AVAILABLE_LANGUAGES
+    presets = [_preset(_("Automatic"), Action("settings.language", ("auto",)), current=automatic)]
+    presets += [
+        _preset(endonym(code), Action("settings.language", (code,)), current=code == language)
+        for code in AVAILABLE_LANGUAGES
+    ]
+    return presets
+
+
+def settings_section_screen(
+    section: str, view: PrefsView, *, now: datetime, language: str | None = None
+) -> Screen:
+    """One preference's presets, the current one marked.
+
+    ``section``: ``mu``, ``dg``, ``qh`` or ``lang``; ``language`` is the stored choice.
+    """
     _check_now(now)
     loc = current_locale()
     if section == "mu":
@@ -157,8 +188,11 @@ def settings_section_screen(section: str, view: PrefsView, *, now: datetime) -> 
     elif section == "qh":
         title, value = _("🌙 <b>Quiet hours</b>"), _quiet_value(view)
         presets = _quiet_presets(view)
+    elif section == "lang":
+        title, value = _("🗣 <b>Language</b>"), _language_value(language)
+        presets = _language_presets(language)
     else:
-        raise ValueError(f"section: must be one of mu, dg, qh, got {section!r}")
+        raise ValueError(f"section: must be one of mu, dg, qh, lang, got {section!r}")
     back = button(_("◀️ Settings"), callback=encode(Action("settings")))
     current = _("Current: {value}").format(value=value)
     return Screen(text=f"{title}\n\n{current}", rows=layout_rows(presets, [back]))
@@ -186,3 +220,16 @@ def home_screen(view: HomeView) -> Screen:
     if view.is_admin:
         groups.append([button(_("👑 Admin"), callback="menu_admin")])
     return Screen(text=text, rows=layout_rows(*groups))
+
+
+def help_screen(is_admin: bool) -> Screen:
+    """Every command by area, the admin area only for administrators."""
+    lines = [_(HELP_HEADER)]
+    for group in GROUPS:
+        if group == "admin" and not is_admin:
+            continue
+        lines += ["", f"<b>{_(GROUP_TITLES[group])}</b>"]
+        lines += [
+            f"/{spec.name} — {_(spec.description)}" for spec in COMMANDS if spec.group == group
+        ]
+    return Screen(text="\n".join(lines), rows=layout_rows([home_button()]))

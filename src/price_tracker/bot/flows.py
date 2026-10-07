@@ -68,7 +68,7 @@ from price_tracker.bot.callbacks import (
     InvalidCallback,
     decode_legacy_entry,
 )
-from price_tracker.bot.messages import N_, _, reset_locale, set_locale
+from price_tracker.bot.messages import N_, _, reset_locale, set_locale, user_locale
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -503,6 +503,12 @@ class _Transport:
             self._failed(None, exc)
 
 
+async def _telegram_language(user_id: int, language_code: str | None) -> str | None:
+    """Default resolver: the Telegram language of the update, without any read."""
+    del user_id
+    return language_code
+
+
 async def _ignore(update: object, context: AnyContext) -> None:
     """Placeholder callback: :class:`GuidedFlow` overrides ``handle_update``."""
     del update, context
@@ -519,13 +525,19 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
         config: FlowConfig | None = None,
         registry: FlowRegistry | None = None,
         codec: ActionRegistry = REGISTRY,
+        locale_resolver: Callable[[int, str | None], Awaitable[str | None]] | None = None,
     ) -> None:
+        """``locale_resolver(user_id, telegram_language)`` gives the language to answer in.
+
+        Without one, the Telegram language of the update is used as it is.
+        """
         super().__init__(_ignore)
         self.services = services
         self.timer = timer
         self.config = config or FlowConfig()
         self.registry = registry if registry is not None else FlowRegistry()
         self.codec = codec
+        self._locale_resolver = locale_resolver or _telegram_language
         self._bot: Bot | None = None
 
     def attach(self, bot: Bot) -> None:
@@ -625,8 +637,9 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
         """Run the route; raise ``ApplicationHandlerStop`` iff the update was consumed."""
         if not isinstance(check_result, Route):  # pragma: no cover - PTB contract
             return
-        # The language is chosen synchronously, before the first await, so that
-        # every ticket the route takes is taken before anything else can run.
+        # Only the Telegram language here, with no I/O: the stored one is read by
+        # _localise after the route's registry step, so a ticket or claim is never
+        # taken behind a pending read.
         locale = set_locale(check_result.language_code)
         try:
             if self._bot is None:
@@ -654,6 +667,17 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
         return await self._end_by_user(route, transport, consume=False)
 
     # -- shared steps --------------------------------------------------------
+
+    async def _localise(self, route: Route) -> str | None:
+        """Read the user's language, make it current for this update and return it.
+
+        Awaited only after the route's synchronous registry step (ticket, claim or
+        replace), so a ``/cancel`` processed during the read still invalidates the
+        route. ``handle_update`` restores the caller's language when the update ends.
+        """
+        language = await self._locale_resolver(route.key[1], route.language_code)
+        set_locale(language)
+        return language
 
     def _new_token(self) -> str:
         return uuid.uuid4().hex
@@ -721,6 +745,10 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
             return False
         user_id = route.key[1]
         ticket = self.registry.generation(route.key)
+        language = await self._localise(route)
+        if not self.registry.is_current(route.key, ticket):
+            await transport.answer(query.id)
+            return True
         active = await self.services.is_active(user_id)
         if not self.registry.is_current(route.key, ticket):
             # Superseded while waiting: open nothing, but still dismiss the
@@ -746,7 +774,7 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
             product_id=product_id,
             prompt_chat_id=route.key[0],
             started_at=time.monotonic(),
-            language_code=route.language_code,
+            language_code=language,
         )
         self._supersede_legacy(context)
         await transport.answer(query.id)
@@ -762,6 +790,9 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
         if route.url is None:  # pragma: no cover - routing contract
             return False
         ticket = self.registry.advance(key)
+        language = await self._localise(route)
+        if not self.registry.is_current(key, ticket):
+            return True
         active = await self.services.is_active(user_id)
         if not self.registry.is_current(key, ticket):
             return True
@@ -785,7 +816,9 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
             return True
         product = result.product
         if product.currency is not None:
-            await self._insert_and_branch(key, product, product.currency, transport, ticket)
+            await self._insert_and_branch(
+                key, product, product.currency, transport, ticket, language
+            )
             return True
         token = self._new_token()
         flow = ActiveFlow(
@@ -797,6 +830,7 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
             payload=product,
             store=product.store,
             started_at=time.monotonic(),
+            language_code=language,
         )
         await self._show_prompt(
             key,
@@ -840,8 +874,12 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
         currency: str,
         transport: _Transport,
         ticket: int,
+        language: str | None,
     ) -> None:
-        """Insert the product with an explicit currency, then run the scope branch."""
+        """Insert the product with an explicit currency, then run the scope branch.
+
+        ``language`` is the one already read for this update; the scope prompt keeps it.
+        """
         user_id = key[1]
         if not self.registry.is_current(key, ticket):
             return
@@ -890,6 +928,7 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
             prompt_chat_id=key[0],
             store=product.store,
             started_at=time.monotonic(),
+            language_code=language,
         )
         shown = await self._show_prompt(
             key,
@@ -910,16 +949,18 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
         token = action.args[0]
         flow = self.registry.get(route.key)
         if flow is None or flow.token != token or not _action_fits(action, flow):
+            await self._localise(route)
             await transport.answer(query.id, _(TEXT_EXPIRED))
             return True
         snapshot = flow.snapshot(route.key)
         choice = action.args[1] if len(action.args) > 1 else None
         if action.name == "flow.cancel" or choice == "cancel":
-            await self._close_by_button(snapshot, query.id, transport)
+            await self._close_by_button(route, snapshot, query.id, transport)
             return True
         if action.name == "flow.currency" and choice == "type":
             if self.registry.replace(snapshot, replace(flow, typing=True)):
                 ticket = self.registry.generation(route.key)
+                await self._localise(route)
                 await transport.answer(query.id)
                 if not self.registry.is_current(route.key, ticket):
                     return True
@@ -929,10 +970,11 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
                 )
             return True
         if action.name == "flow.currency" and isinstance(choice, str):
-            return await self._on_currency_chosen(snapshot, query.id, choice, transport)
+            return await self._on_currency_chosen(route, snapshot, query.id, choice, transport)
         if action.name == "flow.scope_picker":
             if self.registry.replace(snapshot, replace(flow, picker_open=True)):
                 ticket = self.registry.generation(route.key)
+                await self._localise(route)
                 await transport.answer(query.id)
                 if not self.registry.is_current(route.key, ticket):
                     return True
@@ -942,18 +984,20 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
                 )
             return True
         if isinstance(choice, str):
-            return await self._on_scope_chosen(snapshot, query.id, choice, transport)
+            return await self._on_scope_chosen(route, snapshot, query.id, choice, transport)
         return True  # pragma: no cover - registry contract
 
     async def _close_by_button(
-        self, snapshot: FlowSnapshot, query_id: str, transport: _Transport
+        self, route: Route, snapshot: FlowSnapshot, query_id: str, transport: _Transport
     ) -> None:
         claimed = self.registry.claim(snapshot)
         if claimed is None:
+            await self._localise(route)
             await transport.answer(query_id, _(TEXT_EXPIRED))
             return
         ticket = self.registry.generation(snapshot.key)
         self.timer.disarm(snapshot)
+        await self._localise(route)
         await transport.answer(query_id)
         if not self.registry.is_current(snapshot.key, ticket):
             return
@@ -962,14 +1006,21 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
         )
 
     async def _on_currency_chosen(
-        self, snapshot: FlowSnapshot, query_id: str, code: str, transport: _Transport
+        self,
+        route: Route,
+        snapshot: FlowSnapshot,
+        query_id: str,
+        code: str,
+        transport: _Transport,
     ) -> bool:
         claimed = self.registry.claim(snapshot)
         if claimed is None or claimed.payload is None:
+            await self._localise(route)
             await transport.answer(query_id, _(TEXT_EXPIRED))
             return True
         ticket = self.registry.generation(snapshot.key)
         self.timer.disarm(snapshot)
+        language = await self._localise(route)
         await transport.answer(query_id)
         if not self.registry.is_current(snapshot.key, ticket):
             return True
@@ -978,18 +1029,27 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
             claimed.prompt_message_id,
             _(TEXT_CURRENCY_CHOSEN).format(code=code),
         )
-        await self._insert_and_branch(snapshot.key, claimed.payload, code, transport, ticket)
+        await self._insert_and_branch(
+            snapshot.key, claimed.payload, code, transport, ticket, language
+        )
         return True
 
     async def _on_scope_chosen(
-        self, snapshot: FlowSnapshot, query_id: str, choice: str, transport: _Transport
+        self,
+        route: Route,
+        snapshot: FlowSnapshot,
+        query_id: str,
+        choice: str,
+        transport: _Transport,
     ) -> bool:
         claimed = self.registry.claim(snapshot)
         if claimed is None or claimed.product_id is None:
+            await self._localise(route)
             await transport.answer(query_id, _(TEXT_EXPIRED))
             return True
         ticket = self.registry.generation(snapshot.key)
         self.timer.disarm(snapshot)
+        await self._localise(route)
         await transport.answer(query_id)
         if not self.registry.is_current(snapshot.key, ticket):
             return True
@@ -1015,29 +1075,30 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
         if flow.state is FlowState.AWAIT_CURRENCY:
             parsed_code = parse_currency_code(route.text)
             if isinstance(parsed_code, InputError):
-                await self._reject(snapshot, flow, parsed_code, transport)
+                await self._reject(route, snapshot, flow, parsed_code, transport)
                 return True
             claimed = self.registry.claim(snapshot)
             if claimed is None or claimed.payload is None:  # pragma: no cover - sync above
                 return False
             self.timer.disarm(snapshot)
+            ticket = self.registry.generation(snapshot.key)
+            language = await self._localise(route)
             await self._insert_and_branch(
-                snapshot.key,
-                claimed.payload,
-                parsed_code,
-                transport,
-                self.registry.generation(snapshot.key),
+                snapshot.key, claimed.payload, parsed_code, transport, ticket, language
             )
             return True
         value = _parse_for(flow.kind, route.text)
         if isinstance(value, InputError):
-            await self._reject(snapshot, flow, value, transport)
+            await self._reject(route, snapshot, flow, value, transport)
             return True
         claimed = self.registry.claim(snapshot)
         if claimed is None or claimed.product_id is None:  # pragma: no cover - sync above
             return False
         self.timer.disarm(snapshot)
         ticket = self.registry.generation(snapshot.key)
+        await self._localise(route)
+        if not self.registry.is_current(snapshot.key, ticket):
+            return True
         if isinstance(value, Cancel):
             await transport.send(chat_id, _(TEXT_CANCELLED))
             return True
@@ -1050,22 +1111,41 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
         return True
 
     async def _reject(
-        self, snapshot: FlowSnapshot, flow: ActiveFlow, error: InputError, transport: _Transport
+        self,
+        route: Route,
+        snapshot: FlowSnapshot,
+        flow: ActiveFlow,
+        error: InputError,
+        transport: _Transport,
     ) -> None:
         attempts = flow.attempts + 1
         if attempts >= self.config.max_attempts:
-            if self.registry.claim(snapshot) is not None:
-                self.timer.disarm(snapshot)
+            claimed = self.registry.claim(snapshot)
+            if claimed is None:
+                return
+            self.timer.disarm(snapshot)
+            ticket = self.registry.generation(snapshot.key)
+            await self._localise(route)
+            if not self.registry.is_current(snapshot.key, ticket):
+                return
             await transport.send(snapshot.key[0], _(TEXT_TOO_MANY))
             return
         self.registry.replace(snapshot, replace(flow, attempts=attempts))
+        ticket = self.registry.generation(snapshot.key)
+        await self._localise(route)
+        if not self.registry.is_current(snapshot.key, ticket):
+            return
         hint = _HINTS[error.code]
         if flow.kind is FlowKind.INTERVAL and error.code is InputErrorCode.NOT_A_NUMBER:
             hint = TEXT_WHOLE_MINUTES
         await transport.send(snapshot.key[0], _(hint))
 
     async def _end_by_user(self, route: Route, transport: _Transport, *, consume: bool) -> bool:
-        """``/cancel`` (consumed), another command or a foreign callback (passed on)."""
+        """``/cancel`` (consumed), another command or a foreign callback (passed on).
+
+        The claim, or the advance of a ``/cancel`` with no flow, happens before any
+        await: a ``/cancel`` wins over an opening that is still waiting.
+        """
         snapshot = route.snapshot
         claimed = None if snapshot is None else self.registry.claim(snapshot)
         if snapshot is None or claimed is None:
@@ -1073,6 +1153,7 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
                 self.registry.advance(route.key)
             return False
         self.timer.disarm(snapshot)
+        await self._localise(route)
         await transport.edit(
             claimed.prompt_chat_id, claimed.prompt_message_id, closing_text(claimed)
         )
@@ -1132,17 +1213,24 @@ _PREPARE_TEXTS: Final = {
 # --- fallbacks (groups 1 and 3) --------------------------------------------
 
 
+async def _sender_language(update: Update, context: AnyContext) -> str | None:
+    """The stored language of the sender, else their Telegram language."""
+    user = update.effective_user
+    if user is None:
+        return None
+    return await user_locale(context.bot_data["db"], user.id, user.language_code)
+
+
 async def nothing_to_cancel(update: Update, context: AnyContext) -> None:
     """Group 1: ``/cancel`` outside a guided flow.
 
     A prompt still armed by a legacy handler (``pending_action``) is disarmed and
     reported as cancelled; otherwise there is nothing to cancel.
     """
-    user = update.effective_user
-    locale = set_locale(None if user is None else user.language_code)
+    if update.message is None:
+        return
+    locale = set_locale(await _sender_language(update, context))
     try:
-        if update.message is None:
-            return
         user_data = context.user_data
         if isinstance(user_data, dict) and LEGACY_PENDING_KEY in user_data:
             del user_data[LEGACY_PENDING_KEY]
@@ -1155,9 +1243,13 @@ async def nothing_to_cancel(update: Update, context: AnyContext) -> None:
 
 async def no_open_prompt(update: Update, context: AnyContext) -> None:
     """Group 3: free text that no flow asked for."""
-    del context
-    if update.message is not None:
+    if update.message is None:
+        return
+    locale = set_locale(await _sender_language(update, context))
+    try:
         await update.message.reply_text(_(TEXT_NO_OPEN_PROMPT))
+    finally:
+        reset_locale(locale)
 
 
 async def expired_callback(update: Update, context: AnyContext) -> None:

@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler
 
+from price_tracker.bot.command_menus import sync_command_menus
 from price_tracker.bot.decorators import _db, admin_only, with_locale
 from price_tracker.bot.handlers._helpers import _escape_html, _parse_id
 from price_tracker.bot.messages import _
@@ -62,6 +63,8 @@ async def cmd_add_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             chat_id=new_user_id,
             text=_("🎉 You have been authorized to use Price Tracker Bot.\nSend /start to begin."),
         )
+    with contextlib.suppress(Exception):
+        await sync_command_menus(context.bot, db, new_user_id)
 
 
 @with_locale
@@ -103,6 +106,8 @@ async def cmd_remove_user(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             ),
             parse_mode=ParseMode.HTML,
         )
+        with contextlib.suppress(Exception):
+            await sync_command_menus(context.bot, db, target_id)
     else:
         await update.message.reply_text(
             _("❌ User <code>{tg_id}</code> not found.").format(tg_id=target_id),

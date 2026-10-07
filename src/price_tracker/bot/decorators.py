@@ -10,6 +10,7 @@ module so handlers stay framework-agnostic.
 from __future__ import annotations
 
 import contextlib
+import logging
 from collections.abc import Callable
 from decimal import Decimal
 from functools import wraps
@@ -18,6 +19,7 @@ from typing import TYPE_CHECKING, Any
 from telegram.constants import ParseMode
 
 from price_tracker.bot.messages import _, set_locale
+from price_tracker.i18n.locales import effective_language
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable
@@ -29,14 +31,41 @@ if TYPE_CHECKING:
 
 HandlerFn = Callable[..., "Awaitable[Any]"]
 
+logger = logging.getLogger(__name__)
+
+
+async def _reply_language(context: Any, user_id: int, tag: str | None) -> str | None:
+    """The user's stored choice, else ``tag``; stores ``tag`` when it is new for the row.
+
+    One read per update, no cache. A failed read answers in ``tag``; a failed write is
+    only logged.
+    """
+    try:
+        db = _db(context)
+        user = await db.get_user(user_id)
+    except Exception:  # noqa: BLE001 - a failed read must never stop a reply
+        logger.warning("could not read the language of user %s", user_id, exc_info=True)
+        return tag
+    if user is None:
+        return tag
+    if tag and tag != user.telegram_language_tag:
+        # The repository stores only well-formed tags and ignores anything else.
+        try:
+            await db.set_user_telegram_tag(user_id, tag)
+        except Exception:  # noqa: BLE001 - the observation is best effort
+            logger.warning(
+                "could not store the Telegram language of user %s", user_id, exc_info=True
+            )
+    return effective_language(user.language, tag or user.telegram_language_tag)
+
 
 def with_locale(handler: HandlerFn) -> HandlerFn:
-    """Decorator that sets the request locale from Telegram update before
-    invoking the wrapped handler.
+    """Decorator that sets the reply language before invoking the wrapped handler.
 
-    Reads `update.effective_user.language_code` and falls through the
-    fallback chain in `bot.messages.get_translation`. ContextVar isolates
-    locale across concurrent asyncio tasks.
+    The user's chosen language wins; otherwise the Telegram language of the update
+    (``effective_user.language_code``), which is also stored on the user's row when
+    it changed. Falls through the chain in ``bot.messages.get_translation``.
+    ContextVar isolates locale across concurrent asyncio tasks.
 
     MUST be applied as the OUTERMOST decorator so error replies from
     `@restricted` / `@admin_only` are already localized.
@@ -44,8 +73,11 @@ def with_locale(handler: HandlerFn) -> HandlerFn:
 
     @wraps(handler)
     async def wrapper(update: Any, context: Any, *args: Any, **kwargs: Any) -> Any:
-        lang = update.effective_user.language_code if update.effective_user is not None else None
-        set_locale(lang)
+        user = update.effective_user
+        language = None
+        if user is not None:
+            language = await _reply_language(context, user.id, user.language_code)
+        set_locale(language)
         return await handler(update, context, *args, **kwargs)
 
     return wrapper

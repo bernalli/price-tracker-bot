@@ -6,47 +6,47 @@
 -> sendMessage chat=10
    param parse_mode="HTML"
    text:
-   | 📉 <b>Price drop!</b>
+   | 📉 <b>Prezzo in calo!</b>
    |
    | <b>Kettle</b>
-   | <a href="https://shop.example.com/item/1">View product</a>
+   | <a href="https://shop.example.com/item/1">Vedi il prodotto</a>
    |
-   | Was: <s>80.00 €</s>
-   | Now: <b>79.00 €</b>
-   | Drop: -1.00 € (1.2%)
+   | Prima: <s>80.00 €</s>
+   | Ora: <b>79.00 €</b>
+   | Calo: -1.00 € (1.2%)
 -> sendMessage chat=10
    param parse_mode="HTML"
    text:
-   | 📉 <b>Price drop!</b>
+   | 📉 <b>Prezzo in calo!</b>
    |
    | <b>Absolute</b>
-   | <a href="https://shop.example.com/item/4">View product</a>
+   | <a href="https://shop.example.com/item/4">Vedi il prodotto</a>
    |
-   | Was: <s>60.00 €</s>
-   | Now: <b>30.00 €</b>
-   | Drop: -30.00 € (50.0%)
+   | Prima: <s>60.00 €</s>
+   | Ora: <b>30.00 €</b>
+   | Calo: -30.00 € (50.0%)
 -> sendMessage chat=10
    param parse_mode="HTML"
    text:
-   | 📉 <b>Price drop!</b>
+   | 📉 <b>Prezzo in calo!</b>
    |
    | <b>Target Type</b>
-   | <a href="https://shop.example.com/item/5">View product</a>
+   | <a href="https://shop.example.com/item/5">Vedi il prodotto</a>
    |
-   | Was: <s>60.00 €</s>
-   | Now: <b>49.00 €</b>
-   | Drop: -11.00 € (18.3%)
+   | Prima: <s>60.00 €</s>
+   | Ora: <b>49.00 €</b>
+   | Calo: -11.00 € (18.3%)
 -> sendMessage chat=10
    param parse_mode="HTML"
    text:
-   | 📉 <b>Price drop!</b>
+   | 📉 <b>Prezzo in calo!</b>
    |
    | <b>Chef&#x27;s &quot;Penny&quot; Pan</b>
-   | <a href="https://shop.example.com/item/31">View product</a>
+   | <a href="https://shop.example.com/item/31">Vedi il prodotto</a>
    |
-   | Was: <s>1.00 €</s>
-   | Now: <b>0.50 €</b>
-   | Drop: -0.50 € (50.0%)
+   | Prima: <s>1.00 €</s>
+   | Ora: <b>0.50 €</b>
+   | Calo: -0.50 € (50.0%)
 ## db after step 1
 + price_history id=6 {product_id=1, price="79.00", checked_at=<now:9999-99-99 99:99:99>}
 + price_history id=7 {product_id=2, price="30.00", checked_at=<now:9999-99-99 99:99:99>}

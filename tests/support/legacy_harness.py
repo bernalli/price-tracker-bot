@@ -612,13 +612,19 @@ async def seed_user(
     username: str | None = None,
     active: bool = True,
 ) -> None:
-    """Insert or update a user row (never captured unless run inside a step)."""
+    """Insert or update a user row (never captured unless run inside a step).
+
+    A seeded user has already been seen in the scenario's locale, so the Telegram
+    language stored on the row matches the updates the scenario sends.
+    """
     await world.conn.execute(
-        "INSERT INTO users(user_id, is_admin, is_active, display_name, username) "
-        "VALUES(?, ?, ?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET "
+        "INSERT INTO users(user_id, is_admin, is_active, display_name, username, "
+        "telegram_language_tag) "
+        "VALUES(?, ?, ?, ?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET "
         "is_admin = excluded.is_admin, is_active = excluded.is_active, "
-        "display_name = excluded.display_name, username = excluded.username",
-        (user_id, int(admin), int(active), display_name, username),
+        "display_name = excluded.display_name, username = excluded.username, "
+        "telegram_language_tag = excluded.telegram_language_tag",
+        (user_id, int(admin), int(active), display_name, username, world.locale),
     )
     await world.conn.commit()
 

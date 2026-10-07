@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
@@ -16,6 +17,7 @@ from price_tracker.db.models import (
     ScraperHealth,
     UserRecord,
 )
+from price_tracker.i18n.locales import AVAILABLE_LANGUAGES
 
 if TYPE_CHECKING:
     import aiosqlite
@@ -104,6 +106,27 @@ def _row_to_product(row: tuple[Any, ...]) -> ProductRecord:
     )
 
 
+_TELEGRAM_TAG_RE = re.compile(r"[A-Za-z0-9_-]{1,35}")
+_USER_COLS = "user_id, is_admin, is_active, display_name, username, language, telegram_language_tag"
+
+
+def _row_to_user(row: Any) -> UserRecord:
+    return UserRecord(
+        user_id=row[0],
+        is_admin=_is_one(row[1]),
+        is_active=_is_one(row[2]),
+        display_name=row[3],
+        username=row[4],
+        language=row[5],
+        telegram_language_tag=row[6],
+    )
+
+
+def _is_one(value: object) -> bool:
+    """True only for the integer 1: the flag columns have no CHECK, so anything else is false."""
+    return type(value) is int and value == 1
+
+
 class Repository:
     """Typed CRUD wrapper over the SQLite connection."""
 
@@ -140,24 +163,14 @@ class Repository:
             "SELECT is_active FROM users WHERE user_id = ?", (user_id,)
         )
         row = await cursor.fetchone()
-        return bool(row and row[0])
+        return row is not None and _is_one(row[0])
 
     async def get_user(self, user_id: int) -> UserRecord | None:
         cursor = await self._conn.execute(
-            "SELECT user_id, is_admin, is_active, display_name, username "
-            "FROM users WHERE user_id = ?",
-            (user_id,),
+            f"SELECT {_USER_COLS} FROM users WHERE user_id = ?", (user_id,)
         )
         row = await cursor.fetchone()
-        if not row:
-            return None
-        return UserRecord(
-            user_id=row[0],
-            is_admin=bool(row[1]),
-            is_active=bool(row[2]),
-            display_name=row[3],
-            username=row[4],
-        )
+        return _row_to_user(row) if row else None
 
     async def update_user_info(
         self,
@@ -189,37 +202,40 @@ class Repository:
         return int(cursor.rowcount) > 0
 
     async def list_users(self) -> list[UserRecord]:
-        cursor = await self._conn.execute(
-            "SELECT user_id, is_admin, is_active, display_name, username FROM users"
-        )
-        rows = await cursor.fetchall()
-        return [
-            UserRecord(
-                user_id=r[0],
-                is_admin=bool(r[1]),
-                is_active=bool(r[2]),
-                display_name=r[3],
-                username=r[4],
-            )
-            for r in rows
-        ]
+        cursor = await self._conn.execute(f"SELECT {_USER_COLS} FROM users")
+        return [_row_to_user(r) for r in await cursor.fetchall()]
 
     async def list_active_users(self) -> list[UserRecord]:
+        cursor = await self._conn.execute(f"SELECT {_USER_COLS} FROM users WHERE is_active = 1")
+        return [_row_to_user(r) for r in await cursor.fetchall()]
+
+    async def set_user_language(self, user_id: int, code: str | None) -> bool:
+        """Store the chosen interface language (``None`` = automatic).
+
+        Raises ``ValueError`` for a code without a catalogue. Returns False when the user
+        does not exist.
+        """
+        if code is not None and code not in AVAILABLE_LANGUAGES:
+            raise ValueError(f"unsupported language: {code!r}")
         cursor = await self._conn.execute(
-            "SELECT user_id, is_admin, is_active, display_name, username "
-            "FROM users WHERE is_active = 1"
+            "UPDATE users SET language = ? WHERE user_id = ?", (code, user_id)
         )
-        rows = await cursor.fetchall()
-        return [
-            UserRecord(
-                user_id=r[0],
-                is_admin=bool(r[1]),
-                is_active=bool(r[2]),
-                display_name=r[3],
-                username=r[4],
-            )
-            for r in rows
-        ]
+        await self._conn.commit()
+        return int(cursor.rowcount) > 0
+
+    async def set_user_telegram_tag(self, user_id: int, tag: object) -> bool:
+        """Record the IETF tag Telegram last reported for the user, verbatim.
+
+        Anything that is not a well-formed tag is ignored and reported as False, as is an
+        unknown user.
+        """
+        if not isinstance(tag, str) or _TELEGRAM_TAG_RE.fullmatch(tag) is None:
+            return False
+        cursor = await self._conn.execute(
+            "UPDATE users SET telegram_language_tag = ? WHERE user_id = ?", (tag, user_id)
+        )
+        await self._conn.commit()
+        return int(cursor.rowcount) > 0
 
     async def ensure_admin_users(self, user_ids: tuple[int, ...]) -> None:
         for uid in user_ids:
@@ -922,7 +938,7 @@ class Repository:
             "SELECT is_admin FROM users WHERE user_id = ?", (user_id,)
         )
         row = await cursor.fetchone()
-        return bool(row and row[0])
+        return row is not None and _is_one(row[0])
 
     async def add_user(self, user_id: int, *, is_admin: bool = False) -> None:
         """Like :meth:`ensure_user`, but also reactivates a deactivated user."""

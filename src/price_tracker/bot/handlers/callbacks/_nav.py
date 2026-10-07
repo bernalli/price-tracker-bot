@@ -25,7 +25,7 @@ from price_tracker.bot.handlers._cards import (
     product_view,
     screen_markup,
 )
-from price_tracker.bot.messages import _
+from price_tracker.bot.messages import _, reset_locale, set_locale, user_locale
 from price_tracker.bot.ui.cards import list_page, product_card
 from price_tracker.bot.ui.panels import (
     QUIET_WINDOWS,
@@ -36,6 +36,7 @@ from price_tracker.bot.ui.panels import (
 )
 from price_tracker.bot.ui.screens import Screen
 from price_tracker.db.models import NotificationPrefs
+from price_tracker.i18n.locales import AVAILABLE_LANGUAGES
 from price_tracker.notifier.preferences import PreferencesManager
 
 if TYPE_CHECKING:
@@ -74,15 +75,24 @@ async def _noop(
     """The page indicator: the button is inert, the head of the dispatcher already answered."""
 
 
+async def _stored_language(db: Any, user_id: int) -> str | None:
+    user = await db.get_user(user_id)
+    return None if user is None else user.language
+
+
 async def _settings(
     query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, action: Action
 ) -> None:
-    await _edit(query, settings_screen(await _prefs_view(db, user_id), now=datetime.now(UTC)))
+    view = await _prefs_view(db, user_id)
+    language = await _stored_language(db, user_id)
+    await _edit(query, settings_screen(view, now=datetime.now(UTC), language=language))
 
 
 async def _show_section(query: Any, db: Any, user_id: int, section: str) -> None:
     view = await _prefs_view(db, user_id)
-    await _edit(query, settings_section_screen(section, view, now=datetime.now(UTC)))
+    language = await _stored_language(db, user_id)
+    screen = settings_section_screen(section, view, now=datetime.now(UTC), language=language)
+    await _edit(query, screen)
 
 
 async def _settings_section(
@@ -127,6 +137,24 @@ async def _set_quiet(
     start, end = QUIET_WINDOWS.get(str(action.args[0]), (None, None))
     await _write_prefs(db, user_id, quiet_hours_start=start, quiet_hours_end=end)
     await _show_section(query, db, user_id, "qh")
+
+
+async def _set_language(
+    query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, action: Action
+) -> None:
+    value = str(action.args[0])
+    if value == "auto":
+        await db.set_user_language(user_id, None)
+    elif value in AVAILABLE_LANGUAGES:
+        await db.set_user_language(user_id, value)
+    # A registered code without a catalogue writes nothing; the section is redrawn as is.
+    # The section is drawn in the language now in effect, for this render only.
+    language = await user_locale(db, user_id, query.from_user.language_code)
+    token = set_locale(language)
+    try:
+        await _show_section(query, db, user_id, "lang")
+    finally:
+        reset_locale(token)
 
 
 async def _list_screen(
@@ -175,6 +203,7 @@ _HANDLERS: Final[dict[str, Callable[..., Awaitable[None]]]] = {
     "settings.mute": _set_mute,
     "settings.digest": _set_digest,
     "settings.quiet": _set_quiet,
+    "settings.language": _set_language,
     "list.page": _list_page,
     "list.open": _list_open,
     "home": _home,

@@ -33,6 +33,11 @@
    text:
    | ✅ Utente <code>10</code> rimosso.
    | I suoi prodotti restano nel database ma non riceverà più notifiche.
+-> deleteMyCommands
+   param scope={"chat_id": 10, "type": "chat"}
+-> deleteMyCommands
+   param language_code="it"
+   param scope={"chat_id": 10, "type": "chat"}
 ## db after step 5
 ~ users user_id=10 is_active: 1 -> 0
 ## step 6: command "/removeuser 12345" user=1

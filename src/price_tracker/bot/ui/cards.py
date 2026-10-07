@@ -178,7 +178,7 @@ _LIST_NAME_WIDTH = 40
 
 def _filter_word(list_filter: str) -> str:
     if list_filter == "a":
-        return _("active")
+        return _("active ones")
     return _("paused") if list_filter == "p" else _("errors")
 
 
