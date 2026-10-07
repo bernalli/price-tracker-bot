@@ -6,11 +6,11 @@
 -> sendMessage chat=10
    param parse_mode="HTML"
    text:
-   | 📊 <b>Le tue statistiche</b>
+   | ℹ️ <b>Le tue statistiche</b>
    |
    | 📦 Prodotti attivi: 0
    | 📁 Prodotti totali: 0
-   | 🔍 Controlli effettuati: 0
+   | 🔄 Controlli effettuati: 0
    | ⏱ Intervallo check: ogni 6h
    |
    | <b>📡 Bot Status</b>

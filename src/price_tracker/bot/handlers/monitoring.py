@@ -137,7 +137,7 @@ async def cmd_refresh(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         config = _config(context)
         name_safe = _escape_html(truncate_to_width(product.get("name") or _("Unknown"), 80))
         await update.message.reply_text(
-            _("🔄 Interval reset to global (every {min} min)\n📦 #{pid} — {name}").format(
+            _("⏱ Interval reset to global (every {min} min)\n📦 #{pid} — {name}").format(
                 min=config.check_interval_minutes, pid=product_id, name=name_safe
             ),
             parse_mode=ParseMode.HTML,
@@ -157,7 +157,7 @@ async def cmd_refresh(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     display = duration(minutes, locale=current_locale())
 
     await update.message.reply_text(
-        _("🔄 Check interval: <b>every {display}</b>\n📦 #{pid} — {name}").format(
+        _("⏱ Check interval: <b>every {display}</b>\n📦 #{pid} — {name}").format(
             display=display, pid=product_id, name=_escape_html(truncate_to_width(name, 80))
         ),
         parse_mode=ParseMode.HTML,
@@ -187,7 +187,7 @@ async def cmd_check(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text(_("❌ Product paused. Use /reactivate to resume tracking."))
         return
 
-    msg = await update.message.reply_text(_("🔍 Checking..."))
+    msg = await update.message.reply_text(_("🔄 Checking..."))
     scheduler = context.bot_data["scheduler"]
     result = await scheduler.check_one_product_for_user(
         product_id=product_id, user_id=update.effective_user.id
@@ -229,7 +229,7 @@ async def cmd_checkall(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await update.message.reply_text(_("📭 No products to check."))
         return
 
-    msg = await update.message.reply_text(_("🔍 Checking {n} products...").format(n=len(products)))
+    msg = await update.message.reply_text(_("🔄 Checking {n} products...").format(n=len(products)))
     from price_tracker.core.alert import format_alert  # noqa: PLC0415
 
     scheduler = context.bot_data["scheduler"]

@@ -9,13 +9,13 @@ text:
    | [💰 Now: 0,50 € 💰 Now: 0,50 € 💰 Now: 0,50 €]
    | [📌 Start: 0,50 € 📌 Start: 0,50 € 📌 Start: 0,50 €]
    | [🔔 Alert: drop of 10 % from start 🔔 Alert: drop of 10 % from start 🔔 Alert: drop of 10 % from start]
-   | [🔄 Checks: every 7 Tg. · never 🔄 Checks: every 7 Tg. · never 🔄 Checks: every 7 Tg. · never]
+   | [⏱ Checks: every 7 Tg. · never ⏱ Checks: every 7 Tg. · never ⏱ Checks: every 7 Tg. · never]
    | [⚠️ 12 failed reads · /errors ⚠️ 12 failed reads · /errors ⚠️ 12 failed reads · /errors]
 keyboard:
-   [[🔍 Check now 🔍 Check now 🔍 Che…](cb:p:9223372036854775807:ck)
-   [[📊 History 📊 History 📊 History]](cb:p:9223372036854775807:ch:30d)
+   [[🔄 Check now 🔄 Check now 🔄 Che…](cb:p:9223372036854775807:ck)
+   [[📈 History 📈 History 📈 History]](cb:p:9223372036854775807:ch:30d)
    [[▶️ Reactivate ▶️ Reactivate ▶️ R…](cb:p:9223372036854775807:ra)
    [[🗑 Delete 🗑 Delete 🗑 Delete]](cb:p:9223372036854775807:rm)
    [[🔔 Alert rule 🔔 Alert rule 🔔 A…](cb:p:9223372036854775807:th)
-   [[🔄 Interval 🔄 Interval 🔄 Inter…](cb:p:9223372036854775807:iv)
+   [[⏱ Interval ⏱ Interval ⏱ Inter…](cb:p:9223372036854775807:iv)
    [[◀️ List ◀️ List ◀️ List]](cb:l:a:1)

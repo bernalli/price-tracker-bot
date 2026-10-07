@@ -139,13 +139,13 @@ async def handle_menu_navigation(
         for p in products[:8]:
             nm = truncate_to_width(p.get("name") or "?", 30)
             rows.append(
-                [InlineKeyboardButton(f"🔍 #{p['id']} {nm}", callback_data=f"check_{p['id']}")]
+                [InlineKeyboardButton(f"🔄 #{p['id']} {nm}", callback_data=f"check_{p['id']}")]
             )
         if products:
-            rows.append([InlineKeyboardButton("📊 Storico prezzo", callback_data="menu_storia")])
+            rows.append([InlineKeyboardButton("📈 Storico prezzo", callback_data="menu_storia")])
         rows.append(menu_back_button())
         await query.edit_message_text(
-            "🔍 <b>Controllo prezzi</b>\n\nTocca un prodotto per controllarlo.",
+            "💶 <b>Controllo prezzi</b>\n\nTocca un prodotto per controllarlo.",
             parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup(rows),
         )
@@ -160,11 +160,11 @@ async def handle_menu_navigation(
         for p in products[:10]:
             nm = truncate_to_width(p.get("name") or "?", 35)
             rows.append(
-                [InlineKeyboardButton(f"📊 #{p['id']} {nm}", callback_data=f"chart_{p['id']}")]
+                [InlineKeyboardButton(f"📈 #{p['id']} {nm}", callback_data=f"chart_{p['id']}")]
             )
         rows.append(menu_back_button())
         await query.edit_message_text(
-            "📊 <b>Storico prezzi</b>\n\nTocca un prodotto per il grafico.",
+            "📈 <b>Storico prezzi</b>\n\nTocca un prodotto per il grafico.",
             parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup(rows),
         )
@@ -212,7 +212,7 @@ async def handle_menu_navigation(
         await query.edit_message_text(
             f"💾 <b>Import / Export</b>\n\n"
             f"📦 {stats['active_products']} attivi, {stats['total_products']} totali\n"
-            f"🔍 {stats['total_checks']} check effettuati",
+            f"🔄 {stats['total_checks']} check effettuati",
             parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup(rows),
         )
@@ -248,7 +248,7 @@ async def _handle_menu_checkall(
             reply_markup=InlineKeyboardMarkup([menu_back_button()]),
         )
         return True
-    await query.edit_message_text(f"🔍 Controllo {len(products)} prodotti...")
+    await query.edit_message_text(f"🔄 Controllo {len(products)} prodotti...")
     from price_tracker.core.alert import format_alert  # noqa: PLC0415
 
     scheduler = context.bot_data["scheduler"]
@@ -344,10 +344,10 @@ async def _handle_menu_info(
     interval = int(saved) if saved else config.check_interval_minutes
     int_str = f"{interval // 60}h" if interval >= 60 and interval % 60 == 0 else f"{interval}min"
     text = (
-        f"📊 <b>Statistiche</b>\n\n"
+        f"ℹ️ <b>Statistiche</b>\n\n"
         f"📦 Prodotti attivi: {stats['active_products']}\n"
         f"📁 Totali: {stats['total_products']}\n"
-        f"🔍 Check: {stats['total_checks']}\n"
+        f"🔄 Check: {stats['total_checks']}\n"
         f"⏱ Intervallo: ogni {int_str}"
     )
     if is_admin:
@@ -357,7 +357,7 @@ async def _handle_menu_info(
             f"\n\n👑 <b>Admin</b>\n"
             f"👥 Utenti: {len(users)}\n"
             f"📦 Prodotti globali: {gs['active_products']}\n"
-            f"🔍 Check globali: {gs['total_checks']}"
+            f"🔄 Check globali: {gs['total_checks']}"
         )
     await query.edit_message_text(
         text,

@@ -11,13 +11,13 @@ text:
    | [📉 Lowest: $1,199.50 📉 Lowest: $1,199.50 📉 Lowest: $1,199.50]
    | [🎯 Target: $999.99 🎯 Target: $999.99 🎯 Target: $999.99]
    | [🔔 Alert: at or below $999.99 🔔 Alert: at or below $999.99 🔔 Alert: at or below $999.99]
-   | [🔄 Checks: every 1 日 · last 2 時間前 🔄 Checks: every 1 日 · last 2 時間前 🔄 Checks: every 1 日 · last 2 時間前]
+   | [⏱ Checks: every 1 日 · last 2 時間前 ⏱ Checks: every 1 日 · last 2 時間前 ⏱ Checks: every 1 日 · last 2 時間前]
 keyboard:
-   [[🔍 Check now 🔍 Check now 🔍 Che…](cb:p:60:ck)
-   [[📊 History 📊 History 📊 History]](cb:p:60:ch:30d)
+   [[🔄 Check now 🔄 Check now 🔄 Che…](cb:p:60:ck)
+   [[📈 History 📈 History 📈 History]](cb:p:60:ch:30d)
    [[⏸ Pause ⏸ Pause ⏸ Pause]](cb:p:60:pa)
    [[🗑 Delete 🗑 Delete 🗑 Delete]](cb:p:60:rm)
    [[🔔 Alert rule 🔔 Alert rule 🔔 A…](cb:p:60:th)
-   [[🔄 Interval 🔄 Interval 🔄 Inter…](cb:p:60:iv)
+   [[⏱ Interval ⏱ Interval ⏱ Inter…](cb:p:60:iv)
    [[🔗 Open 🔗 Open 🔗 Open]](url:https://shop.example.com/item/60)
    [[◀️ List ◀️ List ◀️ List]](cb:l:a:1)

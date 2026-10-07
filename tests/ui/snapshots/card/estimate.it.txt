@@ -11,10 +11,10 @@ text:
    | 📉 Minimo: 1.199,50 USD
    | 🎯 Obiettivo: 999,99 USD
    | 🔔 Avviso: a 999,99 USD o meno
-   | 🔄 Controlli: ogni 1 giorno · ultimo 2 ore fa
+   | ⏱ Controlli: ogni 1 giorno · ultimo 2 ore fa
 keyboard:
-   [🔍 Controlla ora](cb:p:60:ck)  [📊 Storico](cb:p:60:ch:30d)
+   [🔄 Controlla ora](cb:p:60:ck)  [📈 Storico](cb:p:60:ch:30d)
    [⏸ Pausa](cb:p:60:pa)  [🗑 Elimina](cb:p:60:rm)
-   [🔔 Regola avviso](cb:p:60:th)  [🔄 Intervallo](cb:p:60:iv)
+   [🔔 Regola avviso](cb:p:60:th)  [⏱ Intervallo](cb:p:60:iv)
    [🔗 Apri](url:https://shop.example.com/item/60)
    [◀️ Lista](cb:l:a:1)

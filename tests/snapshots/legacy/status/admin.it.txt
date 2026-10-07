@@ -6,17 +6,17 @@
 -> sendMessage chat=1
    param parse_mode="HTML"
    text:
-   | 📊 <b>Le tue statistiche</b>
+   | ℹ️ <b>Le tue statistiche</b>
    |
    | 📦 Prodotti attivi: 0
    | 📁 Prodotti totali: 0
-   | 🔍 Controlli effettuati: 0
+   | 🔄 Controlli effettuati: 0
    | ⏱ Intervallo check: ogni 1.5h
    |
    | <b>👑 Panoramica admin</b>
    | 👥 Utenti attivi: 3
    | 📦 Prodotti totali (globali): 2
-   | 🔍 Check totali (globali): 5
+   | 🔄 Check totali (globali): 5
    |
    | <b>📡 Bot Status</b>
    | Uptime: 1h 2m 5s

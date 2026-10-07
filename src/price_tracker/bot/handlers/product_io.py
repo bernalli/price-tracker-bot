@@ -113,7 +113,7 @@ async def cmd_export(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     filename = f"prodotti_{datetime.now().strftime('%Y%m%d')}.csv"
     await update.message.reply_document(
         document=InputFile(io.BytesIO(csv_bytes), filename=filename),
-        caption=f"📊 {len(products)} prodotti esportati.",
+        caption=f"💾 {len(products)} prodotti esportati.",
     )
 
 

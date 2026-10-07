@@ -105,9 +105,9 @@
    |
    | Incolla il link di un prodotto per iniziare a seguirlo.
    keyboard:
-   | [📦 Prodotti → l:a:1] [🔍 Verifica tutti → menu_checkall]
-   | [📊 Statistiche → menu_info] [💾 Dati → menu_dati]
-   | [⚙️ Impostazioni → s]
+   | [📦 Prodotti → l:a:1] [💶 Prezzi → menu_prezzi]
+   | [🔔 Notifiche → menu_notifiche] [💾 Dati → menu_dati]
+   | [ℹ️ Stato e info → menu_info] [⚙️ Impostazioni → s]
    | [👑 Admin → menu_admin]
 ## db after step 13
 (no changes)
@@ -116,17 +116,17 @@
 -> editMessageText chat=1 message_id=1008
    param parse_mode="HTML"
    text:
-   | 📊 <b>Statistiche</b>
+   | ℹ️ <b>Statistiche</b>
    |
    | 📦 Prodotti attivi: 0
    | 📁 Totali: 0
-   | 🔍 Check: 0
+   | 🔄 Check: 0
    | ⏱ Intervallo: ogni 1h
    |
    | 👑 <b>Admin</b>
    | 👥 Utenti: 3
    | 📦 Prodotti globali: 0
-   | 🔍 Check globali: 0
+   | 🔄 Check globali: 0
    keyboard:
    | [◀️ Menu → menu_main]
 ## db after step 14

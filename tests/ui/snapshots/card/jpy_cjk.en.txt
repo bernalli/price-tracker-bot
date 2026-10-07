@@ -10,10 +10,10 @@ text:
    | 📌 Start: ¥13,500 · ▼ 5.2%
    | 📉 Lowest: ¥12,800
    | 🔔 Alert: drop of 5% from start
-   | 🔄 Checks: every 30 min · last 12 minutes ago
+   | ⏱ Checks: every 30 min · last 12 minutes ago
 keyboard:
-   [🔍 Check now](cb:p:47:ck)  [📊 History](cb:p:47:ch:30d)
+   [🔄 Check now](cb:p:47:ck)  [📈 History](cb:p:47:ch:30d)
    [⏸ Pause](cb:p:47:pa)  [🗑 Delete](cb:p:47:rm)
-   [🔔 Alert rule](cb:p:47:th)  [🔄 Interval](cb:p:47:iv)
+   [🔔 Alert rule](cb:p:47:th)  [⏱ Interval](cb:p:47:iv)
    [🔗 Open](url:https://shop.example.com/item/47)
    [◀️ List](cb:l:a:1)

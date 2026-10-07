@@ -6,7 +6,7 @@
 -> sendMessage chat=10
    param parse_mode="HTML"
    text:
-   | 📊 <b>Scegli un prodotto per lo storico:</b>
+   | 📈 <b>Scegli un prodotto per lo storico:</b>
    keyboard:
    | [#1 Kettle → chart_1]
    | [#2 Fan → chart_2]
@@ -16,7 +16,7 @@
 -> sendMessage chat=10
    param parse_mode="HTML"
    text:
-   | 📊 <b>Scegli un prodotto per lo storico:</b>
+   | 📈 <b>Scegli un prodotto per lo storico:</b>
    keyboard:
    | [#1 Kettle → chart_1]
    | [#2 Fan → chart_2]
