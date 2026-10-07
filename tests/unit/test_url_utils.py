@@ -93,7 +93,9 @@ def test_allowed_http_scheme_is_case_insensitive(
     validate_public_url("hTTp://example.com/product")
 
 
-@pytest.mark.parametrize("url", ["http://127.0.0.1/", "http://169.254.169.254/", "https:///no-host"])
+@pytest.mark.parametrize(
+    "url", ["http://127.0.0.1/", "http://169.254.169.254/", "https:///no-host"]
+)
 def test_non_scheme_rejections_are_not_scheme_errors(url: str) -> None:
     with pytest.raises(UnsafeURLError) as excinfo:
         validate_public_url(url)
