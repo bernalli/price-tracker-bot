@@ -608,14 +608,6 @@ class Repository:
             for r in rows
         ]
 
-    async def delete_old_price_history(self, *, days: int) -> int:
-        cursor = await self._conn.execute(
-            "DELETE FROM price_history WHERE checked_at < datetime('now', ? || ' days')",
-            (f"-{days}",),
-        )
-        await self._conn.commit()
-        return int(cursor.rowcount)
-
     # ── Scraper Health ─────────────────────────────────────────
 
     async def get_scraper_health(self, domain: str) -> ScraperHealth | None:
@@ -964,10 +956,6 @@ class Repository:
     async def deactivate_product(self, product_id: int) -> None:
         """Alias of :meth:`pause_product`."""
         await self.pause_product(product_id)
-
-    async def cleanup_old_history(self, *, retention_days: int) -> int:
-        """Alias of :meth:`delete_old_price_history` (keyword-renamed)."""
-        return await self.delete_old_price_history(days=retention_days)
 
     async def set_product_interval(self, product_id: int, minutes: int | None) -> None:
         """Alias of :meth:`set_check_interval`."""

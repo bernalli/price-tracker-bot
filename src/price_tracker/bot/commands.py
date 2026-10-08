@@ -1,8 +1,9 @@
 """The closed registry of bot commands.
 
-One list feeds the Telegram command menus, the ``/help`` screen and the test that
-ties it to the registered handlers. Descriptions are English msgids marked with
-``N_`` and translated with ``_`` (or a catalogue's ``gettext``) when shown.
+One list feeds the ``/help`` screen and the test that ties it to the registered
+handlers; ``MENU_COMMANDS`` picks the few of them the Telegram Menu button shows.
+Descriptions are English msgids marked with ``N_`` and translated with ``_`` (or a
+catalogue's ``gettext``) when shown.
 """
 
 from __future__ import annotations
@@ -75,6 +76,10 @@ COMMANDS: Final = (
     CommandSpec("debug", N_("Debug the scraping of a link"), "admin"),
     CommandSpec("health", N_("Show scraper health"), "admin"),
 )
+
+# The commands Telegram's Menu button lists, in this order, for everyone and in every
+# language; every other command and alias stays registered and works when typed.
+MENU_COMMANDS: Final = ("menu", "list", "checkall", "status", "help")
 
 # Registered handlers that share a canonical command's behaviour; never listed in a menu.
 ALIAS_COMMANDS: Final = (

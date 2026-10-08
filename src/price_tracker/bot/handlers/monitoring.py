@@ -405,17 +405,6 @@ async def _send_alert(bot: Any, alert: Any, db: Any, *, chat_id: int | None = No
         )
 
 
-async def scheduled_cleanup(context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Daily cleanup: compact old price history to 1 record/day."""
-    db = context.bot_data["db"]
-    try:
-        deleted = await db.cleanup_old_history(retention_days=30)
-        if deleted > 0:
-            logger.info("🧹 Cleanup: removed %s old history records", deleted)
-    except Exception as e:  # noqa: BLE001 — telemetry only, scheduler must keep running
-        logger.error("Cleanup error: %s", e)
-
-
 # Re-export `_convert_display` so callers in this module can use the same symbol.
 __all__ = [
     "_convert_display",
@@ -425,7 +414,6 @@ __all__ = [
     "cmd_pause",
     "cmd_reactivate",
     "cmd_refresh",
-    "scheduled_cleanup",
 ]
 
 

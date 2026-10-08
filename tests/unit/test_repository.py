@@ -449,21 +449,6 @@ async def test_pending_alert_round_trip(repo: Repository):
     assert p.pending_alert_price is None
 
 
-async def test_delete_old_price_history(repo: Repository):
-    pid = await repo.add_product(
-        user_id=1,
-        url="https://x/hist",
-        name="Hist",
-        domain="x",
-        initial_price=Decimal("1"),
-        currency="EUR",
-    )
-    await repo.add_price_history(pid, Decimal("9"))
-    # Nothing is older than 365 days yet → 0
-    deleted = await repo.delete_old_price_history(days=365)
-    assert deleted == 0
-
-
 async def test_dec_returns_none_on_invalid_string(repo: Repository):
     """_dec helper returns None on un-parsable values (line 23-24)."""
     from price_tracker.db.repository import _dec

@@ -75,6 +75,7 @@ HANDLED = frozenset(
         "list.open",
         "product.card",
         "home",
+        "help",
     }
 )
 
@@ -245,6 +246,19 @@ async def test_message_not_modified_is_ignored(
     error = BadRequest("Message is not modified: specified new message content is the same")
     with caplog.at_level(logging.WARNING):
         query = await _press_with_edit_error(repo, error)
+    query.edit_message_text.assert_awaited_once()
+    assert caplog.records == []
+
+
+async def test_a_repeated_help_press_is_ignored(
+    repo: Repository, caplog: pytest.LogCaptureFixture
+) -> None:
+    query = make_query(encode(Action("help")))
+    query.edit_message_text = AsyncMock(
+        side_effect=BadRequest("Message is not modified: specified new message content is the same")
+    )
+    with caplog.at_level(logging.WARNING):
+        await handle_callback(make_update(query), make_context(repo))
     query.edit_message_text.assert_awaited_once()
     assert caplog.records == []
 

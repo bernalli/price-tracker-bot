@@ -97,6 +97,20 @@ async def test_is_active_reads_the_user_row(env: Env, user_id: int, expected: bo
     assert await env.services.is_active(user_id) is expected
 
 
+@pytest.mark.parametrize(
+    ("user_id", "expected"), [(ADMIN, True), (OWNER, False), (INACTIVE, False), (UNKNOWN, False)]
+)
+async def test_is_admin_needs_the_role_and_access(env: Env, user_id: int, expected: bool) -> None:
+    assert await env.services.is_admin(user_id) is expected
+
+
+async def test_a_deactivated_admin_is_not_an_admin(env: Env) -> None:
+    await env.repo.remove_user(ADMIN)
+
+    assert await env.repo.is_user_admin(ADMIN) is True
+    assert await env.services.is_admin(ADMIN) is False
+
+
 async def test_product_name_follows_visibility(env: Env) -> None:
     assert await env.services.product_name(OWNER, env.product) == "Kettle"
     assert await env.services.product_name(OTHER, env.product) is None

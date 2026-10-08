@@ -4,7 +4,7 @@
 user_id)` unconditionally, BEFORE dispatching on `action_type`
 (handlers/text_input.py, previously lines ~82-86). Admin flows set
 `pending_action` with a placeholder `product_id=0` (admin_adduser,
-admin_interval, admin_debug) or with an unrelated target user id
+admin_interval) or with an unrelated target user id
 (admin_nick) — see handlers/callbacks/_admin.py. On a real database
 `get_product(0)` returns `None` (SQLite `AUTOINCREMENT` ids start at 1),
 so the shared lookup always failed and every admin reply was swallowed
@@ -31,8 +31,6 @@ from price_tracker.db.repository import Repository
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
-
-    import pytest
 
 MIGRATIONS_DIR = Path("src/price_tracker/db/migrations")
 
@@ -129,47 +127,6 @@ async def test_admin_interval_routes_without_a_product_lookup(repo: Repository) 
     stored = await repo.get_config("check_interval_minutes")
     assert stored == "45", "admin_interval must persist the new global interval"
     assert "aggiornato" in _last_reply(update).lower()
-
-
-# ── admin_debug ──────────────────────────────────────────────────────
-
-
-async def test_admin_debug_routes_without_a_product_lookup(
-    repo: Repository, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """pending_action=("admin_debug", 0): 0 is a placeholder, not a product id.
-
-    `cmd_debug` itself (network scraping) is out of scope here: the property
-    under test is only that the admin_debug branch is reached at all instead
-    of being rejected by the shared product lookup, so `cmd_debug` is
-    replaced with a spy.
-
-    The input text starts with "http" (satisfying `admin_debug`'s own
-    `url_input.startswith("http")` check) but has no "://", so it does not
-    match `handle_text_input`'s unrelated, pre-existing `URL_PATTERN` guard
-    at the top of the function — a real "https://..." input would return
-    there before ever reaching pending-action dispatch, which is a separate,
-    out-of-scope routing question from the one this fix addresses.
-    """
-    import price_tracker.bot.handlers.debug as debug_module
-
-    spy = AsyncMock()
-    monkeypatch.setattr(debug_module, "cmd_debug", spy)
-
-    await repo.ensure_user(ADMIN_ID, is_admin=True)
-    update, context = _make_update_and_context(
-        repo,
-        user_id=ADMIN_ID,
-        text="httpdebugtarget",
-        pending_action=("admin_debug", 0),
-    )
-
-    await handle_text_input(update, context)
-
-    # If the product lookup had swallowed the reply, cmd_debug would never
-    # have been invoked at all — that is the property under test.
-    spy.assert_awaited_once()
-    assert context.args == ["httpdebugtarget"]
 
 
 # ── admin_nick ───────────────────────────────────────────────────────

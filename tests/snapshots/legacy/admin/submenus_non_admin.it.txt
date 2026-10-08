@@ -24,5 +24,6 @@
 (no changes)
 ## step 6: press "menu_admin_debug" user=10 on=1 synthetic
 -> answerCallbackQuery
+   param text="Non autorizzato."
 ## db after step 6
 (no changes)

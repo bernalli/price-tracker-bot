@@ -85,6 +85,11 @@ class RepositoryFlowServices:
         """Whether the user may use the bot."""
         return await self._repository().is_user_allowed(user_id)
 
+    async def is_admin(self, user_id: int) -> bool:
+        """Whether the user is an administrator who may still use the bot."""
+        store = self._repository()
+        return await store.is_user_admin(user_id) and await store.is_user_allowed(user_id)
+
     async def product_name(self, user_id: int, product_id: int) -> str | None:
         """The product's display name, or ``None`` when the user cannot see it."""
         product = await self._visible_product(self._repository(), user_id, product_id)

@@ -327,6 +327,7 @@ class FakeServices:
     next_product_id: int = 1000
     languages: dict[int, str] = field(default_factory=dict)
     language_reads: list[int] = field(default_factory=list)
+    admins: set[int] = field(default_factory=set)
 
     async def get_user(self, user_id: int) -> UserRecord | None:
         """The stored row the reply language is read from; a row only when a language is set.
@@ -343,6 +344,10 @@ class FakeServices:
     async def is_active(self, user_id: int) -> bool:
         self.calls.append(("is_active", user_id))
         return user_id in self.active
+
+    async def is_admin(self, user_id: int) -> bool:
+        self.calls.append(("is_admin", user_id))
+        return user_id in self.admins and user_id in self.active
 
     async def product_name(self, user_id: int, product_id: int) -> str | None:
         self.calls.append(("product_name", user_id, product_id))

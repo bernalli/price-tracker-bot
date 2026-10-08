@@ -29,6 +29,7 @@ from price_tracker.bot.messages import _, reset_locale, set_locale, user_locale
 from price_tracker.bot.ui.cards import list_page, product_card
 from price_tracker.bot.ui.panels import (
     QUIET_WINDOWS,
+    help_screen,
     home_button,
     home_screen,
     settings_screen,
@@ -252,6 +253,12 @@ async def _home(
     await _edit(query, home_screen(await home_view(db, user_id)))
 
 
+async def _help(
+    query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, action: Action
+) -> None:
+    await _edit(query, help_screen(await db.is_user_admin(user_id)))
+
+
 _HANDLERS: Final[dict[str, Callable[..., Awaitable[None]]]] = {
     "noop": _noop,
     "settings": _settings,
@@ -264,6 +271,7 @@ _HANDLERS: Final[dict[str, Callable[..., Awaitable[None]]]] = {
     "list.open": _list_open,
     "product.card": _product_card,
     "home": _home,
+    "help": _help,
 }
 
 

@@ -1,7 +1,8 @@
-"""Per-language, per-role command menus and the startup reconciliation of admins."""
+"""The short Telegram command menu and the startup reconciliation of admins."""
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from collections import Counter
@@ -12,6 +13,8 @@ from unittest.mock import AsyncMock, patch
 import aiosqlite
 import pytest
 import pytest_asyncio
+from hypothesis import given, settings
+from hypothesis import strategies as st
 from structlog.testing import capture_logs
 from telegram.error import NetworkError
 
@@ -43,24 +46,50 @@ def request_log() -> FakeRequest:
     return FakeRequest()
 
 
+MENU_METHODS = {"setMyCommands", "deleteMyCommands", "setChatMenuButton"}
+LANGUAGES: tuple[str | None, ...] = (None, "it")
+ENGLISH_MENU = [
+    ("menu", "Open the main menu"),
+    ("list", "List your products"),
+    ("checkall", "Check all your products now"),
+    ("status", "Show your statistics"),
+    ("help", "Show every command"),
+]
+ITALIAN_MENU = [
+    ("menu", "Apri il menu principale"),
+    ("list", "Elenca i tuoi prodotti"),
+    ("checkall", "Controlla subito tutti i tuoi prodotti"),
+    ("status", "Mostra le tue statistiche"),
+    ("help", "Mostra tutti i comandi"),
+]
+SHORT_NAMES = [name for name, _ in ENGLISH_MENU]
+USER_NAMES_1_5 = [spec.name for spec in COMMANDS if not spec.admin]
+ADMIN_LIST_1_5 = [spec.name for spec in COMMANDS]
+# Users 1-4 below: two default lists, the menu button, two deletions per user.
+FULL_SYNC_CALLS = 2 + 1 + 2 * 4
+
+
+def _decode(value: Any) -> Any:
+    return json.loads(value) if isinstance(value, str) else value
+
+
 def _menu_calls(request: FakeRequest) -> list[dict[str, Any]]:
     return [
         {"method": call.method, **call.params}
         for call in request.calls
-        if call.method in {"setMyCommands", "deleteMyCommands"}
+        if call.method in MENU_METHODS and not call.failed
     ]
 
 
 def _key(call: dict[str, Any]) -> Key:
-    scope = call["scope"]
-    scope = json.loads(scope) if isinstance(scope, str) else scope
+    if call["method"] == "setChatMenuButton":
+        return (call["method"], "button", call.get("chat_id"), None)
+    scope = _decode(call["scope"])
     return (call["method"], scope["type"], scope.get("chat_id"), call.get("language_code"))
 
 
-def _names(call: dict[str, Any]) -> set[str]:
-    commands = call["commands"]
-    commands = json.loads(commands) if isinstance(commands, str) else commands
-    return {entry["command"] for entry in commands}
+def _pairs(call: dict[str, Any]) -> list[tuple[str, str]]:
+    return [(entry["command"], entry["description"]) for entry in _decode(call["commands"])]
 
 
 async def _sync(
@@ -72,12 +101,68 @@ async def _sync(
 
 
 async def _seed(conn: aiosqlite.Connection) -> Repository:
+    """1 active admin, 2 demoted admin, 3 removed (inactive), 4 plain user."""
     repo = Repository(conn)
     await repo.add_user(1, is_admin=True)
     await repo.add_user(2, is_admin=True)
-    await repo.remove_user(2)
     await repo.add_user(3)
+    await repo.remove_user(3)
+    await repo.add_user(4)
+    await reconcile_admins(repo, (1,))
     return repo
+
+
+class _CommandStore:
+    """Telegram's stored command lists, resolved for a private chat as the Bot API does.
+
+    Chat scope before Default; at each level the user's language before the
+    no-language fallback; the first list found wins, lists are never merged.
+    """
+
+    def __init__(self) -> None:
+        self.lists: dict[tuple[str, int | None, str | None], list[str]] = {}
+
+    @classmethod
+    def as_of_1_5(cls, admins: tuple[int, ...]) -> _CommandStore:
+        store = cls()
+        for code in LANGUAGES:
+            store.lists[("default", None, code)] = list(USER_NAMES_1_5)
+            for uid in admins:
+                store.lists[("chat", uid, code)] = list(ADMIN_LIST_1_5)
+        return store
+
+    def apply(self, request: FakeRequest) -> None:
+        for call in _menu_calls(request):
+            method, kind, chat_id, code = _key(call)
+            if method == "setMyCommands":
+                self.lists[(kind, chat_id, code)] = [name for name, _ in _pairs(call)]
+            elif method == "deleteMyCommands":
+                self.lists.pop((kind, chat_id, code), None)
+
+    def effective(self, chat_id: int, code: str | None) -> list[str]:
+        for key in (
+            ("chat", chat_id, code),
+            ("chat", chat_id, None),
+            ("default", None, code),
+            ("default", None, None),
+        ):
+            if key in self.lists:
+                return self.lists[key]
+        return []
+
+
+def test_menu_commands_are_the_five_short_entries_in_each_language() -> None:
+    assert [(c.command, c.description) for c in menu_commands("en")] == ENGLISH_MENU
+    assert [(c.command, c.description) for c in menu_commands("it")] == ITALIAN_MENU
+
+
+def test_the_short_menu_names_registered_user_commands_once() -> None:
+    from price_tracker.bot.commands import MENU_COMMANDS
+
+    by_name = {spec.name: spec for spec in COMMANDS}
+    assert list(MENU_COMMANDS) == SHORT_NAMES
+    assert len(set(MENU_COMMANDS)) == len(MENU_COMMANDS)
+    assert all(name in by_name and not by_name[name].admin for name in MENU_COMMANDS)
 
 
 @pytest.mark.asyncio
@@ -90,43 +175,95 @@ async def test_full_sync_sends_the_exact_set_of_calls(
         [
             ("setMyCommands", "default", None, None),
             ("setMyCommands", "default", None, "it"),
-            ("setMyCommands", "chat", 1, None),
-            ("setMyCommands", "chat", 1, "it"),
-            ("deleteMyCommands", "chat", 2, None),
-            ("deleteMyCommands", "chat", 2, "it"),
-            ("deleteMyCommands", "chat", 3, None),
-            ("deleteMyCommands", "chat", 3, "it"),
+            ("setChatMenuButton", "button", None, None),
+            *(
+                ("deleteMyCommands", "chat", uid, code)
+                for uid in (1, 2, 3, 4)
+                for code in LANGUAGES
+            ),
         ]
     )
     assert Counter(_key(call) for call in calls) == expected
+    assert len(calls) == FULL_SYNC_CALLS
+    methods = [call["method"] for call in calls]
+    assert methods[:3] == ["setMyCommands", "setMyCommands", "setChatMenuButton"]
+    assert set(methods[3:]) == {"deleteMyCommands"}
+    lists = {
+        call.get("language_code"): _pairs(call)
+        for call in calls
+        if call["method"] == "setMyCommands"
+    }
+    assert lists == {None: ENGLISH_MENU, "it": ITALIAN_MENU}
+    (button,) = [call for call in calls if call["method"] == "setChatMenuButton"]
+    assert "chat_id" not in button
+    assert _decode(button["menu_button"])["type"] == "commands"
+    for call in calls:
+        if call["method"] == "setMyCommands":
+            assert not ADMIN_NAMES & {name for name, _ in _pairs(call)}
 
 
 @pytest.mark.asyncio
-async def test_only_the_active_admin_receives_the_admin_commands(
+async def test_after_a_sync_every_known_and_unknown_user_sees_the_five_commands(
     conn: aiosqlite.Connection, request_log: FakeRequest
 ) -> None:
     repo = await _seed(conn)
-    for call in await _sync(request_log, repo):
-        if call["method"] != "setMyCommands":
-            continue
-        scope = _key(call)[1:3]
-        names = _names(call)
-        if scope == ("chat", 1):
-            assert names >= ADMIN_NAMES
-        else:
-            assert not ADMIN_NAMES & names
-            assert names, "the global list is never empty"
+    await conn.execute("INSERT INTO users(user_id, is_admin, is_active) VALUES (9, 2, 2)")
+    await conn.commit()
+    # 3 is inactive but still carries a per-chat list (e.g. deactivated outside /removeuser).
+    store = _CommandStore.as_of_1_5(admins=(1, 2, 3, 9))
+    assert store.effective(1, None) == ADMIN_LIST_1_5
+    assert store.effective(4, "it") == USER_NAMES_1_5
+
+    await _sync(request_log, repo)
+    store.apply(request_log)
+
+    for uid in (1, 2, 3, 4, 9, 99):
+        for code in LANGUAGES:
+            assert store.effective(uid, code) == SHORT_NAMES, (uid, code)
+    after_one = dict(store.lists)
+    second = FakeRequest()
+    await _sync(second, repo)
+    store.apply(second)
+    assert store.lists == after_one
 
 
-def test_menu_commands_follow_the_language_and_leave_aliases_out() -> None:
-    english = menu_commands("en", admin=False)
-    italian = menu_commands("it", admin=False)
-    assert [c.command for c in english] == [c.command for c in italian]
-    assert [c.description for c in english] != [c.description for c in italian]
-    assert "lista" not in {c.command for c in english}
-    full = menu_commands("en", admin=True)
-    assert {c.command for c in full} == {c.command for c in english} | ADMIN_NAMES
-    assert not ADMIN_NAMES & {c.command for c in english}
+_FLAG = st.sampled_from((0, 1, 2))
+
+
+@settings(max_examples=30, deadline=None)
+@given(
+    users=st.dictionaries(
+        st.integers(min_value=1, max_value=50),
+        st.tuples(_FLAG, _FLAG, st.booleans()),
+        max_size=6,
+    )
+)
+def test_a_sync_migrates_any_stored_users_to_the_short_menu(
+    users: dict[int, tuple[int, int, bool]],
+) -> None:
+    """Whatever the flags and the 1.5 per-chat lists, every chat ends on the five commands."""
+
+    async def scenario() -> _CommandStore:
+        async with aiosqlite.connect(":memory:") as connection:
+            connection.row_factory = aiosqlite.Row
+            await apply_migrations(connection, MIGRATIONS)
+            for uid, (admin, active, _) in users.items():
+                await connection.execute(
+                    "INSERT INTO users(user_id, is_admin, is_active) VALUES (?, ?, ?)",
+                    (uid, admin, active),
+                )
+            await connection.commit()
+            had_admin_list = tuple(uid for uid, (_, _, listed) in users.items() if listed)
+            store = _CommandStore.as_of_1_5(admins=had_admin_list)
+            request = FakeRequest()
+            await _sync(request, Repository(connection))
+            store.apply(request)
+            return store
+
+    store = asyncio.run(scenario())
+    for uid in [*users, 999]:
+        for code in LANGUAGES:
+            assert store.effective(uid, code) == SHORT_NAMES
 
 
 @pytest.mark.asyncio
@@ -138,6 +275,8 @@ async def test_one_user_sync_touches_only_that_chat(
     assert Counter(_key(call) for call in calls) == Counter(
         [("deleteMyCommands", "chat", 2, None), ("deleteMyCommands", "chat", 2, "it")]
     )
+    calls = await _sync(FakeRequest(), repo, 1)
+    assert {call["method"] for call in calls} == {"deleteMyCommands"}
     calls = await _sync(FakeRequest(), repo, 77)
     assert {_key(call)[2] for call in calls} == {77}
     assert {call["method"] for call in calls} == {"deleteMyCommands"}
@@ -150,16 +289,20 @@ async def test_a_malformed_user_id_is_refused(
 ) -> None:
     with pytest.raises(ValueError, match="user_id"):
         await _sync(request_log, Repository(conn), bad)
-    assert request_log.calls_of("setMyCommands") == []
+    assert _menu_calls(request_log) == []
 
 
 @pytest.mark.asyncio
-async def test_no_users_means_only_the_global_lists(
+async def test_no_users_means_only_the_global_lists_and_the_button(
     conn: aiosqlite.Connection, request_log: FakeRequest
 ) -> None:
     calls = await _sync(request_log, Repository(conn))
     assert Counter(_key(call) for call in calls) == Counter(
-        [("setMyCommands", "default", None, None), ("setMyCommands", "default", None, "it")]
+        [
+            ("setMyCommands", "default", None, None),
+            ("setMyCommands", "default", None, "it"),
+            ("setChatMenuButton", "button", None, None),
+        ]
     )
 
 
@@ -176,29 +319,45 @@ async def test_a_damaged_flag_row_gets_no_admin_menu(
     assert {call["method"] for call in calls} == {"deleteMyCommands"}
 
 
+class _FailingNthRequest(FakeRequest):
+    """Raises a network error on the ``fail_at``-th command-menu call, answers the rest."""
+
+    def __init__(self, fail_at: int) -> None:
+        super().__init__()
+        self.fail_at = fail_at
+        self.menu_attempts = 0
+
+    async def do_request(self, url: str, method: str, *args: Any, **kwargs: Any) -> Any:
+        if url.rsplit("/", 1)[-1] in MENU_METHODS:
+            self.menu_attempts += 1
+            if self.menu_attempts == self.fail_at:
+                raise NetworkError("down")
+        return await super().do_request(url, method, *args, **kwargs)
+
+
 @pytest.mark.asyncio
-async def test_a_telegram_error_does_not_stop_the_other_calls(
-    conn: aiosqlite.Connection, request_log: FakeRequest, caplog: pytest.LogCaptureFixture
+@pytest.mark.parametrize("fail_at", range(1, FULL_SYNC_CALLS + 1))
+async def test_a_telegram_error_does_not_stop_the_other_calls_and_the_next_sync_recovers(
+    conn: aiosqlite.Connection, caplog: pytest.LogCaptureFixture, fail_at: int
 ) -> None:
     repo = await _seed(conn)
-    bot = make_application(request_log).bot
-    real = type(bot).set_my_commands
-    attempts: list[Any] = []
-
-    async def flaky(self: Any, *args: Any, **kwargs: Any) -> Any:
-        attempts.append(kwargs.get("scope"))
-        if len(attempts) == 1:
-            raise NetworkError("down")
-        return await real(self, *args, **kwargs)
-
-    with (
-        patch.object(type(bot), "set_my_commands", flaky),
-        caplog.at_level(logging.WARNING),
-    ):
-        await sync_command_menus(bot, repo)
-    assert len(attempts) == 4
-    assert len(request_log.calls_of("deleteMyCommands")) == 4
-    assert any(record.levelno == logging.WARNING for record in caplog.records)
+    store = _CommandStore.as_of_1_5(admins=(1, 2))
+    flaky = _FailingNthRequest(fail_at)
+    with caplog.at_level(logging.WARNING):
+        await _sync(flaky, repo)
+    assert flaky.menu_attempts == FULL_SYNC_CALLS
+    assert len(_menu_calls(flaky)) == FULL_SYNC_CALLS - 1
+    assert any(
+        record.levelno == logging.WARNING and "command menu update failed" in record.getMessage()
+        for record in caplog.records
+    )
+    store.apply(flaky)
+    healthy = FakeRequest()
+    await _sync(healthy, repo)
+    store.apply(healthy)
+    for uid in (1, 2, 3, 4):
+        for code in LANGUAGES:
+            assert store.effective(uid, code) == SHORT_NAMES
 
 
 async def _reconcile_state(repo: Repository) -> dict[int, tuple[bool, bool]]:
@@ -287,6 +446,7 @@ async def test_startup_completes_when_every_menu_call_fails(tmp_path: Path) -> N
         with (
             patch.object(type(application.bot), "set_my_commands", failing),
             patch.object(type(application.bot), "delete_my_commands", failing),
+            patch.object(type(application.bot), "set_chat_menu_button", failing),
         ):
             await post_init(application)
         assert failing.await_count >= 2
