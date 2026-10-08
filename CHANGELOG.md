@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-10-08
+
+### Changed
+
+- The Telegram Menu button now lists five commands, the same for everyone and in English and
+  Italian: /menu, /list, /checkall, /status and /help. Every other command, including the
+  Italian aliases, still works when typed. Telegram may keep showing the previous list until
+  the chat is reopened.
+- /start now opens the main menu with a greeting.
+- The Status & info menu has a Help button that shows the command list.
+- The admin Debug prompt is now a guided prompt: it expires after five minutes or with /cancel.
+
+### Removed
+
+- The longer command list that administrators saw in the Menu button. Administrators get the
+  same five commands and reach the admin tools from the main menu.
+
+### Fixed
+
+- An automatic suspension is reported once even when two checks of the same product run at the
+  same time, and no suspension notice is sent for a product the user paused while a failing
+  check was running.
+- A link sent after pressing Debug in the admin menu is analysed instead of being added as a
+  product.
+
 ## [1.5.0] - 2026-10-07
 
 ### Added
@@ -707,7 +732,8 @@ auto-quarantine, and a plugin extension point.
 - osv-scanner dependency vulnerability scan in CI.
 - Pre-commit hooks block secrets at commit time.
 
-[Unreleased]: https://github.com/bernalli/price-tracker-bot/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/bernalli/price-tracker-bot/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/bernalli/price-tracker-bot/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/bernalli/price-tracker-bot/compare/v1.4.2...v1.5.0
 [1.4.2]: https://github.com/bernalli/price-tracker-bot/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/bernalli/price-tracker-bot/compare/v1.4.0...v1.4.1
