@@ -11,4 +11,4 @@ keyboard:
    [1 giorno](cb:s:mu:24)  [Per sempre](cb:s:mu:0)
    [🔔 Riattiva](cb:s:mu:off)
    [✏️ Altra durata](cb:s:ask:mu)
-   [◀️ Impostazioni](cb:s)
+   [◀️ Impostazioni](cb:s)  [🏠 Home](cb:h)

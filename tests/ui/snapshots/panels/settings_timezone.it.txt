@@ -8,4 +8,4 @@ text:
    | Attuale: Europe/Berlin
 keyboard:
    [✏️ Cambia](cb:s:ask:tz)
-   [◀️ Impostazioni](cb:s)
+   [◀️ Impostazioni](cb:s)  [🏠 Home](cb:h)

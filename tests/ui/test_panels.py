@@ -79,12 +79,21 @@ def test_main_panel_offers_the_six_sections_and_home() -> None:
         ("th", [], "", [Action("settings.ask", ("th",))]),
     ],
 )
-def test_section_offers_its_presets_and_a_way_back(
+def test_section_offers_its_presets_a_way_back_and_home(
     section: str, values: list[str], action: str, extra: list[Action]
 ) -> None:
     actions = _actions(settings_section_screen(section, BUSY, now=NOW))
     presets = [Action(action, (value,)) for value in values]
-    assert actions == [*presets, *extra, Action("settings")]
+    assert actions == [*presets, *extra, Action("settings"), Action("home")]
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+@pytest.mark.parametrize("section", ["mu", "dg", "qh", "lang", "tz", "th"])
+def test_every_section_ends_with_back_and_home(section: str, locale: str, ui_locales: Path) -> None:
+    set_locale(locale)
+    rows = settings_section_screen(section, BUSY, now=NOW).rows
+    tail = [button.callback for row in rows for button in row][-2:]
+    assert tail == ["s", "h"]
 
 
 def test_unknown_section_is_rejected() -> None:

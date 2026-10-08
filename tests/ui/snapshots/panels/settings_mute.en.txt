@@ -11,4 +11,4 @@ keyboard:
    [1 day](cb:s:mu:24)  [Forever](cb:s:mu:0)
    [🔔 Unmute](cb:s:mu:off)
    [✏️ Other duration](cb:s:ask:mu)
-   [◀️ Settings](cb:s)
+   [◀️ Settings](cb:s)  [🏠 Home](cb:h)

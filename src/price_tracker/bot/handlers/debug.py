@@ -40,9 +40,16 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+# A lone UTF-16 surrogate: JSON can carry one ("\ud800"), a UTF-8 request body cannot.
+_SURROGATE = _re.compile("[\ud800-\udfff]")
+
+
 def _ext(value: object, limit: int) -> str:
-    """Cut an outside value to ``limit`` characters, then escape it for Telegram HTML."""
-    return _escape_html(str(value)[:limit])
+    """Cut an outside value to ``limit`` characters, then escape it for Telegram HTML.
+
+    A lone surrogate is shown as U+FFFD, so the report can still be sent.
+    """
+    return _escape_html(_SURROGATE.sub("\ufffd", str(value)[:limit]))
 
 
 def _format_remaining(until: datetime | None) -> str:

@@ -9,6 +9,7 @@ pairs the prompts produce.
 from __future__ import annotations
 
 import dataclasses
+import zoneinfo
 from datetime import UTC, datetime, time, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -18,6 +19,8 @@ import aiosqlite
 import pytest
 import pytest_asyncio
 from freezegun import freeze_time
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from price_tracker.app.inputs import (
     Absolute,
@@ -32,7 +35,7 @@ from price_tracker.app.inputs import (
     ResetInterval,
     SetTarget,
 )
-from price_tracker.bot.flow_services import RepositoryFlowServices
+from price_tracker.bot.flow_services import RepositoryFlowServices, _setting_changes
 from price_tracker.bot.flows import ApplyStatus, FlowKind, PreparedProduct
 from price_tracker.db.migrator import apply_migrations
 from price_tracker.db.models import NotificationPrefs
@@ -396,6 +399,19 @@ async def test_a_product_mute_writes_the_product_row_with_the_global_digest_and_
         (FlowKind.DIGEST, None, Off()),
         (FlowKind.QUIET, None, "22:00-08:00"),
         (FlowKind.TIMEZONE, None, 5),
+        (FlowKind.TIMEZONE, None, "Mars/Base"),
+        (FlowKind.TIMEZONE, None, "europe/rome"),
+        (FlowKind.TIMEZONE, None, " Europe/Rome"),
+        (FlowKind.TIMEZONE, None, "../etc/passwd"),
+        (FlowKind.TIMEZONE, None, ""),
+        (FlowKind.MUTE, None, 0),
+        (FlowKind.MUTE, None, -1),
+        (FlowKind.MUTE, None, 8761),
+        (FlowKind.MUTE, None, 10**12),
+        (FlowKind.DIGEST, None, 4),
+        (FlowKind.DIGEST, None, 1441),
+        (FlowKind.THROTTLE, None, 0),
+        (FlowKind.THROTTLE, None, 1_000_000_000),
         (FlowKind.THROTTLE, None, Forever()),
         (FlowKind.DEBUG, None, "https://shop.example"),
         (FlowKind.THRESHOLD, None, Percentage(10)),
@@ -432,3 +448,34 @@ async def test_a_user_deactivated_before_answering_writes_nothing(env: Env) -> N
     status = await env.services.apply_setting(OWNER, FlowKind.MUTE, env.product, 8)
     assert status is ApplyStatus.NOT_AUTHORISED
     assert await _prefs_rows(env) == 0
+
+
+_ZONES = sorted(zoneinfo.available_timezones())
+
+
+@settings(max_examples=200, deadline=None)
+@given(text=st.one_of(st.text(), st.sampled_from(_ZONES)))
+def test_only_a_known_zone_is_a_time_zone_setting(text: str) -> None:
+    if text in _ZONES:
+        assert _setting_changes(FlowKind.TIMEZONE, text) == {"timezone": text}
+    else:
+        with pytest.raises(TypeError):
+            _setting_changes(FlowKind.TIMEZONE, text)
+
+
+_INT_BOUNDS = {
+    FlowKind.MUTE: (1, 8_760),
+    FlowKind.DIGEST: (5, 1_440),
+    FlowKind.THROTTLE: (1, 999_999_999),
+}
+
+
+@settings(max_examples=300, deadline=None)
+@given(kind=st.sampled_from(sorted(_INT_BOUNDS)), number=st.integers(-(10**12), 10**12))
+def test_only_a_number_its_prompt_accepts_is_a_setting(kind: FlowKind, number: int) -> None:
+    low, high = _INT_BOUNDS[kind]
+    if low <= number <= high:
+        assert _setting_changes(kind, number)
+    else:
+        with pytest.raises(TypeError):
+            _setting_changes(kind, number)

@@ -14,7 +14,7 @@
    keyboard:
    | [Automatica ✓ → s:lang:auto] [English → s:lang:en]
    | [Italiano → s:lang:it]
-   | [◀️ Impostazioni → s]
+   | [◀️ Impostazioni → s] [🏠 Home → h]
 ## db after step 1
 (no changes)
 ## step 2: press "s:lang:en" user=10 on=1
@@ -29,7 +29,7 @@
    keyboard:
    | [Automatic → s:lang:auto] [English ✓ → s:lang:en]
    | [Italiano → s:lang:it]
-   | [◀️ Settings → s]
+   | [◀️ Settings → s] [🏠 Home → h]
 ## db after step 2
 ~ users user_id=10 language: NULL -> "en"
 ## step 3: press "s" user=10 on=1
@@ -65,7 +65,7 @@
    keyboard:
    | [Automatic → s:lang:auto] [English ✓ → s:lang:en]
    | [Italiano → s:lang:it]
-   | [◀️ Settings → s]
+   | [◀️ Settings → s] [🏠 Home → h]
 ## db after step 4
 (no changes)
 ## step 5: press "s:lang:auto" user=10 on=1
@@ -80,7 +80,7 @@
    keyboard:
    | [Automatica ✓ → s:lang:auto] [English → s:lang:en]
    | [Italiano → s:lang:it]
-   | [◀️ Impostazioni → s]
+   | [◀️ Impostazioni → s] [🏠 Home → h]
 ## db after step 5
 ~ users user_id=10 language: "en" -> NULL
 ## step 6: press "s" user=10 on=1

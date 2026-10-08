@@ -8,4 +8,4 @@ text:
    | Attuale: 5 all'ora
 keyboard:
    [✏️ Cambia](cb:s:ask:th)
-   [◀️ Impostazioni](cb:s)
+   [◀️ Impostazioni](cb:s)  [🏠 Home](cb:h)

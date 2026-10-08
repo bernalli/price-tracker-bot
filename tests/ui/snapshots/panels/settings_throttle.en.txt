@@ -8,4 +8,4 @@ text:
    | Current: 5 per hour
 keyboard:
    [✏️ Change](cb:s:ask:th)
-   [◀️ Settings](cb:s)
+   [◀️ Settings](cb:s)  [🏠 Home](cb:h)

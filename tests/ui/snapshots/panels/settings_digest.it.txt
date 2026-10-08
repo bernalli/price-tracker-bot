@@ -9,4 +9,4 @@ text:
 keyboard:
    [Attivo ✓](cb:s:dg:on)  [Disattivo](cb:s:dg:off)
    [✏️ Intervallo](cb:s:ask:dg)  [📨 Invia ora](cb:s:dn)
-   [◀️ Impostazioni](cb:s)
+   [◀️ Impostazioni](cb:s)  [🏠 Home](cb:h)

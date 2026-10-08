@@ -1,7 +1,7 @@
 """The Home screen and the settings panels: pure screens built from a view.
 
 The values with presets (mute, digest, quiet hours and language) get a button per
-preset; every section shows its current value and leads back to Settings.
+preset; every section shows its current value and leads back to Settings and Home.
 """
 
 from __future__ import annotations
@@ -235,7 +235,9 @@ def settings_section_screen(
         raise ValueError(f"section: must be one of mu, dg, qh, lang, tz, th, got {section!r}")
     back = button(_("◀️ Settings"), callback=encode(Action("settings")))
     current = _("Current: {value}").format(value=value)
-    return Screen(text=f"{title}\n\n{current}", rows=layout_rows(presets, extra, [back]))
+    return Screen(
+        text=f"{title}\n\n{current}", rows=layout_rows(presets, extra, [back, home_button()])
+    )
 
 
 def product_prefs_screen(name: str, product_id: int, view: PrefsView, *, now: datetime) -> Screen:

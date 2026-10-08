@@ -263,8 +263,29 @@ async def test_three_invalid_answers_close_the_prompt(w: Wired, setting: str) ->
         await w.text(PRIVATE, OWNER, answer)
 
     assert w.texts_to(PRIVATE)[-1] == TOO_MANY
+    assert _rows(_last_sent(w)) == GLOBAL_NAV
     assert len(w.flow.registry) == 0
     assert await _prefs_rows(w) == 0
+
+
+async def test_three_invalid_answers_on_a_product_mute_lead_back_to_its_notifications(
+    w: Wired,
+) -> None:
+    await _open(w, f"p:{w.product}:mua")
+    for answer in ("xx", "yy", "zz"):
+        await w.text(PRIVATE, OWNER, answer)
+
+    assert w.texts_to(PRIVATE)[-1] == TOO_MANY
+    assert _rows(_last_sent(w)) == [[f"p:{w.product}:pr", "h"]]
+
+
+async def test_three_invalid_answers_on_an_older_prompt_still_have_no_buttons(w: Wired) -> None:
+    await _open(w, f"p:{w.product}:th")
+    for answer in ("xx", "yy", "zz"):
+        await w.text(PRIVATE, OWNER, answer)
+
+    assert w.texts_to(PRIVATE)[-1] == TOO_MANY
+    assert _rows(_last_sent(w)) == []
 
 
 _PARSERS = {

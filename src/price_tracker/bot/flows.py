@@ -1291,7 +1291,7 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
             await self._localise(route)
             if not self.registry.is_current(snapshot.key, ticket):
                 return
-            await transport.send(snapshot.key[0], _(TEXT_TOO_MANY))
+            await transport.send(snapshot.key[0], _(TEXT_TOO_MANY), self._nav_markup(claimed))
             return
         self.registry.replace(snapshot, replace(flow, attempts=attempts))
         ticket = self.registry.generation(snapshot.key)

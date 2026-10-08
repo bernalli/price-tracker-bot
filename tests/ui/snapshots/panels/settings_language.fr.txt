@@ -10,3 +10,4 @@ keyboard:
    [[Automatic Automatic Automatic]](cb:s:lang:auto)
    [English](cb:s:lang:en)  [Italiano ✓](cb:s:lang:it)
    [[◀️ Settings ◀️ Settings ◀️ Setti…](cb:s)
+   [[🏠 Home 🏠 Home 🏠 Home]](cb:h)

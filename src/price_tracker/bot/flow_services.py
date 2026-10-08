@@ -28,6 +28,10 @@ from price_tracker.app.inputs import (
     QuietHours,
     ResetInterval,
     SetTarget,
+    parse_digest_interval,
+    parse_mute_hours,
+    parse_throttle,
+    parse_timezone,
 )
 from price_tracker.bot.flows import (
     AddResult,
@@ -197,20 +201,25 @@ async def _write(store: ProductStore, kind: FlowKind, product_id: int, value: ob
     raise TypeError(f"no write for {kind!r} with {type(value).__name__}")
 
 
-def _whole(value: object) -> bool:
-    return isinstance(value, int) and not isinstance(value, bool)
+def _whole(value: object, parse: Callable[[str], object]) -> bool:
+    """A whole number that ``parse`` accepts as an answer, so one a prompt can produce."""
+    return isinstance(value, int) and not isinstance(value, bool) and parse(str(value)) == value
 
 
 def _setting_changes(kind: FlowKind, value: object) -> dict[str, object]:
-    """The preference fields one setting answer writes; ``TypeError`` for any other pair."""
+    """The preference fields one setting answer writes; ``TypeError`` for any other pair.
+
+    A value is re-checked against the parser of its prompt: an out-of-range number or an
+    unknown time zone is a pair no prompt produces, never a stored preference.
+    """
     if kind is FlowKind.MUTE:
         if isinstance(value, Forever):
             return {"mute": True, "mute_until": None}
-        if _whole(value):
+        if _whole(value, parse_mute_hours):
             assert isinstance(value, int)
             return {"mute": True, "mute_until": datetime.now(UTC) + timedelta(hours=value)}
     elif kind is FlowKind.DIGEST:
-        if _whole(value):
+        if _whole(value, parse_digest_interval):
             return {"digest_mode": True, "digest_interval_minutes": value}
     elif kind is FlowKind.QUIET:
         if isinstance(value, QuietHours):
@@ -221,11 +230,11 @@ def _setting_changes(kind: FlowKind, value: object) -> dict[str, object]:
         if isinstance(value, Off):
             return {"quiet_hours_start": None, "quiet_hours_end": None}
     elif kind is FlowKind.TIMEZONE:
-        if isinstance(value, str):
+        if isinstance(value, str) and parse_timezone(value) == value:
             return {"timezone": value}
     elif kind is FlowKind.THROTTLE:
         if isinstance(value, Off):
             return {"throttle_per_hour": None}
-        if _whole(value):
+        if _whole(value, parse_throttle):
             return {"throttle_per_hour": value}
     raise TypeError(f"no setting for {kind!r} with {type(value).__name__}")

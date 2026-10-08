@@ -243,6 +243,19 @@ def test_any_text_in_any_field_is_shown_as_plain_text(site: str, value: str) -> 
         assert value[:limit] in shown, report
 
 
+@pytest.mark.parametrize(
+    "site", ["ld_type", "ld_price", "ld_currency", "ld_offers_list_price", "scraper_error"]
+)
+@pytest.mark.asyncio
+async def test_a_lone_surrogate_still_lets_the_report_be_sent(site: str) -> None:
+    """JSON-LD may carry a lone surrogate; the UTF-8 request body to Telegram cannot."""
+    build, _limit = _SITES[site]
+    report = await build("\ud800<b>\udfff").report()
+    report.encode("utf-8")  # raises UnicodeEncodeError if a lone surrogate is left
+    assert _is_valid_telegram_markup(report), report
+    assert "\ufffd&lt;b&gt;\ufffd" in report
+
+
 @pytest.mark.asyncio
 async def test_health_report_shows_domain_and_block_reason_as_plain_text() -> None:
     hostile = '<b>&"'

@@ -9,3 +9,4 @@ text:
 keyboard:
    [[✏️ Change ✏️ Change ✏️ Change]](cb:s:ask:tz)
    [[◀️ Settings ◀️ Settings ◀️ Setti…](cb:s)
+   [[🏠 Home 🏠 Home 🏠 Home]](cb:h)

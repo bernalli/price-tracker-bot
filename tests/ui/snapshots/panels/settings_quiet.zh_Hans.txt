@@ -10,3 +10,4 @@ keyboard:
    [22:00–08:00 ✓](cb:s:qh:2208)  [[Off Off Off]](cb:s:qh:off)
    [[✏️ Other hours ✏️ Other hours ✏️…](cb:s:ask:qh)
    [[◀️ Settings ◀️ Settings ◀️ Setti…](cb:s)
+   [[🏠 Home 🏠 Home 🏠 Home]](cb:h)
