@@ -553,7 +553,10 @@ class Scheduler:
             if 1 <= half < max_errors and updated.consecutive_errors == half:
                 collector.add(self._event("warning", updated, reason=reason, detail=detail))
             return False
-        await self.deps.repo.suspend_product(product.id, reason=reason)
+        if not await self.deps.repo.suspend_product(product.id, reason=reason):
+            # Another check suspended it first, or the user paused it: that
+            # check (or the user) owns the outcome, this one stays silent.
+            return False
         logger.warning(
             "Product %d auto-disabled after %d consecutive errors "
             "(gone_streak=%d, scraper=%s, domain=%s, reason=%s)",
