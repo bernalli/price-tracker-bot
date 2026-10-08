@@ -74,6 +74,14 @@ def _status(record: _Record) -> ProductStatus:
     return "suspended" if record.get("suspension_kind") == "automatic" else "paused"
 
 
+def _out_of_stock(record: _Record) -> bool:
+    """Sold out: an active product whose last check found it unavailable.
+
+    A paused product is never sold out: nothing checks it, so its availability is stale.
+    """
+    return bool(record.get("is_active")) and not record.get("is_available", True)
+
+
 def _threshold_type(value: object) -> ThresholdType:
     allowed: tuple[ThresholdType, ...] = get_args(ThresholdType)
     for candidate in allowed:
@@ -123,6 +131,7 @@ def product_view(record: _Record, *, default_interval_minutes: int) -> ProductVi
         last_checked_at=_checked_at(record.get("last_checked_at")),
         reference_estimate=estimate,
         reference_currency=REFERENCE_CURRENCY,
+        out_of_stock=_out_of_stock(record),
     )
 
 
@@ -156,6 +165,7 @@ _FILTERS = {
     "a": lambda record: bool(record.get("is_active")),
     "p": lambda record: not record.get("is_active"),
     "e": lambda record: int(record.get("consecutive_errors") or 0) > 0,
+    "o": _out_of_stock,
 }
 
 

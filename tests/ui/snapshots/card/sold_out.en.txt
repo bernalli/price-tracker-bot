@@ -1,0 +1,20 @@
+# ui snapshot v1
+# screen: card.sold_out
+# locale: en
+# now: 2026-03-01T12:00:00Z
+text:
+   | 📦 <b>⁨Toaster⁩</b>
+   | ⁨shop.example.com⁩ · #61 · active
+   | 
+   | 💰 Now: €39.90
+   | 🚫 Sold out
+   | 📌 Start: €44.90 · ▼ 11.1%
+   | 📉 Lowest: €39.90
+   | 🔔 Alert: drop of 10% from start
+   | ⏱ Checks: every 6 hr · last 1 hour ago
+keyboard:
+   [🔄 Check now](cb:p:61:ck)  [📈 History](cb:p:61:ch:30d)
+   [⏸ Pause](cb:p:61:pa)  [🗑 Delete](cb:p:61:rm)
+   [🔔 Alert rule](cb:p:61:th)  [⏱ Interval](cb:p:61:iv)
+   [🔗 Open](url:https://shop.example.com/item/61)
+   [◀️ List](cb:l:a:1)

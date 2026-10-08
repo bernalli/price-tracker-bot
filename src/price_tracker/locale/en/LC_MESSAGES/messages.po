@@ -1401,3 +1401,57 @@ msgstr ""
 #: src/price_tracker/bot/handlers/product.py
 msgid "❌ Invalid value: {value}"
 msgstr ""
+
+#: src/price_tracker/bot/handlers/callbacks/_menu.py
+msgid "… {n} more → Products"
+msgstr "… {n} more → Products"
+
+#: src/price_tracker/bot/ui/cards.py
+msgid "🚫 Sold out"
+msgstr "🚫 Sold out"
+
+#: src/price_tracker/bot/ui/cards.py
+msgid "sold out"
+msgstr "sold out"
+
+#: src/price_tracker/bot/handlers/callbacks/_actions.py
+msgid "⏸ Tracking paused."
+msgstr "⏸ Tracking paused."
+
+#: src/price_tracker/bot/handlers/callbacks/_actions.py
+msgid "▶️ Tracking resumed."
+msgstr "▶️ Tracking resumed."
+
+#: src/price_tracker/bot/handlers/callbacks/_product.py
+msgid "🔔 Price dropped: {old} → {new}"
+msgstr "🔔 Price dropped: {old} → {new}"
+
+#: src/price_tracker/bot/handlers/callbacks/_product.py
+msgid "✅ Checked: no significant change."
+msgstr "✅ Checked: no significant change."
+
+#: src/price_tracker/bot/handlers/callbacks/_product.py
+msgid "❌ Not updated: {why}"
+msgstr "❌ Not updated: {why}"
+
+#: src/price_tracker/bot/handlers/callbacks/_product.py
+msgid "❌ Could not check this product. Try again later."
+msgstr "❌ Could not check this product. Try again later."
+
+#: src/price_tracker/bot/handlers/callbacks/_product.py
+msgid "⏸ Not checked: tracking is paused. Reactivate it first."
+msgstr "⏸ Not checked: tracking is paused. Reactivate it first."
+
+#: src/price_tracker/bot/handlers/callbacks/_product.py
+msgid "⛔ This product belongs to another user: it was not checked."
+msgstr "⛔ This product belongs to another user: it was not checked."
+
+#: src/price_tracker/bot/handlers/callbacks/_product.py
+msgid "🗑 Deleted: {name}"
+msgstr "🗑 Deleted: {name}"
+
+#: src/price_tracker/bot/handlers/callbacks/_product.py
+msgid "🗑 Deleted {n} product and its price history."
+msgid_plural "🗑 Deleted {n} products and their price history."
+msgstr[0] "🗑 Deleted {n} product and its price history."
+msgstr[1] "🗑 Deleted {n} products and their price history."

@@ -75,6 +75,7 @@
    | [🔄 #6 Item 06 → check_6]
    | [🔄 #7 Item 07 → check_7]
    | [🔄 #8 Item 08 → check_8]
+   | [… altri 4 → Prodotti → l:a:1]
    | [📈 Storico prezzo → menu_storia]
    | [◀️ Menu → menu_main]
 ## db after step 4

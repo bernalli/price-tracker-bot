@@ -13,12 +13,15 @@ variation while the user believed the -10% default was active.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from price_tracker.bot.handlers.callbacks import _actions, _product
+from price_tracker.bot.messages import set_locale
+from tests.support.list_variants import record
 
 OWNER_ID = 1
 INTRUDER_ID = 2
@@ -38,12 +41,14 @@ def _mock_db(*, is_admin: bool, owned_product: dict[str, Any] | None) -> AsyncMo
     db.is_user_admin.return_value = is_admin
     db.get_product_for_user.return_value = owned_product
     db.get_product.return_value = owned_product or {"name": "Foreign Widget"}
+    db.get_all_products.return_value = []
+    db.get_config.return_value = None
     return db
 
 
 def _mock_context(db: AsyncMock) -> MagicMock:
     context = MagicMock()
-    context.bot_data = {"db": db}
+    context.bot_data = {"db": db, "config": SimpleNamespace(check_interval_minutes=360)}
     context.user_data = {}
     return context
 
@@ -54,6 +59,7 @@ async def test_reactivate_foreign_product_is_rejected() -> None:
     db = _mock_db(is_admin=False, owned_product=None)  # not visible to this user
     query = _mock_query()
     context = _mock_context(db)
+    set_locale("en")
 
     handled = await _actions.handle_reactivate_button(
         query, context, db, INTRUDER_ID, f"reactivate_{PRODUCT_ID}"
@@ -61,15 +67,19 @@ async def test_reactivate_foreign_product_is_rejected() -> None:
 
     assert handled is True
     db.reactivate_product.assert_not_awaited()
-    query.edit_message_text.assert_awaited_once_with("❌ Prodotto non trovato.")
+    query.edit_message_text.assert_awaited_once()
+    msg = query.edit_message_text.await_args.args[0]
+    assert msg.startswith("Product not found.\n\n")
+    assert "Foreign Widget" not in msg
 
 
 @pytest.mark.asyncio
 async def test_reactivate_own_product_succeeds() -> None:
     """Owner sends ``reactivate_<id>`` → product reactivated, confirmation reply."""
-    db = _mock_db(is_admin=False, owned_product={"name": "Widget"})
+    db = _mock_db(is_admin=False, owned_product=record(PRODUCT_ID, name="Widget"))
     query = _mock_query()
     context = _mock_context(db)
+    set_locale("en")
 
     handled = await _actions.handle_reactivate_button(
         query, context, db, OWNER_ID, f"reactivate_{PRODUCT_ID}"
@@ -79,7 +89,8 @@ async def test_reactivate_own_product_succeeds() -> None:
     db.get_product_for_user.assert_awaited_once_with(PRODUCT_ID, OWNER_ID)
     db.reactivate_product.assert_awaited_once_with(PRODUCT_ID)
     msg = query.edit_message_text.await_args.args[0]
-    assert "Riattivato" in msg
+    assert msg.startswith("▶️ Tracking resumed.\n\n")
+    assert "Widget" in msg
 
 
 @pytest.mark.asyncio

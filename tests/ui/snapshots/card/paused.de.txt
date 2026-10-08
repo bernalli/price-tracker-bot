@@ -11,7 +11,6 @@ text:
    | [🔔 Alert: any drop 🔔 Alert: any drop 🔔 Alert: any drop]
    | [⏱ Checks: every 6 Std. · last vor 3 Stunden ⏱ Checks: every 6 Std. · last vor 3 Stunden ⏱ Checks: every 6 Std. · last vor 3 Stunden]
 keyboard:
-   [[🔄 Check now 🔄 Check now 🔄 Che…](cb:p:43:ck)
    [[📈 History 📈 History 📈 History]](cb:p:43:ch:30d)
    [[▶️ Reactivate ▶️ Reactivate ▶️ R…](cb:p:43:ra)
    [[🗑 Delete 🗑 Delete 🗑 Delete]](cb:p:43:rm)

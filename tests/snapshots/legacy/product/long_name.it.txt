@@ -36,44 +36,87 @@
 ## step 3: press "pause_1" user=10 on=1 synthetic
 -> answerCallbackQuery
 -> editMessageText chat=10 message_id=1
+   param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
-   | ⏸ <b>In pausa:</b> Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN…
-   | Usa /riattiva 1 per riattivarlo.
+   | ⏸ Monitoraggio in pausa.
+   |
+   | 📦 <b>⁨Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN…⁩</b>
+   | ⁨example.com⁩ · #1 · in pausa
+   |
+   | 💰 Ora: 80,00 €
+   | 📌 Inizio: 80,00 €
+   | 📉 Minimo: 80,00 €
+   | 🔔 Avviso: ribasso del 10% dall'inizio
+   | ⏱ Controlli: ogni 6 h · ultimo 2 ore fa
+   keyboard:
+   | [📈 Storico → chart_1] [▶️ Riattiva → reactivate_1]
+   | [🗑 Elimina → remove_1] [🔔 Regola avviso → edit_1]
+   | [⏱ Intervallo → setrefresh_1] [🔗 Apri → url:https://shop.example.com/item/1]
+   | [◀️ Lista → l:p:1]
 ## db after step 3
 ~ products id=1 is_active: 1 -> 0
 ~ products id=1 suspension_kind: NULL -> "manual"
-## step 4: press "reactivate_1" user=10 on=1 synthetic
+## step 4: press "reactivate_1" user=10 on=1
 -> answerCallbackQuery
 -> editMessageText chat=10 message_id=1
+   param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
-   | ▶️ <b>Riattivato:</b> Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN…
+   | ▶️ Monitoraggio riattivato.
+   |
+   | 📦 <b>⁨Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN…⁩</b>
+   | ⁨example.com⁩ · #1 · attivo
+   |
+   | 💰 Ora: 80,00 €
+   | 📌 Inizio: 80,00 €
+   | 📉 Minimo: 80,00 €
+   | 🔔 Avviso: ribasso del 10% dall'inizio
+   | ⏱ Controlli: ogni 6 h · ultimo 2 ore fa
+   keyboard:
+   | [🔄 Controlla ora → check_1] [📈 Storico → chart_1]
+   | [⏸ Pausa → pause_1] [🗑 Elimina → remove_1]
+   | [🔔 Regola avviso → edit_1] [⏱ Intervallo → setrefresh_1]
+   | [🔗 Apri → url:https://shop.example.com/item/1]
+   | [◀️ Lista → l:a:1]
 ## db after step 4
 ~ products id=1 is_active: 0 -> 1
 ~ products id=1 suspension_kind: "manual" -> NULL
-## step 5: press "remove_1" user=10 on=1 synthetic
+## step 5: press "remove_1" user=10 on=1
 -> answerCallbackQuery
 -> editMessageText chat=10 message_id=1
    param parse_mode="HTML"
    text:
    | ❓ Cosa vuoi fare con <b>Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN…</b>?
    keyboard:
-   | [🗑 Sì, elimina tutto → confirm_delete_1] [⏸ Solo pausa → pause_1] [❌ Annulla → cancel_delete]
+   | [🗑 Sì, elimina tutto → confirm_delete_1] [⏸ Solo pausa → pause_1] [❌ Annulla → p:1:c]
 ## db after step 5
 (no changes)
 ## step 6: press "check_1" user=10 on=1 synthetic
 -> answerCallbackQuery
 -> editMessageText chat=10 message_id=1
    text:
-   | ⏳ Controllo prezzo in corso...
+   | 🔄 Controllo in corso...
 -> editMessageText chat=10 message_id=1
+   param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
-   | ✅ <b>#1</b> Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN…
-   | 💰 Prezzo: €80.00
+   | ✅ Controllato: nessuna variazione significativa.
+   |
+   | 📦 <b>⁨Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN…⁩</b>
+   | ⁨example.com⁩ · #1 · attivo
+   |
+   | 💰 Ora: 80,00 €
+   | 📌 Inizio: 80,00 €
+   | 📉 Minimo: 80,00 €
+   | 🔔 Avviso: ribasso del 10% dall'inizio
+   | ⏱ Controlli: ogni 6 h · adesso
    keyboard:
-   | [📈 Storico prezzo → chart_1]
+   | [🔄 Controlla ora → check_1] [📈 Storico → chart_1]
+   | [⏸ Pausa → pause_1] [🗑 Elimina → remove_1]
+   | [🔔 Regola avviso → edit_1] [⏱ Intervallo → setrefresh_1]
+   | [🔗 Apri → url:https://shop.example.com/item/1]
+   | [◀️ Lista → l:a:1]
 ## db after step 6
 + price_history id=6 {product_id=1, price="80.00", checked_at=<now:9999-99-99 99:99:99>}
 ~ products id=1 last_checked_at: "2026-03-01 10:00:00" -> <now:9999-99-99 99:99:99>
@@ -129,9 +172,15 @@
 ## step 11: press "confirm_delete_1" user=10 on=1 synthetic
 -> answerCallbackQuery
 -> editMessageText chat=10 message_id=1
+   param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
-   | 🗑 Eliminato definitivamente: <b>Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN…</b>
+   | 🗑 Eliminato: Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN…
+   |
+   | 📭 Non hai prodotti tracciati.
+   | Incollami un link per iniziare!
+   keyboard:
+   | [🏠 Home → h]
 ## db after step 11
 - price_history id=1
 - price_history id=2

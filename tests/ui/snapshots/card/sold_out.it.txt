@@ -1,0 +1,20 @@
+# ui snapshot v1
+# screen: card.sold_out
+# locale: it
+# now: 2026-03-01T12:00:00Z
+text:
+   | 📦 <b>⁨Toaster⁩</b>
+   | ⁨shop.example.com⁩ · #61 · attivo
+   | 
+   | 💰 Ora: 39,90 €
+   | 🚫 Esaurito
+   | 📌 Inizio: 44,90 € · ▼ 11,1%
+   | 📉 Minimo: 39,90 €
+   | 🔔 Avviso: ribasso del 10% dall'inizio
+   | ⏱ Controlli: ogni 6 h · ultimo 1 ora fa
+keyboard:
+   [🔄 Controlla ora](cb:p:61:ck)  [📈 Storico](cb:p:61:ch:30d)
+   [⏸ Pausa](cb:p:61:pa)  [🗑 Elimina](cb:p:61:rm)
+   [🔔 Regola avviso](cb:p:61:th)  [⏱ Intervallo](cb:p:61:iv)
+   [🔗 Apri](url:https://shop.example.com/item/61)
+   [◀️ Lista](cb:l:a:1)

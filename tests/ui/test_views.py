@@ -103,6 +103,17 @@ def test_rejects_not_well_formed_field(overrides: dict[str, Any]) -> None:
         _make_view(**overrides)
 
 
+def test_out_of_stock_defaults_to_false() -> None:
+    assert _make_view().out_of_stock is False
+    assert _make_view(out_of_stock=True).out_of_stock is True
+
+
+@pytest.mark.parametrize("value", ["yes", 1, 0, None])
+def test_out_of_stock_must_be_a_bool(value: object) -> None:
+    with pytest.raises(ValueError, match=r"^out_of_stock:"):
+        _make_view(out_of_stock=value)
+
+
 def test_rejection_names_the_field() -> None:
     with pytest.raises(ValueError, match=r"^id:"):
         _make_view(id=0)

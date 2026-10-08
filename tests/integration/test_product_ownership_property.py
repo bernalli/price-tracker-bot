@@ -26,6 +26,7 @@ import itertools
 import re
 from decimal import Decimal
 from pathlib import Path
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 
 import aiosqlite
@@ -153,6 +154,8 @@ class Wired:
         register_handlers(self.app)
         self.app.bot_data["db"] = repo
         self.app.bot_data["repository"] = repo
+        # As in production: the card falls back to the configured check interval.
+        self.app.bot_data["config"] = SimpleNamespace(check_interval_minutes=360)
         self.errors: list[BaseException] = []
         self.app.add_error_handler(self._record_error)
         self.victim = 0

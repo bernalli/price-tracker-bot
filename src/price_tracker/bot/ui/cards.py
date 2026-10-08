@@ -123,8 +123,9 @@ def _errors_line(view: ProductView) -> str | None:
 
 def _keyboard(view: ProductView, actions: CardActions) -> tuple[tuple[Button, ...], ...]:
     toggle_label = _("⏸ Pause") if view.status == "active" else _("▶️ Reactivate")
-    group_1 = [
-        button(_("🔄 Check now"), callback=actions.check),
+    # The scheduler checks only active products: no button promises a check it skips.
+    group_1 = [button(_("🔄 Check now"), callback=actions.check)] if view.status == "active" else []
+    group_1 += [
         button(_("📈 History"), callback=actions.history),
         button(toggle_label, callback=actions.toggle),
         button(_("🗑 Delete"), callback=actions.delete),
@@ -153,6 +154,8 @@ def product_card(view: ProductView, actions: CardActions, *, now: datetime) -> S
         "",
         _now_line(view, loc=loc),
     ]
+    if view.out_of_stock:
+        lines.append(_("🚫 Sold out"))
     start_line = _start_line(view, loc=loc)
     if start_line is not None:
         lines.append(start_line)
@@ -179,6 +182,8 @@ _LIST_NAME_WIDTH = 40
 def _filter_word(list_filter: str) -> str:
     if list_filter == "a":
         return _("active ones")
+    if list_filter == "o":
+        return _("sold out")
     return _("paused") if list_filter == "p" else _("errors")
 
 
@@ -187,6 +192,8 @@ def _list_row(view: ProductView, *, loc: str) -> str:
         mark = "⏸ "
     elif view.consecutive_errors > 0:
         mark = "⚠️ "
+    elif view.out_of_stock:
+        mark = "🚫 "
     else:
         mark = ""
     name = escape_html(truncate_to_width(sanitize_label(view.name), _LIST_NAME_WIDTH))
@@ -215,14 +222,21 @@ def _list_keyboard(page: ListPage) -> tuple[tuple[Button, ...], ...]:
         if page.page < page.pages:
             nav.append(button("▶️", callback=go(page.page + 1)))
         rows.append(tuple(nav))
-    labels = {"a": _("✅ Active"), "p": _("⏸ Paused"), "e": _("⚠️ Errors")}
-    rows.append(
-        tuple(
-            button(
-                f"{label} ✓" if key == page.filter else label,
-                callback=encode(Action("list.page", (key, 1))),
-            )
-            for key, label in labels.items()
+    labels = {
+        "a": _("✅ Active"),
+        "p": _("⏸ Paused"),
+        "e": _("⚠️ Errors"),
+        "o": _("🚫 Sold out"),
+    }
+    rows.extend(
+        layout_rows(
+            [
+                button(
+                    f"{label} ✓" if key == page.filter else label,
+                    callback=encode(Action("list.page", (key, 1))),
+                )
+                for key, label in labels.items()
+            ]
         )
     )
     footer = []

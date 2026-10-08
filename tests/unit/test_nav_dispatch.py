@@ -73,6 +73,7 @@ HANDLED = frozenset(
         "settings.language",
         "list.page",
         "list.open",
+        "product.card",
         "home",
     }
 )
@@ -541,6 +542,29 @@ async def test_a_filter_that_emptied_says_so(repo: Repository) -> None:
     await repo.pause_product(only)
     query = await press(repo, "l:a:1")
     text, _ = shown(query)
+    assert text.endswith("Nothing here.")
+
+
+async def test_the_sold_out_filter_lists_only_active_sold_out_products(repo: Repository) -> None:
+    await add_product(repo, USER, "Kettle")
+    gone = await add_product(repo, USER, "Toaster")
+    paused_gone = await add_product(repo, USER, "Fan")
+    await repo.set_availability(gone, available=False)
+    await repo.set_availability(paused_gone, available=False)
+    await repo.pause_product(paused_gone)
+    query = await press(repo, "l:o:1")
+    text, markup = shown(query)
+    assert_shows(query, await render_list(repo, "o", 1))
+    assert "Toaster" in text
+    assert "Kettle" not in text
+    assert "Fan" not in text
+    opens = [b.callback_data for r in markup.inline_keyboard for b in r if b.text.startswith("#")]
+    assert opens == [f"l:o:1:{gone}"]
+
+
+async def test_an_empty_sold_out_filter_says_so(repo: Repository) -> None:
+    await add_product(repo, USER, "Kettle")
+    text, _ = shown(await press(repo, "l:o:1"))
     assert text.endswith("Nothing here.")
 
 

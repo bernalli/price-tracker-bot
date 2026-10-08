@@ -167,11 +167,52 @@ async def _list_screen(
     return list_page(list_view(records, list_filter, page, default_interval_minutes=interval))
 
 
+def _with_notice(screen: Screen, notice: str) -> Screen:
+    """``screen`` with ``notice`` as its first line, a blank line before the content."""
+    if not notice:
+        return screen
+    return dataclasses.replace(screen, text=f"{notice}\n\n{screen.text}")
+
+
+async def show_list(
+    query: Any,
+    context: ContextTypes.DEFAULT_TYPE,
+    db: Any,
+    user_id: int,
+    *,
+    list_filter: str = "a",
+    page: int = 1,
+    notice: str = "",
+) -> None:
+    """Redraw the message as a page of ``user_id``'s list, with an optional notice on top."""
+    screen = await _list_screen(context, db, user_id, list_filter, page)
+    await _edit(query, _with_notice(screen, notice))
+
+
+async def show_card(
+    query: Any,
+    context: ContextTypes.DEFAULT_TYPE,
+    record: Any,
+    *,
+    back: str | None = None,
+    notice: str = "",
+) -> None:
+    """Redraw the message as the card of ``record``, with an optional notice on top.
+
+    Without ``back`` the List button opens page 1 of the filter the product is in.
+    """
+    view = product_view(record, default_interval_minutes=await default_interval(context))
+    if back is None:
+        back = encode(Action("list.page", ("a" if view.status == "active" else "p", 1)))
+    screen = product_card(view, card_actions(view, back=back), now=datetime.now(UTC))
+    await _edit(query, _with_notice(screen, notice))
+
+
 async def _list_page(
     query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, action: Action
 ) -> None:
     list_filter, page = action.args
-    await _edit(query, await _list_screen(context, db, user_id, str(list_filter), int(page)))
+    await show_list(query, context, db, user_id, list_filter=str(list_filter), page=int(page))
 
 
 async def _list_open(
@@ -181,13 +222,28 @@ async def _list_open(
     # The list is personal: no admin exception, a foreign id is an unknown id.
     record = await db.get_product_for_user(int(product_id), user_id)
     if record is None:
-        screen = await _list_screen(context, db, user_id, str(list_filter), int(page))
-        notice = _("Product not found.")
-        await _edit(query, dataclasses.replace(screen, text=f"{notice}\n\n{screen.text}"))
+        await show_list(
+            query,
+            context,
+            db,
+            user_id,
+            list_filter=str(list_filter),
+            page=int(page),
+            notice=_("Product not found."),
+        )
         return
-    view = product_view(record, default_interval_minutes=await default_interval(context))
-    back = encode(Action("list.page", (list_filter, page)))
-    await _edit(query, product_card(view, card_actions(view, back=back), now=datetime.now(UTC)))
+    await show_card(query, context, record, back=encode(Action("list.page", (list_filter, page))))
+
+
+async def _product_card(
+    query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, action: Action
+) -> None:
+    # Personal like the list: a foreign id is an unknown id.
+    record = await db.get_product_for_user(int(action.args[0]), user_id)
+    if record is None:
+        await show_list(query, context, db, user_id, notice=_("Product not found."))
+        return
+    await show_card(query, context, record)
 
 
 async def _home(
@@ -206,6 +262,7 @@ _HANDLERS: Final[dict[str, Callable[..., Awaitable[None]]]] = {
     "settings.language": _set_language,
     "list.page": _list_page,
     "list.open": _list_open,
+    "product.card": _product_card,
     "home": _home,
 }
 

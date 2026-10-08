@@ -181,12 +181,17 @@ def _check_env(reason: str | None) -> tuple[Any, Any, Any]:
     db.is_user_allowed.return_value = True
     db.get_product.return_value = row
     db.get_product_for_user.return_value = row
+    db.get_config.return_value = None
     scheduler = MagicMock()
     scheduler.check_one_product_for_user = AsyncMock(
         return_value=CheckResult(product_id=1, user_id=7, reason=reason)
     )
     context = MagicMock()
-    context.bot_data = {"db": db, "scheduler": scheduler, "config": SimpleNamespace()}
+    context.bot_data = {
+        "db": db,
+        "scheduler": scheduler,
+        "config": SimpleNamespace(check_interval_minutes=360),
+    }
     context.args = ["1"]
     placeholder = MagicMock()
     placeholder.edit_text = AsyncMock()

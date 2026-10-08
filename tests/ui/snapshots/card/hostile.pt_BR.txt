@@ -12,7 +12,6 @@ text:
    | [⏱ Checks: every 7 dias · never ⏱ Checks: every 7 dias · never ⏱ Checks: every 7 dias · never]
    | [⚠️ 12 failed reads · /errors ⚠️ 12 failed reads · /errors ⚠️ 12 failed reads · /errors]
 keyboard:
-   [[🔄 Check now 🔄 Check now 🔄 Che…](cb:p:9223372036854775807:ck)
    [[📈 History 📈 History 📈 History]](cb:p:9223372036854775807:ch:30d)
    [[▶️ Reactivate ▶️ Reactivate ▶️ R…](cb:p:9223372036854775807:ra)
    [[🗑 Delete 🗑 Delete 🗑 Delete]](cb:p:9223372036854775807:rm)

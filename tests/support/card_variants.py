@@ -1,4 +1,4 @@
-"""The seven product-card variants shared by test_cards.py and test_snapshots.py."""
+"""The product-card variants shared by test_cards.py and test_snapshots.py."""
 
 from __future__ import annotations
 
@@ -200,6 +200,30 @@ def _just_now() -> ProductView:
     )
 
 
+def _sold_out() -> ProductView:
+    return ProductView(
+        id=61,
+        name="Toaster",
+        url=_url(61),
+        domain=_DOMAIN,
+        currency="EUR",
+        current=Decimal("39.90"),
+        initial=Decimal("44.90"),
+        lowest=Decimal("39.90"),
+        target=None,
+        threshold_type="percentage",
+        threshold_value=Decimal("10"),
+        status="active",
+        consecutive_errors=0,
+        check_interval_minutes=None,
+        default_interval_minutes=360,
+        last_checked_at=NOW - timedelta(hours=1),
+        reference_estimate=None,
+        reference_currency="EUR",
+        out_of_stock=True,
+    )
+
+
 VARIANTS: dict[str, ProductView] = {
     "base": _base(),
     "paused": _paused(),
@@ -208,4 +232,5 @@ VARIANTS: dict[str, ProductView] = {
     "estimate": _estimate(),
     "hostile": _hostile(),
     "just_now": _just_now(),
+    "sold_out": _sold_out(),
 }

@@ -19,6 +19,7 @@ from telegram import (
 )
 from telegram.constants import ParseMode
 
+from price_tracker.bot.callbacks import Action, encode
 from price_tracker.bot.decorators import _config
 from price_tracker.bot.handlers._cards import home_view
 from price_tracker.bot.handlers._helpers import (
@@ -28,6 +29,7 @@ from price_tracker.bot.handlers._helpers import (
 )
 from price_tracker.bot.handlers.callbacks._nav import _edit
 from price_tracker.bot.keyboards import menu_back_button
+from price_tracker.bot.messages import _
 from price_tracker.bot.ui.panels import home_screen
 from price_tracker.bot.ui.width import truncate_to_width
 
@@ -140,6 +142,15 @@ async def handle_menu_navigation(
             nm = truncate_to_width(p.get("name") or "?", 30)
             rows.append(
                 [InlineKeyboardButton(f"🔄 #{p['id']} {nm}", callback_data=f"check_{p['id']}")]
+            )
+        if len(products) > 8:
+            rows.append(
+                [
+                    InlineKeyboardButton(
+                        _("… {n} more → Products").format(n=len(products) - 8),
+                        callback_data=encode(Action("list.page", ("a", 1))),
+                    )
+                ]
             )
         if products:
             rows.append([InlineKeyboardButton("📈 Storico prezzo", callback_data="menu_storia")])

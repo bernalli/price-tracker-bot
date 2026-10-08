@@ -32,7 +32,12 @@ LEGACY_CALLBACKS = {"delete_all"}
 
 def build(count: int, list_filter: ListFilter, page: int) -> ListPage:
     """``count`` products that match ``list_filter``."""
-    fields = {"a": {}, "p": {"is_active": 0}, "e": {"consecutive_errors": 1}}[list_filter]
+    fields = {
+        "a": {},
+        "p": {"is_active": 0},
+        "e": {"consecutive_errors": 1},
+        "o": {"is_available": 0},
+    }[list_filter]
     rows = [record(i, **fields) for i in range(1, count + 1)]
     return list_view(rows, list_filter, page, default_interval_minutes=60)
 
@@ -72,12 +77,14 @@ ROWS = {
     4: record(4, consecutive_errors=1),
     5: record(5, is_active=0, consecutive_errors=1),
     6: record(6, consecutive_errors=0),
+    7: record(7, is_available=0),
+    8: record(8, is_active=0, is_available=0),
 }
 
 
 @pytest.mark.parametrize(
     ("list_filter", "expected"),
-    [("a", [1, 4, 6]), ("p", [2, 3, 5]), ("e", [4, 5])],
+    [("a", [1, 4, 6, 7]), ("p", [2, 3, 5, 8]), ("e", [4, 5]), ("o", [7])],
 )
 def test_each_filter_keeps_exactly_its_products(
     list_filter: ListFilter, expected: list[int]
@@ -85,6 +92,21 @@ def test_each_filter_keeps_exactly_its_products(
     page = list_view(list(ROWS.values()), list_filter, 1, default_interval_minutes=60)
     assert ids(page) == expected
     assert page.total == len(expected)
+
+
+def test_a_record_without_availability_is_in_stock() -> None:
+    row = record(1)
+    del row["is_available"]
+    page = list_view([row], "o", 1, default_interval_minutes=60)
+    assert page.total == 0
+    assert list_view([row], "a", 1, default_interval_minutes=60).items[0].out_of_stock is False
+
+
+def test_only_an_active_product_is_sold_out() -> None:
+    items = list_view(list(ROWS.values()), "p", 1, default_interval_minutes=60).items
+    assert [item.out_of_stock for item in items] == [False, False, False, False]
+    active = list_view(list(ROWS.values()), "a", 1, default_interval_minutes=60).items
+    assert [item.id for item in active if item.out_of_stock] == [7]
 
 
 def test_a_filter_without_products_is_an_empty_single_page() -> None:
@@ -112,7 +134,7 @@ def test_the_view_refuses_malformed_pages() -> None:
 def test_every_callback_decodes_or_is_a_legacy_one(ui_locales: Path) -> None:
     set_locale("en")
     for count, asked in ((0, 1), (1, 1), (7, 1), (7, 2), (12, 2), (12, 3)):
-        for list_filter in ("a", "p", "e"):
+        for list_filter in ("a", "p", "e", "o"):
             screen = list_page(build(count, list_filter, asked))
             for data in callbacks(screen):
                 assert isinstance(decode(data), Action) or data in LEGACY_CALLBACKS, data
@@ -125,7 +147,7 @@ def test_products_open_the_card_on_this_page_and_filter(ui_locales: Path) -> Non
     assert opens == [Action("list.open", ("e", 2, i)) for i in range(6, 11)]
 
 
-@pytest.mark.parametrize("list_filter", ["a", "p", "e"])
+@pytest.mark.parametrize("list_filter", ["a", "p", "e", "o"])
 def test_exactly_one_filter_carries_the_check_mark(
     list_filter: ListFilter, ui_locales: Path
 ) -> None:
@@ -133,8 +155,29 @@ def test_exactly_one_filter_carries_the_check_mark(
     screen = list_page(build(3, list_filter, 1))
     checked = [btn for row in screen.rows for btn in row if btn.label.endswith("✓")]
     assert [btn.callback for btn in checked] == [f"l:{list_filter}:1"]
-    filters = {f"l:{f}:1" for f in "ape"}
+    filters = {f"l:{f}:1" for f in "apeo"}
     assert filters <= set(callbacks(screen))
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+@pytest.mark.parametrize("list_filter", ["a", "p", "e", "o"])
+def test_the_four_filters_sit_in_two_rows_of_two_within_the_budget(
+    list_filter: ListFilter, locale: str, ui_locales: Path
+) -> None:
+    set_locale(locale)
+    screen = list_page(build(3, list_filter, 1))
+    rows = [
+        row
+        for row in screen.rows
+        if any(b.callback in {f"l:{f}:1" for f in "apeo"} for b in row)
+        and all(b.callback is not None and b.callback.count(":") == 2 for b in row)
+    ]
+    assert [b.callback for row in rows for b in row] == ["l:a:1", "l:p:1", "l:e:1", "l:o:1"]
+    for row in rows:
+        limit = HALF_WIDTH if len(row) == 2 else ROW_WIDTH
+        assert all(display_width(b.label) <= limit for b in row), row
+    if locale in ("en", "it"):
+        assert [len(row) for row in rows] == [2, 2]
 
 
 def test_navigation_follows_the_page(ui_locales: Path) -> None:
@@ -182,6 +225,8 @@ def test_the_header_and_the_rows(ui_locales: Path) -> None:
             view(1, "Kettle"),
             view(2, "Fan", status="paused"),
             view(3, "Lamp", errors=1, current=None),
+            view(4, "Iron", out_of_stock=True),
+            view(5, "Mixer", errors=1, out_of_stock=True),
         ),
     )
     lines = list_page(page).text.split("\n")
@@ -190,7 +235,19 @@ def test_the_header_and_the_rows(ui_locales: Path) -> None:
         "<b>#1</b> Kettle · €19.99",
         "⏸ <b>#2</b> Fan · €19.99",
         "⚠️ <b>#3</b> Lamp · —",
+        "🚫 <b>#4</b> Iron · €19.99",
+        "⚠️ <b>#5</b> Mixer · €19.99",
     ]
+
+
+def test_the_sold_out_header(ui_locales: Path) -> None:
+    set_locale("en")
+    header = list_page(build(2, "o", 1)).text.split("\n")[0]
+    assert header == "📦 <b>Your products</b> · sold out (2) · page 1/1"
+    set_locale("it")
+    header = list_page(build(2, "o", 1)).text.split("\n")[0]
+    assert "· esauriti (2) ·" in header
+    set_locale("en")
 
 
 def test_an_empty_filter_says_so_and_keeps_filters_and_home(ui_locales: Path) -> None:
@@ -198,7 +255,7 @@ def test_an_empty_filter_says_so_and_keeps_filters_and_home(ui_locales: Path) ->
     screen = list_page(build(0, "e", 1))
     assert screen.text.endswith("Nothing here.")
     assert "noop" not in callbacks(screen)
-    assert {"l:a:1", "l:p:1", "l:e:1", "h"} <= set(callbacks(screen))
+    assert {"l:a:1", "l:p:1", "l:e:1", "l:o:1", "h"} <= set(callbacks(screen))
 
 
 def test_a_long_name_is_cut_to_forty_cells(ui_locales: Path) -> None:

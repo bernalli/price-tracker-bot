@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 
 ProductStatus = Literal["active", "paused", "suspended"]
 ThresholdType = Literal["percentage", "absolute", "target", "any_drop"]
-ListFilter = Literal["a", "p", "e"]
+ListFilter = Literal["a", "p", "e", "o"]
 
 PAGE_SIZE: Final = 5
 
@@ -111,6 +111,7 @@ class ProductView:
     last_checked_at: datetime | None
     reference_estimate: Decimal | None
     reference_currency: str
+    out_of_stock: bool = False
 
     def __post_init__(self) -> None:
         _check_int("id", self.id, minimum=1)
@@ -131,6 +132,7 @@ class ProductView:
         _check_optional_int("check_interval_minutes", self.check_interval_minutes, minimum=1)
         _check_int("default_interval_minutes", self.default_interval_minutes, minimum=1)
         _check_aware_datetime("last_checked_at", self.last_checked_at)
+        _check_bool("out_of_stock", self.out_of_stock)
 
 
 @dataclass(frozen=True, slots=True)

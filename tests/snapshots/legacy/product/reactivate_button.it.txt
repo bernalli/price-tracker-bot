@@ -14,9 +14,25 @@
 ## step 2: press "reactivate_1" user=10 on=1000
 -> answerCallbackQuery
 -> editMessageText chat=10 message_id=1000
+   param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
-   | ▶️ <b>Riattivato:</b> Old Fan
+   | ▶️ Monitoraggio riattivato.
+   |
+   | 📦 <b>⁨Old Fan⁩</b>
+   | ⁨example.com⁩ · #1 · attivo
+   |
+   | 💰 Ora: 45,00 €
+   | 📌 Inizio: 45,00 €
+   | 📉 Minimo: 45,00 €
+   | 🔔 Avviso: ribasso del 10% dall'inizio
+   | ⏱ Controlli: ogni 6 h · mai
+   keyboard:
+   | [🔄 Controlla ora → check_1] [📈 Storico → chart_1]
+   | [⏸ Pausa → pause_1] [🗑 Elimina → remove_1]
+   | [🔔 Regola avviso → edit_1] [⏱ Intervallo → setrefresh_1]
+   | [🔗 Apri → url:https://shop.example.com/item/8]
+   | [◀️ Lista → l:a:1]
 ## db after step 2
 ~ products id=1 is_active: 0 -> 1
 ~ products id=1 suspension_kind: "manual" -> NULL

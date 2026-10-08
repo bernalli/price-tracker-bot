@@ -18,6 +18,7 @@ from price_tracker.bot.handlers.auth import cmd_add_user, cmd_remove_user
 from price_tracker.bot.handlers.callbacks._admin import handle_admin_menu
 from price_tracker.bot.handlers.callbacks._product import handle_delete_flow
 from price_tracker.bot.handlers.text_input import handle_text_input
+from price_tracker.bot.messages import set_locale
 from price_tracker.db.migrator import apply_migrations
 from price_tracker.db.repository import Repository
 
@@ -173,6 +174,7 @@ async def test_confirm_delete_by_an_admin_deletes_another_users_product(
     query = _query()
     context = _context()
     context.bot_data = {"db": repo}
+    set_locale("en")
 
     handled = await handle_delete_flow(
         query, context, repo, ADMIN_ID, f"confirm_delete_{product_id}"
@@ -180,7 +182,7 @@ async def test_confirm_delete_by_an_admin_deletes_another_users_product(
 
     assert handled is True
     assert await repo.get_product(product_id) is None
-    assert "Eliminato" in _text(query)
+    assert _text(query).startswith("🗑 Deleted: Widget\n\n")
 
 
 async def test_confirm_delete_by_a_plain_user_leaves_another_users_product(
@@ -191,13 +193,15 @@ async def test_confirm_delete_by_a_plain_user_leaves_another_users_product(
     query = _query()
     context = _context()
     context.bot_data = {"db": repo}
+    set_locale("en")
 
     await handle_delete_flow(
         query, context, repo, PLAIN_USER_ID + 4, f"confirm_delete_{product_id}"
     )
 
     assert await repo.get_product(product_id) is not None
-    assert "Eliminato" not in _text(query)
+    assert _text(query).startswith("Product not found.\n\n")
+    assert "Deleted" not in _text(query)
 
 
 # ── /adduser on a deactivated user ────────────────────────────────────
