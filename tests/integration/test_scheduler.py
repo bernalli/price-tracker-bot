@@ -2154,7 +2154,7 @@ async def test_out_of_stock_read_resets_a_streak_of_price_failures(
     assert before is not None
     assert before.consecutive_errors == 5
     notifier.reset_mock()
-    await _run_ticks(repo, [_SOLD_OUT], notifier=notifier, max_errors=10)
+    await _run_ticks(repo, [_SOLD_OUT] * 2, notifier=notifier, max_errors=10)
     p = await repo.get_product(pid)
     assert p is not None
     assert p.consecutive_errors == 0
@@ -2174,7 +2174,7 @@ async def test_sold_out_flag_with_a_price_writes_no_price_and_no_history(
     priced_sold_out = ProductInfo(
         name="Widget", price=Decimal("90"), currency="EUR", available=False
     )
-    await _run_ticks(repo, [priced_sold_out], notifier=notifier)
+    await _run_ticks(repo, [priced_sold_out] * 2, notifier=notifier)
     p = await repo.get_product(pid)
     assert p is not None
     assert p.current_price == Decimal("100")  # the price seeded at add, untouched
@@ -2232,7 +2232,10 @@ async def test_out_of_stock_then_layout_failures_still_suspend(
     and suspend, and availability stays False through them."""
     repo, pid = repo_with_product
     await _run_ticks(
-        repo, [_SOLD_OUT, _LAYOUT_BROKEN, _LAYOUT_BROKEN], notifier=AsyncMock(), max_errors=2
+        repo,
+        [_SOLD_OUT, _SOLD_OUT, _LAYOUT_BROKEN, _LAYOUT_BROKEN],
+        notifier=AsyncMock(),
+        max_errors=2,
     )
     p = await repo.get_product(pid)
     assert p is not None
@@ -2242,20 +2245,76 @@ async def test_out_of_stock_then_layout_failures_still_suspend(
 
 
 @pytest.mark.asyncio
-async def test_out_of_stock_then_restock_then_sold_out_then_restock_notifies_each_return(
+async def test_single_sold_out_flickers_do_not_trigger_restock_alerts(
     repo_with_product: tuple[Repository, int],
 ) -> None:
-    """Flip-flop: one back-in-stock message per genuine return, none for the sold-out reads."""
+    """Isolated sold-out readings never establish a real sold-out spell."""
     repo, pid = repo_with_product
     notifier = AsyncMock()
     back = ProductInfo(name="Widget", price=Decimal("100"), currency="EUR", available=True)
-    await _run_ticks(repo, [_SOLD_OUT, back, _SOLD_OUT, _SOLD_OUT, back], notifier=notifier)
+    await _run_ticks(repo, [_SOLD_OUT, back, _SOLD_OUT, back], notifier=notifier)
     p = await repo.get_product(pid)
     assert p is not None
     assert p.is_active is True
     assert p.is_available is True
     assert p.consecutive_errors == 0
-    assert notifier.await_count == 2
+    assert notifier.await_count == 0
+
+
+class _BlockingInStockScraper(AbstractScraper):
+    name = "blocking-in-stock"
+    priority = 100
+
+    def __init__(self) -> None:
+        self.calls = 0
+        self.first_started = asyncio.Event()
+        self.release_first = asyncio.Event()
+
+    def can_handle(self, url: str) -> bool:
+        return True
+
+    async def scrape(self, url: str, client: httpx.AsyncClient) -> ProductInfo:
+        self.calls += 1
+        if self.calls == 1:
+            self.first_started.set()
+            await self.release_first.wait()
+        return ProductInfo(name="Widget", price=Decimal("100"), currency="EUR", available=True)
+
+
+@pytest.mark.asyncio
+async def test_concurrent_checks_send_one_restock_alert(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    repo, pid = repo_with_product
+    await repo.set_availability(pid, available=False)
+    scraper = _BlockingInStockScraper()
+    registry = ScraperRegistry()
+    registry.register(scraper)
+    notifier = AsyncMock()
+    async with httpx.AsyncClient() as client:
+        scheduler = Scheduler(
+            SchedulerDeps(
+                repo=repo,
+                registry=registry,
+                client=client,
+                notifier=notifier,
+                delay_between_products=0.0,
+            )
+        )
+        periodic = asyncio.create_task(scheduler.run_check_for_user(user_id=1))
+        await scraper.first_started.wait()
+        interactive = asyncio.create_task(
+            scheduler.check_one_product_for_user(product_id=pid, user_id=1)
+        )
+        for _ in range(100):
+            if scraper.calls == 2:
+                break
+            await asyncio.sleep(0)
+        scraper.release_first.set()
+        await asyncio.gather(periodic, interactive)
+
+    assert scraper.calls == 2
+    notifier.assert_awaited_once()
 
 
 @pytest.mark.asyncio
