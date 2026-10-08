@@ -1666,3 +1666,305 @@ msgstr "✏️ Altro orario"
 #: src/price_tracker/bot/ui/panels.py
 msgid "✏️ Change"
 msgstr "✏️ Cambia"
+
+#: src/price_tracker/bot/handlers/__init__.py
+#, python-brace-format
+msgid "👋 <b>Hello {first_name}!</b>"
+msgstr "👋 <b>Ciao {first_name}!</b>"
+
+#: src/price_tracker/bot/handlers/__init__.py
+msgid "❌ An error occurred. Please try again in a moment."
+msgstr "❌ Si è verificato un errore. Riprova tra qualche istante."
+
+#: src/price_tracker/bot/handlers/product.py src/price_tracker/bot/handlers/history.py
+msgid "Product"
+msgstr "Prodotto"
+
+#: src/price_tracker/bot/handlers/product.py
+msgid "❌ Usage: /add &lt;url&gt;\n\nExample:\n<code>/add https://www.amazon.it/dp/B09V3K...</code>\n\nOr paste the link directly into the chat!"
+msgstr "❌ Uso: /add &lt;url&gt;\n\nEsempio:\n<code>/add https://www.amazon.it/dp/B09V3K...</code>\n\nOppure incolla direttamente il link in chat!"
+
+#: src/price_tracker/bot/handlers/product.py
+msgid "🗑 Delete all products"
+msgstr "🗑 Elimina tutti i prodotti"
+
+#: src/price_tracker/bot/handlers/product.py
+msgid "📦 <b>Choose a product to delete:</b>"
+msgstr "📦 <b>Scegli prodotto da eliminare:</b>"
+
+#: src/price_tracker/bot/handlers/product.py
+msgid "🗑 Yes, delete"
+msgstr "🗑 Sì, elimina"
+
+#: src/price_tracker/bot/handlers/product.py
+#, python-brace-format
+msgid "⚠️ Do you want to <b>permanently</b> delete this product?\n\n📦 #{product_id} — {name}\n\nIts entire price history will also be deleted."
+msgstr "⚠️ Vuoi eliminare <b>definitivamente</b> questo prodotto?\n\n📦 #{product_id} — {name}\n\nVerrà cancellato anche tutto lo storico prezzi."
+
+#: src/price_tracker/bot/handlers/product.py
+msgid "📦 <b>Choose a product to set a target:</b>"
+msgstr "📦 <b>Scegli prodotto per impostare target:</b>"
+
+#: src/price_tracker/bot/handlers/product.py
+msgid "❌ Usage: /target &lt;id&gt; &lt;price&gt;\nExample: <code>/target 3 29.99</code>\n\nUse <code>/target &lt;id&gt; 0</code> to remove the target."
+msgstr "❌ Uso: /target &lt;id&gt; &lt;prezzo&gt;\nEsempio: <code>/target 3 29.99</code>\n\nUsa <code>/target &lt;id&gt; 0</code> per rimuovere il target."
+
+#: src/price_tracker/bot/handlers/product.py
+msgid "❌ Invalid price."
+msgstr "❌ Prezzo non valido."
+
+#: src/price_tracker/bot/handlers/product.py
+#, python-brace-format
+msgid "🎯 Target removed for #{product_id}."
+msgstr "🎯 Target rimosso per #{product_id}."
+
+#: src/price_tracker/bot/handlers/product.py
+#, python-brace-format
+msgid "🎯 Target set: <b>{target}</b>"
+msgstr "🎯 Target impostato: <b>{target}</b>"
+
+#: src/price_tracker/bot/handlers/product.py
+#, python-brace-format
+msgid "💰 Current: {current} — <b>already reached!</b>"
+msgstr "💰 Attuale: {current} — <b>già raggiunto!</b>"
+
+#: src/price_tracker/bot/handlers/product.py
+#, python-brace-format
+msgid "💰 Current: {current} (-{difference:.1f}% needed)"
+msgstr "💰 Attuale: {current} (-{difference:.1f}% necessario)"
+
+#: src/price_tracker/bot/handlers/product.py
+msgid "📦 <b>Choose a product to set a threshold:</b>"
+msgstr "📦 <b>Scegli prodotto per impostare soglia:</b>"
+
+#: src/price_tracker/bot/handlers/product.py
+msgid "❌ Usage: /threshold &lt;id&gt; &lt;value&gt;\n\nExamples:\n<code>/threshold 3 20%</code> — notify me if it drops by 20%\n<code>/threshold 3 50</code> — notify me if it drops by €50\n<code>/threshold 3 any</code> — notify me on every drop"
+msgstr "❌ Uso: /soglia &lt;id&gt; &lt;valore&gt;\n\nEsempi:\n<code>/soglia 3 20%</code> — avvisami se scende del 20%\n<code>/soglia 3 50</code> — avvisami se scende di €50\n<code>/soglia 3 ogni</code> — avvisami ad ogni ribasso"
+
+#: src/price_tracker/bot/handlers/product.py
+#, python-brace-format
+msgid "🎯 Threshold set: <b>{threshold}</b>\n📦 #{product_id} — {name}"
+msgstr "🎯 Soglia impostata: <b>{threshold}</b>\n📦 #{product_id} — {name}"
+
+#: src/price_tracker/bot/handlers/product.py
+msgid "❌ URL not allowed: only http:// and https:// links are supported."
+msgstr "❌ URL non consentito: sono supportati solo link http:// e https://."
+
+#: src/price_tracker/bot/handlers/product.py
+msgid "❌ URL not allowed: it points to a private or internal address."
+msgstr "❌ URL non consentito: punta a un indirizzo privato o interno."
+
+#: src/price_tracker/bot/handlers/product.py
+#, python-brace-format
+msgid "ℹ️ You are already tracking this product (#{product_id}).\n💰 Current price: €{current:.2f}"
+msgstr "ℹ️ Stai già tracciando questo prodotto (#{product_id}).\n💰 Prezzo attuale: €{current:.2f}"
+
+#: src/price_tracker/bot/handlers/product.py
+#, python-brace-format
+msgid "ℹ️ You are already tracking this product (#{product_id})."
+msgstr "ℹ️ Stai già tracciando questo prodotto (#{product_id})."
+
+#: src/price_tracker/bot/handlers/product.py
+#, python-brace-format
+msgid "♻️ Product reactivated! (#{product_id})"
+msgstr "♻️ Prodotto riattivato! (#{product_id})"
+
+#: src/price_tracker/bot/handlers/product.py
+msgid "🔍 Analyzing the product..."
+msgstr "🔍 Analizzo il prodotto..."
+
+#: src/price_tracker/bot/handlers/product.py
+msgid "❌ No known scraper for this domain.\n\n💡 Check that the link is correct or report the unsupported site."
+msgstr "❌ Nessuno scraper conosciuto per questo dominio.\n\n💡 Verifica che il link sia corretto o segnala il sito non supportato."
+
+#: src/price_tracker/bot/handlers/product.py
+msgid "🛡 The site is currently blocking automated requests.\nPlease try again in a few minutes."
+msgstr "🛡 Il sito sta bloccando le richieste automatiche in questo momento.\nRiprova tra qualche minuto."
+
+#: src/price_tracker/bot/handlers/product.py
+msgid "Price not found"
+msgstr "Prezzo non trovato"
+
+#: src/price_tracker/bot/handlers/product.py
+#, python-brace-format
+msgid "❌ I could not find the price.\nReason: {reason}\n\n💡 Check that the link is correct and the product is available."
+msgstr "❌ Non sono riuscito a trovare il prezzo.\nMotivo: {reason}\n\n💡 Prova a verificare che il link sia corretto e il prodotto disponibile."
+
+#: src/price_tracker/bot/handlers/product.py
+#, python-brace-format
+msgid "✅ <b>Product added!</b> (#{product_id})"
+msgstr "✅ <b>Prodotto aggiunto!</b> (#{product_id})"
+
+#: src/price_tracker/bot/handlers/product.py
+#, python-brace-format
+msgid "💰 Price: <b>{price}</b>"
+msgstr "💰 Prezzo: <b>{price}</b>"
+
+#: src/price_tracker/bot/handlers/product.py
+#, python-brace-format
+msgid "🌐 Site: {domain}"
+msgstr "🌐 Sito: {domain}"
+
+#: src/price_tracker/bot/handlers/product.py
+msgid "\n📋 <b>Amazon preferences:</b>"
+msgstr "\n📋 <b>Preferenze Amazon:</b>"
+
+#: src/price_tracker/bot/handlers/product.py
+msgid "🆕 New only"
+msgstr "🆕 Solo Nuovo"
+
+#: src/price_tracker/bot/handlers/product.py
+msgid "♻️ Used only"
+msgstr "♻️ Solo Usato"
+
+#: src/price_tracker/bot/handlers/product.py
+msgid "📦 Amazon only"
+msgstr "📦 Solo Amazon"
+
+#: src/price_tracker/bot/handlers/product.py
+msgid "🏪 Any seller"
+msgstr "🏪 Qualsiasi venditore"
+
+#: src/price_tracker/bot/handlers/product.py
+msgid "👍 Anything is fine (default)"
+msgstr "👍 Va bene tutto (default)"
+
+#: src/price_tracker/bot/handlers/product.py
+msgid "\n<b>How do you want to be notified?</b>"
+msgstr "\n<b>Come vuoi essere avvisato?</b>"
+
+#: src/price_tracker/bot/handlers/history.py
+msgid "📈 <b>Choose a product for its history:</b>"
+msgstr "📈 <b>Scegli un prodotto per lo storico:</b>"
+
+#: src/price_tracker/bot/handlers/history.py
+msgid "📭 Not enough data to generate the chart (at least 2 points are needed)."
+msgstr "📭 Dati insufficienti per generare il grafico (servono almeno 2 punti)."
+
+#: src/price_tracker/bot/handlers/history.py
+msgid "❌ Usage: /reset &lt;id&gt;\n\nReset the initial price to the current price.\nUseful when the price has dropped and you want to restart the comparison."
+msgstr "❌ Uso: /reset &lt;id&gt;\n\nReimposta il prezzo iniziale al prezzo corrente.\nUtile quando il prezzo è sceso e vuoi azzerare il confronto."
+
+#: src/price_tracker/bot/handlers/history.py
+#, python-brace-format
+msgid "✅ Initial price updated!\n\n📦 <b>#{product_id}</b> {name}\n💰 New base price: <b>{price}</b>"
+msgstr "✅ Prezzo iniziale aggiornato!\n\n📦 <b>#{product_id}</b> {name}\n💰 Nuovo prezzo base: <b>{price}</b>"
+
+#: src/price_tracker/bot/handlers/history.py
+msgid "❌ Could not update the initial price."
+msgstr "❌ Impossibile aggiornare il prezzo iniziale."
+
+#: src/price_tracker/bot/handlers/debug.py
+msgid "❌ Usage: /debug &lt;url&gt;"
+msgstr "❌ Uso: /debug &lt;url&gt;"
+
+#: src/price_tracker/bot/handlers/debug.py
+msgid "🔍 Analysis in progress..."
+msgstr "🔍 Analisi in corso..."
+
+#: src/price_tracker/bot/handlers/debug.py
+msgid "⚠️ Small response without structured data; trying a fresh client..."
+msgstr "⚠️ Risposta piccola senza dati strutturati, provo client fresco..."
+
+#: src/price_tracker/bot/handlers/debug.py
+msgid "✅ The fresh client retrieved more data!"
+msgstr "✅ Client fresco ha ottenuto più dati!"
+
+#: src/price_tracker/bot/handlers/debug.py
+msgid "\n❌ Could not load the page with any method."
+msgstr "\n❌ Impossibile caricare la pagina con nessun metodo."
+
+#: src/price_tracker/bot/handlers/debug.py
+msgid "📦 JSON-LD: ❌ BS4 does not find the scripts, but regex does!"
+msgstr "📦 JSON-LD: ❌ BS4 non trova gli script, ma regex sì!"
+
+#: src/price_tracker/bot/handlers/debug.py
+#, python-brace-format
+msgid "📦 JSON-LD #{index}: empty content"
+msgstr "📦 JSON-LD #{index}: contenuto vuoto"
+
+#: src/price_tracker/bot/handlers/debug.py
+msgid "📦 JSON-LD: ❌ not found"
+msgstr "📦 JSON-LD: ❌ non trovato"
+
+#: src/price_tracker/bot/handlers/debug.py
+msgid "🏷 OG/meta price: ❌ not found"
+msgstr "🏷 OG/meta price: ❌ non trovato"
+
+#: src/price_tracker/bot/handlers/debug.py
+msgid "🔖 itemprop=price: ❌ not found"
+msgstr "🔖 itemprop=price: ❌ non trovato"
+
+#: src/price_tracker/bot/handlers/debug.py
+msgid "🎯 CSS selectors: ❌ no matches"
+msgstr "🎯 CSS selectors: ❌ nessun match"
+
+#: src/price_tracker/bot/handlers/debug.py
+msgid "🔎 Regex €: ❌ no matches"
+msgstr "🔎 Regex €: ❌ nessun match"
+
+#: src/price_tracker/bot/handlers/debug.py
+msgid "\n🤖 <b>Scraper result:</b>"
+msgstr "\n🤖 <b>Risultato scraper:</b>"
+
+#: src/price_tracker/bot/handlers/debug.py
+msgid "   ❌ no known scraper for this domain"
+msgstr "   ❌ nessuno scraper conosciuto per questo dominio"
+
+#: src/price_tracker/bot/handlers/debug.py
+#, python-brace-format
+msgid "   Name: {name}"
+msgstr "   Nome: {name}"
+
+#: src/price_tracker/bot/handlers/debug.py
+#, python-brace-format
+msgid "   Price: €{price}"
+msgstr "   Prezzo: €{price}"
+
+#: src/price_tracker/bot/handlers/debug.py
+#, python-brace-format
+msgid "   Price: ❌ ({error})"
+msgstr "   Prezzo: ❌ {error}"
+
+#: src/price_tracker/bot/handlers/debug.py
+msgid "ℹ️ <b>Your statistics</b>\n"
+msgstr "ℹ️ <b>Le tue statistiche</b>\n"
+
+#: src/price_tracker/bot/handlers/debug.py
+#, python-brace-format
+msgid "📦 Active products: {count}"
+msgstr "📦 Prodotti attivi: {count}"
+
+#: src/price_tracker/bot/handlers/debug.py
+#, python-brace-format
+msgid "📁 Total products: {count}"
+msgstr "📁 Prodotti totali: {count}"
+
+#: src/price_tracker/bot/handlers/debug.py
+#, python-brace-format
+msgid "🔄 Checks performed: {count}"
+msgstr "🔄 Controlli effettuati: {count}"
+
+#: src/price_tracker/bot/handlers/debug.py
+#, python-brace-format
+msgid "⏱ Check interval: every {interval}"
+msgstr "⏱ Intervallo check: ogni {interval}"
+
+#: src/price_tracker/bot/handlers/debug.py
+msgid "<b>👑 Admin overview</b>"
+msgstr "<b>👑 Panoramica admin</b>"
+
+#: src/price_tracker/bot/handlers/debug.py
+#, python-brace-format
+msgid "👥 Active users: {count}"
+msgstr "👥 Utenti attivi: {count}"
+
+#: src/price_tracker/bot/handlers/debug.py
+#, python-brace-format
+msgid "📦 Total products (global): {count}"
+msgstr "📦 Prodotti totali (globali): {count}"
+
+#: src/price_tracker/bot/handlers/debug.py
+#, python-brace-format
+msgid "🔄 Total checks (global): {count}"
+msgstr "🔄 Check totali (globali): {count}"

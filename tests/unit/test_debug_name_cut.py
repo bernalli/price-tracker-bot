@@ -14,7 +14,7 @@ from price_tracker.bot.handlers.debug import cmd_debug
 from price_tracker.bot.ui.width import display_width
 
 _PAGE = "<html><body><p>nothing here</p></body></html>"
-_NAME_LINE = re.compile(r"^   Nome: (.*)$", re.MULTILINE)
+_NAME_LINE = re.compile(r"^   Name: (.*)$", re.MULTILINE)
 
 
 async def _debug_report(name: str | None) -> str:
@@ -43,6 +43,7 @@ async def _debug_report(name: str | None) -> str:
 
 
 def _shown_name(report: str) -> str:
+    assert "   Price: ❌ (e)" in report
     match = _NAME_LINE.search(report)
     assert match is not None, report
     return html.unescape(match.group(1))

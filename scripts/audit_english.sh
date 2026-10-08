@@ -9,12 +9,13 @@
 #     appear in legitimate English compounds e.g. "non-EUR", "non-None")
 #
 # Coverage scope:
-#   - bot/decorators.py + bot/handlers/{auth,monitoring,_helpers}.py and
-#     the descendants under callbacks/ that have already been swept.
+#   - bot/decorators.py + bot/handlers/{__init__,auth,debug,history,
+#     monitoring,product,_helpers}.py and the descendants under callbacks/
+#     that have already been swept.
 #
 # Out of scope (carry-over IT strings, scheduled for a later sweep):
-#   - bot/handlers/{product,product_io,history,settings,text_input,debug}.py
-#     and callbacks/{_actions,_admin,_menu,_product}.py — legacy handler
+#   - bot/handlers/{product_io,settings,text_input}.py and
+#     callbacks/{_actions,_admin,_menu,_product}.py — legacy handler
 #     bodies; UX-visible strings already wrapped in `_()` but msgid texts
 #     remain Italian (covered by it_IT catalog passthrough).
 #   - scrapers/** — domain-specific IT/EN dual-language parsing logic
@@ -32,14 +33,10 @@ if matches=$(rg --pcre2 "$PATTERN" \
               --type py \
               --glob '!src/price_tracker/locale/**' \
               --glob '!src/price_tracker/bot/messages.py' \
-              --glob '!src/price_tracker/bot/handlers/product.py' \
               --glob '!src/price_tracker/bot/handlers/product_io.py' \
               --glob '!src/price_tracker/bot/handlers/product_list.py' \
-              --glob '!src/price_tracker/bot/handlers/history.py' \
               --glob '!src/price_tracker/bot/handlers/settings.py' \
               --glob '!src/price_tracker/bot/handlers/text_input.py' \
-              --glob '!src/price_tracker/bot/handlers/debug.py' \
-              --glob '!src/price_tracker/bot/handlers/__init__.py' \
               --glob '!src/price_tracker/bot/handlers/callbacks/**' \
               --glob '!src/price_tracker/scrapers/**'); then
   echo "ERROR: Italian residual strings found in covered source:"

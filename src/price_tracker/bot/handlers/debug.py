@@ -127,7 +127,9 @@ def _tier_label(state: str) -> str:
 async def cmd_debug(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Debug scraping for a URL — shows what each strategy finds."""
     if not context.args:
-        await update.message.reply_text("❌ Uso: /debug &lt;url&gt;", parse_mode=ParseMode.HTML)
+        await update.message.reply_text(
+            _("❌ Usage: /debug &lt;url&gt;"), parse_mode=ParseMode.HTML
+        )
         return
     await debug_url(update, context, context.args[0])
 
@@ -137,7 +139,7 @@ async def debug_url(update: Update, context: ContextTypes.DEFAULT_TYPE, url: str
 
     The caller checks that the user may run it: ``/debug`` and the admin debug prompt.
     """
-    msg = await update.message.reply_text(_("🔍 Analisi in corso..."))
+    msg = await update.message.reply_text(_("🔍 Analysis in progress..."))
 
     from bs4 import BeautifulSoup  # noqa: PLC0415 — heavy import deferred
 
@@ -155,7 +157,9 @@ async def debug_url(update: Update, context: ContextTypes.DEFAULT_TYPE, url: str
             html = resp.text
             # If suspiciously small, try fresh client
             if len(html) < 80000 and "application/ld+json" not in html:
-                lines.append("⚠️ Risposta piccola senza dati strutturati, provo client fresco...")
+                lines.append(
+                    _("⚠️ Small response without structured data; trying a fresh client...")
+                )
                 try:
                     async with build_client(timeout=30) as fresh:
                         r2 = await public_request(
@@ -179,7 +183,7 @@ async def debug_url(update: Update, context: ContextTypes.DEFAULT_TYPE, url: str
                         )
                         if r2.status_code == 200 and len(r2.text) > len(html):
                             html = r2.text
-                            lines.append("✅ Client fresco ha ottenuto più dati!")
+                            lines.append(_("✅ The fresh client retrieved more data!"))
                 except Exception as e:  # noqa: BLE001 — debug surface, never crash
                     lines.append(f"❌ httpx fresh: {_ext(e, 60)}")
         elif resp.status_code == 403:
@@ -188,7 +192,7 @@ async def debug_url(update: Update, context: ContextTypes.DEFAULT_TYPE, url: str
         lines.append(f"❌ httpx: {_ext(e, 80)}")
 
     if not html:
-        lines.append("\n❌ Impossibile caricare la pagina con nessun metodo.")
+        lines.append(_("\n❌ Could not load the page with any method."))
         await msg.edit_text("\n".join(lines), parse_mode=ParseMode.HTML)
         return
 
@@ -206,7 +210,7 @@ async def debug_url(update: Update, context: ContextTypes.DEFAULT_TYPE, url: str
         ):
             try:
                 _json.loads(m.group(1).strip())
-                lines.append("📦 JSON-LD: ❌ BS4 non trova gli script, ma regex sì!")
+                lines.append(_("📦 JSON-LD: ❌ BS4 does not find the scripts, but regex does!"))
                 break
             except _json.JSONDecodeError:
                 pass
@@ -216,7 +220,7 @@ async def debug_url(update: Update, context: ContextTypes.DEFAULT_TYPE, url: str
             try:
                 raw = s.string or s.get_text(strip=True)
                 if not raw:
-                    lines.append(f"📦 JSON-LD #{i + 1}: contenuto vuoto")
+                    lines.append(_("📦 JSON-LD #{index}: empty content").format(index=i + 1))
                     continue
                 data = _json.loads(raw)
                 tp = data.get("@type", "?")
@@ -237,7 +241,7 @@ async def debug_url(update: Update, context: ContextTypes.DEFAULT_TYPE, url: str
             except Exception as e:  # noqa: BLE001 — debug parse surface
                 lines.append(f"📦 JSON-LD #{i + 1}: parse error: {_ext(e, 40)}")
     else:
-        lines.append("📦 JSON-LD: ❌ non trovato")
+        lines.append(_("📦 JSON-LD: ❌ not found"))
 
     # Step 3: Check OG/meta tags
     og_price = soup.find("meta", property="og:price:amount") or soup.find(
@@ -250,7 +254,7 @@ async def debug_url(update: Update, context: ContextTypes.DEFAULT_TYPE, url: str
         content = _ext(product_price.get("content", "?"), 40)
         lines.append(f"🏷 product:price:amount: <b>{content}</b>")
     if not og_price and not product_price:
-        lines.append("🏷 OG/meta price: ❌ non trovato")
+        lines.append(_("🏷 OG/meta price: ❌ not found"))
 
     # Step 4: Check microdata
     itemprop_price = soup.find(attrs={"itemprop": "price"})
@@ -258,7 +262,7 @@ async def debug_url(update: Update, context: ContextTypes.DEFAULT_TYPE, url: str
         val = itemprop_price.get("content") or itemprop_price.get_text(strip=True)
         lines.append(f"🔖 itemprop=price: <b>{_ext(val, 30)}</b>")
     else:
-        lines.append("🔖 itemprop=price: ❌ non trovato")
+        lines.append(_("🔖 itemprop=price: ❌ not found"))
 
     # Step 5: Check common selectors
     found_css = False
@@ -278,7 +282,7 @@ async def debug_url(update: Update, context: ContextTypes.DEFAULT_TYPE, url: str
             lines.append(f"🎯 CSS '{sel}': <b>{_escape_html(val_str[:40])}</b>")
             found_css = True
     if not found_css:
-        lines.append("🎯 CSS selectors: ❌ nessun match")
+        lines.append(_("🎯 CSS selectors: ❌ no matches"))
 
     # Step 6: Regex price in first 3000 chars of body
     body = soup.find("body")
@@ -288,7 +292,7 @@ async def debug_url(update: Update, context: ContextTypes.DEFAULT_TYPE, url: str
         if price_matches:
             lines.append(f"🔎 Regex €: {', '.join(_ext(m, 40) for m in price_matches[:5])}")
         else:
-            lines.append("🔎 Regex €: ❌ nessun match")
+            lines.append(_("🔎 Regex €: ❌ no matches"))
 
     # Step 7: Title
     title = soup.find("title")
@@ -298,16 +302,20 @@ async def debug_url(update: Update, context: ContextTypes.DEFAULT_TYPE, url: str
     # Step 8: Run actual scraper
     scraper = _scraper(context)
     scraper_for_url = scraper.resolve(url)
-    lines.append("\n🤖 <b>Risultato scraper:</b>")
+    lines.append(_("\n🤖 <b>Scraper result:</b>"))
     if scraper_for_url is None:
-        lines.append("   ❌ nessuno scraper conosciuto per questo dominio")
+        lines.append(_("   ❌ no known scraper for this domain"))
     else:
         result = await scraper_for_url.scrape(url, client)
-        lines.append(f"   Nome: {_escape_html(truncate_to_width(result.name or '❌', 60))}")
-        price_repr = (
-            "€" + _ext(result.price, 40) if result.price else "❌ " + _ext(result.error or "", 40)
+        lines.append(
+            _("   Name: {name}").format(
+                name=_escape_html(truncate_to_width(result.name or "❌", 60))
+            )
         )
-        lines.append(f"   Prezzo: {price_repr}")
+        if result.price is not None:
+            lines.append(_("   Price: €{price}").format(price=_ext(result.price, 40)))
+        else:
+            lines.append(_("   Price: ❌ ({error})").format(error=_ext(result.error or "", 40)))
 
     await msg.edit_text("\n".join(lines), parse_mode=ParseMode.HTML, disable_web_page_preview=True)
 
@@ -332,11 +340,11 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         interval_str = f"{interval}min"
 
     lines = [
-        "ℹ️ <b>Le tue statistiche</b>\n",
-        f"📦 Prodotti attivi: {user_stats['active_products']}",
-        f"📁 Prodotti totali: {user_stats['total_products']}",
-        f"🔄 Controlli effettuati: {user_stats['total_checks']}",
-        f"⏱ Intervallo check: ogni {interval_str}",
+        _("ℹ️ <b>Your statistics</b>\n"),
+        _("📦 Active products: {count}").format(count=user_stats["active_products"]),
+        _("📁 Total products: {count}").format(count=user_stats["total_products"]),
+        _("🔄 Checks performed: {count}").format(count=user_stats["total_checks"]),
+        _("⏱ Check interval: every {interval}").format(interval=interval_str),
     ]
 
     products_tracked: int | None = None
@@ -347,10 +355,12 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         lines.extend(
             [
                 "",
-                "<b>👑 Panoramica admin</b>",
-                f"👥 Utenti attivi: {len(users)}",
-                f"📦 Prodotti totali (globali): {global_stats['active_products']}",
-                f"🔄 Check totali (globali): {global_stats['total_checks']}",
+                _("<b>👑 Admin overview</b>"),
+                _("👥 Active users: {count}").format(count=len(users)),
+                _("📦 Total products (global): {count}").format(
+                    count=global_stats["active_products"]
+                ),
+                _("🔄 Total checks (global): {count}").format(count=global_stats["total_checks"]),
             ]
         )
 
