@@ -21,11 +21,25 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
 
 
-# Bot API URLs carry the token in the path: /bot<token>/ and /file/bot<token>/.
-_TELEGRAM_TOKEN_IN_URL = re.compile(
-    r"(https?://api\.telegram\.org/(?:file/)?bot)[^/\s\"']+/",
+# Bot API URLs carry the token in the path: /bot<token> and /file/bot<token>.
+# Match ordinary URLs, raw JSON-escaped slashes, and fully percent-encoded URLs.
+_SLASH = r"(?:/|\\/)"
+_TELEGRAM_TOKEN_IN_URLS = (
+    re.compile(
+        rf"(?P<prefix>https?:{_SLASH}{_SLASH}api\.telegram\.org{_SLASH}"
+        rf"(?:file{_SLASH})?bot)"
+        r"(?P<token>[^/\\?#\s\"']+)"
+        rf"(?P<suffix>{_SLASH}|[?#\s\"']|$)",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"(?P<prefix>https?%3a%2f%2fapi\.telegram\.org%2f(?:file%2f)?bot)"
+        r"(?P<token>(?:(?!%2f|%3f|%23|[\s\"']).)+)"
+        r"(?P<suffix>%2f|%3f|%23|[\s\"']|$)",
+        re.IGNORECASE,
+    ),
 )
-_REDACTED_TOKEN = r"\1***/"
+_REDACTED_TOKEN = r"\g<prefix>***\g<suffix>"
 
 # Loggers that log full request URLs (and so the bot token) at INFO/DEBUG.
 _URL_LOGGING_LOGGERS = ("httpx", "httpcore")
@@ -46,7 +60,9 @@ class TelegramTokenRedactingFilter(logging.Filter):
             message = record.getMessage()
         except Exception:  # noqa: BLE001 - a malformed record must still be logged
             return True
-        redacted = _TELEGRAM_TOKEN_IN_URL.sub(_REDACTED_TOKEN, message)
+        redacted = message
+        for pattern in _TELEGRAM_TOKEN_IN_URLS:
+            redacted = pattern.sub(_REDACTED_TOKEN, redacted)
         if redacted != message:
             record.msg = redacted
             record.args = ()
