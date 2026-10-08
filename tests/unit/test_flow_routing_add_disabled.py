@@ -12,7 +12,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
-from hypothesis import given, settings
+from hypothesis import example, given, settings
 from hypothesis import strategies as st
 
 from price_tracker.app.inputs import InputError, InputErrorCode
@@ -237,6 +237,8 @@ async def test_with_the_debug_prompt_open_any_text_is_its_answer(
         ),
     )
 )
+@example(text="https://.")
+@example(text="(see http://),")
 def test_a_debug_answer_is_a_link_found_in_the_text_or_not_a_link(text: str) -> None:
     result = _parse_for(FlowKind.DEBUG, text)
 
@@ -246,3 +248,15 @@ def test_a_debug_answer_is_a_link_found_in_the_text_or_not_a_link(text: str) -> 
         assert isinstance(result, str)
         assert result in text
         assert URL_PATTERN.fullmatch(result)
+
+
+@settings(max_examples=200, deadline=None)
+@given(
+    before=st.text(st.characters(exclude_characters="hH"), max_size=10),
+    path=st.text("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/-_", max_size=20),
+    after=st.sampled_from(["", " ", ".", ").", "!? more"]),
+)
+def test_a_link_set_apart_in_the_answer_is_always_found(before: str, path: str, after: str) -> None:
+    url = f"https://a.example/{path}"
+
+    assert _parse_for(FlowKind.DEBUG, f"{before} {url}{after}") == url

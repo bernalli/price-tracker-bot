@@ -1175,17 +1175,17 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
     ) -> None:
         """Run the debug of ``url`` if the sender is still an active administrator.
 
-        A failure of the run goes to the error handlers here: raised, it would let the
-        later handler groups take the link as a product to add.
+        A failure of the admin check or of the run goes to the error handlers here:
+        raised, it would let the later handler groups take the link as a product to add.
         """
         user = update.effective_user
         chat = update.effective_chat
         if user is None or chat is None:  # pragma: no cover - routing contract
             return
-        if self._debug_runner is None or not await self.services.is_admin(user.id):
-            await transport.send(chat.id, _(TEXT_NOT_AUTHORISED))
-            return
         try:
+            if self._debug_runner is None or not await self.services.is_admin(user.id):
+                await transport.send(chat.id, _(TEXT_NOT_AUTHORISED))
+                return
             await self._debug_runner(update, context, url)
         except Exception as exc:  # noqa: BLE001 - reported to the error handlers below
             await context.application.process_error(update, exc)

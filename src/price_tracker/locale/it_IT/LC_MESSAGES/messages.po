@@ -827,7 +827,7 @@ msgstr ""
 
 #: src/price_tracker/bot/flows.py:437
 msgid "That is not a link."
-msgstr ""
+msgstr "Non è un link."
 
 #: src/price_tracker/bot/flows.py:438
 msgid "That link is not allowed."

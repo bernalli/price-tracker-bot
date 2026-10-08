@@ -73,6 +73,10 @@ ITALIAN: dict[str, str] = {
         "Usa cifre con un punto o una virgola, per esempio 1299,99."
     ),
     "That value is out of range.": "Valore fuori intervallo.",
+    "That is not a link.": "Non è un link.",
+    "Send the link of the product page to analyse.": (
+        "Invia il link della pagina prodotto da analizzare."
+    ),
 }
 
 

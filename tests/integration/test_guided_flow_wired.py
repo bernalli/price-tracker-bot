@@ -771,7 +771,10 @@ async def test_link_in_another_chat_is_an_add_and_the_prompt_stays(
     assert wd.flow.registry.keys() == {(PRIVATE, ADMIN)}
 
 
-@pytest.mark.parametrize("answer", ["hello", "http:/x", "ftp://x/y", " .,;! ", "\x07\x1b abc"])
+@pytest.mark.parametrize(
+    "answer",
+    ["hello", "http:/x", "ftp://x/y", " .,;! ", "\x07\x1b abc", "https://.", "(http://)"],
+)
 async def test_an_answer_without_a_link_is_rejected_and_counted(
     wd: Wired, debug_runs: list[tuple[int, str]], answer: str
 ) -> None:
@@ -797,6 +800,20 @@ async def test_three_answers_without_a_link_close_the_debug_prompt(
 
     assert wd.texts_to(PRIVATE)[-3:] == [NOT_A_LINK, NOT_A_LINK, TOO_MANY]
     assert len(wd.flow.registry) == 0
+    assert debug_runs == []
+
+
+async def test_the_debug_prompt_and_its_hint_follow_the_language(
+    wd: Wired, debug_runs: list[tuple[int, str]]
+) -> None:
+    await wd.press(PRIVATE, ADMIN, DEBUG_ENTRY, language_code="it")
+
+    await wd.process(message_update(wd.app.bot, PRIVATE, ADMIN, "ciao", language_code="it"))
+
+    assert wd.texts_to(PRIVATE) == [
+        "Invia il link della pagina prodotto da analizzare.",
+        "Non è un link.",
+    ]
     assert debug_runs == []
 
 
@@ -884,6 +901,20 @@ async def test_cancel_closes_the_debug_prompt(wd: Wired, debug_runs: list[tuple[
     assert debug_runs == []
 
 
+async def test_the_debug_prompt_disarms_a_legacy_admin_prompt(wd: Wired) -> None:
+    await _arm_admin_interval(wd)
+
+    prompt = await _open_debug(wd)
+    flow = wd.flow.registry.get((PRIVATE, ADMIN))
+    assert flow is not None
+    await wd.flow.on_timeout(flow.snapshot((PRIVATE, ADMIN)))
+    await wd.text(PRIVATE, ADMIN, "60")
+
+    assert wd.pending(ADMIN) is None
+    assert wd.edits_of(prompt) == [EXPIRED]
+    assert await wd.repo.get_config("check_interval_minutes") is None
+
+
 async def test_a_second_debug_prompt_replaces_the_first(wd: Wired) -> None:
     first = await _open_debug(wd)
     second = await _open_debug(wd)
@@ -941,3 +972,27 @@ async def test_a_failing_debug_run_reaches_the_error_handler_and_adds_nothing(
     assert legacy_adds == []
     assert await _product_count(wd) == products
     assert len(wd.flow.registry) == 0
+
+
+async def test_a_failing_admin_check_at_the_answer_reaches_the_error_handler_and_adds_nothing(
+    wd: Wired,
+    debug_runs: list[tuple[int, str]],
+    legacy_adds: list[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def locked(user_id: int) -> bool:
+        del user_id
+        raise RuntimeError("database is locked")
+
+    await _open_debug(wd)
+    monkeypatch.setattr(wd.repo, "is_user_admin", locked)
+    products = await _product_count(wd)
+
+    await wd.text(PRIVATE, ADMIN, URL)
+
+    assert [type(e) for e in wd.errors] == [RuntimeError]
+    assert debug_runs == []
+    assert legacy_adds == []
+    assert await _product_count(wd) == products
+    assert len(wd.flow.registry) == 0
+    assert "errore" in wd.texts_to(PRIVATE)[-1]

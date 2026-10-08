@@ -185,6 +185,9 @@ async def test_full_sync_sends_the_exact_set_of_calls(
     )
     assert Counter(_key(call) for call in calls) == expected
     assert len(calls) == FULL_SYNC_CALLS
+    methods = [call["method"] for call in calls]
+    assert methods[:3] == ["setMyCommands", "setMyCommands", "setChatMenuButton"]
+    assert set(methods[3:]) == {"deleteMyCommands"}
     lists = {
         call.get("language_code"): _pairs(call)
         for call in calls

@@ -14,7 +14,7 @@
 ## step 2: text "notaurl" user=1
 -> sendMessage chat=1
    text:
-   | That is not a link.
+   | Non è un link.
 ## db after step 2
 (no changes)
 ## step 3: press "menu_admin_debug" user=1 on=1 synthetic
