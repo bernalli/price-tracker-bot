@@ -312,7 +312,7 @@ async def debug_url(update: Update, context: ContextTypes.DEFAULT_TYPE, url: str
                 name=_escape_html(truncate_to_width(result.name or "❌", 60))
             )
         )
-        if result.price is not None:
+        if result.price:
             lines.append(_("   Price: €{price}").format(price=_ext(result.price, 40)))
         else:
             lines.append(_("   Price: ❌ ({error})").format(error=_ext(result.error or "", 40)))
