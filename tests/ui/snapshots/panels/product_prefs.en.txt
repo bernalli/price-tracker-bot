@@ -15,5 +15,6 @@ keyboard:
    [1 hr](cb:p:7:mu:1)  [8 hr](cb:p:7:mu:8)
    [1 day](cb:p:7:mu:24)  [Forever](cb:p:7:mu:0)
    [🔔 Unmute](cb:p:7:mu:off)
+   [✏️ Other duration](cb:p:7:mua)
    [⚙️ Settings](cb:s)  [◀️ Product](cb:p:7:c)
    [🏠 Home](cb:h)

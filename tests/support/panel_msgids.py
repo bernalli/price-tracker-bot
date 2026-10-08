@@ -70,6 +70,10 @@ PANEL_SINGULAR: tuple[str, ...] = (
     "◀️ Admin",
     "◀️ Status & info",
     "➕ Add",
+    "✏️ Other duration",
+    "✏️ Interval",
+    "✏️ Other hours",
+    "✏️ Change",
     "➕ <b>Add a product</b>\n\nPaste the link of a product page here to start tracking it.",
 )
 

@@ -8,4 +8,5 @@ text:
    | Attuale: 22:00–08:00
 keyboard:
    [22:00–08:00 ✓](cb:s:qh:2208)  [Disattivo](cb:s:qh:off)
+   [✏️ Altro orario](cb:s:ask:qh)
    [◀️ Impostazioni](cb:s)

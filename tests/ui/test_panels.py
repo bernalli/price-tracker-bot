@@ -66,12 +66,17 @@ def test_main_panel_offers_the_six_sections_and_home() -> None:
 @pytest.mark.parametrize(
     ("section", "values", "action", "extra"),
     [
-        ("mu", ["1", "8", "24", "0", "off"], "settings.mute", []),
-        ("dg", ["on", "off"], "settings.digest", [Action("settings.digest_now")]),
-        ("qh", ["2208", "off"], "settings.quiet", []),
+        ("mu", ["1", "8", "24", "0", "off"], "settings.mute", [Action("settings.ask", ("mu",))]),
+        (
+            "dg",
+            ["on", "off"],
+            "settings.digest",
+            [Action("settings.ask", ("dg",)), Action("settings.digest_now")],
+        ),
+        ("qh", ["2208", "off"], "settings.quiet", [Action("settings.ask", ("qh",))]),
         ("lang", ["auto", "en", "it"], "settings.language", []),
-        ("tz", [], "", []),
-        ("th", [], "", []),
+        ("tz", [], "", [Action("settings.ask", ("tz",))]),
+        ("th", [], "", [Action("settings.ask", ("th",))]),
     ],
 )
 def test_section_offers_its_presets_and_a_way_back(
@@ -172,6 +177,7 @@ def test_product_notifications_offer_mute_presets_settings_product_and_home() ->
     actions = _actions(product_prefs_screen("Kettle", 7, BUSY, now=NOW))
     assert actions == [
         *(Action("product.mute", (7, value)) for value in ("1", "8", "24", "0", "off")),
+        Action("product.mute_ask", (7,)),
         Action("settings"),
         Action("product.card", (7,)),
         Action("home"),

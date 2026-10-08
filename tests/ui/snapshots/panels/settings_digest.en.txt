@@ -8,5 +8,5 @@ text:
    | Current: on, every 30 min
 keyboard:
    [On ✓](cb:s:dg:on)  [Off](cb:s:dg:off)
-   [📨 Send now](cb:s:dn)
+   [✏️ Interval](cb:s:ask:dg)  [📨 Send now](cb:s:dn)
    [◀️ Settings](cb:s)

@@ -163,6 +163,11 @@ def _settings_mute(value: str) -> Action:
     return Action("settings.mute", (value,))
 
 
+def _ask(label: str, setting: str) -> Button:
+    """The button that asks for a typed value of ``setting``."""
+    return button(label, callback=encode(Action("settings.ask", (setting,))))
+
+
 def _digest_presets(view: PrefsView) -> list[Button]:
     return [
         _preset(_("On"), Action("settings.digest", ("on",)), current=view.digest_mode),
@@ -205,20 +210,27 @@ def settings_section_screen(
     if section == "mu":
         title, value = _("🔕 <b>Mute</b>"), _mute_value(view, now, loc)
         presets = _mute_presets(view, now, loc, _settings_mute)
+        extra = [_ask(_("✏️ Other duration"), "mu")]
     elif section == "dg":
         title, value = _("📬 <b>Digest</b>"), _digest_value(view, loc)
         presets = _digest_presets(view)
-        extra = [button(_("📨 Send now"), callback=encode(Action("settings.digest_now")))]
+        extra = [
+            _ask(_("✏️ Interval"), "dg"),
+            button(_("📨 Send now"), callback=encode(Action("settings.digest_now"))),
+        ]
     elif section == "qh":
         title, value = _("🌙 <b>Quiet hours</b>"), _quiet_value(view)
         presets = _quiet_presets(view)
+        extra = [_ask(_("✏️ Other hours"), "qh")]
     elif section == "lang":
         title, value = _("🗣 <b>Language</b>"), _language_value(language)
         presets = _language_presets(language)
     elif section == "tz":
         title, value = _("🌍 <b>Timezone</b>"), escape_html(view.timezone)
+        extra = [_ask(_("✏️ Change"), "tz")]
     elif section == "th":
         title, value = _("⏱ <b>Throttle</b>"), _throttle_value(view)
+        extra = [_ask(_("✏️ Change"), "th")]
     else:
         raise ValueError(f"section: must be one of mu, dg, qh, lang, tz, th, got {section!r}")
     back = button(_("◀️ Settings"), callback=encode(Action("settings")))
@@ -247,11 +259,14 @@ def product_prefs_screen(name: str, product_id: int, view: PrefsView, *, now: da
         return Action("product.mute", (product_id, value))
 
     presets = _mute_presets(view, now, loc, mute)
+    other = button(
+        _("✏️ Other duration"), callback=encode(Action("product.mute_ask", (product_id,)))
+    )
     links = [
         button(_("⚙️ Settings"), callback=encode(Action("settings"))),
         button(_("◀️ Product"), callback=encode(Action("product.card", (product_id,)))),
     ]
-    return Screen(text="\n".join(lines), rows=layout_rows(presets, links, [home_button()]))
+    return Screen(text="\n".join(lines), rows=layout_rows(presets, [other], links, [home_button()]))
 
 
 def home_screen(view: HomeView) -> Screen:

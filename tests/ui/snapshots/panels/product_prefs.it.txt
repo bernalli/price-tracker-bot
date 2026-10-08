@@ -15,5 +15,6 @@ keyboard:
    [1 h](cb:p:7:mu:1)  [8 h](cb:p:7:mu:8)
    [1 giorno](cb:p:7:mu:24)  [Per sempre](cb:p:7:mu:0)
    [🔔 Riattiva](cb:p:7:mu:off)
+   [✏️ Altra durata](cb:p:7:mua)
    [⚙️ Impostazioni](cb:s)  [◀️ Prodotto](cb:p:7:c)
    [🏠 Home](cb:h)

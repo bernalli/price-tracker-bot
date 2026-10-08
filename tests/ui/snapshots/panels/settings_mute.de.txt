@@ -11,4 +11,5 @@ keyboard:
    [1 Tg.](cb:s:mu:24)
    [[Forever Forever Forever]](cb:s:mu:0)
    [[🔔 Unmute 🔔 Unmute 🔔 Unmute]](cb:s:mu:off)
+   [[✏️ Other duration ✏️ Other durat…](cb:s:ask:mu)
    [[◀️ Settings ◀️ Settings ◀️ Setti…](cb:s)

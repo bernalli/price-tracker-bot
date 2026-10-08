@@ -7,4 +7,5 @@ text:
    | 
    | [Current: [5 per hour 5 per hour 5 per hour] Current: [5 per hour 5 per hour 5 per hour] Current: [5 per hour 5 per hour 5 per hour]]
 keyboard:
+   [[✏️ Change ✏️ Change ✏️ Change]](cb:s:ask:th)
    [[◀️ Settings ◀️ Settings ◀️ Setti…](cb:s)

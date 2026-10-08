@@ -1622,3 +1622,47 @@ msgstr "➕ Aggiungi"
 #: src/price_tracker/bot/ui/panels.py
 msgid "➕ <b>Add a product</b>\n\nPaste the link of a product page here to start tracking it."
 msgstr "➕ <b>Aggiungi un prodotto</b>\n\nIncolla qui il link della pagina di un prodotto per iniziare a seguirlo."
+
+#: src/price_tracker/bot/flows.py
+msgid "Send the mute duration in hours (1-8760), or forever."
+msgstr "Invia la durata del silenzio in ore (1-8760), oppure forever."
+
+#: src/price_tracker/bot/flows.py
+msgid "Send the digest interval in minutes (5-1440)."
+msgstr "Invia l'intervallo del digest in minuti (5-1440)."
+
+#: src/price_tracker/bot/flows.py
+msgid "Send the quiet hours as HH:MM-HH:MM, or off."
+msgstr "Invia le ore silenziose come HH:MM-HH:MM, oppure off."
+
+#: src/price_tracker/bot/flows.py
+msgid "Send your time zone, for example Europe/Rome."
+msgstr "Invia il tuo fuso orario, ad esempio Europe/Rome."
+
+#: src/price_tracker/bot/flows.py
+msgid "Send the most notifications per hour, or off."
+msgstr "Invia il numero massimo di notifiche all'ora, oppure off."
+
+#: src/price_tracker/bot/flows.py
+msgid "Use a whole number, e.g. 12."
+msgstr "Usa un numero intero, per esempio 12."
+
+#: src/price_tracker/bot/flows.py
+msgid "◀️ Notifications"
+msgstr "◀️ Notifiche"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "✏️ Other duration"
+msgstr "✏️ Altra durata"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "✏️ Interval"
+msgstr "✏️ Intervallo"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "✏️ Other hours"
+msgstr "✏️ Altro orario"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "✏️ Change"
+msgstr "✏️ Cambia"

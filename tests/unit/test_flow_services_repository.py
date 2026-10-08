@@ -9,6 +9,7 @@ pairs the prompts produce.
 from __future__ import annotations
 
 import dataclasses
+from datetime import UTC, datetime, time, timedelta
 from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -16,20 +17,25 @@ from typing import TYPE_CHECKING, Any
 import aiosqlite
 import pytest
 import pytest_asyncio
+from freezegun import freeze_time
 
 from price_tracker.app.inputs import (
     Absolute,
     AnyDrop,
     Cancel,
     ClearTarget,
+    Forever,
     IntervalMinutes,
+    Off,
     Percentage,
+    QuietHours,
     ResetInterval,
     SetTarget,
 )
 from price_tracker.bot.flow_services import RepositoryFlowServices
 from price_tracker.bot.flows import ApplyStatus, FlowKind, PreparedProduct
 from price_tracker.db.migrator import apply_migrations
+from price_tracker.db.models import NotificationPrefs
 from price_tracker.db.repository import Repository
 
 if TYPE_CHECKING:
@@ -286,3 +292,143 @@ async def test_repository_is_read_at_call_time(env: Env) -> None:
 
     assert await services.is_active(OWNER) is True
     assert await services.product_name(OWNER, env.product) == "Kettle"
+
+
+# --- apply_setting: the notification preferences the setting prompts write ------
+
+SETTING_ROW: dict[str, Any] = {
+    "mute": True,
+    "mute_until": datetime(2030, 1, 1, tzinfo=UTC),
+    "digest_mode": False,
+    "digest_interval_minutes": 30,
+    "quiet_hours_start": "23:00",
+    "quiet_hours_end": "07:00",
+    "throttle_per_hour": 5,
+    "timezone": "Asia/Tokyo",
+    "throttle_state_json": '{"ts": []}',
+}
+FROZEN_NOW = datetime(2026, 3, 1, 12, tzinfo=UTC)
+# (kind, value) -> the fields that answer writes, written from the prompt table.
+SETTING_CASES: list[tuple[FlowKind, object, dict[str, Any]]] = [
+    (FlowKind.MUTE, 8, {"mute": True, "mute_until": FROZEN_NOW + timedelta(hours=8)}),
+    (FlowKind.MUTE, Forever(), {"mute": True, "mute_until": None}),
+    (FlowKind.DIGEST, 45, {"digest_mode": True, "digest_interval_minutes": 45}),
+    (
+        FlowKind.QUIET,
+        QuietHours(time(22, 0), time(8, 5)),
+        {"quiet_hours_start": "22:00", "quiet_hours_end": "08:05"},
+    ),
+    (FlowKind.QUIET, Off(), {"quiet_hours_start": None, "quiet_hours_end": None}),
+    (FlowKind.TIMEZONE, "America/New_York", {"timezone": "America/New_York"}),
+    (FlowKind.THROTTLE, 12, {"throttle_per_hour": 12}),
+    (FlowKind.THROTTLE, Off(), {"throttle_per_hour": None}),
+]
+
+
+async def _prefs(env: Env, user_id: int, product_id: int | None) -> NotificationPrefs | None:
+    row = await env.repo.get_notification_prefs(user_id=user_id, product_id=product_id)
+    return None if row is None else dataclasses.replace(row, updated_at=None)
+
+
+async def _prefs_rows(env: Env) -> int:
+    cursor = await env.conn.execute("SELECT COUNT(*) FROM notification_prefs")
+    found = await cursor.fetchone()
+    assert found is not None
+    return int(found[0])
+
+
+@pytest.mark.parametrize(("kind", "value", "fields"), SETTING_CASES, ids=repr)
+async def test_each_setting_answer_changes_only_its_fields(
+    env: Env, kind: FlowKind, value: object, fields: dict[str, Any]
+) -> None:
+    await env.repo.upsert_notification_prefs(NotificationPrefs(user_id=OWNER, **SETTING_ROW))
+    with freeze_time(FROZEN_NOW):
+        status = await env.services.apply_setting(OWNER, kind, None, value)
+    assert status is ApplyStatus.OK
+    expected = NotificationPrefs(user_id=OWNER, **{**SETTING_ROW, **fields})
+    assert await _prefs(env, OWNER, None) == expected
+
+
+async def test_a_timezone_answer_is_stored_exactly(env: Env) -> None:
+    await env.services.apply_setting(
+        OWNER, FlowKind.TIMEZONE, None, "America/Argentina/Buenos_Aires"
+    )
+    row = await _prefs(env, OWNER, None)
+    assert row is not None
+    assert row.timezone == "America/Argentina/Buenos_Aires"
+
+
+async def test_a_digest_interval_turns_the_digest_on(env: Env) -> None:
+    await env.services.apply_setting(OWNER, FlowKind.DIGEST, None, 15)
+    row = await _prefs(env, OWNER, None)
+    assert row is not None
+    assert (row.digest_mode, row.digest_interval_minutes) == (True, 15)
+
+
+async def test_a_product_mute_writes_the_product_row_with_the_global_digest_and_zone(
+    env: Env,
+) -> None:
+    await env.repo.upsert_notification_prefs(NotificationPrefs(user_id=OWNER, **SETTING_ROW))
+    with freeze_time(FROZEN_NOW):
+        status = await env.services.apply_setting(OWNER, FlowKind.MUTE, env.product, 3)
+    assert status is ApplyStatus.OK
+    row = await _prefs(env, OWNER, env.product)
+    assert row == NotificationPrefs(
+        user_id=OWNER,
+        product_id=env.product,
+        mute=True,
+        mute_until=FROZEN_NOW + timedelta(hours=3),
+        digest_mode=False,
+        digest_interval_minutes=30,
+        timezone="Asia/Tokyo",
+    )
+    assert await _prefs(env, OWNER, None) == NotificationPrefs(user_id=OWNER, **SETTING_ROW)
+
+
+@pytest.mark.parametrize(
+    ("kind", "product", "value"),
+    [
+        (FlowKind.THROTTLE, "own", 5),
+        (FlowKind.DIGEST, "own", 30),
+        (FlowKind.MUTE, None, "12"),
+        (FlowKind.MUTE, None, True),
+        (FlowKind.MUTE, None, Off()),
+        (FlowKind.DIGEST, None, Off()),
+        (FlowKind.QUIET, None, "22:00-08:00"),
+        (FlowKind.TIMEZONE, None, 5),
+        (FlowKind.THROTTLE, None, Forever()),
+        (FlowKind.DEBUG, None, "https://shop.example"),
+        (FlowKind.THRESHOLD, None, Percentage(10)),
+    ],
+    ids=repr,
+)
+async def test_a_pair_no_prompt_produces_raises_before_any_write(
+    env: Env, kind: FlowKind, product: str | None, value: object
+) -> None:
+    product_id = env.product if product == "own" else None
+    with pytest.raises(TypeError):
+        await env.services.apply_setting(OWNER, kind, product_id, value)
+    assert await _prefs_rows(env) == 0
+
+
+async def test_an_admin_cannot_mute_the_product_of_another_user(env: Env) -> None:
+    status = await env.services.apply_setting(ADMIN, FlowKind.MUTE, env.product, 8)
+    assert status is ApplyStatus.NOT_FOUND
+    assert await _prefs_rows(env) == 0
+
+
+async def test_a_missing_product_is_not_found(env: Env) -> None:
+    status = await env.services.apply_setting(OWNER, FlowKind.MUTE, 999_999, 8)
+    assert status is ApplyStatus.NOT_FOUND
+    assert await _prefs_rows(env) == 0
+
+
+async def test_a_user_deactivated_before_answering_writes_nothing(env: Env) -> None:
+    await env.repo.remove_user(OWNER)
+    for kind, value, _fields in SETTING_CASES:
+        assert await env.services.apply_setting(OWNER, kind, None, value) is (
+            ApplyStatus.NOT_AUTHORISED
+        )
+    status = await env.services.apply_setting(OWNER, FlowKind.MUTE, env.product, 8)
+    assert status is ApplyStatus.NOT_AUTHORISED
+    assert await _prefs_rows(env) == 0
