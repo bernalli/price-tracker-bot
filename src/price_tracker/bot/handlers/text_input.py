@@ -119,17 +119,6 @@ async def handle_text_input(  # noqa: PLR0915 — verbatim port; not yet split i
             parse_mode=ParseMode.HTML,
         )
 
-    elif action_type == "admin_debug":
-        url_input = text.strip()
-        if not url_input.startswith("http"):
-            await update.message.reply_text(_("❌ URL non valido."))
-            return
-        # Trigger the debug command
-        from price_tracker.bot.handlers.debug import cmd_debug  # noqa: PLC0415
-
-        context.args = [url_input]
-        await cmd_debug(update, context)
-
     elif action_type == "admin_interval":
         try:
             minutes = int(text.strip())

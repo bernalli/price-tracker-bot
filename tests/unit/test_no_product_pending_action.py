@@ -13,7 +13,7 @@ from pathlib import Path
 
 _SRC_ROOT = Path(__file__).resolve().parents[2] / "src" / "price_tracker"
 PRODUCT_KINDS = {"threshold", "target", "refresh"}
-ADMIN_KINDS = {"admin_adduser", "admin_nick", "admin_interval", "admin_debug"}
+ADMIN_KINDS = {"admin_adduser", "admin_nick", "admin_interval"}
 
 
 def _pending_action_kinds() -> list[tuple[str, int, str]]:
@@ -49,7 +49,7 @@ def test_no_product_prompt_is_armed_through_pending_action() -> None:
 
 
 def test_scan_sees_the_admin_prompts() -> None:
-    """Positive control: the same scan finds the four admin assignments."""
+    """Positive control: the same scan finds the three admin assignments."""
     admin = [kind for _, _, kind in _pending_action_kinds() if kind in ADMIN_KINDS]
 
     assert sorted(admin) == sorted(ADMIN_KINDS)

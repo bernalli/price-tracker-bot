@@ -56,6 +56,7 @@ from tests.support.flow_harness import Harness, ServiceBarrier
 
 PRIVATE, GROUP = 100, -500
 USERS = (10, 11)
+ADMINS = frozenset({10})
 CHATS = (PRIVATE, GROUP)
 KEYS = [(c, u) for c in CHATS for u in USERS]
 OWNED = {1: 10, 2: 10, 3: 11}
@@ -63,6 +64,8 @@ URL_EUR = "https://shop.example/item/eur"
 URL_NOCUR = "https://shop.example/item/nocur"
 URL_BROKEN = "https://shop.example/item/broken"
 NO_OPEN_PROMPT = "No open prompt - use the buttons or /menu."
+DEBUG_ENTRIES = ("menu_admin_debug", "a:dbg")
+DEBUG_LINK_RE = re.compile(r"https?://\S+")
 KIND_BY_VERB = {"th": "threshold", "tg": "target", "iv": "interval"}
 SUT_KIND = {
     "threshold": FlowKind.THRESHOLD,
@@ -125,12 +128,14 @@ class GuidedFlowMachine(RuleBasedStateMachine):
                 URL_EUR: ready(URL_EUR, currency="EUR"),
                 URL_NOCUR: ready(URL_NOCUR, currency=None),
             },
+            admins=set(ADMINS),
         )
         self.h = Harness(self.services, concurrent_updates=2)
         self.loop.run_until_complete(self.h.start())
         # the model
         self.flows: dict[tuple[int, int], MFlow] = {}
         self.writes: list[tuple[Any, ...]] = []
+        self.debug_runs: list[tuple[int, str]] = []
         self.active: set[int] = set(USERS)
         self.defaults: dict[int, str] = {}
         self.next_id = 1000
@@ -243,7 +248,18 @@ class GuidedFlowMachine(RuleBasedStateMachine):
         self._begin()
         text = f"/add {url}" if as_command else f"look {url}"
         self._run(self.h.text(key[0], key[1], text))
+        flow = self.flows.get(key)
+        if not as_command and flow is not None and flow.kind == "debug":
+            self._model_text(key, text)  # an open debug prompt takes the link
+            return
         self._model_add(key, url)
+
+    @rule(key=st.sampled_from(KEYS), data=st.sampled_from(DEBUG_ENTRIES))
+    def open_debug(self, key: tuple[int, int], data: str) -> None:
+        self._begin()
+        self._run(self.h.press(key[0], key[1], data))
+        if key[1] in self.active and key[1] in ADMINS:
+            self._open(key, MFlow("debug", "value", ""))
 
     def _model_add(self, key: tuple[int, int], url: str) -> None:
         self._advance(key)
@@ -276,7 +292,9 @@ class GuidedFlowMachine(RuleBasedStateMachine):
         """
         key = data.draw(st.sampled_from(sorted(self.flows)))
         flow = self.flows[key]
-        if flow.state == "value":
+        if flow.kind == "debug":
+            accepted = [f"look {URL_EUR}"]
+        elif flow.state == "value":
             accepted = [t for t, m in VALUE_TEXTS.items() if m[flow.kind] is not None]
         else:
             accepted = [t for t, c in CURRENCY_TEXTS.items() if c is not None]
@@ -307,6 +325,16 @@ class GuidedFlowMachine(RuleBasedStateMachine):
             self._end_flow(key)
             assert flow.url is not None
             self._open(key, self._insert_and_branch(key, flow.url, code))
+            return
+        if flow.kind == "debug":
+            link = DEBUG_LINK_RE.search(text)
+            if link is None:
+                self._model_reject(key, flow)
+                return
+            self._end_flow(key)
+            if key[1] in self.active and key[1] in ADMINS:
+                event("debug answer ran")
+                self.debug_runs.append((key[1], link.group(0)))
             return
         meaning = VALUE_TEXTS.get(text, {}).get(flow.kind)
         if meaning is None:
@@ -621,6 +649,10 @@ class GuidedFlowMachine(RuleBasedStateMachine):
     @invariant()
     def writes_match_model(self) -> None:
         assert self.services.writes == self.writes
+
+    @invariant()
+    def debug_runs_match_model(self) -> None:
+        assert self.h.debug_runs == self.debug_runs
 
     @invariant()
     def text_consumed_once(self) -> None:

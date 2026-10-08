@@ -141,6 +141,7 @@ def register_handlers(app: Application) -> None:
         locale_resolver=lambda user_id, fallback: user_locale(
             app.bot_data["db"], user_id, fallback
         ),
+        debug_runner=debug.debug_url,
     )
     register_guided_flow(app, flow, legacy_handlers_present=True)
 

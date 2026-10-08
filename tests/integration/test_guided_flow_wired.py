@@ -9,6 +9,7 @@ fake HTTP layer.
 
 from __future__ import annotations
 
+import contextlib
 import dataclasses
 import itertools
 import json
@@ -170,8 +171,8 @@ class Wired:
         return self.app.user_data[user_id].get("pending_action")
 
 
-@pytest.fixture
-async def w(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[Wired]:
+@contextlib.asynccontextmanager
+async def _wired() -> AsyncIterator[Wired]:
     conn = await aiosqlite.connect(":memory:")
     conn.row_factory = aiosqlite.Row
     await apply_migrations(conn, MIGRATIONS_DIR)
@@ -203,6 +204,36 @@ async def w(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[Wired]:
     finally:
         await wired.app.shutdown()
         await conn.close()
+
+
+@pytest.fixture
+async def w() -> AsyncIterator[Wired]:
+    async with _wired() as wired:
+        yield wired
+
+
+@pytest.fixture
+def debug_runs(monkeypatch: pytest.MonkeyPatch) -> list[tuple[int, str]]:
+    """Stand-in for the scraper debug run; patched before the application is built."""
+    runs: list[tuple[int, str]] = []
+
+    async def fake_debug_url(update: Update, context: Any, url: str) -> None:
+        del context
+        assert update.effective_user is not None
+        assert update.message is not None
+        runs.append((update.effective_user.id, url))
+        await update.message.reply_text("debug ran")
+
+    monkeypatch.setattr("price_tracker.bot.handlers.debug.debug_url", fake_debug_url)
+    return runs
+
+
+@pytest.fixture
+async def wd(debug_runs: list[tuple[int, str]]) -> AsyncIterator[Wired]:
+    """``w`` with the debug run replaced by ``debug_runs``."""
+    del debug_runs
+    async with _wired() as wired:
+        yield wired
 
 
 @pytest.fixture
@@ -664,3 +695,249 @@ async def test_status_and_info_offers_help_and_the_way_back(
     markup = json.loads(markup) if isinstance(markup, str) else markup
     rows = [[(b["text"], b["callback_data"]) for b in row] for row in markup["inline_keyboard"]]
     assert rows == [[(label, HELP_DATA)], [("◀️ Menu", "menu_main")]]
+
+
+# --- the admin debug prompt ----------------------------------------------------
+
+DEBUG_ENTRY = "menu_admin_debug"
+DEBUG_PROMPT = "Send the link of the product page to analyse."
+NOT_A_LINK = "That is not a link."
+SUPERSEDED = "Replaced by a newer prompt."
+BUTTON_EXPIRED = "This button has expired."
+
+
+async def _product_count(w: Wired) -> int:
+    cursor = await w.conn.execute("SELECT COUNT(*) FROM products")
+    row = await cursor.fetchone()
+    assert row is not None
+    return int(row[0])
+
+
+async def _open_debug(w: Wired, *, chat_id: int = PRIVATE) -> Call:
+    return await _open(w, DEBUG_ENTRY, chat_id=chat_id, user_id=ADMIN)
+
+
+async def test_debug_button_opens_a_guided_prompt(wd: Wired) -> None:
+    before = len(wd.request.calls)
+
+    prompt = await _open_debug(wd)
+
+    assert prompt.params["text"] == DEBUG_PROMPT
+    assert wd.flow.registry.keys() == {(PRIVATE, ADMIN)}
+    flow = wd.flow.registry.get((PRIVATE, ADMIN))
+    assert flow is not None
+    assert flow.kind == "debug"
+    assert wd.pending(ADMIN) is None
+    methods = [c.method for c in wd.calls_since(before)]
+    assert "editMessageText" not in methods
+    assert methods.count("answerCallbackQuery") == 1
+
+
+@pytest.mark.parametrize("user_id", [OWNER, OTHER, ADMIN, STRANGER])
+async def test_debug_entry_press_is_answered_once(wd: Wired, user_id: int) -> None:
+    await wd.press(PRIVATE, user_id, DEBUG_ENTRY)
+
+    assert len(wd.request.calls_of("answerCallbackQuery")) == 1
+
+
+async def test_link_at_the_debug_prompt_runs_the_debug_once_and_adds_nothing(
+    wd: Wired, debug_runs: list[tuple[int, str]], legacy_adds: list[str]
+) -> None:
+    await _open_debug(wd)
+    products = await _product_count(wd)
+
+    await wd.text(PRIVATE, ADMIN, URL)
+
+    assert debug_runs == [(ADMIN, URL)]
+    assert legacy_adds == []
+    assert await _product_count(wd) == products
+    assert len(wd.flow.registry) == 0
+    assert wd.errors == []
+
+    await wd.text(PRIVATE, ADMIN, URL)
+    assert debug_runs == [(ADMIN, URL)]
+    assert legacy_adds == [URL]
+
+
+async def test_link_in_another_chat_is_an_add_and_the_prompt_stays(
+    wd: Wired, debug_runs: list[tuple[int, str]], legacy_adds: list[str]
+) -> None:
+    await _open_debug(wd)
+
+    await wd.text(GROUP, ADMIN, URL)
+
+    assert legacy_adds == [URL]
+    assert debug_runs == []
+    assert wd.flow.registry.keys() == {(PRIVATE, ADMIN)}
+
+
+@pytest.mark.parametrize("answer", ["hello", "http:/x", "ftp://x/y", " .,;! ", "\x07\x1b abc"])
+async def test_an_answer_without_a_link_is_rejected_and_counted(
+    wd: Wired, debug_runs: list[tuple[int, str]], answer: str
+) -> None:
+    await _open_debug(wd)
+
+    await wd.text(PRIVATE, ADMIN, answer)
+
+    assert wd.texts_to(PRIVATE)[-1] == NOT_A_LINK
+    flow = wd.flow.registry.get((PRIVATE, ADMIN))
+    assert flow is not None
+    assert flow.attempts == 1
+    assert debug_runs == []
+    assert wd.errors == []
+
+
+async def test_three_answers_without_a_link_close_the_debug_prompt(
+    wd: Wired, debug_runs: list[tuple[int, str]]
+) -> None:
+    await _open_debug(wd)
+
+    for answer in ("one", "two", "three"):
+        await wd.text(PRIVATE, ADMIN, answer)
+
+    assert wd.texts_to(PRIVATE)[-3:] == [NOT_A_LINK, NOT_A_LINK, TOO_MANY]
+    assert len(wd.flow.registry) == 0
+    assert debug_runs == []
+
+
+@pytest.mark.parametrize(
+    ("answer", "url"),
+    [
+        ("guarda https://a.example/p ora", "https://a.example/p"),
+        ("https://a.example/one https://b.example/two", "https://a.example/one"),
+        ("(see https://a.example/p).", "https://a.example/p"),
+        ("https://a.example/" + "x" * 3000, "https://a.example/" + "x" * 3000),
+    ],
+    ids=["inside-text", "two-links", "trailing-punctuation", "very-long"],
+)
+async def test_the_link_is_taken_from_the_answer(
+    wd: Wired, debug_runs: list[tuple[int, str]], answer: str, url: str
+) -> None:
+    await _open_debug(wd)
+
+    await wd.text(PRIVATE, ADMIN, answer)
+
+    assert debug_runs == [(ADMIN, url)]
+    assert wd.errors == []
+
+
+@pytest.mark.parametrize("user_id", [OWNER, STRANGER, "inactive-admin"])
+async def test_only_an_active_admin_opens_the_debug_prompt(wd: Wired, user_id: Any) -> None:
+    if user_id == "inactive-admin":
+        await wd.repo.remove_user(ADMIN)
+        user_id = ADMIN
+
+    await wd.press(PRIVATE, user_id, DEBUG_ENTRY)
+
+    assert wd.toasts() == [NOT_AUTHORISED]
+    assert len(wd.flow.registry) == 0
+    assert wd.prompts(PRIVATE) == []
+
+
+@pytest.mark.parametrize("change", ["demoted", "deactivated"])
+async def test_an_admin_who_lost_the_role_gets_no_debug_run(
+    wd: Wired, debug_runs: list[tuple[int, str]], legacy_adds: list[str], change: str
+) -> None:
+    await _open_debug(wd)
+    if change == "demoted":
+        await wd.repo.set_admin(ADMIN, False)
+    else:
+        await wd.repo.remove_user(ADMIN)
+    products = await _product_count(wd)
+
+    await wd.text(PRIVATE, ADMIN, URL)
+
+    assert wd.texts_to(PRIVATE)[-1] == NOT_AUTHORISED
+    assert debug_runs == []
+    assert legacy_adds == []
+    assert await _product_count(wd) == products
+    assert len(wd.flow.registry) == 0
+
+
+async def test_the_debug_prompt_expires_and_a_later_link_is_an_add(
+    wd: Wired, debug_runs: list[tuple[int, str]], legacy_adds: list[str]
+) -> None:
+    prompt = await _open_debug(wd)
+    flow = wd.flow.registry.get((PRIVATE, ADMIN))
+    assert flow is not None
+    assert wd.app.job_queue is not None
+    snapshot = flow.snapshot((PRIVATE, ADMIN))
+    (job,) = wd.app.job_queue.get_jobs_by_name(f"guided-flow:{PRIVATE}:{ADMIN}:{snapshot.token}")
+    delay = (job.job.trigger.run_date - datetime.now(tz=UTC)).total_seconds()
+    assert 295 < delay <= 300
+
+    await wd.flow.on_timeout(snapshot)
+    await wd.text(PRIVATE, ADMIN, URL)
+
+    assert wd.edits_of(prompt) == [EXPIRED]
+    assert legacy_adds == [URL]
+    assert debug_runs == []
+
+
+async def test_cancel_closes_the_debug_prompt(wd: Wired, debug_runs: list[tuple[int, str]]) -> None:
+    prompt = await _open_debug(wd)
+
+    await wd.text(PRIVATE, ADMIN, "/cancel")
+
+    assert wd.edits_of(prompt) == [CANCELLED]
+    assert len(wd.flow.registry) == 0
+    assert debug_runs == []
+
+
+async def test_a_second_debug_prompt_replaces_the_first(wd: Wired) -> None:
+    first = await _open_debug(wd)
+    second = await _open_debug(wd)
+    (first_cancel,) = first.callback_data()
+
+    await wd.press(PRIVATE, ADMIN, first_cancel)
+
+    assert wd.edits_of(first) == [SUPERSEDED]
+    assert wd.toasts()[-1] == BUTTON_EXPIRED
+    flow = wd.flow.registry.get((PRIVATE, ADMIN))
+    assert flow is not None
+    assert second.callback_data() == [f"p:{flow.token}:x"]
+
+
+async def test_a_value_prompt_replaces_the_debug_prompt(
+    wd: Wired, debug_runs: list[tuple[int, str]]
+) -> None:
+    debug_prompt = await _open_debug(wd)
+
+    await _open(wd, f"setsoglia_{wd.product}", user_id=ADMIN)
+    await wd.text(PRIVATE, ADMIN, "20%")
+
+    assert wd.edits_of(debug_prompt) == [SUPERSEDED]
+    assert wd.texts_to(PRIVATE)[-1] == SAVED
+    assert debug_runs == []
+
+
+@pytest.mark.parametrize("with_prompt", [False, True])
+async def test_debug_command_runs_once_and_closes_the_prompt(
+    wd: Wired, debug_runs: list[tuple[int, str]], with_prompt: bool
+) -> None:
+    prompt = await _open_debug(wd) if with_prompt else None
+
+    await wd.text(PRIVATE, ADMIN, f"/debug {URL}")
+
+    assert debug_runs == [(ADMIN, URL)]
+    assert len(wd.flow.registry) == 0
+    if prompt is not None:
+        assert wd.edits_of(prompt) == [CANCELLED]
+
+
+async def test_a_failing_debug_run_reaches_the_error_handler_and_adds_nothing(
+    wd: Wired, legacy_adds: list[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def broken(update: Update, context: Any, url: str) -> None:
+        raise RuntimeError("scraper exploded")
+
+    await _open_debug(wd)
+    monkeypatch.setattr(wd.flow, "_debug_runner", broken)
+    products = await _product_count(wd)
+
+    await wd.text(PRIVATE, ADMIN, URL)
+
+    assert [type(e) for e in wd.errors] == [RuntimeError]
+    assert legacy_adds == []
+    assert await _product_count(wd) == products
+    assert len(wd.flow.registry) == 0

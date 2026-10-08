@@ -1459,3 +1459,7 @@ msgstr[1] "🗑 Deleted {n} products and their price history."
 #: src/price_tracker/bot/handlers/callbacks/_menu.py
 msgid "❓ Help"
 msgstr "❓ Help"
+
+#: src/price_tracker/bot/flows.py
+msgid "Send the link of the product page to analyse."
+msgstr "Send the link of the product page to analyse."

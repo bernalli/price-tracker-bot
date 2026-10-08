@@ -149,7 +149,12 @@ def _no_read_before_the_barrier(tree: ast.AsyncFunctionDef) -> bool:
 
 @pytest.mark.parametrize(
     "method",
-    [GuidedFlow._on_entry_callback, GuidedFlow._on_add_entry, GuidedFlow._end_by_user],
+    [
+        GuidedFlow._on_entry_callback,
+        GuidedFlow._on_debug_entry,
+        GuidedFlow._on_add_entry,
+        GuidedFlow._end_by_user,
+    ],
     ids=lambda m: m.__name__,
 )
 def test_the_read_is_the_first_await_after_the_ticket_or_claim(

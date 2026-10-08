@@ -99,6 +99,7 @@ class FlowKind(StrEnum):
     TARGET = "target"
     INTERVAL = "interval"
     ADD = "add"
+    DEBUG = "debug"
 
 
 class FlowState(StrEnum):
@@ -113,7 +114,10 @@ ENTRY_ACTIONS: Final = {
     "product.threshold": FlowKind.THRESHOLD,
     "product.target": FlowKind.TARGET,
     "product.interval": FlowKind.INTERVAL,
+    "admin.debug": FlowKind.DEBUG,
 }
+# The admin menu's Debug button still sends its pre-registry string.
+LEGACY_DEBUG_ENTRY: Final = "menu_admin_debug"
 
 
 @dataclass(frozen=True, slots=True)
@@ -273,6 +277,8 @@ class FlowServices(Protocol):
 
     async def is_active(self, user_id: int) -> bool: ...
 
+    async def is_admin(self, user_id: int) -> bool: ...
+
     async def product_name(self, user_id: int, product_id: int) -> str | None: ...
 
     async def apply_value(
@@ -424,6 +430,7 @@ _PROMPTS: Final = {
     FlowKind.TARGET: N_("Send the target price, e.g. 49.90 (0 clears it)."),
     FlowKind.INTERVAL: N_("Send the check interval in minutes (5-10080, 0 resets)."),
 }
+PROMPT_DEBUG: Final = N_("Send the link of the product page to analyse.")
 
 _HINTS: Final = {
     InputErrorCode.EMPTY: N_("Please send a value."),
@@ -526,10 +533,13 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
         registry: FlowRegistry | None = None,
         codec: ActionRegistry = REGISTRY,
         locale_resolver: Callable[[int, str | None], Awaitable[str | None]] | None = None,
+        debug_runner: Callable[[Update, AnyContext, str], Awaitable[None]] | None = None,
     ) -> None:
         """``locale_resolver(user_id, telegram_language)`` gives the language to answer in.
 
         Without one, the Telegram language of the update is used as it is.
+        ``debug_runner(update, context, url)`` analyses the link sent to the admin debug
+        prompt; without one that prompt never opens.
         """
         super().__init__(_ignore)
         self.services = services
@@ -538,6 +548,7 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
         self.registry = registry if registry is not None else FlowRegistry()
         self.codec = codec
         self._locale_resolver = locale_resolver or _telegram_language
+        self._debug_runner = debug_runner
         self._bot: Bot | None = None
 
     def attach(self, bot: Bot) -> None:
@@ -570,6 +581,9 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
         text = message.text
         if filters.COMMAND.check_update(update):
             return self._route_command(key, snapshot, text)
+        if flow is not None and flow.kind is FlowKind.DEBUG:
+            # The debug prompt asks for a link: it takes one before the add entry does.
+            return Route(RouteKind.ANSWER, key, snapshot, text=text)
         url = URL_PATTERN.search(text)
         if url is not None:
             if not self.config.add_entry:
@@ -616,6 +630,8 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
         decoded: Action | InvalidCallback | None = self.codec.decode(query.data)
         if isinstance(decoded, InvalidCallback):
             decoded = decode_legacy_entry(query.data)
+        if decoded is None and query.data == LEGACY_DEBUG_ENTRY:
+            decoded = Action("admin.debug", ())
         if isinstance(decoded, Action):
             if self.codec.is_flow_action(decoded):
                 return Route(RouteKind.FLOW_CALLBACK, key, snapshot, action=decoded)
@@ -655,13 +671,15 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
         self, update: Update, route: Route, context: AnyContext, transport: _Transport
     ) -> bool:
         if route.kind is RouteKind.ENTRY_CALLBACK:
+            if route.action is not None and ENTRY_ACTIONS[route.action.name] is FlowKind.DEBUG:
+                return await self._on_debug_entry(update, route, context, transport)
             return await self._on_entry_callback(update, route, context, transport)
         if route.kind is RouteKind.FLOW_CALLBACK:
             return await self._on_flow_callback(update, route, transport)
         if route.kind is RouteKind.ADD_ENTRY:
             return await self._on_add_entry(route, context, transport)
         if route.kind is RouteKind.ANSWER:
-            return await self._on_answer(route, transport)
+            return await self._on_answer(update, route, context, transport)
         if route.kind is RouteKind.CANCEL:
             return await self._end_by_user(route, transport, consume=True)
         return await self._end_by_user(route, transport, consume=False)
@@ -782,6 +800,41 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
         await self._show_prompt(
             route.key, flow, f"{name}\n{_(_PROMPTS[kind])}", markup, transport, ticket
         )
+        return True
+
+    async def _on_debug_entry(
+        self, update: Update, route: Route, context: AnyContext, transport: _Transport
+    ) -> bool:
+        """Open the admin debug prompt; only an active administrator gets it."""
+        query = update.callback_query
+        if query is None:  # pragma: no cover - routing contract
+            return False
+        query_id = query.id
+        ticket = self.registry.generation(route.key)
+        language = await self._localise(route)
+        if not self.registry.is_current(route.key, ticket):
+            await transport.answer(query_id)
+            return True
+        admin = self._debug_runner is not None and await self.services.is_admin(route.key[1])
+        if not self.registry.is_current(route.key, ticket):
+            await transport.answer(query_id)
+            return True
+        if not admin:
+            await transport.answer(query_id, _(TEXT_NOT_AUTHORISED))
+            return True
+        flow = ActiveFlow(
+            kind=FlowKind.DEBUG,
+            state=FlowState.AWAIT_VALUE,
+            token=self._new_token(),
+            product_id=None,
+            prompt_chat_id=route.key[0],
+            started_at=time.monotonic(),
+            language_code=language,
+        )
+        self._supersede_legacy(context)
+        await transport.answer(query_id)
+        markup = InlineKeyboardMarkup([self._cancel_row(flow.token)])
+        await self._show_prompt(route.key, flow, _(PROMPT_DEBUG), markup, transport, ticket)
         return True
 
     async def _on_add_entry(self, route: Route, context: AnyContext, transport: _Transport) -> bool:
@@ -1066,7 +1119,9 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
             await transport.send(snapshot.key[0], text)
         return True
 
-    async def _on_answer(self, route: Route, transport: _Transport) -> bool:
+    async def _on_answer(
+        self, update: Update, route: Route, context: AnyContext, transport: _Transport
+    ) -> bool:
         snapshot = route.snapshot
         flow = None if snapshot is None else self.registry.get(snapshot.key)
         if snapshot is None or flow is None or flow.token != snapshot.token or route.text is None:
@@ -1092,13 +1147,18 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
             await self._reject(route, snapshot, flow, value, transport)
             return True
         claimed = self.registry.claim(snapshot)
-        if claimed is None or claimed.product_id is None:  # pragma: no cover - sync above
+        if claimed is None:  # pragma: no cover - sync above
             return False
         self.timer.disarm(snapshot)
         ticket = self.registry.generation(snapshot.key)
         await self._localise(route)
         if not self.registry.is_current(snapshot.key, ticket):
             return True
+        if claimed.kind is FlowKind.DEBUG and isinstance(value, str):
+            await self._run_debug(update, context, value, transport)
+            return True
+        if claimed.product_id is None:  # pragma: no cover - only the debug flow has none
+            return False
         if isinstance(value, Cancel):
             await transport.send(chat_id, _(TEXT_CANCELLED))
             return True
@@ -1109,6 +1169,26 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
             return True
         await transport.send(chat_id, _(_APPLY_TEXTS[status]))
         return True
+
+    async def _run_debug(
+        self, update: Update, context: AnyContext, url: str, transport: _Transport
+    ) -> None:
+        """Run the debug of ``url`` if the sender is still an active administrator.
+
+        A failure of the run goes to the error handlers here: raised, it would let the
+        later handler groups take the link as a product to add.
+        """
+        user = update.effective_user
+        chat = update.effective_chat
+        if user is None or chat is None:  # pragma: no cover - routing contract
+            return
+        if self._debug_runner is None or not await self.services.is_admin(user.id):
+            await transport.send(chat.id, _(TEXT_NOT_AUTHORISED))
+            return
+        try:
+            await self._debug_runner(update, context, url)
+        except Exception as exc:  # noqa: BLE001 - reported to the error handlers below
+            await context.application.process_error(update, exc)
 
     async def _reject(
         self,
@@ -1188,7 +1268,19 @@ def _action_fits(action: Action, flow: ActiveFlow) -> bool:
     return flow.state is FlowState.AWAIT_SCOPE
 
 
+def _parse_link(text: str) -> str | InputError:
+    """The first link in ``text``, without trailing punctuation."""
+    match = URL_PATTERN.search(text)
+    if match is not None:
+        url = match.group(0).rstrip(".,;:!?)")
+        if URL_PATTERN.fullmatch(url):
+            return url
+    return InputError(InputErrorCode.NOT_A_URL)
+
+
 def _parse_for(kind: FlowKind, text: str) -> object:
+    if kind is FlowKind.DEBUG:
+        return _parse_link(text)
     if kind is FlowKind.THRESHOLD:
         return parse_threshold(text)
     if kind is FlowKind.TARGET:

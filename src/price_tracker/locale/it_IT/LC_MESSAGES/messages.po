@@ -1484,3 +1484,7 @@ msgstr[1] "🗑 Eliminati {n} prodotti e il loro storico prezzi."
 #: src/price_tracker/bot/handlers/callbacks/_menu.py
 msgid "❓ Help"
 msgstr "❓ Aiuto"
+
+#: src/price_tracker/bot/flows.py
+msgid "Send the link of the product page to analyse."
+msgstr "Invia il link della pagina prodotto da analizzare."

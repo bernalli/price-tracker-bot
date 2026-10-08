@@ -43,6 +43,7 @@ from telegram import Update
 from telegram.ext import CallbackContext
 
 from price_tracker.bot import decorators
+from price_tracker.bot.flows import GuidedFlow
 from price_tracker.bot.handlers import error_handler, register_handlers
 from price_tracker.bot.messages import get_translation
 from price_tracker.config import Config
@@ -457,6 +458,9 @@ async def build_world(
     monkeypatch.setattr(socket, "getaddrinfo", offline_getaddrinfo)
     # Exchange rates loaded by an earlier test would change every non-EUR price.
     monkeypatch.setattr(decorators, "_ECB_RATES", {})
+    # A guided prompt carries a random token in its buttons; a counter keeps them stable.
+    tokens = itertools.count(1)
+    monkeypatch.setattr(GuidedFlow, "_new_token", lambda self: f"{next(tokens):032x}")
 
     conn = await bootstrap_database(":memory:")
     http_client: httpx.AsyncClient | None = None
