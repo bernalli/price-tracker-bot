@@ -1235,7 +1235,3 @@ class Scheduler:
             user_id=user_id,
             delay_between_products=delay_between_products,
         )
-
-    async def cleanup_old_history(self, *, retention_days: int = 365) -> int:
-        """Delete price_history rows older than `retention_days`. Returns row count."""
-        return await self.deps.repo.delete_old_price_history(days=retention_days)

@@ -398,13 +398,6 @@ async def test_get_all_users_dict_shape(repo: Repository) -> None:
     assert by_id[2].get("is_admin") is False
 
 
-async def test_cleanup_old_history_keyword_arg(repo: Repository) -> None:
-    """Handler invokes ``cleanup_old_history(retention_days=30)`` as kwarg."""
-    deleted = await repo.cleanup_old_history(retention_days=30)
-    assert isinstance(deleted, int)
-    assert deleted >= 0
-
-
 async def test_set_product_preferences_keyword_args(repo: Repository) -> None:
     pid = await repo.add_product(
         user_id=1,

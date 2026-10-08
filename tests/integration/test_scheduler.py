@@ -670,30 +670,6 @@ async def test_scheduler_price_none_without_scraper_error_still_records_reason(
     assert p.last_error == "price_none"
 
 
-@pytest.mark.asyncio
-async def test_scheduler_cleanup_old_history(
-    repo_with_product: tuple[Repository, int],
-) -> None:
-    """Line 123: cleanup_old_history delegates to repo.delete_old_price_history."""
-    repo, pid = repo_with_product
-    registry = ScraperRegistry()
-    notifier = AsyncMock()
-    async with httpx.AsyncClient() as client:
-        scheduler = Scheduler(
-            SchedulerDeps(
-                repo=repo,
-                registry=registry,
-                client=client,
-                notifier=notifier,
-                max_consecutive_errors=10,
-                delay_between_products=0.0,
-            )
-        )
-        deleted = await scheduler.cleanup_old_history(retention_days=365)
-    # Empty history → 0 rows deleted
-    assert deleted == 0
-
-
 # ---------------------------------------------------------------------------
 # Shared fixtures: scheduler_factory + sample_products
 # (defined in tests/integration/conftest.py and shared across integration tests)
