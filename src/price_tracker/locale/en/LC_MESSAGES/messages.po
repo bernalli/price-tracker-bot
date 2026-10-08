@@ -1006,20 +1006,6 @@ msgid "🌙 Quiet hours: {quiet}"
 msgstr ""
 
 #: src/price_tracker/bot/ui/panels.py
-#, python-brace-format
-msgid "⏱ Throttle: {throttle} · change with /throttle &lt;N&gt;|off"
-msgstr ""
-
-#: src/price_tracker/bot/ui/panels.py
-#, python-brace-format
-msgid "🌍 Timezone: {timezone} · change with /timezone &lt;zone&gt;"
-msgstr ""
-
-#: src/price_tracker/bot/ui/panels.py
-msgid "Other values: /digest_mode on|off &lt;minutes&gt;, /quiet_hours HH:MM-HH:MM"
-msgstr ""
-
-#: src/price_tracker/bot/ui/panels.py
 msgid "off"
 msgstr ""
 
@@ -1463,3 +1449,195 @@ msgstr "❓ Help"
 #: src/price_tracker/bot/flows.py
 msgid "Send the link of the product page to analyse."
 msgstr "Send the link of the product page to analyse."
+
+#: src/price_tracker/bot/handlers/callbacks/_admin.py
+msgid "👥 User list"
+msgstr "👥 User list"
+
+#: src/price_tracker/bot/handlers/callbacks/_admin.py
+msgid "➕ Add user"
+msgstr "➕ Add user"
+
+#: src/price_tracker/bot/handlers/callbacks/_admin.py
+msgid "🚫 Remove user"
+msgstr "🚫 Remove user"
+
+#: src/price_tracker/bot/handlers/callbacks/_admin.py
+msgid "✏️ User nickname"
+msgstr "✏️ User nickname"
+
+#: src/price_tracker/bot/handlers/callbacks/_admin.py
+msgid "⏱ Global interval: {interval} min"
+msgstr "⏱ Global interval: {interval} min"
+
+#: src/price_tracker/bot/handlers/callbacks/_admin.py
+msgid "🔧 Debug scraper"
+msgstr "🔧 Debug scraper"
+
+#: src/price_tracker/bot/handlers/callbacks/_admin.py
+msgid "👑 <b>Admin</b>\n\n👥 Active users: {users}\n⏱ Global interval: {interval} min"
+msgstr "👑 <b>Admin</b>\n\n👥 Active users: {users}\n⏱ Global interval: {interval} min"
+
+#: src/price_tracker/bot/handlers/callbacks/_actions.py
+msgid "not set"
+msgstr "not set"
+
+#: src/price_tracker/bot/handlers/callbacks/_actions.py
+msgid "🔔 Any drop"
+msgstr "🔔 Any drop"
+
+#: src/price_tracker/bot/handlers/callbacks/_actions.py
+msgid "📉 Threshold % or €"
+msgstr "📉 Threshold % or €"
+
+#: src/price_tracker/bot/handlers/callbacks/_actions.py
+msgid "💰 Target price"
+msgstr "💰 Target price"
+
+#: src/price_tracker/bot/handlers/callbacks/_actions.py
+msgid "🔄 Reset base price"
+msgstr "🔄 Reset base price"
+
+#: src/price_tracker/bot/handlers/callbacks/_actions.py
+msgid "✏️ <b>Edit #{id}</b> {name}\n\n🎯 Current threshold: <b>{threshold}</b>\n🏁 Current target: <b>{target}</b>\n📌 Base price: <b>{base}</b>\n\n<b>What do you want to change?</b>"
+msgstr "✏️ <b>Edit #{id}</b> {name}\n\n🎯 Current threshold: <b>{threshold}</b>\n🏁 Current target: <b>{target}</b>\n📌 Base price: <b>{base}</b>\n\n<b>What do you want to change?</b>"
+
+#: src/price_tracker/bot/handlers/callbacks/_menu.py
+msgid "🔔 <b>Notifications</b>\n\nTap a product to change its threshold or target."
+msgstr "🔔 <b>Notifications</b>\n\nTap a product to change its threshold or target."
+
+#: src/price_tracker/bot/handlers/callbacks/_menu.py
+msgid "ℹ️ <b>Statistics</b>\n\n📦 Active products: {active}\n📁 Total: {total}\n🔄 Checks: {checks}\n⏱ Interval: every {interval}"
+msgstr "ℹ️ <b>Statistics</b>\n\n📦 Active products: {active}\n📁 Total: {total}\n🔄 Checks: {checks}\n⏱ Interval: every {interval}"
+
+#: src/price_tracker/bot/handlers/callbacks/_menu.py
+msgid "👑 <b>Admin</b>\n👥 Active users: {users}\n📦 Global products: {products}\n🔄 Global checks: {checks}"
+msgstr "👑 <b>Admin</b>\n👥 Active users: {users}\n📦 Global products: {products}\n🔄 Global checks: {checks}"
+
+#: src/price_tracker/bot/keyboards.py
+msgid "◀️ Menu"
+msgstr "◀️ Menu"
+
+#: src/price_tracker/bot/handlers/debug.py
+msgid "✅ No recent errors on your products."
+msgstr "✅ No recent errors on your products."
+
+#: src/price_tracker/bot/handlers/debug.py
+msgid "⚠️ <b>Recent errors ({n})</b>"
+msgstr "⚠️ <b>Recent errors ({n})</b>"
+
+#: src/price_tracker/bot/handlers/debug.py
+msgid "🔒 {tier} (resumes in {until})"
+msgstr "🔒 {tier} (resumes in {until})"
+
+#: src/price_tracker/bot/handlers/debug.py
+msgid "❌ {n} failed reads"
+msgstr "❌ {n} failed reads"
+
+#: src/price_tracker/bot/handlers/debug.py
+msgid "ℹ️ Sites in 🔒 quarantine resume on their own; use /reactivate to reactivate a suspended product."
+msgstr "ℹ️ Sites in 🔒 quarantine resume on their own; use /reactivate to reactivate a suspended product."
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "⏱ Throttle: {throttle}"
+msgstr "⏱ Throttle: {throttle}"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "🌍 Timezone: {timezone}"
+msgstr "🌍 Timezone: {timezone}"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "⏱ Throttle"
+msgstr "⏱ Throttle"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "🌍 Timezone"
+msgstr "🌍 Timezone"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "⏱ <b>Throttle</b>"
+msgstr "⏱ <b>Throttle</b>"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "🌍 <b>Timezone</b>"
+msgstr "🌍 <b>Timezone</b>"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "📨 Send now"
+msgstr "📨 Send now"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "🔔 <b>Notifications</b>"
+msgstr "🔔 <b>Notifications</b>"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "◀️ Product"
+msgstr "◀️ Product"
+
+#: src/price_tracker/bot/handlers/callbacks/_nav.py
+msgid "Pending alerts sent: {n}"
+msgstr "Pending alerts sent: {n}"
+
+#: src/price_tracker/bot/handlers/callbacks/_nav.py
+msgid "◀️ Admin"
+msgstr "◀️ Admin"
+
+#: src/price_tracker/bot/handlers/callbacks/_nav.py
+msgid "◀️ Status & info"
+msgstr "◀️ Status & info"
+
+#: src/price_tracker/bot/handlers/callbacks/_admin.py
+msgid "🏥 Scraper health"
+msgstr "🏥 Scraper health"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "➕ Add"
+msgstr "➕ Add"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "➕ <b>Add a product</b>\n\nPaste the link of a product page here to start tracking it."
+msgstr "➕ <b>Add a product</b>\n\nPaste the link of a product page here to start tracking it."
+
+#: src/price_tracker/bot/flows.py
+msgid "Send the mute duration in hours (1-8760), or forever."
+msgstr "Send the mute duration in hours (1-8760), or forever."
+
+#: src/price_tracker/bot/flows.py
+msgid "Send the digest interval in minutes (5-1440)."
+msgstr "Send the digest interval in minutes (5-1440)."
+
+#: src/price_tracker/bot/flows.py
+msgid "Send the quiet hours as HH:MM-HH:MM, or off."
+msgstr "Send the quiet hours as HH:MM-HH:MM, or off."
+
+#: src/price_tracker/bot/flows.py
+msgid "Send your time zone, for example Europe/Rome."
+msgstr "Send your time zone, for example Europe/Rome."
+
+#: src/price_tracker/bot/flows.py
+msgid "Send the most notifications per hour, or off."
+msgstr "Send the most notifications per hour, or off."
+
+#: src/price_tracker/bot/flows.py
+msgid "Use a whole number, e.g. 12."
+msgstr "Use a whole number, e.g. 12."
+
+#: src/price_tracker/bot/flows.py
+msgid "◀️ Notifications"
+msgstr "◀️ Notifications"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "✏️ Other duration"
+msgstr "✏️ Other duration"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "✏️ Interval"
+msgstr "✏️ Interval"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "✏️ Other hours"
+msgstr "✏️ Other hours"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "✏️ Change"
+msgstr "✏️ Change"

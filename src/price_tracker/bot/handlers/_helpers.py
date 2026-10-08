@@ -57,7 +57,7 @@ def out_of_stock_line() -> str:
 def _format_threshold(threshold_type: str, threshold_value: str) -> str:
     """Render a threshold tuple as a user-facing string."""
     if threshold_type == "any_drop":
-        return "\U0001f514 Ogni ribasso"
+        return _("🔔 Any drop")
     if threshold_type == "percentage":
         return f"-{threshold_value}%"
     return f"-€{Decimal(threshold_value):.2f}"

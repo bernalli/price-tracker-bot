@@ -1,8 +1,7 @@
 """The Home screen and the settings panels: pure screens built from a view.
 
-Only the values the code already has presets for get buttons (mute, digest,
-quiet hours and language); timezone and throttle are shown with the command that
-changes them.
+The values with presets (mute, digest, quiet hours and language) get a button per
+preset; every section shows its current value and leads back to Settings and Home.
 """
 
 from __future__ import annotations
@@ -16,10 +15,14 @@ from price_tracker.bot.messages import _, current_locale, ngettext
 from price_tracker.bot.ui.escape import escape_html
 from price_tracker.bot.ui.labels import button, layout_rows
 from price_tracker.bot.ui.screens import Button, Screen
+from price_tracker.bot.ui.width import sanitize_label, truncate_to_width
+from price_tracker.core.textlimits import NAME_BUDGET
 from price_tracker.i18n.format import duration, when
 from price_tracker.i18n.locales import AVAILABLE_LANGUAGES, endonym
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from price_tracker.app.views import HomeView, PrefsView
 
 # Wire value of the quiet-hours preset -> the HH:MM window it stands for.
@@ -83,6 +86,20 @@ def home_button() -> Button:
     return button(_("🏠 Home"), callback=encode(Action("home")))
 
 
+def add_button() -> Button:
+    """The button that explains how to add a product."""
+    return button(_("➕ Add"), callback=encode(Action("add")))
+
+
+def add_screen() -> Screen:
+    """How to add a product: paste its link. Back to the product list, or Home."""
+    back = button(_("◀️ List"), callback=encode(Action("list.page", ("a", 1))))
+    text = _(
+        "➕ <b>Add a product</b>\n\nPaste the link of a product page here to start tracking it."
+    )
+    return Screen(text=text, rows=layout_rows([back, home_button()]))
+
+
 def _preset(label: str, action: Action, *, current: bool) -> Button:
     return button(f"{label} ✓" if current else label, callback=encode(action))
 
@@ -90,6 +107,17 @@ def _preset(label: str, action: Action, *, current: bool) -> Button:
 def _check_now(now: datetime) -> None:
     if not isinstance(now, datetime) or now.tzinfo is None:
         raise ValueError(f"now: must be an aware datetime, got {now!r}")
+
+
+def _value_lines(view: PrefsView, now: datetime, loc: str) -> list[str]:
+    """Mute, digest, quiet hours, throttle and time zone, one line each."""
+    return [
+        _("🔕 Mute: {mute}").format(mute=_mute_value(view, now, loc)),
+        _("📬 Digest: {digest}").format(digest=_digest_value(view, loc)),
+        _("🌙 Quiet hours: {quiet}").format(quiet=_quiet_value(view)),
+        _("⏱ Throttle: {throttle}").format(throttle=_throttle_value(view)),
+        _("🌍 Timezone: {timezone}").format(timezone=escape_html(view.timezone)),
+    ]
 
 
 def settings_screen(view: PrefsView, *, now: datetime, language: str | None = None) -> Screen:
@@ -102,45 +130,42 @@ def settings_screen(view: PrefsView, *, now: datetime, language: str | None = No
     lines = [
         _("⚙️ <b>Settings</b>"),
         "",
-        _("🔕 Mute: {mute}").format(mute=_mute_value(view, now, loc)),
-        _("📬 Digest: {digest}").format(digest=_digest_value(view, loc)),
-        _("🌙 Quiet hours: {quiet}").format(quiet=_quiet_value(view)),
-        _("⏱ Throttle: {throttle} · change with /throttle &lt;N&gt;|off").format(
-            throttle=_throttle_value(view)
-        ),
-        _("🌍 Timezone: {timezone} · change with /timezone &lt;zone&gt;").format(
-            timezone=escape_html(view.timezone)
-        ),
+        *_value_lines(view, now, loc),
         _("🗣 Language: {language}").format(language=_language_value(language)),
-        "",
-        _("Other values: /digest_mode on|off &lt;minutes&gt;, /quiet_hours HH:MM-HH:MM"),
     ]
     sections = [
         button(_("🔕 Mute"), callback=encode(Action("settings.section", ("mu",)))),
         button(_("📬 Digest"), callback=encode(Action("settings.section", ("dg",)))),
         button(_("🌙 Quiet hours"), callback=encode(Action("settings.section", ("qh",)))),
+        button(_("⏱ Throttle"), callback=encode(Action("settings.section", ("th",)))),
+        button(_("🌍 Timezone"), callback=encode(Action("settings.section", ("tz",)))),
         button(_("🗣 Language"), callback=encode(Action("settings.section", ("lang",)))),
     ]
     return Screen(text="\n".join(lines), rows=layout_rows(sections, [home_button()]))
 
 
-def _mute_presets(view: PrefsView, now: datetime, loc: str) -> list[Button]:
+def _mute_presets(
+    view: PrefsView, now: datetime, loc: str, make: Callable[[str], Action]
+) -> list[Button]:
+    """The mute presets; ``make`` turns a preset value into the action that sets it."""
     off = _mute_ends_at(view, now) is None and not _muted_forever(view)
     presets = [
-        _preset(
-            duration(hours * 60, locale=loc),
-            Action("settings.mute", (str(hours),)),
-            current=False,
-        )
+        _preset(duration(int(value) * 60, locale=loc), make(value), current=False)
         for value in MUTE_PRESETS
         if value != "0"
-        for hours in (int(value),)
     ]
-    presets.append(
-        _preset(_("Forever"), Action("settings.mute", ("0",)), current=_muted_forever(view))
-    )
-    presets.append(_preset(_("🔔 Unmute"), Action("settings.mute", ("off",)), current=off))
+    presets.append(_preset(_("Forever"), make("0"), current=_muted_forever(view)))
+    presets.append(_preset(_("🔔 Unmute"), make("off"), current=off))
     return presets
+
+
+def _settings_mute(value: str) -> Action:
+    return Action("settings.mute", (value,))
+
+
+def _ask(label: str, setting: str) -> Button:
+    """The button that asks for a typed value of ``setting``."""
+    return button(label, callback=encode(Action("settings.ask", (setting,))))
 
 
 def _digest_presets(view: PrefsView) -> list[Button]:
@@ -175,27 +200,75 @@ def settings_section_screen(
 ) -> Screen:
     """One preference's presets, the current one marked.
 
-    ``section``: ``mu``, ``dg``, ``qh`` or ``lang``; ``language`` is the stored choice.
+    ``section``: ``mu``, ``dg``, ``qh``, ``lang``, ``tz`` or ``th``; ``language`` is the
+    stored choice.
     """
     _check_now(now)
     loc = current_locale()
+    extra: list[Button] = []
+    presets: list[Button] = []
     if section == "mu":
         title, value = _("🔕 <b>Mute</b>"), _mute_value(view, now, loc)
-        presets = _mute_presets(view, now, loc)
+        presets = _mute_presets(view, now, loc, _settings_mute)
+        extra = [_ask(_("✏️ Other duration"), "mu")]
     elif section == "dg":
         title, value = _("📬 <b>Digest</b>"), _digest_value(view, loc)
         presets = _digest_presets(view)
+        extra = [
+            _ask(_("✏️ Interval"), "dg"),
+            button(_("📨 Send now"), callback=encode(Action("settings.digest_now"))),
+        ]
     elif section == "qh":
         title, value = _("🌙 <b>Quiet hours</b>"), _quiet_value(view)
         presets = _quiet_presets(view)
+        extra = [_ask(_("✏️ Other hours"), "qh")]
     elif section == "lang":
         title, value = _("🗣 <b>Language</b>"), _language_value(language)
         presets = _language_presets(language)
+    elif section == "tz":
+        title, value = _("🌍 <b>Timezone</b>"), escape_html(view.timezone)
+        extra = [_ask(_("✏️ Change"), "tz")]
+    elif section == "th":
+        title, value = _("⏱ <b>Throttle</b>"), _throttle_value(view)
+        extra = [_ask(_("✏️ Change"), "th")]
     else:
-        raise ValueError(f"section: must be one of mu, dg, qh, lang, got {section!r}")
+        raise ValueError(f"section: must be one of mu, dg, qh, lang, tz, th, got {section!r}")
     back = button(_("◀️ Settings"), callback=encode(Action("settings")))
     current = _("Current: {value}").format(value=value)
-    return Screen(text=f"{title}\n\n{current}", rows=layout_rows(presets, [back]))
+    return Screen(
+        text=f"{title}\n\n{current}", rows=layout_rows(presets, extra, [back, home_button()])
+    )
+
+
+def product_prefs_screen(name: str, product_id: int, view: PrefsView, *, now: datetime) -> Screen:
+    """The notifications of one product: its effective values and its mute presets.
+
+    ``view`` holds the preferences resolved for this product; ``name`` is shown escaped.
+    """
+    _check_now(now)
+    if not isinstance(product_id, int) or isinstance(product_id, bool) or product_id < 1:
+        raise ValueError(f"product_id: must be a positive int, got {product_id!r}")
+    loc = current_locale()
+    shown = escape_html(truncate_to_width(sanitize_label(name), NAME_BUDGET))
+    lines = [
+        _("🔔 <b>Notifications</b>"),
+        _("📦 <b>{name}</b>").format(name=f"\u2068{shown}\u2069"),
+        "",
+        *_value_lines(view, now, loc),
+    ]
+
+    def mute(value: str) -> Action:
+        return Action("product.mute", (product_id, value))
+
+    presets = _mute_presets(view, now, loc, mute)
+    other = button(
+        _("✏️ Other duration"), callback=encode(Action("product.mute_ask", (product_id,)))
+    )
+    links = [
+        button(_("⚙️ Settings"), callback=encode(Action("settings"))),
+        button(_("◀️ Product"), callback=encode(Action("product.card", (product_id,)))),
+    ]
+    return Screen(text="\n".join(lines), rows=layout_rows(presets, [other], links, [home_button()]))
 
 
 def home_screen(view: HomeView) -> Screen:

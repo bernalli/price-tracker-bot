@@ -13,4 +13,4 @@ keyboard:
    [#3](cb:l:p:1:3)
    [✅ Active](cb:l:a:1)  [⏸ Paused ✓](cb:l:p:1)
    [⚠️ Errors](cb:l:e:1)  [🚫 Sold out](cb:l:o:1)
-   [🏠 Home](cb:h)
+   [➕ Add](cb:ad)  [🏠 Home](cb:h)

@@ -8,12 +8,11 @@ text:
    | 🔕 Silenzia: fino a 01/03/26, 21:00
    | 📬 Digest: attivo, ogni 30 min
    | 🌙 Ore silenziose: 22:00–08:00
-   | ⏱ Limite: 5 all'ora · cambia con /throttle &lt;N&gt;|off
-   | 🌍 Fuso orario: Europe/Berlin · cambia con /timezone &lt;zona&gt;
+   | ⏱ Limite: 5 all'ora
+   | 🌍 Fuso orario: Europe/Berlin
    | 🗣 Lingua: Automatica (Italiano)
-   | 
-   | Altri valori: /digest_mode on|off &lt;minuti&gt;, /quiet_hours HH:MM-HH:MM
 keyboard:
    [🔕 Silenzia](cb:s:mu)  [📬 Digest](cb:s:dg)
-   [🌙 Ore silenziose](cb:s:qh)  [🗣 Lingua](cb:s:lang)
+   [🌙 Ore silenziose](cb:s:qh)  [⏱ Limite](cb:s:th)
+   [🌍 Fuso orario](cb:s:tz)  [🗣 Lingua](cb:s:lang)
    [🏠 Home](cb:h)

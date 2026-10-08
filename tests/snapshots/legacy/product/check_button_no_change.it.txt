@@ -14,7 +14,7 @@
    | [#1 → l:a:1:1]
    | [✅ Attivi ✓ → l:a:1] [⏸ In pausa → l:p:1]
    | [⚠️ Errori → l:e:1] [🚫 Esaurito → l:o:1]
-   | [🏠 Home → h]
+   | [➕ Aggiungi → ad] [🏠 Home → h]
 ## db after step 1
 ~ users user_id=10 display_name: NULL -> "U10"
 ## step 2: press "l:a:1:1" user=10 on=1000
@@ -85,7 +85,8 @@
    | [#3 → l:a:1:3]
    | [✅ Attivi ✓ → l:a:1] [⏸ In pausa → l:p:1]
    | [⚠️ Errori → l:e:1] [🚫 Esaurito → l:o:1]
-   | [🗑 Elimina tutti → delete_all] [🏠 Home → h]
+   | [🗑 Elimina tutti → delete_all] [➕ Aggiungi → ad]
+   | [🏠 Home → h]
 ## db after step 5
 (no changes)
 ## step 6: press "l:a:1:2" user=10 on=1001
@@ -155,7 +156,8 @@
    | [#3 → l:a:1:3]
    | [✅ Attivi ✓ → l:a:1] [⏸ In pausa → l:p:1]
    | [⚠️ Errori → l:e:1] [🚫 Esaurito → l:o:1]
-   | [🗑 Elimina tutti → delete_all] [🏠 Home → h]
+   | [🗑 Elimina tutti → delete_all] [➕ Aggiungi → ad]
+   | [🏠 Home → h]
 ## db after step 8
 (no changes)
 ## step 9: press "l:a:1:3" user=10 on=1002

@@ -26,6 +26,8 @@
    | Attuale: None
    |
    | Scrivi il nuovo nickname:
+   keyboard:
+   | [Annulla → menu_admin]
 ## db after step 2
 (no changes)
 ## step 3: text "Bob" user=1
@@ -52,6 +54,8 @@
    | Attuale: Bob
    |
    | Scrivi il nuovo nickname:
+   keyboard:
+   | [Annulla → menu_admin]
 ## db after step 5
 (no changes)
 ## step 6: text "   " user=1

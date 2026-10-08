@@ -50,7 +50,10 @@ PERIODS: Final = ("7d", "30d", "90d", "1y", "all")
 THEMES: Final = ("light", "dark")
 MUTE_PRESETS: Final = ("1", "8", "24", "0")
 LIST_FILTERS: Final = ("a", "p", "e", "o")
-SETTINGS_SECTIONS: Final = ("mu", "dg", "qh", "lang")
+SETTINGS_SECTIONS: Final = ("mu", "dg", "qh", "lang", "tz", "th")
+# The settings that take a typed value: mute hours, digest minutes, quiet hours,
+# time zone and notifications per hour.
+ASK_SETTINGS: Final = ("mu", "dg", "qh", "tz", "th")
 SETTINGS_MUTE: Final = (*MUTE_PRESETS, "off")
 SETTINGS_DIGEST: Final = ("on", "off")
 SETTINGS_QUIET: Final = ("2208", "off")
@@ -398,7 +401,9 @@ def build_registry() -> ActionRegistry:
         ActionSpec("product.target", _product("tg")),
         ActionSpec("product.interval", _product("iv")),
         ActionSpec("product.offer_filter", _product("pf", Choice("offer", OFFER_FILTERS))),
-        ActionSpec("product.mute", _product("mu", Choice("hours", MUTE_PRESETS))),
+        ActionSpec("product.mute", _product("mu", Choice("hours", SETTINGS_MUTE))),
+        ActionSpec("product.mute_ask", _product("mua")),
+        ActionSpec("product.prefs", _product("pr")),
         ActionSpec("product.scope_picker", _product("sco")),
         ActionSpec("product.scope", _product("sco", Choice("scope", CARD_SCOPE_CHOICES))),
         ActionSpec(
@@ -415,6 +420,8 @@ def build_registry() -> ActionRegistry:
         ActionSpec("flow.cancel", (_lit("p"), TOK, _lit("x")), flow=True),
         ActionSpec("settings", (_lit("s"),)),
         ActionSpec("settings.section", (_lit("s"), Choice("section", SETTINGS_SECTIONS))),
+        ActionSpec("settings.ask", (_lit("s"), _lit("ask"), Choice("setting", ASK_SETTINGS))),
+        ActionSpec("settings.digest_now", (_lit("s"), _lit("dn"))),
         ActionSpec("settings.mute", (_lit("s"), _lit("mu"), Choice("hours", SETTINGS_MUTE))),
         ActionSpec("settings.digest", (_lit("s"), _lit("dg"), Choice("mode", SETTINGS_DIGEST))),
         ActionSpec("settings.quiet", (_lit("s"), _lit("qh"), Choice("window", SETTINGS_QUIET))),
@@ -434,6 +441,9 @@ def build_registry() -> ActionRegistry:
         ActionSpec("admin.nick_id", (_lit("a"), _lit("nk"), UID)),
         ActionSpec("admin.interval", (_lit("a"), _lit("iv"))),
         ActionSpec("admin.debug", (_lit("a"), _lit("dbg"))),
+        ActionSpec("admin.health", (_lit("a"), _lit("hl"))),
+        ActionSpec("errors", (_lit("er"),)),
+        ActionSpec("add", (_lit("ad"),)),
     ]
     return ActionRegistry(specs)
 

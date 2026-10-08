@@ -1,4 +1,4 @@
-"""Guided-flow services on the repository for the threshold, target and interval prompts.
+"""Guided-flow services on the repository for the value and setting prompts.
 
 :class:`RepositoryFlowServices` implements :class:`~price_tracker.bot.flows.FlowServices`
 over the object stored in ``bot_data["db"]``, read on every call because the
@@ -13,6 +13,7 @@ disabled so they are never reached.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Final, Protocol
 
@@ -20,10 +21,17 @@ from price_tracker.app.inputs import (
     Absolute,
     AnyDrop,
     ClearTarget,
+    Forever,
     IntervalMinutes,
+    Off,
     Percentage,
+    QuietHours,
     ResetInterval,
     SetTarget,
+    parse_digest_interval,
+    parse_mute_hours,
+    parse_throttle,
+    parse_timezone,
 )
 from price_tracker.bot.flows import (
     AddResult,
@@ -34,9 +42,12 @@ from price_tracker.bot.flows import (
     PrepareResult,
 )
 from price_tracker.bot.ui.width import truncate_to_width
+from price_tracker.notifier.preferences import update_prefs
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+    from price_tracker.db.models import NotificationPrefs
 
 NAME_LIMIT: Final = 60
 _ADD_NOT_WIRED: Final = "add flow is not wired"
@@ -66,6 +77,12 @@ class ProductStore(Protocol):
     async def set_target_price(self, product_id: int, target: Decimal | None) -> None: ...
 
     async def set_product_interval(self, product_id: int, minutes: int | None) -> None: ...
+
+    async def get_notification_prefs(
+        self, *, user_id: int, product_id: int | None
+    ) -> NotificationPrefs | None: ...
+
+    async def upsert_notification_prefs(self, prefs: NotificationPrefs) -> None: ...
 
 
 class RepositoryFlowServices:
@@ -116,6 +133,26 @@ class RepositoryFlowServices:
         await _write(store, kind, product_id, value)
         return ApplyStatus.OK
 
+    async def apply_setting(
+        self, user_id: int, kind: FlowKind, product_id: int | None, value: object
+    ) -> ApplyStatus:
+        """Write one setting answer: a global preference, or the mute of one own product.
+
+        Raises ``TypeError``, before any read or write, for a ``(kind, value)`` pair no
+        prompt produces, or a product for any kind but the mute. The product must be the
+        user's own: an admin does not set the preferences of someone else's product.
+        """
+        if product_id is not None and kind is not FlowKind.MUTE:
+            raise TypeError(f"{kind!r} has no product setting")
+        changes = _setting_changes(kind, value)
+        store = self._repository()
+        if not await store.is_user_allowed(user_id):
+            return ApplyStatus.NOT_AUTHORISED
+        if product_id is not None and await store.get_product_for_user(product_id, user_id) is None:
+            return ApplyStatus.NOT_FOUND
+        await update_prefs(store, user_id, product_id, **changes)
+        return ApplyStatus.OK
+
     async def prepare_add(self, user_id: int, url: str) -> PrepareResult:
         """Not served: the add flow stays with the legacy handlers."""
         raise RuntimeError(_ADD_NOT_WIRED)
@@ -162,3 +199,42 @@ async def _write(store: ProductStore, kind: FlowKind, product_id: int, value: ob
             await store.set_product_interval(product_id, None)
             return
     raise TypeError(f"no write for {kind!r} with {type(value).__name__}")
+
+
+def _whole(value: object, parse: Callable[[str], object]) -> bool:
+    """A whole number that ``parse`` accepts as an answer, so one a prompt can produce."""
+    return isinstance(value, int) and not isinstance(value, bool) and parse(str(value)) == value
+
+
+def _setting_changes(kind: FlowKind, value: object) -> dict[str, object]:
+    """The preference fields one setting answer writes; ``TypeError`` for any other pair.
+
+    A value is re-checked against the parser of its prompt: an out-of-range number or an
+    unknown time zone is a pair no prompt produces, never a stored preference.
+    """
+    if kind is FlowKind.MUTE:
+        if isinstance(value, Forever):
+            return {"mute": True, "mute_until": None}
+        if _whole(value, parse_mute_hours):
+            assert isinstance(value, int)
+            return {"mute": True, "mute_until": datetime.now(UTC) + timedelta(hours=value)}
+    elif kind is FlowKind.DIGEST:
+        if _whole(value, parse_digest_interval):
+            return {"digest_mode": True, "digest_interval_minutes": value}
+    elif kind is FlowKind.QUIET:
+        if isinstance(value, QuietHours):
+            return {
+                "quiet_hours_start": value.start.strftime("%H:%M"),
+                "quiet_hours_end": value.end.strftime("%H:%M"),
+            }
+        if isinstance(value, Off):
+            return {"quiet_hours_start": None, "quiet_hours_end": None}
+    elif kind is FlowKind.TIMEZONE:
+        if isinstance(value, str) and parse_timezone(value) == value:
+            return {"timezone": value}
+    elif kind is FlowKind.THROTTLE:
+        if isinstance(value, Off):
+            return {"throttle_per_hour": None}
+        if _whole(value, parse_throttle):
+            return {"throttle_per_hour": value}
+    raise TypeError(f"no setting for {kind!r} with {type(value).__name__}")

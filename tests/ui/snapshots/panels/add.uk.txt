@@ -1,0 +1,15 @@
+# ui snapshot v1
+# screen: panels.add
+# locale: uk
+# now: 2026-03-01T12:00:00Z
+text:
+   | [➕ <b>Add a product</b>
+   | 
+   | Paste the link of a product page here to start tracking it. ➕ <b>Add a product</b>
+   | 
+   | Paste the link of a product page here to start tracking it. ➕ <b>Add a product</b>
+   | 
+   | Paste the link of a product page here to start tracking it.]
+keyboard:
+   [[◀️ List ◀️ List ◀️ List]](cb:l:a:1)
+   [[🏠 Home 🏠 Home 🏠 Home]](cb:h)

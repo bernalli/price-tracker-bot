@@ -12,7 +12,7 @@ import logging
 import re as _re
 import time
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler
@@ -38,6 +38,18 @@ if TYPE_CHECKING:
     from price_tracker.observability.metrics import MetricsRegistry
 
 logger = logging.getLogger(__name__)
+
+
+# A lone UTF-16 surrogate: JSON can carry one ("\ud800"), a UTF-8 request body cannot.
+_SURROGATE = _re.compile("[\ud800-\udfff]")
+
+
+def _ext(value: object, limit: int) -> str:
+    """Cut an outside value to ``limit`` characters, then escape it for Telegram HTML.
+
+    A lone surrogate is shown as U+FFFD, so the report can still be sent.
+    """
+    return _escape_html(_SURROGATE.sub("\ufffd", str(value)[:limit]))
 
 
 def _format_remaining(until: datetime | None) -> str:
@@ -169,11 +181,11 @@ async def debug_url(update: Update, context: ContextTypes.DEFAULT_TYPE, url: str
                             html = r2.text
                             lines.append("✅ Client fresco ha ottenuto più dati!")
                 except Exception as e:  # noqa: BLE001 — debug surface, never crash
-                    lines.append(f"❌ httpx fresh: {str(e)[:60]}")
+                    lines.append(f"❌ httpx fresh: {_ext(e, 60)}")
         elif resp.status_code == 403:
             lines.append("Unbound curl and Scrapling backends are disabled.")
     except Exception as e:  # noqa: BLE001 — debug surface, never crash
-        lines.append(f"❌ httpx: {str(e)[:80]}")
+        lines.append(f"❌ httpx: {_ext(e, 80)}")
 
     if not html:
         lines.append("\n❌ Impossibile caricare la pagina con nessun metodo.")
@@ -211,18 +223,19 @@ async def debug_url(update: Update, context: ContextTypes.DEFAULT_TYPE, url: str
                 offers = data.get("offers", data.get("Offers"))
                 has_offers = offers is not None
                 lines.append(
-                    f"📦 JSON-LD #{i + 1}: type=<b>{tp}</b> offers={'✅' if has_offers else '❌'}"
+                    f"📦 JSON-LD #{i + 1}: type=<b>{_ext(tp, 40)}</b> "
+                    f"offers={'✅' if has_offers else '❌'}"
                 )
                 if has_offers:
                     if isinstance(offers, dict):
                         p = offers.get("price", "?")
                         curr = offers.get("priceCurrency", "?")
-                        lines.append(f"   → price: {p} {curr}")
+                        lines.append(f"   → price: {_ext(p, 40)} {_ext(curr, 40)}")
                     elif isinstance(offers, list):
                         for o in offers[:2]:
-                            lines.append(f"   → price: {o.get('price', '?')}")
+                            lines.append(f"   → price: {_ext(o.get('price', '?'), 40)}")
             except Exception as e:  # noqa: BLE001 — debug parse surface
-                lines.append(f"📦 JSON-LD #{i + 1}: parse error: {str(e)[:40]}")
+                lines.append(f"📦 JSON-LD #{i + 1}: parse error: {_ext(e, 40)}")
     else:
         lines.append("📦 JSON-LD: ❌ non trovato")
 
@@ -231,10 +244,11 @@ async def debug_url(update: Update, context: ContextTypes.DEFAULT_TYPE, url: str
         "meta", attrs={"name": "og:price:amount"}
     )
     if og_price:
-        lines.append(f"🏷 og:price:amount: <b>{og_price.get('content', '?')}</b>")
+        lines.append(f"🏷 og:price:amount: <b>{_ext(og_price.get('content', '?'), 40)}</b>")
     product_price = soup.find("meta", property="product:price:amount")
     if product_price:
-        lines.append(f"🏷 product:price:amount: <b>{product_price.get('content', '?')}</b>")
+        content = _ext(product_price.get("content", "?"), 40)
+        lines.append(f"🏷 product:price:amount: <b>{content}</b>")
     if not og_price and not product_price:
         lines.append("🏷 OG/meta price: ❌ non trovato")
 
@@ -242,7 +256,7 @@ async def debug_url(update: Update, context: ContextTypes.DEFAULT_TYPE, url: str
     itemprop_price = soup.find(attrs={"itemprop": "price"})
     if itemprop_price:
         val = itemprop_price.get("content") or itemprop_price.get_text(strip=True)
-        lines.append(f"🔖 itemprop=price: <b>{str(val)[:30]}</b>")
+        lines.append(f"🔖 itemprop=price: <b>{_ext(val, 30)}</b>")
     else:
         lines.append("🔖 itemprop=price: ❌ non trovato")
 
@@ -272,7 +286,7 @@ async def debug_url(update: Update, context: ContextTypes.DEFAULT_TYPE, url: str
         text = body.get_text(separator=" ")[:3000]
         price_matches = _re.findall(r"€\s*\d+[.,]\d{2}|\d+[.,]\d{2}\s*€", text)
         if price_matches:
-            lines.append(f"🔎 Regex €: {', '.join(price_matches[:5])}")
+            lines.append(f"🔎 Regex €: {', '.join(_ext(m, 40) for m in price_matches[:5])}")
         else:
             lines.append("🔎 Regex €: ❌ nessun match")
 
@@ -290,7 +304,9 @@ async def debug_url(update: Update, context: ContextTypes.DEFAULT_TYPE, url: str
     else:
         result = await scraper_for_url.scrape(url, client)
         lines.append(f"   Nome: {_escape_html(truncate_to_width(result.name or '❌', 60))}")
-        price_repr = "€" + str(result.price) if result.price else "❌ " + (result.error or "")
+        price_repr = (
+            "€" + _ext(result.price, 40) if result.price else "❌ " + _ext(result.error or "", 40)
+        )
         lines.append(f"   Prezzo: {price_repr}")
 
     await msg.edit_text("\n".join(lines), parse_mode=ParseMode.HTML, disable_web_page_preview=True)
@@ -371,9 +387,13 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 @admin_only
 async def health_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Admin: show scraper health report (English output)."""
+    await update.message.reply_html(health_text(context.bot_data["health_manager"]))
+
+
+def health_text(health_mgr: Any) -> str:
+    """The scraper health report: domain counts by state, locks and the last block events."""
     from price_tracker.core.health import QuarantineState  # noqa: PLC0415
 
-    health_mgr = context.bot_data["health_manager"]
     records = health_mgr.all_records()
 
     # Classify by EFFECTIVE state: an expired lockout is HALF_OPEN on read
@@ -403,7 +423,7 @@ async def health_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         lines.append("<b>Locked:</b>")
         for r in sorted(locked, key=lambda x: x.locked_until or datetime.max.replace(tzinfo=UTC)):
             lines.append(
-                f"  • {r.domain} — {_tier_label(effective[r.domain].value)}, "
+                f"  • {_escape_html(r.domain)} — {_tier_label(effective[r.domain].value)}, "
                 f"expires in {_format_remaining(r.locked_until)}"
             )
         lines.append("")
@@ -411,7 +431,7 @@ async def health_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if half_open:
         lines.append("<b>Half-open:</b>")
         for r in half_open:
-            lines.append(f"  • {r.domain} — probing on next tick")
+            lines.append(f"  • {_escape_html(r.domain)} — probing on next tick")
         lines.append("")
 
     recent_blocks = sorted(
@@ -423,9 +443,10 @@ async def health_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         lines.append("<b>Last 5 block events:</b>")
         for r in recent_blocks:
             ts = r.last_block_at.strftime("%Y-%m-%d %H:%M:%SZ") if r.last_block_at else "—"
-            lines.append(f"  • {r.domain} — {r.last_block_reason or '?'} — {ts}")
-
-    await update.message.reply_html("\n".join(lines))
+            domain = _escape_html(r.domain)
+            reason = _escape_html(r.last_block_reason or "?")
+            lines.append(f"  • {domain} — {reason} — {ts}")
+    return "\n".join(lines)
 
 
 @with_locale
@@ -433,23 +454,37 @@ async def health_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 async def cmd_errori(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """User-facing: products with recent scrape errors + domain quarantine state.
 
-    Complements the admin-only English /health (domain-level) with a per-product,
-    Italian view that surfaces the persisted ``last_error`` for debugging.
+    Complements the admin-only English /health (domain-level) with a per-product
+    view that surfaces the persisted ``last_error`` for debugging.
+    """
+    text = await errors_text(
+        _db(context), context.bot_data.get("health_manager"), update.effective_user.id
+    )
+    if text is None:
+        await update.message.reply_text(no_errors_text())
+        return
+    await update.message.reply_html(text)
+
+
+def no_errors_text() -> str:
+    """What the error report says when no product of the user has errors."""
+    return _("✅ No recent errors on your products.")
+
+
+async def errors_text(db: Any, health_mgr: Any, user_id: int) -> str | None:
+    """The products of ``user_id`` with recent read errors and their domain's quarantine.
+
+    ``None`` when no product has errors.
     """
     from price_tracker.core.health import QuarantineState  # noqa: PLC0415
 
-    db = _db(context)
-    user_id = update.effective_user.id
-    health_mgr = context.bot_data.get("health_manager")
-
     errored = await db.list_products_with_errors(user_id=user_id)
     if not errored:
-        await update.message.reply_text("✅ Nessun errore recente sui tuoi prodotti.")
-        return
+        return None
 
-    lines: list[str] = [f"⚠️ <b>Errori recenti ({len(errored)})</b>", ""]
+    lines: list[str] = [_("⚠️ <b>Recent errors ({n})</b>").format(n=len(errored)), ""]
     for row in errored:
-        name = _escape_html(truncate_to_width(row.name or "Sconosciuto", 50))
+        name = _escape_html(truncate_to_width(row.name or _("Unknown"), 50))
         lines.append(f"<b>#{row.id}</b> {name}")
 
         state_label = ""
@@ -457,9 +492,13 @@ async def cmd_errori(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             state = health_mgr.state(row.domain)
             if state != QuarantineState.CLOSED:
                 until = _format_remaining(health_mgr.locked_until(row.domain))
-                state_label = f" — 🔒 {_tier_label(state.value)} (riprende tra {until})"
+                resumes = _("🔒 {tier} (resumes in {until})").format(
+                    tier=_tier_label(state.value), until=until
+                )
+                state_label = f" — {resumes}"
         lines.append(f"  🌐 {_escape_html(row.domain or '?')}{state_label}")
-        lines.append(f"  ❌ {row.consecutive_errors} letture fallite")
+        failed = _("❌ {n} failed reads").format(n=row.consecutive_errors)
+        lines.append(f"  {failed}")
         if row.last_error:
             when = _format_relative_time(row.last_error_at)
             when_str = f" — {when}" if when else ""
@@ -467,10 +506,12 @@ async def cmd_errori(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         lines.append("")
 
     lines.append(
-        "ℹ️ I siti in 🔒 quarantena riprendono da soli; "
-        "usa /reactivate per riattivare un prodotto sospeso."
+        _(
+            "ℹ️ Sites in 🔒 quarantine resume on their own; "
+            "use /reactivate to reactivate a suspended product."
+        )
     )
-    await update.message.reply_html("\n".join(lines))
+    return "\n".join(lines)
 
 
 def register(app: Application) -> None:

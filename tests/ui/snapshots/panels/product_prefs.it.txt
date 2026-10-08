@@ -1,0 +1,20 @@
+# ui snapshot v1
+# screen: panels.product_prefs
+# locale: it
+# now: 2026-03-01T12:00:00Z
+text:
+   | 🔔 <b>Notifiche</b>
+   | 📦 <b>⁨Kettle⁩</b>
+   | 
+   | 🔕 Silenzia: fino a 01/03/26, 21:00
+   | 📬 Digest: attivo, ogni 30 min
+   | 🌙 Ore silenziose: 22:00–08:00
+   | ⏱ Limite: 5 all'ora
+   | 🌍 Fuso orario: Europe/Berlin
+keyboard:
+   [1 h](cb:p:7:mu:1)  [8 h](cb:p:7:mu:8)
+   [1 giorno](cb:p:7:mu:24)  [Per sempre](cb:p:7:mu:0)
+   [🔔 Riattiva](cb:p:7:mu:off)
+   [✏️ Altra durata](cb:p:7:mua)
+   [⚙️ Impostazioni](cb:s)  [◀️ Prodotto](cb:p:7:c)
+   [🏠 Home](cb:h)

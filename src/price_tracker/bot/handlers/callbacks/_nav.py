@@ -25,20 +25,25 @@ from price_tracker.bot.handlers._cards import (
     product_view,
     screen_markup,
 )
+from price_tracker.bot.handlers.debug import errors_text, health_text, no_errors_text
 from price_tracker.bot.messages import _, reset_locale, set_locale, user_locale
 from price_tracker.bot.ui.cards import list_page, product_card
+from price_tracker.bot.ui.labels import button, layout_rows
 from price_tracker.bot.ui.panels import (
     QUIET_WINDOWS,
+    add_button,
+    add_screen,
     help_screen,
     home_button,
     home_screen,
+    product_prefs_screen,
     settings_screen,
     settings_section_screen,
 )
-from price_tracker.bot.ui.screens import Screen
-from price_tracker.db.models import NotificationPrefs
+from price_tracker.bot.ui.screens import Button, Screen
+from price_tracker.core.textlimits import split_message
 from price_tracker.i18n.locales import AVAILABLE_LANGUAGES
-from price_tracker.notifier.preferences import PreferencesManager
+from price_tracker.notifier.preferences import PreferencesManager, clear_mute, update_prefs
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -65,8 +70,13 @@ async def _edit(query: Any, screen: Screen) -> None:
         logger.warning("Telegram asked to retry after %s s; the press is dropped", exc.retry_after)
 
 
-async def _prefs_view(db: Any, user_id: int) -> PrefsView:
-    effective = await PreferencesManager(repo=db).resolve_global(user_id=user_id)
+async def _prefs_view(db: Any, user_id: int, product_id: int | None = None) -> PrefsView:
+    """The global preferences, or those in effect for ``product_id``."""
+    manager = PreferencesManager(repo=db)
+    if product_id is None:
+        effective = await manager.resolve_global(user_id=user_id)
+    else:
+        effective = await manager.resolve(user_id=user_id, product_id=product_id)
     return PrefsView(**dataclasses.asdict(effective))
 
 
@@ -89,11 +99,11 @@ async def _settings(
     await _edit(query, settings_screen(view, now=datetime.now(UTC), language=language))
 
 
-async def _show_section(query: Any, db: Any, user_id: int, section: str) -> None:
+async def _show_section(query: Any, db: Any, user_id: int, section: str, notice: str = "") -> None:
     view = await _prefs_view(db, user_id)
     language = await _stored_language(db, user_id)
     screen = settings_section_screen(section, view, now=datetime.now(UTC), language=language)
-    await _edit(query, screen)
+    await _edit(query, _with_notice(screen, notice))
 
 
 async def _settings_section(
@@ -102,32 +112,93 @@ async def _settings_section(
     await _show_section(query, db, user_id, str(action.args[0]))
 
 
-async def _write_prefs(db: Any, user_id: int, **changes: Any) -> None:
-    """Change fields of the global row, keeping the rest: the upsert replaces the whole row."""
-    existing = await db.get_notification_prefs(user_id=user_id, product_id=None)
-    base = existing if existing is not None else NotificationPrefs(user_id=user_id)
-    await db.upsert_notification_prefs(dataclasses.replace(base, **changes))
+def _mute_changes(value: str) -> dict[str, Any]:
+    """The fields a mute preset writes: ``off``, ``0`` (forever) or a number of hours."""
+    if value == "off":
+        return {"mute": False, "mute_until": None}
+    if value == "0":
+        return {"mute": True, "mute_until": None}
+    return {"mute": True, "mute_until": datetime.now(UTC) + timedelta(hours=int(value))}
 
 
 async def _set_mute(
     query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, action: Action
 ) -> None:
-    value = str(action.args[0])
-    if value == "off":
-        await _write_prefs(db, user_id, mute=False, mute_until=None)
-    elif value == "0":
-        await _write_prefs(db, user_id, mute=True, mute_until=None)
-    else:
-        until = datetime.now(UTC) + timedelta(hours=int(value))
-        await _write_prefs(db, user_id, mute=True, mute_until=until)
+    await update_prefs(db, user_id, None, **_mute_changes(str(action.args[0])))
     await _show_section(query, db, user_id, "mu")
+
+
+async def _digest_now(
+    query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, action: Action
+) -> None:
+    sent = await context.bot_data["digest_service"].flush_user(user_id=user_id)
+    notice = _("Pending alerts sent: {n}").format(n=sent)
+    await _show_section(query, db, user_id, "dg", notice=notice)
+
+
+async def _show_product_prefs(
+    query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, record: Any
+) -> None:
+    product_id = int(record["id"])
+    name = record.get("name") or _("Product #{product_id}").format(product_id=product_id)
+    view = await _prefs_view(db, user_id, product_id)
+    await _edit(query, product_prefs_screen(name, product_id, view, now=datetime.now(UTC)))
+
+
+async def _product_prefs(
+    query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, action: Action
+) -> None:
+    # Personal like the card: a foreign id is an unknown id, for admins too.
+    record = await db.get_product_for_user(int(action.args[0]), user_id)
+    if record is None:
+        await show_list(query, context, db, user_id, notice=_("Product not found."))
+        return
+    await _show_product_prefs(query, context, db, user_id, record)
+
+
+async def _product_mute(
+    query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, action: Action
+) -> None:
+    product_id, value = int(action.args[0]), str(action.args[1])
+    record = await db.get_product_for_user(product_id, user_id)
+    if record is None:
+        await show_list(query, context, db, user_id, notice=_("Product not found."))
+        return
+    if value == "off":
+        # Only the product's own mute: a global mute still applies to it.
+        await clear_mute(db, user_id, product_id)
+    else:
+        await update_prefs(db, user_id, product_id, **_mute_changes(value))
+    await _show_product_prefs(query, context, db, user_id, record)
+
+
+def _report_screen(text: str, back: Button) -> Screen:
+    """A report cut to one message, with a way back and Home."""
+    return Screen(text=split_message(text)[0], rows=layout_rows([back, home_button()]))
+
+
+async def _admin_health(
+    query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, action: Action
+) -> None:
+    if not await db.is_user_admin(user_id):
+        return  # silent, like the other admin buttons
+    text = health_text(context.bot_data["health_manager"])
+    await _edit(query, _report_screen(text, button(_("◀️ Admin"), callback="menu_admin")))
+
+
+async def _errors(
+    query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, action: Action
+) -> None:
+    text = await errors_text(db, context.bot_data.get("health_manager"), user_id)
+    back = button(_("◀️ Status & info"), callback="menu_info")
+    await _edit(query, _report_screen(text or no_errors_text(), back))
 
 
 async def _set_digest(
     query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, action: Action
 ) -> None:
     enabled = action.args[0] == "on"
-    await _write_prefs(db, user_id, digest_mode=enabled, digest_interval_minutes=60)
+    await update_prefs(db, user_id, None, digest_mode=enabled)
     await _show_section(query, db, user_id, "dg")
 
 
@@ -136,7 +207,7 @@ async def _set_quiet(
 ) -> None:
     # "off" has no window: both ends are cleared.
     start, end = QUIET_WINDOWS.get(str(action.args[0]), (None, None))
-    await _write_prefs(db, user_id, quiet_hours_start=start, quiet_hours_end=end)
+    await update_prefs(db, user_id, None, quiet_hours_start=start, quiet_hours_end=end)
     await _show_section(query, db, user_id, "qh")
 
 
@@ -163,7 +234,7 @@ async def _list_screen(
 ) -> Screen:
     records = await db.get_all_products(user_id)
     if not records:
-        return Screen(text=empty_list_text(), rows=((home_button(),),))
+        return Screen(text=empty_list_text(), rows=layout_rows([add_button(), home_button()]))
     interval = await default_interval(context)
     return list_page(list_view(records, list_filter, page, default_interval_minutes=interval))
 
@@ -253,6 +324,12 @@ async def _home(
     await _edit(query, home_screen(await home_view(db, user_id)))
 
 
+async def _add(
+    query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, action: Action
+) -> None:
+    await _edit(query, add_screen())
+
+
 async def _help(
     query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, action: Action
 ) -> None:
@@ -272,6 +349,12 @@ _HANDLERS: Final[dict[str, Callable[..., Awaitable[None]]]] = {
     "product.card": _product_card,
     "home": _home,
     "help": _help,
+    "settings.digest_now": _digest_now,
+    "product.prefs": _product_prefs,
+    "product.mute": _product_mute,
+    "admin.health": _admin_health,
+    "errors": _errors,
+    "add": _add,
 }
 
 

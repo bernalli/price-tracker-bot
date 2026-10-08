@@ -1,0 +1,10 @@
+# ui snapshot v1
+# screen: panels.add
+# locale: it
+# now: 2026-03-01T12:00:00Z
+text:
+   | ➕ <b>Aggiungi un prodotto</b>
+   | 
+   | Incolla qui il link della pagina di un prodotto per iniziare a seguirlo.
+keyboard:
+   [◀️ Lista](cb:l:a:1)  [🏠 Home](cb:h)

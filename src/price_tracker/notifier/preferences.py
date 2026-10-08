@@ -1,19 +1,21 @@
 """Per-user/per-product notification preferences with resolution chain.
 
 Resolution order: per-product → per-user-global → defaults.
-NULL fields fall through.
+NULL fields fall through. Mutes are the exception: a product mute and the global mute
+add up, so a product is muted while either one is active.
 """
 
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields, replace
 from datetime import datetime, time, timedelta
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, Final, Protocol, TypeVar
 from zoneinfo import ZoneInfo
 
+from price_tracker.db.models import NotificationPrefs
+
 if TYPE_CHECKING:
-    from price_tracker.db.models import NotificationPrefs
     from price_tracker.db.repository import Repository
 
 T = TypeVar("T")
@@ -60,7 +62,8 @@ class PreferencesManager:
     """Resolve per-user/per-product notification preferences.
 
     Resolution chain (field-by-field): per-product row → per-user-global row → defaults.
-    NULL fields fall through to the next layer.
+    NULL fields fall through to the next layer. The mute is not chosen field by field:
+    the mute of the product row and the global mute add up (see ``_added_mutes``).
     """
 
     def __init__(self, repo: Repository) -> None:
@@ -80,10 +83,28 @@ class PreferencesManager:
         return _coalesce_rows(None, per_user)
 
 
+def _added_mutes(*rows: NotificationPrefs | None) -> tuple[bool, datetime | None]:
+    """The mute in effect when the mutes of ``rows`` add up.
+
+    Muted if any row is muted; the mute ends at the latest end, and a mute without an end
+    (forever) wins. An ended mute never outlasts an active one, so at any instant this is
+    muted exactly while one of the rows is.
+    """
+    ends = [row.mute_until for row in rows if row is not None and row.mute]
+    if not ends:
+        return False, None
+    if any(end is None for end in ends):
+        return True, None
+    return True, max(end for end in ends if end is not None)
+
+
 def _coalesce_rows(
     per_product: NotificationPrefs | None, per_user: NotificationPrefs | None
 ) -> EffectivePrefs:
-    """Coalesce preference rows field-by-field, then fall back to defaults."""
+    """Coalesce preference rows field-by-field, then fall back to defaults.
+
+    The mute is the sum of both rows' mutes, not the first one found.
+    """
 
     def _pick_bool(name: str, default: bool) -> bool:
         pp = getattr(per_product, name, None) if per_product is not None else None
@@ -119,18 +140,10 @@ def _coalesce_rows(
             return None
         return int(v)
 
-    def _pick_optional_dt(name: str) -> datetime | None:
-        pp = getattr(per_product, name, None) if per_product is not None else None
-        pu = getattr(per_user, name, None) if per_user is not None else None
-        v = _coalesce(pp, pu)
-        if v is None:
-            return None
-        assert isinstance(v, datetime)
-        return v
-
+    mute, mute_until = _added_mutes(per_product, per_user)
     return EffectivePrefs(
-        mute=_pick_bool("mute", _DEFAULTS.mute),
-        mute_until=_pick_optional_dt("mute_until"),
+        mute=mute,
+        mute_until=mute_until,
         digest_mode=_pick_bool("digest_mode", _DEFAULTS.digest_mode),
         digest_interval_minutes=_pick_int(
             "digest_interval_minutes", _DEFAULTS.digest_interval_minutes
@@ -213,3 +226,68 @@ class ThrottleWindow:
 
     def exceeded(self, *, limit: int, now: datetime) -> bool:
         return self.count_within_hour(now) >= limit
+
+
+class PrefsStore(Protocol):
+    """Where preference rows are read and written."""
+
+    async def get_notification_prefs(
+        self, *, user_id: int, product_id: int | None
+    ) -> NotificationPrefs | None: ...
+
+    async def upsert_notification_prefs(self, prefs: NotificationPrefs) -> None: ...
+
+
+# Fields a product row takes from the global row when it is created: they are NOT NULL,
+# so a product row with the defaults would hide what the user chose globally.
+_INHERITED: Final = ("digest_mode", "digest_interval_minutes", "timezone")
+_KEYS: Final = frozenset({"user_id", "product_id", "updated_at"})
+
+
+def _check_id(name: str, value: object, *, optional: bool) -> None:
+    if value is None and optional:
+        return
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise TypeError(f"{name}: must be an int, got {value!r}")
+    if value <= 0:
+        raise ValueError(f"{name}: must be positive, got {value!r}")
+
+
+async def update_prefs(
+    store: PrefsStore, user_id: int, product_id: int | None, **changes: object
+) -> None:
+    """Change ``changes`` in the ``(user_id, product_id)`` row and keep every other field.
+
+    The upsert replaces the whole row, so the row is read first. A product row that does
+    not exist yet starts from the digest and time zone of the global row.
+    """
+    _check_id("user_id", user_id, optional=False)
+    _check_id("product_id", product_id, optional=True)
+    known = {f.name for f in fields(NotificationPrefs)} - _KEYS
+    unknown = set(changes) - known
+    if unknown:
+        raise TypeError(f"unknown preference fields: {sorted(unknown)}")
+    base = await store.get_notification_prefs(user_id=user_id, product_id=product_id)
+    if base is None:
+        base = NotificationPrefs(user_id=user_id, product_id=product_id)
+        if product_id is not None:
+            shared = await store.get_notification_prefs(user_id=user_id, product_id=None)
+            if shared is not None:
+                base = replace(base, **{name: getattr(shared, name) for name in _INHERITED})
+    await store.upsert_notification_prefs(replace(base, **changes))  # type: ignore[arg-type]
+
+
+async def clear_mute(store: PrefsStore, user_id: int, product_id: int | None) -> None:
+    """Clear the mute of the ``(user_id, product_id)`` row and keep every other field.
+
+    A product without its own row has no mute of its own to clear, so nothing is
+    written: a product row never makes the product an exception to the global mute.
+    """
+    _check_id("user_id", user_id, optional=False)
+    _check_id("product_id", product_id, optional=True)
+    if (
+        product_id is not None
+        and await store.get_notification_prefs(user_id=user_id, product_id=product_id) is None
+    ):
+        return
+    await update_prefs(store, user_id, product_id, mute=False, mute_until=None)

@@ -15,6 +15,7 @@ from telegram import (
 )
 from telegram.constants import ParseMode
 
+from price_tracker.bot.callbacks import Action, encode
 from price_tracker.bot.decorators import _config
 from price_tracker.bot.handlers._helpers import _escape_html, _parse_id
 from price_tracker.bot.keyboards import menu_back_button
@@ -24,6 +25,12 @@ if TYPE_CHECKING:
     from telegram.ext import ContextTypes
 
 logger = logging.getLogger(__name__)
+
+
+def _cancel_prompt() -> InlineKeyboardMarkup:
+    """The Cancel button of a prompt waiting for typed text: back to the admin menu."""
+    return InlineKeyboardMarkup([[InlineKeyboardButton(_("Cancel"), callback_data="menu_admin")]])
+
 
 _BACK_TO_ADMIN = InlineKeyboardMarkup(
     [[InlineKeyboardButton("◀️ Impostazioni", callback_data="menu_admin")]]
@@ -37,30 +44,37 @@ async def handle_admin_menu(
     if data == "menu_admin":
         if not await db.is_user_admin(user_id):
             return True  # silent reject — handled
+        # Back here from a prompt: the next message is no longer an answer to it.
+        context.user_data.pop("pending_action", None)
         users = await db.list_active_users()
         config = _config(context)
         saved = await db.get_config("check_interval_minutes")
         interval = int(saved) if saved else config.check_interval_minutes
         rows = [
-            [InlineKeyboardButton("👥 Lista utenti", callback_data="menu_admin_users")],
+            [InlineKeyboardButton(_("👥 User list"), callback_data="menu_admin_users")],
             [
-                InlineKeyboardButton("➕ Aggiungi utente", callback_data="menu_admin_adduser"),
-                InlineKeyboardButton("🚫 Rimuovi utente", callback_data="menu_admin_removeuser"),
+                InlineKeyboardButton(_("➕ Add user"), callback_data="menu_admin_adduser"),
+                InlineKeyboardButton(_("🚫 Remove user"), callback_data="menu_admin_removeuser"),
             ],
-            [InlineKeyboardButton("✏️ Nickname utente", callback_data="menu_admin_nick")],
+            [InlineKeyboardButton(_("✏️ User nickname"), callback_data="menu_admin_nick")],
             [
                 InlineKeyboardButton(
-                    f"⏱ Intervallo globale: {interval} min",
+                    _("⏱ Global interval: {interval} min").format(interval=interval),
                     callback_data="menu_admin_interval",
                 )
             ],
-            [InlineKeyboardButton("🔧 Debug scraper", callback_data="menu_admin_debug")],
+            [InlineKeyboardButton(_("🔧 Debug scraper"), callback_data="menu_admin_debug")],
+            [
+                InlineKeyboardButton(
+                    _("🏥 Scraper health"), callback_data=encode(Action("admin.health"))
+                )
+            ],
             menu_back_button(),
         ]
         await query.edit_message_text(
-            f"👑 <b>Impostazioni</b>\n\n"
-            f"👥 Utenti attivi: {len(users)}\n"
-            f"⏱ Intervallo globale: {interval} min",
+            _(
+                "👑 <b>Admin</b>\n\n👥 Active users: {users}\n⏱ Global interval: {interval} min"
+            ).format(users=len(users), interval=interval),
             parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup(rows),
         )
@@ -93,6 +107,7 @@ async def handle_admin_menu(
         await query.edit_message_text(
             "➕ <b>Aggiungi utente</b>\n\nScrivi l'ID Telegram dell'utente da aggiungere:",
             parse_mode=ParseMode.HTML,
+            reply_markup=_cancel_prompt(),
         )
         return True
 
@@ -181,6 +196,7 @@ async def handle_admin_menu(
             f"Attuale: {_escape_html(str(current_name))}\n\n"
             "Scrivi il nuovo nickname:",
             parse_mode=ParseMode.HTML,
+            reply_markup=_cancel_prompt(),
         )
         return True
 
@@ -192,6 +208,7 @@ async def handle_admin_menu(
             "⏱ <b>Intervallo globale</b>\n\n"
             "Scrivi i minuti (es. <code>60</code>, <code>360</code>):",
             parse_mode=ParseMode.HTML,
+            reply_markup=_cancel_prompt(),
         )
         return True
 

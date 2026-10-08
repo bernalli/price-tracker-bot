@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-10-08
+
+### Added
+
+- Every command can now be reached by tapping buttons from the main menu.
+- Settings has Time zone and Throttle, and each setting that takes a value (mute duration,
+  digest interval, quiet hours, time zone, notifications per hour) has a button that asks for
+  it, with Cancel. The Digest section has Send now.
+- Alert rule has a Notifications screen for one product: its effective settings, and mute,
+  unmute or mute for a chosen time.
+- Status & info has an error report; the Admin menu has Scraper health.
+- The product list has an Add button that explains how to add a product: paste its link.
+- The admin prompts for adding a user, a nickname and the global interval have a Cancel button.
+
+### Changed
+
+- The Admin, Alert rule, Notifications and Status & info menus follow the chosen language.
+- The Settings screen no longer lists typed commands.
+- Turning the digest on or off keeps its interval.
+- Italian translations were added for the prompts and hints of the guided flows.
+
+### Fixed
+
+- The /debug report shows values read from the page as plain text; page content can no longer
+  break the message. The /health report shows domain names and block reasons the same way.
+- Muting one product no longer overrides the digest and time zone that apply to it.
+- A muted product stays muted when everything is muted too, and unmuting a product no longer
+  exempts it from muting everything.
+
 ## [1.6.0] - 2026-10-08
 
 ### Changed
@@ -732,7 +761,8 @@ auto-quarantine, and a plugin extension point.
 - osv-scanner dependency vulnerability scan in CI.
 - Pre-commit hooks block secrets at commit time.
 
-[Unreleased]: https://github.com/bernalli/price-tracker-bot/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/bernalli/price-tracker-bot/compare/v1.7.0...HEAD
+[1.7.0]: https://github.com/bernalli/price-tracker-bot/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/bernalli/price-tracker-bot/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/bernalli/price-tracker-bot/compare/v1.4.2...v1.5.0
 [1.4.2]: https://github.com/bernalli/price-tracker-bot/compare/v1.4.1...v1.4.2

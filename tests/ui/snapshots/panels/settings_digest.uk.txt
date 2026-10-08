@@ -8,4 +8,7 @@ text:
    | [Current: [on, every 30 хв on, every 30 хв on, every 30 хв] Current: [on, every 30 хв on, every 30 хв on, every 30 хв] Current: [on, every 30 хв on, every 30 хв on, every 30 хв]]
 keyboard:
    [[On On On] ✓](cb:s:dg:on)  [[Off Off Off]](cb:s:dg:off)
+   [[✏️ Interval ✏️ Interval ✏️ Inter…](cb:s:ask:dg)
+   [[📨 Send now 📨 Send now 📨 Send …](cb:s:dn)
    [[◀️ Settings ◀️ Settings ◀️ Setti…](cb:s)
+   [[🏠 Home 🏠 Home 🏠 Home]](cb:h)

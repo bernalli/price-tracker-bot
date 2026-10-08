@@ -1,0 +1,12 @@
+# ui snapshot v1
+# screen: panels.settings_throttle
+# locale: pt_BR
+# now: 2026-03-01T12:00:00Z
+text:
+   | [⏱ <b>Throttle</b> ⏱ <b>Throttle</b> ⏱ <b>Throttle</b>]
+   | 
+   | [Current: [5 per hour 5 per hour 5 per hour] Current: [5 per hour 5 per hour 5 per hour] Current: [5 per hour 5 per hour 5 per hour]]
+keyboard:
+   [[✏️ Change ✏️ Change ✏️ Change]](cb:s:ask:th)
+   [[◀️ Settings ◀️ Settings ◀️ Setti…](cb:s)
+   [[🏠 Home 🏠 Home 🏠 Home]](cb:h)

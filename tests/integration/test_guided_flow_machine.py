@@ -34,6 +34,7 @@ import os
 import re
 import string
 from dataclasses import dataclass, replace
+from datetime import time
 from decimal import Decimal
 from typing import Any
 
@@ -45,8 +46,11 @@ from price_tracker.app.inputs import (
     Absolute,
     Cancel,
     ClearTarget,
+    Forever,
     IntervalMinutes,
+    Off,
     Percentage,
+    QuietHours,
     ResetInterval,
     SetTarget,
 )
@@ -67,32 +71,56 @@ NO_OPEN_PROMPT = "No open prompt - use the buttons or /menu."
 DEBUG_ENTRIES = ("menu_admin_debug", "a:dbg")
 DEBUG_LINK_RE = re.compile(r"https?://\S+")
 KIND_BY_VERB = {"th": "threshold", "tg": "target", "iv": "interval"}
+SETTING_BY_ASK = {
+    "mu": "mute",
+    "dg": "digest",
+    "qh": "quiet",
+    "tz": "timezone",
+    "th": "throttle",
+}
+SETTING_KINDS = frozenset(SETTING_BY_ASK.values())
 SUT_KIND = {
     "threshold": FlowKind.THRESHOLD,
     "target": FlowKind.TARGET,
     "interval": FlowKind.INTERVAL,
+    "mute": FlowKind.MUTE,
+    "digest": FlowKind.DIGEST,
+    "quiet": FlowKind.QUIET,
+    "timezone": FlowKind.TIMEZONE,
+    "throttle": FlowKind.THROTTLE,
 }
+_NO_SETTING = dict.fromkeys(SETTING_KINDS)
 MAX_ATTEMPTS = 3
 TOKEN_RE = re.compile(r"^p:([0-9a-f]{32}):(cur|sc|x)(?::([A-Za-z_]+))?$")
 
 # text -> meaning per value kind (None = rejected), written from the grammar.
+_NO_VALUE = {"threshold": None, "target": None, "interval": None}
 VALUE_TEXTS: dict[str, dict[str, Any]] = {
-    "20%": {"threshold": Percentage(20), "target": None, "interval": None},
+    "20%": {**_NO_SETTING, "threshold": Percentage(20), "target": None, "interval": None},
     "12.50": {
+        **_NO_SETTING,
         "threshold": Absolute(Decimal("12.50")),
         "target": SetTarget(Decimal("12.50")),
         "interval": None,
     },
     "30": {
+        **_NO_SETTING,
         "threshold": Absolute(Decimal("30")),
         "target": SetTarget(Decimal("30")),
         "interval": IntervalMinutes(30),
+        "mute": 30,
+        "digest": 30,
+        "throttle": 30,
     },
-    "0": {"threshold": None, "target": ClearTarget(), "interval": ResetInterval()},
-    "-": {"threshold": Cancel(), "target": Cancel(), "interval": None},
-    "NaN": {"threshold": None, "target": None, "interval": None},
-    "1e3": {"threshold": None, "target": None, "interval": None},
-    "hello": {"threshold": None, "target": None, "interval": None},
+    "0": {**_NO_SETTING, "threshold": None, "target": ClearTarget(), "interval": ResetInterval()},
+    "-": {**_NO_SETTING, "threshold": Cancel(), "target": Cancel(), "interval": None},
+    "NaN": {**_NO_SETTING, **_NO_VALUE},
+    "1e3": {**_NO_SETTING, **_NO_VALUE},
+    "hello": {**_NO_SETTING, **_NO_VALUE},
+    "forever": {**_NO_SETTING, **_NO_VALUE, "mute": Forever()},
+    "off": {**_NO_SETTING, **_NO_VALUE, "quiet": Off(), "throttle": Off()},
+    "22:00-08:00": {**_NO_SETTING, **_NO_VALUE, "quiet": QuietHours(time(22, 0), time(8, 0))},
+    "Europe/Rome": {**_NO_SETTING, **_NO_VALUE, "timezone": "Europe/Rome"},
 }
 CURRENCY_TEXTS: dict[str, str | None] = {"usd": "USD", "gbp": "GBP", "us$": None, "euro": None}
 ALL_TEXTS = sorted({*VALUE_TEXTS, *CURRENCY_TEXTS})
@@ -239,6 +267,21 @@ class GuidedFlowMachine(RuleBasedStateMachine):
             return
         self._open(key, MFlow(KIND_BY_VERB[verb], "value", "", product=product))
 
+    @rule(key=st.sampled_from(KEYS), setting=st.sampled_from(sorted(SETTING_BY_ASK)))
+    def open_setting(self, key: tuple[int, int], setting: str) -> None:
+        self._begin()
+        self._run(self.h.press(key[0], key[1], f"s:ask:{setting}"))
+        if key[1] in self.active:
+            self._open(key, MFlow(SETTING_BY_ASK[setting], "value", ""))
+
+    @rule(key=st.sampled_from(KEYS), product=st.sampled_from(sorted(OWNED)))
+    def open_product_mute(self, key: tuple[int, int], product: int) -> None:
+        self._begin()
+        self._run(self.h.press(key[0], key[1], f"p:{product}:mua"))
+        user = key[1]
+        if user in self.active and OWNED[product] == user:
+            self._open(key, MFlow("mute", "value", "", product=product))
+
     @rule(
         key=st.sampled_from(KEYS),
         url=st.sampled_from((URL_EUR, URL_NOCUR, URL_BROKEN)),
@@ -344,6 +387,10 @@ class GuidedFlowMachine(RuleBasedStateMachine):
         if isinstance(meaning, Cancel) or key[1] not in self.active:
             event("value answer: cancel or revoked")
             return
+        if flow.kind in SETTING_KINDS:
+            event(f"setting answer applied: {flow.kind}")
+            self.writes.append(("setting", key[1], SUT_KIND[flow.kind], flow.product, meaning))
+            return
         event("value answer applied")
         self.writes.append(("value", key[1], SUT_KIND[flow.kind], flow.product, meaning))
 
@@ -428,12 +475,18 @@ class GuidedFlowMachine(RuleBasedStateMachine):
                 self.writes.append(("scope", key[1], flow.product, True, arg))
 
     def _model_non_flow_press(self, key: tuple[int, int], data: str) -> None:
-        entry = re.fullmatch(r"p:([0-9]+):(th|tg|iv)", data)
+        entry = re.fullmatch(r"p:([0-9]+):(th|tg|iv|mua)", data)
         if entry is not None:
             product, verb = int(entry.group(1)), entry.group(2)
             user = key[1]
             if user in self.active and OWNED.get(product) == user:
-                self._open(key, MFlow(KIND_BY_VERB[verb], "value", "", product=product))
+                kind = "mute" if verb == "mua" else KIND_BY_VERB[verb]
+                self._open(key, MFlow(kind, "value", "", product=product))
+            return
+        ask = re.fullmatch(r"s:ask:(mu|dg|qh|tz|th)", data)
+        if ask is not None:
+            if key[1] in self.active:
+                self._open(key, MFlow(SETTING_BY_ASK[ask.group(1)], "value", ""))
             return
         self._end_flow(key)  # any other callback abandons the prompt (E8)
 

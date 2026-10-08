@@ -504,7 +504,7 @@
   },
   {
    "id": "No open prompt - use the buttons or /menu.",
-   "string": ""
+   "string": "Nessuna richiesta aperta - usa i pulsanti o /menu."
   },
   {
    "id": "Nothing to cancel.",
@@ -520,27 +520,27 @@
   },
   {
    "id": "Added.",
-   "string": ""
+   "string": "Aggiunto."
   },
   {
    "id": "Added - other stores will be followed too.",
-   "string": ""
+   "string": "Aggiunto - verranno seguiti anche gli altri negozi."
   },
   {
    "id": "Could not read this page. Nothing was added.",
-   "string": ""
+   "string": "Impossibile leggere questa pagina. Non è stato aggiunto nulla."
   },
   {
    "id": "Already tracked.",
-   "string": ""
+   "string": "Già monitorato."
   },
   {
    "id": "Tracking resumed.",
-   "string": ""
+   "string": "Monitoraggio riattivato."
   },
   {
    "id": "Type a three-letter currency code, for example USD.",
-   "string": ""
+   "string": "Scrivi un codice valuta di tre lettere, ad esempio USD."
   },
   {
    "id": "Cancelled - nothing changed.",
@@ -548,7 +548,7 @@
   },
   {
    "id": "Cancelled - no product was added.",
-   "string": ""
+   "string": "Annullato - nessun prodotto aggiunto."
   },
   {
    "id": "Expired - nothing changed.",
@@ -556,27 +556,27 @@
   },
   {
    "id": "Expired - no product was added.",
-   "string": ""
+   "string": "Scaduto - nessun prodotto aggiunto."
   },
   {
    "id": "Other stores will be followed at this level from a later version.",
-   "string": ""
+   "string": "Gli altri negozi verranno seguiti a questo livello da una versione futura."
   },
   {
    "id": "Which currency is this price in?",
-   "string": ""
+   "string": "In quale valuta è questo prezzo?"
   },
   {
    "id": "Where should the price be followed?",
-   "string": ""
+   "string": "Dove va seguito il prezzo?"
   },
   {
    "id": "Choose a level:",
-   "string": ""
+   "string": "Scegli un livello:"
   },
   {
    "id": "Currency: {code}",
-   "string": ""
+   "string": "Valuta: {code}"
   },
   {
    "id": "Cancel",
@@ -584,27 +584,27 @@
   },
   {
    "id": "Type a code",
-   "string": ""
+   "string": "Scrivi un codice"
   },
   {
    "id": "Other stores too",
-   "string": ""
+   "string": "Anche altri negozi"
   },
   {
    "id": "Only on {store}",
-   "string": ""
+   "string": "Solo su {store}"
   },
   {
    "id": "My country",
-   "string": ""
+   "string": "Il mio paese"
   },
   {
    "id": "My customs area",
-   "string": ""
+   "string": "La mia area doganale"
   },
   {
    "id": "Worldwide",
-   "string": ""
+   "string": "In tutto il mondo"
   },
   {
    "id": "Send the drop threshold: 20% or 5.50 (one dot or comma).",
@@ -640,15 +640,15 @@
   },
   {
    "id": "Unknown currency code.",
-   "string": ""
+   "string": "Codice valuta sconosciuto."
   },
   {
    "id": "Unknown time zone.",
-   "string": ""
+   "string": "Fuso orario sconosciuto."
   },
   {
    "id": "Use HH:MM-HH:MM.",
-   "string": ""
+   "string": "Usa HH:MM-HH:MM."
   },
   {
    "id": "That is not a link.",
@@ -656,11 +656,11 @@
   },
   {
    "id": "That link is not allowed.",
-   "string": ""
+   "string": "Questo link non è consentito."
   },
   {
    "id": "Kept: only on {store}.",
-   "string": ""
+   "string": "Mantenuto: solo su {store}."
   },
   {
    "id": "Use whole minutes, e.g. 30.",
