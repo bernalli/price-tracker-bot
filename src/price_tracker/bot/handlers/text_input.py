@@ -76,7 +76,7 @@ async def handle_text_input(  # noqa: PLR0915 — verbatim port; not yet split i
             return
 
     if text.lower() in ("no", "skip", "salta", "-", "annulla"):
-        await update.message.reply_text(_("👍 Ok, nessuna modifica."))
+        await update.message.reply_text(_("👍 Okay, no changes."))
         return
 
     db = _db(context)
@@ -84,25 +84,25 @@ async def handle_text_input(  # noqa: PLR0915 — verbatim port; not yet split i
     if action_type == "admin_adduser":
         new_uid = _parse_id(text.strip())
         if new_uid is None:
-            await update.message.reply_text(_("❌ ID non valido. Deve essere un numero."))
+            await update.message.reply_text(_("❌ Invalid ID. Must be a number."))
             context.user_data["pending_action"] = pending_action
             return
         existing = await db.get_user(new_uid)
         if existing and existing.get("is_active"):
             await update.message.reply_text(
-                f"ℹ️ Utente <code>{new_uid}</code> già autorizzato.",
+                _("ℹ️ User <code>{user_id}</code> is already authorized.").format(user_id=new_uid),
                 parse_mode=ParseMode.HTML,
             )
         else:
             await db.add_user(new_uid, is_admin=False)
             await update.message.reply_text(
-                f"✅ Utente <code>{new_uid}</code> aggiunto!",
+                _("✅ User <code>{user_id}</code> added!").format(user_id=new_uid),
                 parse_mode=ParseMode.HTML,
             )
             with contextlib.suppress(Exception):
                 await context.bot.send_message(
                     chat_id=new_uid,
-                    text="🎉 Sei stato autorizzato! Invia /start.",
+                    text=_("🎉 You have been authorized! Send /start."),
                 )
 
     elif action_type == "admin_nick":
@@ -111,11 +111,11 @@ async def handle_text_input(  # noqa: PLR0915 — verbatim port; not yet split i
         target_user_id = product_id
         nickname = text.strip()
         if not nickname:
-            await update.message.reply_text(_("❌ Nickname vuoto."))
+            await update.message.reply_text(_("❌ Empty nickname."))
             return
         await db.update_user_info(target_user_id, display_name=nickname)
         await update.message.reply_text(
-            f"✅ Nickname aggiornato: <b>{_escape_html(nickname)}</b>",
+            _("✅ Nickname updated: <b>{nickname}</b>").format(nickname=_escape_html(nickname)),
             parse_mode=ParseMode.HTML,
         )
 
@@ -123,25 +123,29 @@ async def handle_text_input(  # noqa: PLR0915 — verbatim port; not yet split i
         try:
             minutes = int(text.strip())
         except ValueError:
-            await update.message.reply_text(_("❌ Numero non valido."))
+            await update.message.reply_text(_("❌ Invalid number."))
             context.user_data["pending_action"] = pending_action
             return
         if minutes < 5:
-            await update.message.reply_text(_("❌ Minimo 5 minuti."))
+            await update.message.reply_text(_("❌ Minimum is 5 minutes."))
             context.user_data["pending_action"] = pending_action
             return
         if minutes > 1440 * 7:
-            await update.message.reply_text(_("❌ L'intervallo massimo è 7 giorni."))
+            await update.message.reply_text(_("❌ Maximum interval is 7 days."))
             context.user_data["pending_action"] = pending_action
             return
         await db.set_config("check_interval_minutes", str(minutes))
         if minutes >= 60:
             h = minutes / 60
-            display = f"{h:.0f} ore" if h == int(h) else f"{h:.1f} ore"
+            display = (
+                _("{hours:.0f} hours").format(hours=h)
+                if h == int(h)
+                else _("{hours:.1f} hours").format(hours=h)
+            )
         else:
-            display = f"{minutes} minuti"
+            display = _("{minutes} minutes").format(minutes=minutes)
         await update.message.reply_text(
-            f"✅ Intervallo aggiornato: <b>ogni {display}</b>",
+            _("✅ Interval updated: <b>every {display}</b>").format(display=display),
             parse_mode=ParseMode.HTML,
         )
 

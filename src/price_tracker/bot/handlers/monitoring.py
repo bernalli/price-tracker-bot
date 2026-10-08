@@ -341,9 +341,9 @@ async def cmd_pause(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await _db(context).deactivate_product(product_id)
     name = product.get("name") or _("Unknown")
     await update.message.reply_text(
-        _("⏸ Tracking paused: <b>{name}</b>").format(name=_escape_html(truncate_to_width(name, 80)))
-        + "\n"
-        + _("Use /reactivate {pid} to resume tracking.").format(pid=product_id),
+        _("⏸ Tracking paused: <b>{name}</b>\nUse /reactivate {pid} to resume tracking.").format(
+            name=_escape_html(truncate_to_width(name, 80)), pid=product_id
+        ),
         parse_mode=ParseMode.HTML,
     )
 

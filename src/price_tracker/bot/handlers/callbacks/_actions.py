@@ -108,7 +108,7 @@ async def handle_pause_button(
 
     product_id = _parse_id(data.replace("pause_", ""))
     if product_id is None:
-        await query.edit_message_text("❌ ID non valido.")
+        await query.edit_message_text(_("❌ Invalid ID."))
         return True
     product = await _get_user_product(context, product_id, user_id)
     if not product:
@@ -145,30 +145,30 @@ async def handle_remove_button(
 
     product_id = _parse_id(data.replace("remove_", ""))
     if product_id is None:
-        await query.edit_message_text("❌ ID non valido.")
+        await query.edit_message_text(_("❌ Invalid ID."))
         return True
     product = await _get_user_product(context, product_id, user_id)
     if not product:
         await show_list(query, context, db, user_id, notice=_("Product not found."))
         return True
 
-    name = truncate_to_width(product.get("name") or "Sconosciuto", 50)
+    name = truncate_to_width(product.get("name") or _("Unknown"), 50)
     keyboard = InlineKeyboardMarkup(
         [
             [
                 InlineKeyboardButton(
-                    "🗑 Sì, elimina tutto",
+                    _("🗑 Yes, delete everything"),
                     callback_data=f"confirm_delete_{product_id}",
                 ),
-                InlineKeyboardButton("⏸ Solo pausa", callback_data=f"pause_{product_id}"),
+                InlineKeyboardButton(_("⏸ Pause only"), callback_data=f"pause_{product_id}"),
                 InlineKeyboardButton(
-                    "❌ Annulla", callback_data=encode(Action("product.card", (product_id,)))
+                    _("❌ Cancel"), callback_data=encode(Action("product.card", (product_id,)))
                 ),
             ]
         ]
     )
     await query.edit_message_text(
-        f"❓ Cosa vuoi fare con <b>{_escape_html(name)}</b>?",
+        _("❓ What do you want to do with <b>{name}</b>?").format(name=_escape_html(name)),
         parse_mode=ParseMode.HTML,
         reply_markup=keyboard,
     )
@@ -178,31 +178,33 @@ async def handle_remove_button(
 async def handle_reset_button(
     query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, data: str
 ) -> bool:
-    """Handle the 'Azzera prezzo base' button (`reset_<id>`)."""
+    """Handle the 'Reset base price' button (`reset_<id>`)."""
     if not data.startswith("reset_"):
         return False
 
     product_id = _parse_id(data.replace("reset_", ""))
     if product_id is None:
-        await query.edit_message_text("❌ ID non valido.")
+        await query.edit_message_text(_("❌ Invalid ID."))
         return True
     product = await _get_user_product(context, product_id, user_id)
     if not product:
-        await query.edit_message_text("❌ Prodotto non trovato.")
+        await query.edit_message_text(_("❌ Product not found."))
         return True
     success = await db.reset_initial_price(product_id)
     if success:
-        name = truncate_to_width(product.get("name") or "Sconosciuto", 60)
+        name = truncate_to_width(product.get("name") or _("Unknown"), 60)
         current = _safe_dec(product.get("current_price"))
-        price_str = f"€{current:.2f}" if current else "N/D"
+        price_str = f"€{current:.2f}" if current else _("N/A")
         await query.edit_message_text(
-            f"✅ Prezzo base aggiornato!\n\n"
-            f"📦 <b>#{product_id}</b> {_escape_html(name)}\n"
-            f"💰 Nuovo base: <b>{price_str}</b>",
+            _(
+                "✅ Base price updated!\n\n"
+                "📦 <b>#{product_id}</b> {name}\n"
+                "💰 New base: <b>{price}</b>"
+            ).format(product_id=product_id, name=_escape_html(name), price=price_str),
             parse_mode=ParseMode.HTML,
         )
     else:
-        await query.edit_message_text("❌ Impossibile aggiornare.")
+        await query.edit_message_text(_("❌ Could not update."))
     return True
 
 
@@ -215,7 +217,7 @@ async def handle_reactivate_button(
 
     product_id = _parse_id(data.replace("reactivate_", ""))
     if product_id is None:
-        await query.edit_message_text("❌ ID non valido.")
+        await query.edit_message_text(_("❌ Invalid ID."))
         return True
     product = await _get_user_product(context, product_id, user_id)
     if not product:
