@@ -674,7 +674,7 @@ msgstr "Sostituita da una richiesta più recente."
 
 #: src/price_tracker/bot/flows.py:393
 msgid "No open prompt - use the buttons or /menu."
-msgstr ""
+msgstr "Nessuna richiesta aperta - usa i pulsanti o /menu."
 
 #: src/price_tracker/bot/flows.py:394
 msgid "Nothing to cancel."
@@ -690,27 +690,27 @@ msgstr "Salvato."
 
 #: src/price_tracker/bot/flows.py:397
 msgid "Added."
-msgstr ""
+msgstr "Aggiunto."
 
 #: src/price_tracker/bot/flows.py:398
 msgid "Added - other stores will be followed too."
-msgstr ""
+msgstr "Aggiunto - verranno seguiti anche gli altri negozi."
 
 #: src/price_tracker/bot/flows.py:399
 msgid "Could not read this page. Nothing was added."
-msgstr ""
+msgstr "Impossibile leggere questa pagina. Non è stato aggiunto nulla."
 
 #: src/price_tracker/bot/flows.py:400
 msgid "Already tracked."
-msgstr ""
+msgstr "Già monitorato."
 
 #: src/price_tracker/bot/flows.py:401
 msgid "Tracking resumed."
-msgstr ""
+msgstr "Monitoraggio riattivato."
 
 #: src/price_tracker/bot/flows.py:402
 msgid "Type a three-letter currency code, for example USD."
-msgstr ""
+msgstr "Scrivi un codice valuta di tre lettere, ad esempio USD."
 
 #: src/price_tracker/bot/flows.py:403
 msgid "Cancelled - nothing changed."
@@ -718,7 +718,7 @@ msgstr "Annullato - nessuna modifica."
 
 #: src/price_tracker/bot/flows.py:404
 msgid "Cancelled - no product was added."
-msgstr ""
+msgstr "Annullato - nessun prodotto aggiunto."
 
 #: src/price_tracker/bot/flows.py:405
 msgid "Expired - nothing changed."
@@ -726,28 +726,28 @@ msgstr "Scaduto - nessuna modifica."
 
 #: src/price_tracker/bot/flows.py:406
 msgid "Expired - no product was added."
-msgstr ""
+msgstr "Scaduto - nessun prodotto aggiunto."
 
 #: src/price_tracker/bot/flows.py:407
 msgid "Other stores will be followed at this level from a later version."
-msgstr ""
+msgstr "Gli altri negozi verranno seguiti a questo livello da una versione futura."
 
 #: src/price_tracker/bot/flows.py:408
 msgid "Which currency is this price in?"
-msgstr ""
+msgstr "In quale valuta è questo prezzo?"
 
 #: src/price_tracker/bot/flows.py:409
 msgid "Where should the price be followed?"
-msgstr ""
+msgstr "Dove va seguito il prezzo?"
 
 #: src/price_tracker/bot/flows.py:410
 msgid "Choose a level:"
-msgstr ""
+msgstr "Scegli un livello:"
 
 #: src/price_tracker/bot/flows.py:411
 #, python-brace-format
 msgid "Currency: {code}"
-msgstr ""
+msgstr "Valuta: {code}"
 
 #: src/price_tracker/bot/flows.py:412
 msgid "Cancel"
@@ -755,28 +755,28 @@ msgstr "Annulla"
 
 #: src/price_tracker/bot/flows.py:413
 msgid "Type a code"
-msgstr ""
+msgstr "Scrivi un codice"
 
 #: src/price_tracker/bot/flows.py:414
 msgid "Other stores too"
-msgstr ""
+msgstr "Anche altri negozi"
 
 #: src/price_tracker/bot/flows.py:415
 #, python-brace-format
 msgid "Only on {store}"
-msgstr ""
+msgstr "Solo su {store}"
 
 #: src/price_tracker/bot/flows.py:417
 msgid "My country"
-msgstr ""
+msgstr "Il mio paese"
 
 #: src/price_tracker/bot/flows.py:418
 msgid "My customs area"
-msgstr ""
+msgstr "La mia area doganale"
 
 #: src/price_tracker/bot/flows.py:419
 msgid "Worldwide"
-msgstr ""
+msgstr "In tutto il mondo"
 
 #: src/price_tracker/bot/flows.py:423
 #, python-format
@@ -815,15 +815,15 @@ msgstr "Valore fuori intervallo."
 
 #: src/price_tracker/bot/flows.py:434
 msgid "Unknown currency code."
-msgstr ""
+msgstr "Codice valuta sconosciuto."
 
 #: src/price_tracker/bot/flows.py:435
 msgid "Unknown time zone."
-msgstr ""
+msgstr "Fuso orario sconosciuto."
 
 #: src/price_tracker/bot/flows.py:436
 msgid "Use HH:MM-HH:MM."
-msgstr ""
+msgstr "Usa HH:MM-HH:MM."
 
 #: src/price_tracker/bot/flows.py:437
 msgid "That is not a link."
@@ -831,12 +831,12 @@ msgstr "Non è un link."
 
 #: src/price_tracker/bot/flows.py:438
 msgid "That link is not allowed."
-msgstr ""
+msgstr "Questo link non è consentito."
 
 #: src/price_tracker/bot/flows.py:443
 #, python-brace-format
 msgid "Kept: only on {store}."
-msgstr ""
+msgstr "Mantenuto: solo su {store}."
 
 #: src/price_tracker/bot/flows.py:442
 msgid "Use whole minutes, e.g. 30."
