@@ -8,14 +8,14 @@ text:
    | [🔕 Mute: [until 2026/3/1 21:00 until 2026/3/1 21:00 until 2026/3/1 21:00] 🔕 Mute: [until 2026/3/1 21:00 until 2026/3/1 21:00 until 2026/3/1 21:00] 🔕 Mute: [until 2026/3/1 21:00 until 2026/3/1 21:00 until 2026/3/1 21:00]]
    | [📬 Digest: [on, every 30分钟 on, every 30分钟 on, every 30分钟] 📬 Digest: [on, every 30分钟 on, every 30分钟 on, every 30分钟] 📬 Digest: [on, every 30分钟 on, every 30分钟 on, every 30分钟]]
    | [🌙 Quiet hours: 22:00–08:00 🌙 Quiet hours: 22:00–08:00 🌙 Quiet hours: 22:00–08:00]
-   | [⏱ Throttle: [5 per hour 5 per hour 5 per hour] · change with /throttle &lt;N&gt;|off ⏱ Throttle: [5 per hour 5 per hour 5 per hour] · change with /throttle &lt;N&gt;|off ⏱ Throttle: [5 per hour 5 per hour 5 per hour] · change with /throttle &lt;N&gt;|off]
-   | [🌍 Timezone: Europe/Berlin · change with /timezone &lt;zone&gt; 🌍 Timezone: Europe/Berlin · change with /timezone &lt;zone&gt; 🌍 Timezone: Europe/Berlin · change with /timezone &lt;zone&gt;]
+   | [⏱ Throttle: [5 per hour 5 per hour 5 per hour] ⏱ Throttle: [5 per hour 5 per hour 5 per hour] ⏱ Throttle: [5 per hour 5 per hour 5 per hour]]
+   | [🌍 Timezone: Europe/Berlin 🌍 Timezone: Europe/Berlin 🌍 Timezone: Europe/Berlin]
    | [🗣 Language: [Automatic (中文) Automatic (中文) Automatic (中文)] 🗣 Language: [Automatic (中文) Automatic (中文) Automatic (中文)] 🗣 Language: [Automatic (中文) Automatic (中文) Automatic (中文)]]
-   | 
-   | [Other values: /digest_mode on|off &lt;minutes&gt;, /quiet_hours HH:MM-HH:MM Other values: /digest_mode on|off &lt;minutes&gt;, /quiet_hours HH:MM-HH:MM Other values: /digest_mode on|off &lt;minutes&gt;, /quiet_hours HH:MM-HH:MM]
 keyboard:
    [[🔕 Mute 🔕 Mute 🔕 Mute]](cb:s:mu)
    [[📬 Digest 📬 Digest 📬 Digest]](cb:s:dg)
    [[🌙 Quiet hours 🌙 Quiet hours 🌙…](cb:s:qh)
+   [[⏱ Throttle ⏱ Throttle ⏱ Throt…](cb:s:th)
+   [[🌍 Timezone 🌍 Timezone 🌍 Timez…](cb:s:tz)
    [[🗣 Language 🗣 Language 🗣 Langu…](cb:s:lang)
    [[🏠 Home 🏠 Home 🏠 Home]](cb:h)

@@ -1,0 +1,10 @@
+# ui snapshot v1
+# screen: panels.settings_timezone
+# locale: ja
+# now: 2026-03-01T12:00:00Z
+text:
+   | [🌍 <b>Timezone</b> 🌍 <b>Timezone</b> 🌍 <b>Timezone</b>]
+   | 
+   | [Current: Europe/Berlin Current: Europe/Berlin Current: Europe/Berlin]
+keyboard:
+   [[◀️ Settings ◀️ Settings ◀️ Setti…](cb:s)

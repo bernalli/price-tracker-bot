@@ -15,6 +15,7 @@ from telegram import (
 )
 from telegram.constants import ParseMode
 
+from price_tracker.bot.callbacks import Action, encode
 from price_tracker.bot.decorators import _config
 from price_tracker.bot.handlers._helpers import _escape_html, _parse_id
 from price_tracker.bot.keyboards import menu_back_button
@@ -24,6 +25,12 @@ if TYPE_CHECKING:
     from telegram.ext import ContextTypes
 
 logger = logging.getLogger(__name__)
+
+
+def _cancel_prompt() -> InlineKeyboardMarkup:
+    """The Cancel button of a prompt waiting for typed text: back to the admin menu."""
+    return InlineKeyboardMarkup([[InlineKeyboardButton(_("Cancel"), callback_data="menu_admin")]])
+
 
 _BACK_TO_ADMIN = InlineKeyboardMarkup(
     [[InlineKeyboardButton("◀️ Impostazioni", callback_data="menu_admin")]]
@@ -37,6 +44,8 @@ async def handle_admin_menu(
     if data == "menu_admin":
         if not await db.is_user_admin(user_id):
             return True  # silent reject — handled
+        # Back here from a prompt: the next message is no longer an answer to it.
+        context.user_data.pop("pending_action", None)
         users = await db.list_active_users()
         config = _config(context)
         saved = await db.get_config("check_interval_minutes")
@@ -55,6 +64,11 @@ async def handle_admin_menu(
                 )
             ],
             [InlineKeyboardButton(_("🔧 Debug scraper"), callback_data="menu_admin_debug")],
+            [
+                InlineKeyboardButton(
+                    _("🏥 Scraper health"), callback_data=encode(Action("admin.health"))
+                )
+            ],
             menu_back_button(),
         ]
         await query.edit_message_text(
@@ -93,6 +107,7 @@ async def handle_admin_menu(
         await query.edit_message_text(
             "➕ <b>Aggiungi utente</b>\n\nScrivi l'ID Telegram dell'utente da aggiungere:",
             parse_mode=ParseMode.HTML,
+            reply_markup=_cancel_prompt(),
         )
         return True
 
@@ -181,6 +196,7 @@ async def handle_admin_menu(
             f"Attuale: {_escape_html(str(current_name))}\n\n"
             "Scrivi il nuovo nickname:",
             parse_mode=ParseMode.HTML,
+            reply_markup=_cancel_prompt(),
         )
         return True
 
@@ -192,6 +208,7 @@ async def handle_admin_menu(
             "⏱ <b>Intervallo globale</b>\n\n"
             "Scrivi i minuti (es. <code>60</code>, <code>360</code>):",
             parse_mode=ParseMode.HTML,
+            reply_markup=_cancel_prompt(),
         )
         return True
 

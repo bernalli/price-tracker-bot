@@ -1,0 +1,10 @@
+# ui snapshot v1
+# screen: panels.settings_throttle
+# locale: en
+# now: 2026-03-01T12:00:00Z
+text:
+   | ⏱ <b>Throttle</b>
+   | 
+   | Current: 5 per hour
+keyboard:
+   [◀️ Settings](cb:s)

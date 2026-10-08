@@ -13,14 +13,13 @@
    | 🔕 Silenzia: off
    | 📬 Digest: off
    | 🌙 Ore silenziose: off
-   | ⏱ Limite: illimitato · cambia con /throttle &lt;N&gt;|off
-   | 🌍 Fuso orario: Europe/Rome · cambia con /timezone &lt;zona&gt;
+   | ⏱ Limite: illimitato
+   | 🌍 Fuso orario: Europe/Rome
    | 🗣 Lingua: Automatica (Italiano)
-   |
-   | Altri valori: /digest_mode on|off &lt;minuti&gt;, /quiet_hours HH:MM-HH:MM
    keyboard:
    | [🔕 Silenzia → s:mu] [📬 Digest → s:dg]
-   | [🌙 Ore silenziose → s:qh] [🗣 Lingua → s:lang]
+   | [🌙 Ore silenziose → s:qh] [⏱ Limite → s:th]
+   | [🌍 Fuso orario → s:tz] [🗣 Lingua → s:lang]
    | [🏠 Home → h]
 ## db after step 1
 (no changes)
@@ -67,6 +66,7 @@
    | Attuale: off
    keyboard:
    | [Attivo → s:dg:on] [Disattivo ✓ → s:dg:off]
+   | [📨 Invia ora → s:dn]
    | [◀️ Impostazioni → s]
 ## db after step 4
 (no changes)
@@ -81,6 +81,7 @@
    | Attuale: attivo, ogni 1 h
    keyboard:
    | [Attivo ✓ → s:dg:on] [Disattivo → s:dg:off]
+   | [📨 Invia ora → s:dn]
    | [◀️ Impostazioni → s]
 ## db after step 5
 ~ notification_prefs user_id=10,product_id=NULL digest_mode: 0 -> 1

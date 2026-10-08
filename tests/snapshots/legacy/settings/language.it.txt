@@ -43,14 +43,13 @@
    | 🔕 Mute: off
    | 📬 Digest: off
    | 🌙 Quiet hours: off
-   | ⏱ Throttle: unlimited · change with /throttle &lt;N&gt;|off
-   | 🌍 Timezone: Europe/Rome · change with /timezone &lt;zone&gt;
+   | ⏱ Throttle: unlimited
+   | 🌍 Timezone: Europe/Rome
    | 🗣 Language: English
-   |
-   | Other values: /digest_mode on|off &lt;minutes&gt;, /quiet_hours HH:MM-HH:MM
    keyboard:
    | [🔕 Mute → s:mu] [📬 Digest → s:dg]
-   | [🌙 Quiet hours → s:qh] [🗣 Language → s:lang]
+   | [🌙 Quiet hours → s:qh] [⏱ Throttle → s:th]
+   | [🌍 Timezone → s:tz] [🗣 Language → s:lang]
    | [🏠 Home → h]
 ## db after step 3
 (no changes)
@@ -95,14 +94,13 @@
    | 🔕 Silenzia: off
    | 📬 Digest: off
    | 🌙 Ore silenziose: off
-   | ⏱ Limite: illimitato · cambia con /throttle &lt;N&gt;|off
-   | 🌍 Fuso orario: Europe/Rome · cambia con /timezone &lt;zona&gt;
+   | ⏱ Limite: illimitato
+   | 🌍 Fuso orario: Europe/Rome
    | 🗣 Lingua: Automatica (Italiano)
-   |
-   | Altri valori: /digest_mode on|off &lt;minuti&gt;, /quiet_hours HH:MM-HH:MM
    keyboard:
    | [🔕 Silenzia → s:mu] [📬 Digest → s:dg]
-   | [🌙 Ore silenziose → s:qh] [🗣 Lingua → s:lang]
+   | [🌙 Ore silenziose → s:qh] [⏱ Limite → s:th]
+   | [🌍 Fuso orario → s:tz] [🗣 Lingua → s:lang]
    | [🏠 Home → h]
 ## db after step 6
 (no changes)

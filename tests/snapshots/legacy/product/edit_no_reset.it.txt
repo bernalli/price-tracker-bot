@@ -55,5 +55,6 @@
    | [🔔 Ogni ribasso → track_any_1]
    | [📉 Soglia % o € → track_threshold_1]
    | [💰 Prezzo target → track_target_1]
+   | [🔔 Notifiche → p:1:pr]
 ## db after step 3
 (no changes)

@@ -1006,20 +1006,6 @@ msgid "🌙 Quiet hours: {quiet}"
 msgstr ""
 
 #: src/price_tracker/bot/ui/panels.py
-#, python-brace-format
-msgid "⏱ Throttle: {throttle} · change with /throttle &lt;N&gt;|off"
-msgstr ""
-
-#: src/price_tracker/bot/ui/panels.py
-#, python-brace-format
-msgid "🌍 Timezone: {timezone} · change with /timezone &lt;zone&gt;"
-msgstr ""
-
-#: src/price_tracker/bot/ui/panels.py
-msgid "Other values: /digest_mode on|off &lt;minutes&gt;, /quiet_hours HH:MM-HH:MM"
-msgstr ""
-
-#: src/price_tracker/bot/ui/panels.py
 msgid "off"
 msgstr ""
 
@@ -1551,3 +1537,55 @@ msgstr "❌ {n} failed reads"
 #: src/price_tracker/bot/handlers/debug.py
 msgid "ℹ️ Sites in 🔒 quarantine resume on their own; use /reactivate to reactivate a suspended product."
 msgstr "ℹ️ Sites in 🔒 quarantine resume on their own; use /reactivate to reactivate a suspended product."
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "⏱ Throttle: {throttle}"
+msgstr "⏱ Throttle: {throttle}"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "🌍 Timezone: {timezone}"
+msgstr "🌍 Timezone: {timezone}"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "⏱ Throttle"
+msgstr "⏱ Throttle"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "🌍 Timezone"
+msgstr "🌍 Timezone"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "⏱ <b>Throttle</b>"
+msgstr "⏱ <b>Throttle</b>"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "🌍 <b>Timezone</b>"
+msgstr "🌍 <b>Timezone</b>"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "📨 Send now"
+msgstr "📨 Send now"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "🔔 <b>Notifications</b>"
+msgstr "🔔 <b>Notifications</b>"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "◀️ Product"
+msgstr "◀️ Product"
+
+#: src/price_tracker/bot/handlers/callbacks/_nav.py
+msgid "Pending alerts sent: {n}"
+msgstr "Pending alerts sent: {n}"
+
+#: src/price_tracker/bot/handlers/callbacks/_nav.py
+msgid "◀️ Admin"
+msgstr "◀️ Admin"
+
+#: src/price_tracker/bot/handlers/callbacks/_nav.py
+msgid "◀️ Status & info"
+msgstr "◀️ Status & info"
+
+#: src/price_tracker/bot/handlers/callbacks/_admin.py
+msgid "🏥 Scraper health"
+msgstr "🏥 Scraper health"

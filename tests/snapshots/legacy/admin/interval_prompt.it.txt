@@ -10,6 +10,8 @@
    | ⏱ <b>Intervallo globale</b>
    |
    | Scrivi i minuti (es. <code>60</code>, <code>360</code>):
+   keyboard:
+   | [Annulla → menu_admin]
 ## db after step 1
 (no changes)
 ## step 2: text "abc" user=1
@@ -45,6 +47,8 @@
    | ⏱ <b>Intervallo globale</b>
    |
    | Scrivi i minuti (es. <code>60</code>, <code>360</code>):
+   keyboard:
+   | [Annulla → menu_admin]
 ## db after step 6
 (no changes)
 ## step 7: text "30" user=1
@@ -62,6 +66,8 @@
    | ⏱ <b>Intervallo globale</b>
    |
    | Scrivi i minuti (es. <code>60</code>, <code>360</code>):
+   keyboard:
+   | [Annulla → menu_admin]
 ## db after step 8
 (no changes)
 ## step 9: text "10081" user=1
@@ -85,6 +91,8 @@
    | ⏱ <b>Intervallo globale</b>
    |
    | Scrivi i minuti (es. <code>60</code>, <code>360</code>):
+   keyboard:
+   | [Annulla → menu_admin]
 ## db after step 11
 (no changes)
 ## step 12: text "60" user=1
@@ -128,7 +136,7 @@
    | 📦 Prodotti globali: 0
    | 🔄 Check globali: 0
    keyboard:
-   | [❓ Aiuto → hp]
+   | [❓ Aiuto → hp] [⚠️ Errori → er]
    | [◀️ Menu → menu_main]
 ## db after step 14
 (no changes)

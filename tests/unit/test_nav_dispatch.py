@@ -48,6 +48,8 @@ from price_tracker.bot.handlers.settings import (
 from price_tracker.bot.messages import set_locale
 from price_tracker.bot.ui.cards import list_page
 from price_tracker.bot.ui.panels import home_screen
+from price_tracker.core.health import HealthManager
+from price_tracker.core.textlimits import TELEGRAM_MESSAGE_LIMIT, visible_length
 from price_tracker.db.migrator import apply_migrations
 from price_tracker.db.models import NotificationPrefs
 from price_tracker.db.repository import Repository
@@ -76,6 +78,11 @@ HANDLED = frozenset(
         "product.card",
         "home",
         "help",
+        "settings.digest_now",
+        "product.prefs",
+        "product.mute",
+        "admin.health",
+        "errors",
     }
 )
 
@@ -109,6 +116,8 @@ def make_context(db: Any) -> MagicMock:
         "db": db,
         "repository": db,
         "config": SimpleNamespace(check_interval_minutes=360),
+        "digest_service": SimpleNamespace(flush_user=AsyncMock(return_value=0)),
+        "health_manager": HealthManager(repo=MagicMock()),
     }
     context.user_data = {}
     return context
@@ -156,7 +165,7 @@ async def test_legacy_payloads_never_reach_the_navigation_handlers(
     await press(repo, data)
 
 
-@pytest.mark.parametrize("data", ["l:a:0", "garbage", "s:tz"])
+@pytest.mark.parametrize("data", ["l:a:0", "garbage", "s:zz"])
 async def test_garbage_edits_nothing_and_is_logged(
     repo: Repository, caplog: pytest.LogCaptureFixture, data: str
 ) -> None:
@@ -777,3 +786,192 @@ async def test_a_user_who_is_not_allowed_changes_nothing(repo: Repository) -> No
     query.edit_message_text.assert_not_called()
     assert await repo.get_user(stranger) is None
     assert await stored_language(repo) is None
+
+
+# --- the nodes reached by tapping: digest now, one product's notifications, ------
+# --- the scraper health report and the error report -------------------------------
+
+PROMOTED = 14
+DEMOTED = 15
+DEACTIVATED = 16
+
+
+async def press_as(repo: Repository, data: str, user_id: int, context: Any = None) -> MagicMock:
+    query = make_query(data, user_id=user_id)
+    await handle_callback(make_update(query), context or make_context(repo))
+    return query
+
+
+async def every_text(query: MagicMock) -> str:
+    texts = [str(c.args[0]) for c in query.edit_message_text.await_args_list]
+    texts += [str(c.args[0]) for c in query.message.reply_text.await_args_list]
+    return "\n".join(texts)
+
+
+async def all_prefs_rows(repo: Repository) -> list[Any]:
+    cursor = await repo._conn.execute("SELECT * FROM notification_prefs")
+    return list(await cursor.fetchall())
+
+
+async def new_node_wires(repo: Repository) -> list[tuple[str, int]]:
+    pid = await add_product(repo, USER, "Kettle")
+    await repo.ensure_user(ADMIN, is_admin=True)
+    return [
+        ("s:dn", USER),
+        (f"p:{pid}:pr", USER),
+        (f"p:{pid}:mu:8", USER),
+        ("a:hl", ADMIN),
+        ("er", USER),
+    ]
+
+
+async def test_each_new_node_edits_the_message_once(repo: Repository) -> None:
+    for wire, user_id in await new_node_wires(repo):
+        query = await press_as(repo, wire, user_id)
+        query.edit_message_text.assert_awaited_once()
+        query.message.reply_text.assert_not_called()
+
+
+async def test_a_repeated_press_on_a_new_node_is_ignored(
+    repo: Repository, caplog: pytest.LogCaptureFixture
+) -> None:
+    not_modified = BadRequest("Message is not modified: specified new message content is the same")
+    for wire, user_id in await new_node_wires(repo):
+        query = make_query(wire, user_id=user_id)
+        query.edit_message_text = AsyncMock(side_effect=not_modified)
+        with caplog.at_level(logging.WARNING):
+            await handle_callback(make_update(query), make_context(repo))
+        query.edit_message_text.assert_awaited_once()
+    assert caplog.records == []
+
+
+async def test_send_now_flushes_the_presser_once_and_says_how_many(repo: Repository) -> None:
+    context = make_context(repo)
+    flush = AsyncMock(return_value=3)
+    context.bot_data["digest_service"] = SimpleNamespace(flush_user=flush)
+    query = await press_as(repo, "s:dn", USER, context)
+    flush.assert_awaited_once_with(user_id=USER)
+    text = edited_text(query)
+    assert text.startswith("Pending alerts sent: 3\n\n")
+    assert "Digest" in text
+    wires = [b.callback_data for row in shown(query)[1].inline_keyboard for b in row]
+    assert "s:dn" in wires
+    assert "s" in wires
+
+
+CUSTOM_PRODUCT_ROW: dict[str, Any] = {
+    "digest_mode": True,
+    "digest_interval_minutes": 30,
+    "quiet_hours_start": "23:00",
+    "quiet_hours_end": "07:00",
+    "throttle_per_hour": 5,
+    "timezone": "Europe/Berlin",
+}
+
+
+@pytest.mark.parametrize(
+    ("value", "mute", "hours"),
+    [("1", True, 1), ("8", True, 8), ("24", True, 24), ("0", True, None), ("off", False, None)],
+)
+async def test_product_mute_writes_only_the_mute_of_that_product(
+    repo: Repository, value: str, mute: bool, hours: int | None
+) -> None:
+    pid = await add_product(repo, USER, "Kettle")
+    await repo.upsert_notification_prefs(
+        NotificationPrefs(user_id=USER, product_id=pid, mute=not mute, **CUSTOM_PRODUCT_ROW)
+    )
+    with freeze_time(FROZEN, real_asyncio=True):
+        query = await press(repo, f"p:{pid}:mu:{value}")
+    row = await repo.get_notification_prefs(user_id=USER, product_id=pid)
+    assert row is not None
+    until = None if hours is None else datetime(2026, 3, 1, 12, tzinfo=UTC) + timedelta(hours=hours)
+    assert (row.mute, row.mute_until) == (mute, until)
+    assert {key: getattr(row, key) for key in CUSTOM_PRODUCT_ROW} == CUSTOM_PRODUCT_ROW
+    assert await repo.get_notification_prefs(user_id=USER, product_id=None) is None
+    assert "Kettle" in edited_text(query)
+
+
+@pytest.mark.parametrize("verb", ["pr", "mu:8", "mu:off"])
+async def test_a_foreign_or_missing_product_is_not_found_and_nothing_is_written(
+    repo: Repository, verb: str
+) -> None:
+    await repo.ensure_user(OTHER_USER)
+    await repo.ensure_user(ADMIN, is_admin=True)
+    foreign = await add_product(repo, OTHER_USER, "Secret Fan")
+    for presser, pid in ((USER, foreign), (ADMIN, foreign), (USER, foreign + 1000)):
+        query = await press_as(repo, f"p:{pid}:{verb}", presser)
+        text = edited_text(query)
+        assert text.startswith("Product not found.")
+        assert "Secret Fan" not in text
+    assert await all_prefs_rows(repo) == []
+
+
+async def test_product_notifications_show_the_effective_values(repo: Repository) -> None:
+    pid = await add_product(repo, USER, "Kettle")
+    await repo.upsert_notification_prefs(
+        NotificationPrefs(user_id=USER, timezone="Asia/Tokyo", throttle_per_hour=4)
+    )
+    await repo.upsert_notification_prefs(
+        NotificationPrefs(user_id=USER, product_id=pid, mute=True, timezone="Asia/Tokyo")
+    )
+    text = edited_text(await press(repo, f"p:{pid}:pr"))
+    assert "forever" in text
+    assert "Asia/Tokyo" in text
+    assert "4 per hour" in text
+
+
+@pytest.mark.parametrize("who", ["never", "demoted", "deactivated"])
+async def test_the_health_report_is_only_for_active_admins(repo: Repository, who: str) -> None:
+    user_id = {"never": PROMOTED, "demoted": DEMOTED, "deactivated": DEACTIVATED}[who]
+    await repo.ensure_user(user_id, is_admin=who != "never")
+    if who == "demoted":
+        await repo.set_admin(user_id, False)
+    if who == "deactivated":
+        await repo.remove_user(user_id)
+    query = await press_as(repo, "a:hl", user_id)
+    query.edit_message_text.assert_not_called()
+    assert "Scraper Health Report" not in await every_text(query)
+
+
+async def test_an_admin_sees_the_health_report(repo: Repository) -> None:
+    await repo.ensure_user(ADMIN, is_admin=True)
+    query = await press_as(repo, "a:hl", ADMIN)
+    text, markup = shown(query)
+    assert "Scraper Health Report" in text
+    wires = [b.callback_data for row in markup.inline_keyboard for b in row]
+    assert wires == ["menu_admin", "h"]
+
+
+async def test_the_error_report_without_errors(repo: Repository) -> None:
+    await add_product(repo, USER, "Kettle")
+    text, markup = shown(await press(repo, "er"))
+    assert text == "✅ No recent errors on your products."
+    wires = [b.callback_data for row in markup.inline_keyboard for b in row]
+    assert wires == ["menu_info", "h"]
+
+
+async def set_error(repo: Repository, pid: int, error: str) -> None:
+    await repo._conn.execute(
+        "UPDATE products SET consecutive_errors = 3, last_error = ? WHERE id = ?", (error, pid)
+    )
+    await repo._conn.commit()
+
+
+async def test_the_error_report_escapes_names_and_errors(repo: Repository) -> None:
+    pid = await add_product(repo, USER, "<b>&Kettle")
+    await set_error(repo, pid, "<i>&broken")
+    text = edited_text(await press(repo, "er"))
+    assert "&lt;b&gt;&amp;Kettle" in text
+    assert "&lt;i&gt;&amp;broken" in text
+    assert "<b>&" not in text
+
+
+async def test_a_long_error_report_is_cut_to_one_message(repo: Repository) -> None:
+    for index in range(60):
+        pid = await add_product(repo, USER, f"Product {index} " + "x" * 40)
+        await set_error(repo, pid, "e" * 140)
+    query = await press(repo, "er")
+    query.edit_message_text.assert_awaited_once()
+    text = edited_text(query)
+    assert visible_length(text) <= TELEGRAM_MESSAGE_LIMIT
+    assert "Product 0" in text

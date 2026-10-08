@@ -56,6 +56,7 @@
    | [📉 Soglia % o € → track_threshold_1]
    | [💰 Prezzo target → track_target_1]
    | [🔄 Azzera prezzo base → reset_1]
+   | [🔔 Notifiche → p:1:pr]
 ## db after step 3
 (no changes)
 ## step 4: press "reset_1" user=10 on=1001

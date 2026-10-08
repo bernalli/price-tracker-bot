@@ -1008,20 +1008,6 @@ msgid "🌙 Quiet hours: {quiet}"
 msgstr "🌙 Ore silenziose: {quiet}"
 
 #: src/price_tracker/bot/ui/panels.py
-#, python-brace-format
-msgid "⏱ Throttle: {throttle} · change with /throttle &lt;N&gt;|off"
-msgstr "⏱ Limite: {throttle} · cambia con /throttle &lt;N&gt;|off"
-
-#: src/price_tracker/bot/ui/panels.py
-#, python-brace-format
-msgid "🌍 Timezone: {timezone} · change with /timezone &lt;zone&gt;"
-msgstr "🌍 Fuso orario: {timezone} · cambia con /timezone &lt;zona&gt;"
-
-#: src/price_tracker/bot/ui/panels.py
-msgid "Other values: /digest_mode on|off &lt;minutes&gt;, /quiet_hours HH:MM-HH:MM"
-msgstr "Altri valori: /digest_mode on|off &lt;minuti&gt;, /quiet_hours HH:MM-HH:MM"
-
-#: src/price_tracker/bot/ui/panels.py
 msgid "off"
 msgstr "off"
 
@@ -1576,3 +1562,55 @@ msgstr "❌ {n} letture fallite"
 #: src/price_tracker/bot/handlers/debug.py
 msgid "ℹ️ Sites in 🔒 quarantine resume on their own; use /reactivate to reactivate a suspended product."
 msgstr "ℹ️ I siti in 🔒 quarantena riprendono da soli; usa /reactivate per riattivare un prodotto sospeso."
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "⏱ Throttle: {throttle}"
+msgstr "⏱ Limite: {throttle}"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "🌍 Timezone: {timezone}"
+msgstr "🌍 Fuso orario: {timezone}"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "⏱ Throttle"
+msgstr "⏱ Limite"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "🌍 Timezone"
+msgstr "🌍 Fuso orario"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "⏱ <b>Throttle</b>"
+msgstr "⏱ <b>Limite</b>"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "🌍 <b>Timezone</b>"
+msgstr "🌍 <b>Fuso orario</b>"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "📨 Send now"
+msgstr "📨 Invia ora"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "🔔 <b>Notifications</b>"
+msgstr "🔔 <b>Notifiche</b>"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "◀️ Product"
+msgstr "◀️ Prodotto"
+
+#: src/price_tracker/bot/handlers/callbacks/_nav.py
+msgid "Pending alerts sent: {n}"
+msgstr "Avvisi in attesa inviati: {n}"
+
+#: src/price_tracker/bot/handlers/callbacks/_nav.py
+msgid "◀️ Admin"
+msgstr "◀️ Admin"
+
+#: src/price_tracker/bot/handlers/callbacks/_nav.py
+msgid "◀️ Status & info"
+msgstr "◀️ Stato e info"
+
+#: src/price_tracker/bot/handlers/callbacks/_admin.py
+msgid "🏥 Scraper health"
+msgstr "🏥 Salute scraper"

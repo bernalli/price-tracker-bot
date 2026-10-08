@@ -1,0 +1,19 @@
+# ui snapshot v1
+# screen: panels.product_prefs
+# locale: en
+# now: 2026-03-01T12:00:00Z
+text:
+   | 🔔 <b>Notifications</b>
+   | 📦 <b>⁨Kettle⁩</b>
+   | 
+   | 🔕 Mute: until 3/1/26, 9:00 PM
+   | 📬 Digest: on, every 30 min
+   | 🌙 Quiet hours: 22:00–08:00
+   | ⏱ Throttle: 5 per hour
+   | 🌍 Timezone: Europe/Berlin
+keyboard:
+   [1 hr](cb:p:7:mu:1)  [8 hr](cb:p:7:mu:8)
+   [1 day](cb:p:7:mu:24)  [Forever](cb:p:7:mu:0)
+   [🔔 Unmute](cb:p:7:mu:off)
+   [⚙️ Settings](cb:s)  [◀️ Product](cb:p:7:c)
+   [🏠 Home](cb:h)

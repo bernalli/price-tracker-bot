@@ -224,6 +224,7 @@ ITALIAN_LABELS: dict[str, list[str]] = {
         "✏️ Nickname utente",
         "⏱ Intervallo globale: 360 min",
         "🔧 Debug scraper",
+        "🏥 Salute scraper",
         "◀️ Menu",
     ],
     "edit": [
@@ -231,6 +232,7 @@ ITALIAN_LABELS: dict[str, list[str]] = {
         "📉 Soglia % o €",
         "💰 Prezzo target",
         "🔄 Azzera prezzo base",
+        "🔔 Notifiche",
     ],
     "notifications": ["#1 Kettle [🔔 Ogni ribasso]", "◀️ Menu"],
     "back_buttons": ["◀️ Menu", "◀️ Menu"],
@@ -275,3 +277,19 @@ async def test_unknown_threshold_type_still_renders() -> None:
     with _locale("en"):
         text, _buttons = await _edit(_product(threshold_type="weird", threshold_value="7"))()
     assert "-€7.00" in text
+
+
+@pytest.mark.parametrize(
+    ("panel", "wire"),
+    [
+        ("edit", "p:1:pr"),
+        ("info_user", "er"),
+        ("info_admin", "er"),
+        ("admin_menu", "a:hl"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_the_panel_links_to_its_new_node(panel: str, wire: str) -> None:
+    with _locale("en"):
+        _text, buttons = await PANELS[panel]()
+    assert wire in [data for _label, data in buttons]

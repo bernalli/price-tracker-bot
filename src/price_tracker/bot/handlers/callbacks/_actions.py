@@ -71,6 +71,13 @@ async def handle_edit_button(
         edit_buttons.append(
             [InlineKeyboardButton(_("🔄 Reset base price"), callback_data=f"reset_{product_id}")]
         )
+    edit_buttons.append(
+        [
+            InlineKeyboardButton(
+                _("🔔 Notifications"), callback_data=encode(Action("product.prefs", (product_id,)))
+            )
+        ]
+    )
 
     await query.message.reply_text(
         _(
