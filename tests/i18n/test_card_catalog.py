@@ -60,7 +60,7 @@ def test_po_files_have_no_fuzzy_and_no_obsolete() -> None:
             assert msgid in ids, (locale, msgid)
         assert CARD_PLURAL in ids, locale
         if locale == "it_IT":
-            assert len(list(catalog)) == 306
+            assert len(list(catalog)) == 351
 
 
 def _as_key(value: str | tuple[str, ...] | list[str] | None) -> str | tuple[str, ...] | None:
@@ -81,3 +81,21 @@ def test_pre_existing_entries_match_the_pinned_baseline() -> None:
             assert message is not None, (locale, key)
             assert _as_key(message.string) == _as_key(entry["string"]), (locale, key)
             assert not message.fuzzy, (locale, key)
+
+
+def test_it_catalog_has_no_empty_translation() -> None:
+    with _PO_PATHS["it_IT"].open("rb") as handle:
+        catalog = read_po(handle)
+    empty: list[object] = []
+    for message in catalog:
+        if not message.id:
+            continue
+        source = message.id if isinstance(message.id, str) else message.id[0]
+        strings = message.string if isinstance(message.string, tuple) else (message.string,)
+        if not all(strings):
+            empty.append(message.id)
+            continue
+        expected = _placeholders(source)
+        for text in strings:
+            assert _placeholders(str(text)) == expected, message.id
+    assert empty == []

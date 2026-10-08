@@ -43,7 +43,9 @@ Silence alerts for a single product or all products.
 Remove an active mute.
 
 - **Examples**: `/unmute 42`, `/unmute all`
-- **Behavior**: clears the mute entry; alerts resume immediately for that target.
+- **Behavior**: clears the mute of that target only. `/unmute 42` clears the mute of product 42;
+  while everything is muted (`/mute all`), product 42 stays muted too. `/unmute all` clears the
+  global mute; a product muted on its own stays muted until its own mute ends.
 
 ### `/digest_mode <on|off> [interval_min]`
 Switch between immediate and digest delivery.
@@ -111,12 +113,14 @@ The migrator handles schema upgrades automatically (`db/migrations/009_add_notif
 
 ## Resolution priority
 
-When determining the effective preference for a given alert, the notifier resolves in this order (most specific wins):
+When determining the effective preference for a given alert, the notifier resolves in this order:
 
-1. **Per-product mute** — if the user has muted the specific product, that wins.
-2. **Global "all" mute** — if the user has `/mute all` active, applies to every product.
-3. **User-level prefs** — digest mode, quiet hours, throttle, timezone (no per-product override; these are user-wide).
-4. **Defaults** — applied for any unset field.
+1. **Mute** — the product's own mute and the global "all" mute add up: the product is muted
+   while either one is active, until the later of the two ends, and a mute without an end
+   wins. Unmuting a product clears only its own mute; it never exempts the product from
+   `/mute all`.
+2. **User-level prefs** — digest mode, quiet hours, throttle, timezone (no per-product override; these are user-wide).
+3. **Defaults** — applied for any unset field.
 
 The `EffectivePrefs` dataclass (`notifier/preferences.py:21`) is the resolved snapshot used at dispatch time, computed by `PreferencesManager.resolve(*, user_id, product_id)` (`preferences.py:68`).
 

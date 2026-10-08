@@ -10,4 +10,4 @@ keyboard:
    [#11](cb:l:o:1:11)
    [✅ Attivi](cb:l:a:1)  [⏸ In pausa](cb:l:p:1)
    [⚠️ Errori](cb:l:e:1)  [🚫 Esaurito ✓](cb:l:o:1)
-   [🏠 Home](cb:h)
+   [➕ Aggiungi](cb:ad)  [🏠 Home](cb:h)

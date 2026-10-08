@@ -14,7 +14,7 @@
    | [#1 → l:a:1:1]
    | [✅ Attivi ✓ → l:a:1] [⏸ In pausa → l:p:1]
    | [⚠️ Errori → l:e:1] [🚫 Esaurito → l:o:1]
-   | [🏠 Home → h]
+   | [➕ Aggiungi → ad] [🏠 Home → h]
 ## db after step 1
 ~ users user_id=10 display_name: NULL -> "U10"
 ## step 2: press "l:a:1:1" user=10 on=1000
@@ -56,5 +56,6 @@
    | [📉 Soglia % o € → track_threshold_1]
    | [💰 Prezzo target → track_target_1]
    | [🔄 Azzera prezzo base → reset_1]
+   | [🔔 Notifiche → p:1:pr]
 ## db after step 3
 (no changes)

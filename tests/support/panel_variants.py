@@ -7,7 +7,13 @@ from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 from price_tracker.app.views import HomeView, PrefsView
-from price_tracker.bot.ui.panels import home_screen, settings_screen, settings_section_screen
+from price_tracker.bot.ui.panels import (
+    add_screen,
+    home_screen,
+    product_prefs_screen,
+    settings_screen,
+    settings_section_screen,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -49,6 +55,10 @@ SCREENS: dict[str, Callable[[], Screen]] = {
     "settings_digest": lambda: settings_section_screen("dg", BUSY, now=NOW),
     "settings_quiet": lambda: settings_section_screen("qh", BUSY, now=NOW),
     "settings_language": lambda: settings_section_screen("lang", BUSY, now=NOW, language="it"),
+    "settings_timezone": lambda: settings_section_screen("tz", BUSY, now=NOW),
+    "settings_throttle": lambda: settings_section_screen("th", BUSY, now=NOW),
+    "product_prefs": lambda: product_prefs_screen("Kettle", 7, BUSY, now=NOW),
+    "add": add_screen,
     "home_user": lambda: home_screen(HomeView(active=3, paused=1, is_admin=False)),
     "home_admin": lambda: home_screen(HomeView(active=3, paused=1, is_admin=True)),
 }

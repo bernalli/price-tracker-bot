@@ -15,6 +15,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from price_tracker.bot.handlers.callbacks import _actions, _admin, _product
+from price_tracker.bot.messages import reset_locale, set_locale
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -58,7 +59,11 @@ async def test_tampered_callback_id_replies_error_instead_of_crashing(
     db = AsyncMock()
     db.is_user_admin = AsyncMock(return_value=True)
 
-    handled = await handler(query, context, db, 1, data)  # must NOT raise ValueError
+    token = set_locale("it")
+    try:
+        handled = await handler(query, context, db, 1, data)  # must NOT raise ValueError
+    finally:
+        reset_locale(token)
 
     assert handled is True
     query.edit_message_text.assert_awaited_once()

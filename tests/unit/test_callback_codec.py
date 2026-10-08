@@ -82,7 +82,9 @@ MODEL: dict[str, tuple[Any, ...]] = {
     "product.target": ("p", ID, "tg"),
     "product.interval": ("p", ID, "iv"),
     "product.offer_filter": ("p", ID, "pf", _enum("n", "u", "s1", "s0", "0")),
-    "product.mute": ("p", ID, "mu", _enum("1", "8", "24", "0")),
+    "product.mute": ("p", ID, "mu", _enum("1", "8", "24", "0", "off")),
+    "product.prefs": ("p", ID, "pr"),
+    "product.mute_ask": ("p", ID, "mua"),
     "product.scope_picker": ("p", ID, "sco"),
     "product.scope": ("p", ID, "sco", _enum("store", *LEVELS, "default")),
     "flow.currency": ("p", TOK, "cur", _enum(*CURRENCY_CHOICES)),
@@ -90,7 +92,9 @@ MODEL: dict[str, tuple[Any, ...]] = {
     "flow.scope": ("p", TOK, "sc", _enum("store", *LEVELS)),
     "flow.cancel": ("p", TOK, "x"),
     "settings": ("s",),
-    "settings.section": ("s", _enum("mu", "dg", "qh", "lang")),
+    "settings.section": ("s", _enum("mu", "dg", "qh", "lang", "tz", "th")),
+    "settings.ask": ("s", "ask", _enum("mu", "dg", "qh", "tz", "th")),
+    "settings.digest_now": ("s", "dn"),
     "settings.mute": ("s", "mu", _enum("1", "8", "24", "0", "off")),
     "settings.digest": ("s", "dg", _enum("on", "off")),
     "settings.quiet": ("s", "qh", _enum("2208", "off")),
@@ -108,6 +112,9 @@ MODEL: dict[str, tuple[Any, ...]] = {
     "admin.nick_id": ("a", "nk", ID),
     "admin.interval": ("a", "iv"),
     "admin.debug": ("a", "dbg"),
+    "admin.health": ("a", "hl"),
+    "errors": ("er",),
+    "add": ("ad",),
 }
 
 _ID_TEXT = r"[1-9][0-9]{0,18}"
@@ -286,9 +293,29 @@ def test_list_open_and_settings_round_trip_with_every_value() -> None:
         assert decode(f"s:dg:{value}") == Action("settings.digest", (value,))
     for value in ("2208", "off"):
         assert decode(f"s:qh:{value}") == Action("settings.quiet", (value,))
-    for section in ("mu", "dg", "qh", "lang"):
+    for section in ("mu", "dg", "qh", "lang", "tz", "th"):
         assert decode(f"s:{section}") == Action("settings.section", (section,))
         assert encode(Action("settings.section", (section,))) == f"s:{section}"
+
+
+def test_the_nodes_reached_by_tapping_round_trip() -> None:
+    for setting in ("mu", "dg", "qh", "tz", "th"):
+        assert decode(f"s:ask:{setting}") == Action("settings.ask", (setting,))
+        assert encode(Action("settings.ask", (setting,))) == f"s:ask:{setting}"
+    pairs = {
+        "s:dn": Action("settings.digest_now"),
+        f"p:{ID_MAX}:pr": Action("product.prefs", (ID_MAX,)),
+        "p:7:mua": Action("product.mute_ask", (7,)),
+        "a:hl": Action("admin.health"),
+        "er": Action("errors"),
+        "ad": Action("add"),
+    }
+    for value in ("1", "8", "24", "0", "off"):
+        pairs[f"p:7:mu:{value}"] = Action("product.mute", (7, value))
+    for wire, action in pairs.items():
+        assert decode(wire) == action
+        assert encode(action) == wire
+        assert len(wire.encode("ascii")) <= 64
 
 
 @pytest.mark.parametrize("value", [*LOCALES, "auto"])
@@ -394,8 +421,7 @@ REJECTED = [
 ]
 
 # Not-well-formed shapes of the list and settings actions, each with the reason
-# decode reports. ``s:tz`` and ``s:th`` are rejected on purpose: timezone and
-# throttle have no preset, so no button may carry them.
+# decode reports.
 _PAGE_20_DIGITS = "1" * 20
 REJECTED_WITH_REASON = [
     ("l:a:0", InvalidReason.UNKNOWN_ACTION),
@@ -434,9 +460,36 @@ REJECTED_WITH_REASON = [
     ("s:dg:ON", InvalidReason.UNKNOWN_ACTION),
     ("s:qh:2208:x", InvalidReason.UNKNOWN_ACTION),
     ("s:qh:0007", InvalidReason.UNKNOWN_ACTION),
-    ("s:tz", InvalidReason.UNKNOWN_ACTION),
-    ("s:th", InvalidReason.UNKNOWN_ACTION),
+    ("s:TZ", InvalidReason.UNKNOWN_ACTION),
     ("s:tz:Europe/Rome", InvalidReason.UNKNOWN_ACTION),
+    ("s:tz:x", InvalidReason.UNKNOWN_ACTION),
+    ("s:ask", InvalidReason.UNKNOWN_ACTION),
+    ("s:ask:", InvalidReason.BAD_TOKENS),
+    ("s:ask:xx", InvalidReason.UNKNOWN_ACTION),
+    ("s:ask:lang", InvalidReason.UNKNOWN_ACTION),
+    ("s:ask:tz:x", InvalidReason.UNKNOWN_ACTION),
+    ("s:ask:TZ", InvalidReason.UNKNOWN_ACTION),
+    ("s:ask:t\u00e9", InvalidReason.NOT_ASCII),
+    ("s:ask:tz\x00", InvalidReason.BAD_TOKENS),
+    ("s:DN", InvalidReason.UNKNOWN_ACTION),
+    ("s:dn:1", InvalidReason.UNKNOWN_ACTION),
+    ("p:0:pr", InvalidReason.UNKNOWN_ACTION),
+    ("p:01:pr", InvalidReason.UNKNOWN_ACTION),
+    ("p:9223372036854775808:pr", InvalidReason.UNKNOWN_ACTION),
+    ("p:1:pr:x", InvalidReason.UNKNOWN_ACTION),
+    ("p:1:mu:99", InvalidReason.UNKNOWN_ACTION),
+    ("p:1:mu:OFF", InvalidReason.UNKNOWN_ACTION),
+    ("p:1:mua:x", InvalidReason.UNKNOWN_ACTION),
+    ("p:\u0661:mua", InvalidReason.NOT_ASCII),
+    ("a:hl:x", InvalidReason.UNKNOWN_ACTION),
+    ("a:HL", InvalidReason.UNKNOWN_ACTION),
+    ("er:x", InvalidReason.UNKNOWN_ACTION),
+    ("ER", InvalidReason.UNKNOWN_ACTION),
+    ("er\x00", InvalidReason.BAD_TOKENS),
+    ("ad:x", InvalidReason.UNKNOWN_ACTION),
+    ("AD", InvalidReason.UNKNOWN_ACTION),
+    ("ad:", InvalidReason.BAD_TOKENS),
+    ("add", InvalidReason.UNKNOWN_ACTION),
     ("s:th:3", InvalidReason.UNKNOWN_ACTION),
     ("s:lang:xx", InvalidReason.UNKNOWN_ACTION),
     ("s:lang:AUTO", InvalidReason.UNKNOWN_ACTION),
@@ -510,6 +563,17 @@ def test_not_well_formed_is_rejected(data: object) -> None:
         Action("settings.digest", ("30",)),
         Action("settings.quiet", ("0007",)),
         Action("settings.quiet", ()),
+        Action("settings.section", ("ask",)),
+        Action("settings.ask", ("lang",)),
+        Action("settings.ask", ()),
+        Action("settings.digest_now", ("x",)),
+        Action("product.prefs", (0,)),
+        Action("product.prefs", ()),
+        Action("product.mute", (1, "99")),
+        Action("product.mute_ask", ("1",)),
+        Action("admin.health", (1,)),
+        Action("errors", ("x",)),
+        Action("add", (1,)),
     ],
     ids=repr,
 )
@@ -577,6 +641,14 @@ def test_no_new_wire_starts_with_a_legacy_entry() -> None:
         "settings.mute",
         "settings.digest",
         "settings.quiet",
+        "settings.ask",
+        "settings.digest_now",
+        "product.prefs",
+        "product.mute",
+        "product.mute_ask",
+        "admin.health",
+        "errors",
+        "add",
     )
     wires = [
         render(

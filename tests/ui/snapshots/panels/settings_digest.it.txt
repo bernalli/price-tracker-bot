@@ -8,4 +8,5 @@ text:
    | Attuale: attivo, ogni 30 min
 keyboard:
    [Attivo ✓](cb:s:dg:on)  [Disattivo](cb:s:dg:off)
-   [◀️ Impostazioni](cb:s)
+   [✏️ Intervallo](cb:s:ask:dg)  [📨 Invia ora](cb:s:dn)
+   [◀️ Impostazioni](cb:s)  [🏠 Home](cb:h)

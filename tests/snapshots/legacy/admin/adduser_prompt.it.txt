@@ -34,6 +34,7 @@
    | [✏️ Nickname utente → menu_admin_nick]
    | [⏱ Intervallo globale: 360 min → menu_admin_interval]
    | [🔧 Debug scraper → menu_admin_debug]
+   | [🏥 Salute scraper → a:hl]
    | [◀️ Menu → menu_main]
 ## db after step 2
 (no changes)
@@ -45,6 +46,8 @@
    | ➕ <b>Aggiungi utente</b>
    |
    | Scrivi l'ID Telegram dell'utente da aggiungere:
+   keyboard:
+   | [Annulla → menu_admin]
 ## db after step 3
 (no changes)
 ## step 4: text "abc" user=1
@@ -71,6 +74,8 @@
    | ➕ <b>Aggiungi utente</b>
    |
    | Scrivi l'ID Telegram dell'utente da aggiungere:
+   keyboard:
+   | [Annulla → menu_admin]
 ## db after step 6
 (no changes)
 ## step 7: text "98" user=1

@@ -12,4 +12,5 @@ keyboard:
    [[⏸ Paused ⏸ Paused ⏸ Paused]](cb:l:p:1)
    [[⚠️ Errors ⚠️ Errors ⚠️ Errors]](cb:l:e:1)
    [[🚫 Sold out 🚫 Sold out 🚫 Sold …](cb:l:o:1)
+   [[➕ Add ➕ Add ➕ Add]](cb:ad)
    [[🏠 Home 🏠 Home 🏠 Home]](cb:h)

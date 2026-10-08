@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import html
+import re
 from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -11,9 +13,20 @@ import pytest
 from price_tracker.app.views import HomeView, PrefsView
 from price_tracker.bot.callbacks import Action, InvalidCallback, decode
 from price_tracker.bot.messages import set_locale
-from price_tracker.bot.ui.panels import home_screen, settings_screen, settings_section_screen
+from price_tracker.bot.ui.panels import (
+    add_screen,
+    home_screen,
+    product_prefs_screen,
+    settings_screen,
+    settings_section_screen,
+)
 from price_tracker.bot.ui.width import display_width
-from price_tracker.core.textlimits import SAFE_LIMIT, _is_valid_telegram_markup, visible_length
+from price_tracker.core.textlimits import (
+    NAME_BUDGET,
+    SAFE_LIMIT,
+    _is_valid_telegram_markup,
+    visible_length,
+)
 from tests.support.panel_variants import BUSY, NOW, SCREENS, prefs
 from tests.support.ui_snapshot import compare_or_update, render_snapshot
 
@@ -38,30 +51,49 @@ def _actions(screen: Screen) -> list[Action]:
     return [item for item in decoded if isinstance(item, Action)]
 
 
-def test_main_panel_offers_the_four_sections_and_home() -> None:
+def test_main_panel_offers_the_six_sections_and_home() -> None:
     assert _actions(settings_screen(BUSY, now=NOW)) == [
         Action("settings.section", ("mu",)),
         Action("settings.section", ("dg",)),
         Action("settings.section", ("qh",)),
+        Action("settings.section", ("th",)),
+        Action("settings.section", ("tz",)),
         Action("settings.section", ("lang",)),
         Action("home"),
     ]
 
 
 @pytest.mark.parametrize(
-    ("section", "values", "action"),
+    ("section", "values", "action", "extra"),
     [
-        ("mu", ["1", "8", "24", "0", "off"], "settings.mute"),
-        ("dg", ["on", "off"], "settings.digest"),
-        ("qh", ["2208", "off"], "settings.quiet"),
-        ("lang", ["auto", "en", "it"], "settings.language"),
+        ("mu", ["1", "8", "24", "0", "off"], "settings.mute", [Action("settings.ask", ("mu",))]),
+        (
+            "dg",
+            ["on", "off"],
+            "settings.digest",
+            [Action("settings.ask", ("dg",)), Action("settings.digest_now")],
+        ),
+        ("qh", ["2208", "off"], "settings.quiet", [Action("settings.ask", ("qh",))]),
+        ("lang", ["auto", "en", "it"], "settings.language", []),
+        ("tz", [], "", [Action("settings.ask", ("tz",))]),
+        ("th", [], "", [Action("settings.ask", ("th",))]),
     ],
 )
-def test_section_offers_its_presets_and_a_way_back(
-    section: str, values: list[str], action: str
+def test_section_offers_its_presets_a_way_back_and_home(
+    section: str, values: list[str], action: str, extra: list[Action]
 ) -> None:
     actions = _actions(settings_section_screen(section, BUSY, now=NOW))
-    assert actions == [*(Action(action, (value,)) for value in values), Action("settings")]
+    presets = [Action(action, (value,)) for value in values]
+    assert actions == [*presets, *extra, Action("settings"), Action("home")]
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+@pytest.mark.parametrize("section", ["mu", "dg", "qh", "lang", "tz", "th"])
+def test_every_section_ends_with_back_and_home(section: str, locale: str, ui_locales: Path) -> None:
+    set_locale(locale)
+    rows = settings_section_screen(section, BUSY, now=NOW).rows
+    tail = [button.callback for row in rows for button in row][-2:]
+    assert tail == ["s", "h"]
 
 
 def test_unknown_section_is_rejected() -> None:
@@ -122,13 +154,81 @@ def test_a_custom_window_and_a_timed_mute_check_nothing() -> None:
     assert _checked(settings_section_screen("mu", BUSY, now=NOW)) == []
 
 
-def test_throttle_and_timezone_show_their_commands_instead_of_buttons() -> None:
+def test_throttle_and_timezone_show_their_values() -> None:
     text = settings_screen(BUSY, now=NOW).text
     assert "Europe/Berlin" in text
-    assert "/timezone" in text
-    assert "/throttle" in text
     assert "5 per hour" in text
     assert "unlimited" in settings_screen(prefs(), now=NOW).text
+    assert "Europe/Berlin" in settings_section_screen("tz", BUSY, now=NOW).text
+    assert "5 per hour" in settings_section_screen("th", BUSY, now=NOW).text
+    assert "unlimited" in settings_section_screen("th", prefs(), now=NOW).text
+
+
+_TYPED_COMMANDS = ("/throttle", "/timezone", "/digest_mode", "/quiet_hours", "/mute")
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_no_settings_screen_tells_the_user_to_type_a_command(locale: str, ui_locales: Path) -> None:
+    set_locale(locale)
+    screens = [settings_screen(BUSY, now=NOW)] + [
+        settings_section_screen(section, BUSY, now=NOW)
+        for section in ("mu", "dg", "qh", "tz", "th", "lang")
+    ]
+    screens.append(product_prefs_screen("Kettle", 7, BUSY, now=NOW))
+    for screen in screens:
+        assert not any(command in screen.text for command in _TYPED_COMMANDS), screen.text
+
+
+# --- the notifications of one product -------------------------------------------
+
+
+def test_product_notifications_offer_mute_presets_settings_product_and_home() -> None:
+    actions = _actions(product_prefs_screen("Kettle", 7, BUSY, now=NOW))
+    assert actions == [
+        *(Action("product.mute", (7, value)) for value in ("1", "8", "24", "0", "off")),
+        Action("product.mute_ask", (7,)),
+        Action("settings"),
+        Action("product.card", (7,)),
+        Action("home"),
+    ]
+
+
+def test_product_notifications_show_the_five_effective_values(ui_locales: Path) -> None:
+    set_locale("en")
+    text = product_prefs_screen("Kettle", 7, BUSY, now=NOW).text
+    for expected in ("Kettle", "until", "every 30", "22:00", "5 per hour", "Europe/Berlin"):
+        assert expected in text, expected
+
+
+def test_product_notifications_mark_the_current_mute() -> None:
+    assert _checked(product_prefs_screen("K", 7, prefs(), now=NOW)) == ["p:7:mu:off"]
+    assert _checked(product_prefs_screen("K", 7, prefs(mute=True), now=NOW)) == ["p:7:mu:0"]
+    ended = prefs(mute=True, mute_until=NOW - timedelta(seconds=1))
+    assert product_prefs_screen("K", 7, ended, now=NOW) == product_prefs_screen(
+        "K", 7, prefs(), now=NOW
+    )
+    assert "unlimited" in product_prefs_screen("K", 7, prefs(), now=NOW).text
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+@pytest.mark.parametrize("name", [HOSTILE, "<b>&" * 200, "x" * 500, "電気ケトル" * 100])
+def test_product_notifications_name_stays_inert_and_short(
+    locale: str, name: str, ui_locales: Path
+) -> None:
+    set_locale(locale)
+    screen = product_prefs_screen(name, 7, BUSY, now=NOW)
+    assert _is_valid_telegram_markup(screen.text)
+    assert visible_length(screen.text) <= SAFE_LIMIT
+    assert "<b>&" not in screen.text
+    if locale == "en":
+        name_line = html.unescape(re.sub(r"<[^>]+>", "", screen.text.split("\n")[1]))
+        assert display_width(name_line) <= NAME_BUDGET + 4, name_line
+
+
+@pytest.mark.parametrize("product_id", [0, -1, True, "7"])
+def test_product_notifications_refuse_a_bad_id(product_id: object) -> None:
+    with pytest.raises(ValueError, match="product_id"):
+        product_prefs_screen("K", product_id, BUSY, now=NOW)  # type: ignore[arg-type]
 
 
 @pytest.mark.parametrize("locale", LOCALES)
@@ -247,3 +347,25 @@ def test_home_shows_the_counts(ui_locales: Path) -> None:
 def test_the_home_view_refuses_malformed_values(changes: dict[str, object]) -> None:
     with pytest.raises(ValueError, match=r"."):
         HomeView(**{"active": 1, "paused": 1, "is_admin": False, **changes})  # type: ignore[arg-type]
+
+
+# --- Add -------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_add_asks_for_a_link_and_leads_back_to_the_list_and_home(
+    locale: str, ui_locales: Path
+) -> None:
+    set_locale(locale)
+    screen = add_screen()
+    assert _callbacks(screen) == ["l:a:1", "h"]
+    assert _is_valid_telegram_markup(screen.text)
+    assert "/add" not in screen.text
+
+
+def test_add_says_to_paste_a_link(ui_locales: Path) -> None:
+    set_locale("en")
+    assert "Paste" in add_screen().text
+    set_locale("it")
+    assert "Incolla" in add_screen().text
+    set_locale("en")

@@ -155,7 +155,7 @@ def _no_read_before_the_barrier(tree: ast.AsyncFunctionDef) -> bool:
     "method",
     [
         GuidedFlow._on_entry_callback,
-        GuidedFlow._on_debug_entry,
+        GuidedFlow._on_global_entry,
         GuidedFlow._on_add_entry,
         GuidedFlow._end_by_user,
     ],

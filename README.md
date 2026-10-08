@@ -80,6 +80,7 @@ Every command has an English name and, where it existed first, an Italian alias 
 are registered, so `/list` and `/lista` are the same command.
 The Menu button in Telegram lists `/menu`, `/list`, `/checkall`, `/status` and `/help`; every
 other command works when typed.
+Everything else is reachable by tapping the buttons of the main menu.
 
 ### Tracking
 - `/start` — register and view the main menu

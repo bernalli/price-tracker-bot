@@ -682,11 +682,15 @@ async def test_help_button_edits_nothing_for_a_user_without_access(w: Wired, use
 
 
 @pytest.mark.parametrize(
-    ("user_id", "language_code", "label"),
-    [(OWNER, "en", "❓ Help"), (ADMIN, "en", "❓ Help"), (OWNER, "it", "❓ Aiuto")],
+    ("user_id", "language_code", "label", "errors"),
+    [
+        (OWNER, "en", "❓ Help", "⚠️ Errors"),
+        (ADMIN, "en", "❓ Help", "⚠️ Errors"),
+        (OWNER, "it", "❓ Aiuto", "⚠️ Errori"),
+    ],
 )
-async def test_status_and_info_offers_help_and_the_way_back(
-    w: Wired, user_id: int, language_code: str, label: str
+async def test_status_and_info_offers_help_errors_and_the_way_back(
+    w: Wired, user_id: int, language_code: str, label: str, errors: str
 ) -> None:
     await w.press(PRIVATE, user_id, "menu_info", language_code=language_code)
 
@@ -694,7 +698,7 @@ async def test_status_and_info_offers_help_and_the_way_back(
     markup = edit.params["reply_markup"]
     markup = json.loads(markup) if isinstance(markup, str) else markup
     rows = [[(b["text"], b["callback_data"]) for b in row] for row in markup["inline_keyboard"]]
-    assert rows == [[(label, HELP_DATA)], [("◀️ Menu", "menu_main")]]
+    assert rows == [[(label, HELP_DATA), (errors, "er")], [("◀️ Menu", "menu_main")]]
 
 
 # --- the admin debug prompt ----------------------------------------------------

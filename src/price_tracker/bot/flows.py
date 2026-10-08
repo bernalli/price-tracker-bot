@@ -57,9 +57,14 @@ from price_tracker.app.inputs import (
     InputError,
     InputErrorCode,
     parse_currency_code,
+    parse_digest_interval,
+    parse_mute_hours,
     parse_product_interval,
+    parse_quiet_hours,
     parse_target,
     parse_threshold,
+    parse_throttle,
+    parse_timezone,
 )
 from price_tracker.bot.callbacks import (
     REGISTRY,
@@ -100,6 +105,11 @@ class FlowKind(StrEnum):
     INTERVAL = "interval"
     ADD = "add"
     DEBUG = "debug"
+    MUTE = "mute"
+    DIGEST = "digest"
+    QUIET = "quiet"
+    TIMEZONE = "timezone"
+    THROTTLE = "throttle"
 
 
 class FlowState(StrEnum):
@@ -114,8 +124,27 @@ ENTRY_ACTIONS: Final = {
     "product.threshold": FlowKind.THRESHOLD,
     "product.target": FlowKind.TARGET,
     "product.interval": FlowKind.INTERVAL,
+    "product.mute_ask": FlowKind.MUTE,
     "admin.debug": FlowKind.DEBUG,
 }
+# ``settings.ask`` opens the prompt of the setting its argument names.
+SETTING_ASKS: Final = {
+    "mu": FlowKind.MUTE,
+    "dg": FlowKind.DIGEST,
+    "qh": FlowKind.QUIET,
+    "tz": FlowKind.TIMEZONE,
+    "th": FlowKind.THROTTLE,
+}
+SETTING_KINDS: Final = frozenset(SETTING_ASKS.values())
+
+
+def entry_kind(action: Action) -> FlowKind | None:
+    """The kind of prompt ``action`` opens, or ``None`` when it opens none."""
+    if action.name == "settings.ask":
+        return SETTING_ASKS.get(str(action.args[0])) if action.args else None
+    return ENTRY_ACTIONS.get(action.name)
+
+
 # The admin menu's Debug button still sends its pre-registry string.
 LEGACY_DEBUG_ENTRY: Final = "menu_admin_debug"
 
@@ -285,6 +314,10 @@ class FlowServices(Protocol):
         self, user_id: int, kind: FlowKind, product_id: int, value: object
     ) -> ApplyStatus: ...
 
+    async def apply_setting(
+        self, user_id: int, kind: FlowKind, product_id: int | None, value: object
+    ) -> ApplyStatus: ...
+
     async def prepare_add(self, user_id: int, url: str) -> PrepareResult: ...
 
     async def add_product(
@@ -416,6 +449,9 @@ TEXT_WHERE_FOLLOWED: Final = N_("Where should the price be followed?")
 TEXT_CHOOSE_LEVEL: Final = N_("Choose a level:")
 TEXT_CURRENCY_CHOSEN: Final = N_("Currency: {code}")
 LABEL_CANCEL: Final = N_("Cancel")
+LABEL_BACK_SETTINGS: Final = N_("◀️ Settings")
+LABEL_BACK_NOTIFICATIONS: Final = N_("◀️ Notifications")
+LABEL_HOME: Final = N_("🏠 Home")
 LABEL_TYPE_CODE: Final = N_("Type a code")
 LABEL_OTHER_STORES: Final = N_("Other stores too")
 LABEL_ONLY_ON: Final = N_("Only on {store}")
@@ -429,6 +465,11 @@ _PROMPTS: Final = {
     FlowKind.THRESHOLD: N_("Send the drop threshold: 20% or 5.50 (one dot or comma)."),
     FlowKind.TARGET: N_("Send the target price, e.g. 49.90 (0 clears it)."),
     FlowKind.INTERVAL: N_("Send the check interval in minutes (5-10080, 0 resets)."),
+    FlowKind.MUTE: N_("Send the mute duration in hours (1-8760), or forever."),
+    FlowKind.DIGEST: N_("Send the digest interval in minutes (5-1440)."),
+    FlowKind.QUIET: N_("Send the quiet hours as HH:MM-HH:MM, or off."),
+    FlowKind.TIMEZONE: N_("Send your time zone, for example Europe/Rome."),
+    FlowKind.THROTTLE: N_("Send the most notifications per hour, or off."),
 }
 PROMPT_DEBUG: Final = N_("Send the link of the product page to analyse.")
 
@@ -447,6 +488,9 @@ _HINTS: Final = {
 # The interval prompt takes whole minutes only: the generic number hint (one dot
 # or comma, e.g. 1299.99) would steer the user to another rejected answer.
 TEXT_WHOLE_MINUTES: Final = N_("Use whole minutes, e.g. 30.")
+# The same for the settings that take a whole number of hours, minutes or messages.
+TEXT_WHOLE_NUMBER: Final = N_("Use a whole number, e.g. 12.")
+_WHOLE_NUMBER_KINDS: Final = frozenset({FlowKind.MUTE, FlowKind.DIGEST, FlowKind.THROTTLE})
 
 
 def _kept_text(store: str) -> str:
@@ -635,7 +679,7 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
         if isinstance(decoded, Action):
             if self.codec.is_flow_action(decoded):
                 return Route(RouteKind.FLOW_CALLBACK, key, snapshot, action=decoded)
-            if decoded.name in ENTRY_ACTIONS:
+            if entry_kind(decoded) is not None:
                 return Route(RouteKind.ENTRY_CALLBACK, key, snapshot, action=decoded)
         if snapshot is None:
             return None
@@ -671,8 +715,12 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
         self, update: Update, route: Route, context: AnyContext, transport: _Transport
     ) -> bool:
         if route.kind is RouteKind.ENTRY_CALLBACK:
-            if route.action is not None and ENTRY_ACTIONS[route.action.name] is FlowKind.DEBUG:
-                return await self._on_debug_entry(update, route, context, transport)
+            action = route.action
+            kind = None if action is None else entry_kind(action)
+            if action is None or kind is None:  # pragma: no cover - routing contract
+                return False
+            if kind is FlowKind.DEBUG or action.name == "settings.ask":
+                return await self._on_global_entry(update, route, context, transport, kind)
             return await self._on_entry_callback(update, route, context, transport)
         if route.kind is RouteKind.FLOW_CALLBACK:
             return await self._on_flow_callback(update, route, transport)
@@ -705,6 +753,18 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
 
     def _cancel_row(self, token: str) -> list[InlineKeyboardButton]:
         return [self._button(_(LABEL_CANCEL), Action("flow.cancel", (token,)))]
+
+    def _nav_markup(self, flow: ActiveFlow) -> InlineKeyboardMarkup | None:
+        """The way back and Home under a message that ends a setting prompt; none otherwise."""
+        if flow.kind not in SETTING_KINDS:
+            return None
+        if flow.product_id is None:
+            back = self._button(_(LABEL_BACK_SETTINGS), Action("settings"))
+        else:
+            back = self._button(
+                _(LABEL_BACK_NOTIFICATIONS), Action("product.prefs", (flow.product_id,))
+            )
+        return InlineKeyboardMarkup([[back, self._button(_(LABEL_HOME), Action("home"))]])
 
     async def _close_superseded(
         self, key: FlowKey, flow: ActiveFlow, transport: _Transport
@@ -802,10 +862,18 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
         )
         return True
 
-    async def _on_debug_entry(
-        self, update: Update, route: Route, context: AnyContext, transport: _Transport
+    async def _on_global_entry(
+        self,
+        update: Update,
+        route: Route,
+        context: AnyContext,
+        transport: _Transport,
+        kind: FlowKind,
     ) -> bool:
-        """Open the admin debug prompt; only an active administrator gets it."""
+        """Open a prompt that belongs to no product: the admin debug or a setting.
+
+        Only an active administrator gets the debug prompt; any active user a setting one.
+        """
         query = update.callback_query
         if query is None:  # pragma: no cover - routing contract
             return False
@@ -815,15 +883,18 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
         if not self.registry.is_current(route.key, ticket):
             await transport.answer(query_id)
             return True
-        admin = self._debug_runner is not None and await self.services.is_admin(route.key[1])
+        if kind is FlowKind.DEBUG:
+            allowed = self._debug_runner is not None and await self.services.is_admin(route.key[1])
+        else:
+            allowed = await self.services.is_active(route.key[1])
         if not self.registry.is_current(route.key, ticket):
             await transport.answer(query_id)
             return True
-        if not admin:
+        if not allowed:
             await transport.answer(query_id, _(TEXT_NOT_AUTHORISED))
             return True
         flow = ActiveFlow(
-            kind=FlowKind.DEBUG,
+            kind=kind,
             state=FlowState.AWAIT_VALUE,
             token=self._new_token(),
             product_id=None,
@@ -834,7 +905,8 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
         self._supersede_legacy(context)
         await transport.answer(query_id)
         markup = InlineKeyboardMarkup([self._cancel_row(flow.token)])
-        await self._show_prompt(route.key, flow, _(PROMPT_DEBUG), markup, transport, ticket)
+        text = _(PROMPT_DEBUG if kind is FlowKind.DEBUG else _PROMPTS[kind])
+        await self._show_prompt(route.key, flow, text, markup, transport, ticket)
         return True
 
     async def _on_add_entry(self, route: Route, context: AnyContext, transport: _Transport) -> bool:
@@ -1055,7 +1127,10 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
         if not self.registry.is_current(snapshot.key, ticket):
             return
         await transport.edit(
-            claimed.prompt_chat_id, claimed.prompt_message_id, closing_text(claimed)
+            claimed.prompt_chat_id,
+            claimed.prompt_message_id,
+            closing_text(claimed),
+            self._nav_markup(claimed),
         )
 
     async def _on_currency_chosen(
@@ -1157,6 +1232,14 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
         if claimed.kind is FlowKind.DEBUG and isinstance(value, str):
             await self._run_debug(update, context, value, transport)
             return True
+        if claimed.kind in SETTING_KINDS:
+            status = await self.services.apply_setting(
+                snapshot.key[1], claimed.kind, claimed.product_id, value
+            )
+            if status is not ApplyStatus.OK and not self.registry.is_current(snapshot.key, ticket):
+                return True
+            await transport.send(chat_id, _(_APPLY_TEXTS[status]), self._nav_markup(claimed))
+            return True
         if claimed.product_id is None:  # pragma: no cover - only the debug flow has none
             return False
         if isinstance(value, Cancel):
@@ -1208,7 +1291,7 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
             await self._localise(route)
             if not self.registry.is_current(snapshot.key, ticket):
                 return
-            await transport.send(snapshot.key[0], _(TEXT_TOO_MANY))
+            await transport.send(snapshot.key[0], _(TEXT_TOO_MANY), self._nav_markup(claimed))
             return
         self.registry.replace(snapshot, replace(flow, attempts=attempts))
         ticket = self.registry.generation(snapshot.key)
@@ -1218,6 +1301,8 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
         hint = _HINTS[error.code]
         if flow.kind is FlowKind.INTERVAL and error.code is InputErrorCode.NOT_A_NUMBER:
             hint = TEXT_WHOLE_MINUTES
+        if flow.kind in _WHOLE_NUMBER_KINDS and error.code is InputErrorCode.NOT_A_NUMBER:
+            hint = TEXT_WHOLE_NUMBER
         await transport.send(snapshot.key[0], _(hint))
 
     async def _end_by_user(self, route: Route, transport: _Transport, *, consume: bool) -> bool:
@@ -1235,7 +1320,10 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
         self.timer.disarm(snapshot)
         await self._localise(route)
         await transport.edit(
-            claimed.prompt_chat_id, claimed.prompt_message_id, closing_text(claimed)
+            claimed.prompt_chat_id,
+            claimed.prompt_message_id,
+            closing_text(claimed),
+            self._nav_markup(claimed),
         )
         return consume
 
@@ -1251,6 +1339,7 @@ class GuidedFlow(BaseHandler[Update, AnyContext, None]):
                 claimed.prompt_chat_id,
                 claimed.prompt_message_id,
                 closing_text(claimed, expired=True),
+                self._nav_markup(claimed),
             )
         finally:
             reset_locale(locale)
@@ -1278,14 +1367,21 @@ def _parse_link(text: str) -> str | InputError:
     return InputError(InputErrorCode.NOT_A_URL)
 
 
+_PARSERS: Final[dict[FlowKind, Callable[[str], object]]] = {
+    FlowKind.DEBUG: _parse_link,
+    FlowKind.THRESHOLD: parse_threshold,
+    FlowKind.TARGET: parse_target,
+    FlowKind.INTERVAL: parse_product_interval,
+    FlowKind.MUTE: parse_mute_hours,
+    FlowKind.DIGEST: parse_digest_interval,
+    FlowKind.QUIET: parse_quiet_hours,
+    FlowKind.TIMEZONE: parse_timezone,
+    FlowKind.THROTTLE: parse_throttle,
+}
+
+
 def _parse_for(kind: FlowKind, text: str) -> object:
-    if kind is FlowKind.DEBUG:
-        return _parse_link(text)
-    if kind is FlowKind.THRESHOLD:
-        return parse_threshold(text)
-    if kind is FlowKind.TARGET:
-        return parse_target(text)
-    return parse_product_interval(text)
+    return _PARSERS[kind](text)
 
 
 _APPLY_TEXTS: Final = {

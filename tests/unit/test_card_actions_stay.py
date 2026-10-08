@@ -175,12 +175,12 @@ async def card_screen(repo: Repository, product_id: int, *, back: str) -> Screen
 async def list_screen(
     repo: Repository, user_id: int = USER, list_filter: ListFilter = "a", page: int = 1
 ) -> Screen:
-    from price_tracker.bot.ui.panels import home_button
+    from price_tracker.bot.ui.panels import add_button, home_button
     from price_tracker.bot.ui.screens import Screen
 
     records = await repo.get_all_products(user_id)
     if not records:
-        return Screen(text=empty_list_text(), rows=((home_button(),),))
+        return Screen(text=empty_list_text(), rows=((add_button(), home_button()),))
     return list_page(list_view(records, list_filter, page, default_interval_minutes=360))
 
 
@@ -299,7 +299,7 @@ async def test_deleting_the_last_product_shows_the_empty_text_and_home(repo: Rep
     query = await press(repo, f"confirm_delete_{pid}")
     text, markup = shown(query)
     assert text == f"🗑 Deleted: Kettle\n\n{empty_list_text()}"
-    assert wires(markup) == ["h"]
+    assert wires(markup) == ["ad", "h"]
 
 
 async def test_the_deleted_name_is_escaped_and_cut(repo: Repository) -> None:

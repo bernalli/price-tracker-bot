@@ -9,4 +9,4 @@ text:
 keyboard:
    [Automatic](cb:s:lang:auto)  [English](cb:s:lang:en)
    [Italiano ✓](cb:s:lang:it)
-   [◀️ Settings](cb:s)
+   [◀️ Settings](cb:s)  [🏠 Home](cb:h)

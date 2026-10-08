@@ -365,6 +365,15 @@ class FakeServices:
         self.writes.append(("value", user_id, kind, product_id, value))
         return ApplyStatus.OK
 
+    async def apply_setting(
+        self, user_id: int, kind: FlowKind, product_id: int | None, value: object
+    ) -> ApplyStatus:
+        self.calls.append(("apply_setting", user_id, kind, product_id, value))
+        if user_id not in self.active:
+            return ApplyStatus.NOT_AUTHORISED
+        self.writes.append(("setting", user_id, kind, product_id, value))
+        return ApplyStatus.OK
+
     async def prepare_add(self, user_id: int, url: str) -> PrepareResult:
         self.calls.append(("prepare_add", user_id, url))
         if user_id not in self.active:

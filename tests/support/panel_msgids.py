@@ -12,9 +12,8 @@ PANEL_SINGULAR: tuple[str, ...] = (
     "🔕 Mute: {mute}",
     "📬 Digest: {digest}",
     "🌙 Quiet hours: {quiet}",
-    "⏱ Throttle: {throttle} · change with /throttle &lt;N&gt;|off",
-    "🌍 Timezone: {timezone} · change with /timezone &lt;zone&gt;",
-    "Other values: /digest_mode on|off &lt;minutes&gt;, /quiet_hours HH:MM-HH:MM",
+    "⏱ Throttle: {throttle}",
+    "🌍 Timezone: {timezone}",
     "off",
     "forever",
     "until {when}",
@@ -60,6 +59,22 @@ PANEL_SINGULAR: tuple[str, ...] = (
     "Automatic ({language})",
     "sold out",
     "🚫 Sold out",
+    "⏱ Throttle",
+    "🌍 Timezone",
+    "⏱ <b>Throttle</b>",
+    "🌍 <b>Timezone</b>",
+    "📨 Send now",
+    "🔔 <b>Notifications</b>",
+    "◀️ Product",
+    "Pending alerts sent: {n}",
+    "◀️ Admin",
+    "◀️ Status & info",
+    "➕ Add",
+    "✏️ Other duration",
+    "✏️ Interval",
+    "✏️ Other hours",
+    "✏️ Change",
+    "➕ <b>Add a product</b>\n\nPaste the link of a product page here to start tracking it.",
 )
 
 PANEL_PLURAL: tuple[str, str] = ("{n} active", "{n} active")
@@ -74,5 +89,6 @@ PANEL_IDENTICAL: frozenset[str] = frozenset(
         "{mark}<b>#{id}</b> {name} · {price}",
         "📦 {active} · ⏸ {paused}",
         "👑 Admin",
+        "◀️ Admin",
     }
 )
