@@ -45,7 +45,7 @@ MIGRATIONS_DIR = Path(price_tracker.__file__).resolve().parent / "db" / "migrati
 USER = 10
 OTHER = 12
 ADMIN = 13
-BAD_ID = "❌ ID non valido."
+BAD_ID = "❌ Invalid ID."
 NOT_FOUND = "Product not found."
 
 
