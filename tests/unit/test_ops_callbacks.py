@@ -88,7 +88,7 @@ async def test_ops_react_rejects_invalid_missing_and_foreign_anchor(repo: Reposi
     context = _context(repo, scheduler)
 
     assert await _ops.handle_ops_buttons(query, context, repo, USER_ID, "ops_react_x") is True
-    query.edit_message_text.assert_awaited_once_with("❌ ID non valido.")
+    query.edit_message_text.assert_awaited_once_with("❌ Invalid ID.")
 
     query.edit_message_text.reset_mock()
     assert await _ops.handle_ops_buttons(query, context, repo, USER_ID, "ops_react_999") is True
