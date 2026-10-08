@@ -149,14 +149,14 @@ async def test_target_already_below_does_not_renotify(
 async def test_availability_is_persisted(
     repo_with_product: tuple[Repository, int],
 ) -> None:
-    """A sold-out listing must be recorded as unavailable, not left looking live."""
+    """Two consecutive sold-out readings must be recorded as unavailable."""
     repo, pid = repo_with_product
     scraper = _ScriptedScraper(
         [ProductInfo(name="Widget", price=BASE, currency="EUR", available=False)]
     )
     notifier = AsyncMock()
 
-    await _run(repo, scraper, notifier)
+    await _run(repo, scraper, notifier, times=2)
 
     product = await repo.get_product(pid)
     assert product is not None
@@ -164,20 +164,21 @@ async def test_availability_is_persisted(
 
 
 @pytest.mark.asyncio
-async def test_back_in_stock_notifies(
+async def test_two_consecutive_sold_out_readings_trigger_one_restock_alert(
     repo_with_product: tuple[Repository, int],
 ) -> None:
-    """Coming back in stock is worth a message — it is why people track things."""
+    """One real sold-out spell produces one back-in-stock message."""
     repo, pid = repo_with_product
     scraper = _ScriptedScraper(
         [
+            ProductInfo(name="Widget", price=BASE, currency="EUR", available=False),
             ProductInfo(name="Widget", price=BASE, currency="EUR", available=False),
             ProductInfo(name="Widget", price=BASE, currency="EUR", available=True),
         ]
     )
     notifier = AsyncMock()
 
-    await _run(repo, scraper, notifier, times=2)
+    await _run(repo, scraper, notifier, times=3)
 
     notifier.assert_awaited_once()
     assert notifier.await_args is not None
