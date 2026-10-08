@@ -34,7 +34,7 @@ from price_tracker.bot.handlers import (
 )
 from price_tracker.bot.handlers._cards import home_view, reply_screen
 from price_tracker.bot.handlers._helpers import _escape_html
-from price_tracker.bot.messages import _, user_locale
+from price_tracker.bot.messages import _, reset_locale, set_locale, user_locale
 from price_tracker.bot.ui.panels import help_screen, home_screen
 
 logger = logging.getLogger(__name__)
@@ -49,7 +49,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """`/start` — a greeting above the Home screen."""
     user = update.effective_user
     screen = home_screen(await home_view(_db(context), user.id))
-    greeting = f"👋 <b>Ciao {_escape_html(user.first_name)}!</b>"
+    greeting = _("👋 <b>Hello {first_name}!</b>").format(first_name=_escape_html(user.first_name))
     await reply_screen(
         update.message, dataclasses.replace(screen, text=f"{greeting}\n\n{screen.text}")
     )
@@ -85,10 +85,19 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 
     logger.error("Exception while handling update: %s", context.error, exc_info=context.error)
     if isinstance(update, Update) and update.message:
-        with contextlib.suppress(Exception):
-            await update.message.reply_text(
-                "❌ Si è verificato un errore. Riprova tra qualche istante."
-            )
+        user = update.effective_user
+        language = user.language_code if user is not None else None
+        if user is not None:
+            with contextlib.suppress(Exception):
+                language = await user_locale(_db(context), user.id, language)
+        token = set_locale(language)
+        try:
+            with contextlib.suppress(Exception):
+                await update.message.reply_text(
+                    _("❌ An error occurred. Please try again in a moment.")
+                )
+        finally:
+            reset_locale(token)
 
 
 # ── Aggregator ────────────────────────────────────────────────────
