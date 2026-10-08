@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 
+from price_tracker.bot.callbacks import Action, encode
 from price_tracker.bot.handlers._helpers import (
     _escape_html,
     _format_threshold,
@@ -20,6 +21,8 @@ from price_tracker.bot.handlers._helpers import (
     _parse_id,
     _safe_dec,
 )
+from price_tracker.bot.handlers.callbacks._nav import show_card, show_list
+from price_tracker.bot.messages import _
 from price_tracker.bot.ui.width import truncate_to_width
 
 if TYPE_CHECKING:
@@ -90,16 +93,28 @@ async def handle_pause_button(
         return True
     product = await _get_user_product(context, product_id, user_id)
     if not product:
-        await query.edit_message_text("❌ Prodotto non trovato.")
+        await show_list(query, context, db, user_id, notice=_("Product not found."))
         return True
 
-    name = truncate_to_width(product.get("name") or "Sconosciuto", 50)
     await db.deactivate_product(product_id)
-    await query.edit_message_text(
-        f"⏸ <b>In pausa:</b> {_escape_html(name)}\nUsa /riattiva {product_id} per riattivarlo.",
-        parse_mode=ParseMode.HTML,
-    )
+    await _show_fresh_card(query, context, db, user_id, product_id, _("⏸ Tracking paused."))
     return True
+
+
+async def _show_fresh_card(
+    query: Any,
+    context: ContextTypes.DEFAULT_TYPE,
+    db: Any,
+    user_id: int,
+    product_id: int,
+    notice: str,
+) -> None:
+    """Redraw the card from the stored row after an action; the list if the row is gone."""
+    record = await db.get_product(product_id)
+    if record is None:
+        await show_list(query, context, db, user_id, notice=_("Product not found."))
+        return
+    await show_card(query, context, record, notice=notice)
 
 
 async def handle_remove_button(
@@ -115,7 +130,7 @@ async def handle_remove_button(
         return True
     product = await _get_user_product(context, product_id, user_id)
     if not product:
-        await query.edit_message_text("❌ Prodotto non trovato.")
+        await show_list(query, context, db, user_id, notice=_("Product not found."))
         return True
 
     name = truncate_to_width(product.get("name") or "Sconosciuto", 50)
@@ -127,7 +142,9 @@ async def handle_remove_button(
                     callback_data=f"confirm_delete_{product_id}",
                 ),
                 InlineKeyboardButton("⏸ Solo pausa", callback_data=f"pause_{product_id}"),
-                InlineKeyboardButton("❌ Annulla", callback_data="cancel_delete"),
+                InlineKeyboardButton(
+                    "❌ Annulla", callback_data=encode(Action("product.card", (product_id,)))
+                ),
             ]
         ]
     )
@@ -183,12 +200,8 @@ async def handle_reactivate_button(
         return True
     product = await _get_user_product(context, product_id, user_id)
     if not product:
-        await query.edit_message_text("❌ Prodotto non trovato.")
+        await show_list(query, context, db, user_id, notice=_("Product not found."))
         return True
     await db.reactivate_product(product_id)
-    name = truncate_to_width(product.get("name") or "Sconosciuto", 50)
-    await query.edit_message_text(
-        f"▶️ <b>Riattivato:</b> {_escape_html(name)}",
-        parse_mode=ParseMode.HTML,
-    )
+    await _show_fresh_card(query, context, db, user_id, product_id, _("▶️ Tracking resumed."))
     return True

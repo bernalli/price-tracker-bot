@@ -24,6 +24,7 @@ from price_tracker.bot.handlers import history, monitoring, product
 from price_tracker.bot.handlers.callbacks import _actions, _menu, _ops, _product
 from price_tracker.bot.handlers.debug import cmd_errori
 from price_tracker.bot.ui.width import display_width, truncate_to_width
+from price_tracker.core.textlimits import NAME_BUDGET
 from price_tracker.db.models import ProductErrorRow
 
 LONG_NAME = (
@@ -99,6 +100,7 @@ def _env(name: str, *, active: bool = True) -> tuple[Surfaces, MagicMock, MagicM
     db.get_all_products.return_value = [row]
     db.delete_product.return_value = True
     db.reset_initial_price.return_value = True
+    db.get_config.return_value = None
 
     scheduler = MagicMock()
     scheduler.check_one_product_for_user = AsyncMock(
@@ -292,11 +294,15 @@ SITES: list[tuple[str, Driver, int]] = [
     ("chart_title", _drive_chart_title, 50),
     ("cmd_errori", _drive_errori, 50),
     ("edit_button", _callback_driver(_actions.handle_edit_button, "edit_1"), 60),
-    ("pause_button", _callback_driver(_actions.handle_pause_button, "pause_1"), 50),
+    ("pause_button", _callback_driver(_actions.handle_pause_button, "pause_1"), NAME_BUDGET),
     ("remove_button", _callback_driver(_actions.handle_remove_button, "remove_1"), 50),
     ("reset_button", _callback_driver(_actions.handle_reset_button, "reset_1"), 60),
-    ("reactivate_button", _callback_driver(_actions.handle_reactivate_button, "reactivate_1"), 50),
-    ("confirm_delete", _callback_driver(_product.handle_delete_flow, "confirm_delete_1"), 80),
+    (
+        "reactivate_button",
+        _callback_driver(_actions.handle_reactivate_button, "reactivate_1"),
+        NAME_BUDGET,
+    ),
+    ("confirm_delete", _callback_driver(_product.handle_delete_flow, "confirm_delete_1"), 60),
     ("check_button", _callback_driver(_product.handle_check_button, "check_1"), 60),
     ("chart_button", _drive_chart_button, 50),
     ("amazon_pref", _callback_driver(_product.handle_amazon_pref, "pref_new_1"), 60),

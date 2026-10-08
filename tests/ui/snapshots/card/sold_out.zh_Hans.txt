@@ -1,0 +1,23 @@
+# ui snapshot v1
+# screen: card.sold_out
+# locale: zh_Hans
+# now: 2026-03-01T12:00:00Z
+text:
+   | [📦 <b>⁨Toaster⁩</b> 📦 <b>⁨Toaster⁩</b> 📦 <b>⁨Toaster⁩</b>]
+   | [⁨shop.example.com⁩ · #61 · [active active active] ⁨shop.example.com⁩ · #61 · [active active active] ⁨shop.example.com⁩ · #61 · [active active active]]
+   | 
+   | [💰 Now: €39.90 💰 Now: €39.90 💰 Now: €39.90]
+   | [🚫 Sold out 🚫 Sold out 🚫 Sold out]
+   | [📌 Start: €44.90 · ▼ 11.1% 📌 Start: €44.90 · ▼ 11.1% 📌 Start: €44.90 · ▼ 11.1%]
+   | [📉 Lowest: €39.90 📉 Lowest: €39.90 📉 Lowest: €39.90]
+   | [🔔 Alert: drop of 10% from start 🔔 Alert: drop of 10% from start 🔔 Alert: drop of 10% from start]
+   | [⏱ Checks: every 6小时 · last 1小时前 ⏱ Checks: every 6小时 · last 1小时前 ⏱ Checks: every 6小时 · last 1小时前]
+keyboard:
+   [[🔄 Check now 🔄 Check now 🔄 Che…](cb:p:61:ck)
+   [[📈 History 📈 History 📈 History]](cb:p:61:ch:30d)
+   [[⏸ Pause ⏸ Pause ⏸ Pause]](cb:p:61:pa)
+   [[🗑 Delete 🗑 Delete 🗑 Delete]](cb:p:61:rm)
+   [[🔔 Alert rule 🔔 Alert rule 🔔 A…](cb:p:61:th)
+   [[⏱ Interval ⏱ Interval ⏱ Inter…](cb:p:61:iv)
+   [[🔗 Open 🔗 Open 🔗 Open]](url:https://shop.example.com/item/61)
+   [[◀️ List ◀️ List ◀️ List]](cb:l:a:1)

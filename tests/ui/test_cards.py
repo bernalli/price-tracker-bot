@@ -1,4 +1,4 @@
-"""Verifies price_tracker.bot.ui.cards.product_card against the seven variants."""
+"""Verifies price_tracker.bot.ui.cards.product_card against the shared variants."""
 
 from __future__ import annotations
 
@@ -244,3 +244,53 @@ def test_labels_within_budget_every_locale(view, locale: str, ui_locales) -> Non
     residual = screen.text.replace("<b>", "").replace("</b>", "")
     assert "<" not in residual, screen.text
     assert ">" not in residual, screen.text
+
+
+# --- sold out ------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("fields", "shown"),
+    [
+        ({"is_available": 0}, True),
+        ({"is_available": 1}, False),
+        ({"is_active": 0, "is_available": 0}, False),
+        ({"is_active": 0, "suspension_kind": "automatic", "is_available": 0}, False),
+    ],
+    ids=["active-sold-out", "active-in-stock", "paused-sold-out", "suspended-sold-out"],
+)
+def test_the_sold_out_row_is_only_for_an_active_unavailable_product(
+    fields: dict[str, object], shown: bool
+) -> None:
+    from price_tracker.bot.handlers._cards import product_view
+    from tests.support.list_variants import record
+
+    view = product_view(record(7, **fields), default_interval_minutes=360)
+    lines = product_card(view, actions_for(view), now=NOW).text.split("\n")
+    assert ("🚫 Sold out" in lines) is shown
+    if shown:
+        assert lines[lines.index("🚫 Sold out") - 1].startswith("💰 Now")
+
+
+def test_the_sold_out_row_is_translated(ui_locales) -> None:
+    from price_tracker.bot.handlers._cards import product_view
+    from tests.support.list_variants import record
+
+    set_locale("it")
+    view = product_view(record(7, is_available=0), default_interval_minutes=360)
+    assert "🚫 Esaurito" in product_card(view, actions_for(view), now=NOW).text.split("\n")
+
+
+@pytest.mark.parametrize(
+    ("name", "shown"),
+    [("base", True), ("sold_out", True), ("paused", False), ("hostile", False)],
+    ids=["active", "sold-out", "paused", "suspended"],
+)
+def test_check_now_is_only_on_an_active_card(name: str, shown: bool) -> None:
+    view = VARIANTS[name]
+    actions = actions_for(view)
+    screen = product_card(view, actions, now=NOW)
+    callbacks = [btn.callback for row in screen.rows for btn in row]
+    assert (actions.check in callbacks) is shown
+    labels = [btn.label for row in screen.rows for btn in row]
+    assert any("Check now" in label for label in labels) is shown

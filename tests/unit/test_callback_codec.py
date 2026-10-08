@@ -63,8 +63,8 @@ MODEL: dict[str, tuple[Any, ...]] = {
     "help": ("hp",),
     "help.section": ("hp", _enum("tracking", "alerts", "prefs", "data", "admin")),
     "back": ("x", BACK),
-    "list.page": ("l", _enum("a", "p", "e"), ID),
-    "list.open": ("l", _enum("a", "p", "e"), ID, ID),
+    "list.page": ("l", _enum("a", "p", "e", "o"), ID),
+    "list.open": ("l", _enum("a", "p", "e", "o"), ID, ID),
     "list.remove_all": ("l", "rmall"),
     "list.remove_all_ok": ("l", "rmallok"),
     "product.card": ("p", ID, "c"),
@@ -270,6 +270,13 @@ def test_currency_callback_belongs_to_the_grammar() -> None:
     assert isinstance(decode(f"p:{token.upper()}:cur:USD"), InvalidCallback)
 
 
+def test_the_sold_out_filter_round_trips() -> None:
+    assert decode("l:o:1") == Action("list.page", ("o", 1))
+    assert encode(Action("list.page", ("o", 1))) == "l:o:1"
+    assert decode("l:o:2:7") == Action("list.open", ("o", 2, 7))
+    assert encode(Action("list.open", ("o", 2, 7))) == "l:o:2:7"
+
+
 def test_list_open_and_settings_round_trip_with_every_value() -> None:
     assert encode(Action("list.open", ("e", ID_MAX, ID_MAX))) == f"l:e:{ID_MAX}:{ID_MAX}"
     assert decode("l:p:3:42") == Action("list.open", ("p", 3, 42))
@@ -413,6 +420,11 @@ REJECTED_WITH_REASON = [
     ("l:a:1:42 ", InvalidReason.BAD_TOKENS),
     ("l:a:1\x00", InvalidReason.BAD_TOKENS),
     ("l:a:1:" + "9" * 60, InvalidReason.TOO_LONG),
+    ("l:O:1", InvalidReason.UNKNOWN_ACTION),
+    ("l:o:0", InvalidReason.UNKNOWN_ACTION),
+    ("l:o:1:0", InvalidReason.UNKNOWN_ACTION),
+    ("l:o:", InvalidReason.BAD_TOKENS),
+    ("l:o", InvalidReason.UNKNOWN_ACTION),
     ("s:mu:2", InvalidReason.UNKNOWN_ACTION),
     ("s:mu:", InvalidReason.BAD_TOKENS),
     ("s:MU", InvalidReason.UNKNOWN_ACTION),

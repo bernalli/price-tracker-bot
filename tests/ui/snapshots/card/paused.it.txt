@@ -11,8 +11,7 @@ text:
    | 🔔 Avviso: ogni ribasso
    | ⏱ Controlli: ogni 6 h · ultimo 3 ore fa
 keyboard:
-   [🔄 Controlla ora](cb:p:43:ck)  [📈 Storico](cb:p:43:ch:30d)
-   [▶️ Riattiva](cb:p:43:ra)  [🗑 Elimina](cb:p:43:rm)
-   [🔔 Regola avviso](cb:p:43:th)  [⏱ Intervallo](cb:p:43:iv)
-   [🔗 Apri](url:https://shop.example.com/item/43)
+   [📈 Storico](cb:p:43:ch:30d)  [▶️ Riattiva](cb:p:43:ra)
+   [🗑 Elimina](cb:p:43:rm)  [🔔 Regola avviso](cb:p:43:th)
+   [⏱ Intervallo](cb:p:43:iv)  [🔗 Apri](url:https://shop.example.com/item/43)
    [◀️ Lista](cb:l:a:1)

@@ -12,7 +12,8 @@
    | <b>#1</b> Kettle · 80,00 €
    keyboard:
    | [#1 → l:a:1:1]
-   | [✅ Attivi ✓ → l:a:1] [⏸ In pausa → l:p:1] [⚠️ Errori → l:e:1]
+   | [✅ Attivi ✓ → l:a:1] [⏸ In pausa → l:p:1]
+   | [⚠️ Errori → l:e:1] [🚫 Esaurito → l:o:1]
    | [🏠 Home → h]
 ## db after step 1
 ~ users user_id=10 display_name: NULL -> "U10"
@@ -45,12 +46,12 @@
    text:
    | ❓ Cosa vuoi fare con <b>Kettle</b>?
    keyboard:
-   | [🗑 Sì, elimina tutto → confirm_delete_1] [⏸ Solo pausa → pause_1] [❌ Annulla → cancel_delete]
+   | [🗑 Sì, elimina tutto → confirm_delete_1] [⏸ Solo pausa → pause_1] [❌ Annulla → p:1:c]
 ## db after step 3
 (no changes)
-## step 4: press "cancel_delete" user=10 on=1000
+## step 4: press "cancel_delete" user=10 on=1 synthetic
 -> answerCallbackQuery
--> editMessageText chat=10 message_id=1000
+-> editMessageText chat=10 message_id=1
    text:
    | 👍 Operazione annullata.
 ## db after step 4
