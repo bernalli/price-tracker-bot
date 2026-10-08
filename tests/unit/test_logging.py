@@ -1,11 +1,20 @@
 import io
 import json
 import logging
+import string
+from urllib.parse import quote
 
 import pytest
 import structlog
+from hypothesis import given
+from hypothesis import strategies as st
+from telegram import Bot
 
-from price_tracker.observability.logging import bind_request_context, configure_logging
+from price_tracker.observability.logging import (
+    TelegramTokenRedactingFilter,
+    bind_request_context,
+    configure_logging,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -66,6 +75,7 @@ class TestBindRequestContext:
 
 
 FAKE_TOKEN = "123:FAKE"
+TOKEN_TAILS = st.text(alphabet=string.ascii_letters + string.digits + "_-", min_size=1, max_size=64)
 
 
 @pytest.fixture
@@ -117,6 +127,65 @@ class TestTelegramTokenStaysOutOfStdlibLogs:
         assert FAKE_TOKEN not in out
         assert "https://api.telegram.org/bot***/sendMessage" in out
 
+    def test_python_telegram_bot_base_urls_are_redacted(self, stdlib_logging_state):
+        configure_logging(level="DEBUG")
+        Bot(token=FAKE_TOKEN)
+        out = stdlib_logging_state.getvalue()
+        assert FAKE_TOKEN not in out
+        assert "Set Bot API URL: https://api.telegram.org/bot***" in out
+        assert "Set Bot API File URL: https://api.telegram.org/file/bot***" in out
+
+    @given(
+        token_tail=TOKEN_TAILS,
+        suffix=st.sampled_from(("", "/getUpdates", "?x=1", "#fragment", " ", '"', "'")),
+        file_api=st.booleans(),
+        escaped_slashes=st.booleans(),
+        host_case=st.lists(st.booleans(), min_size=16, max_size=16),
+        scheme=st.sampled_from(("http", "https", "HTTP", "HTTPS")),
+    )
+    def test_redacts_plain_and_json_escaped_urls_at_token_boundaries(
+        self, token_tail, suffix, file_api, escaped_slashes, host_case, scheme
+    ):
+        host = "".join(
+            char.upper() if uppercase else char
+            for char, uppercase in zip("api.telegram.org", host_case, strict=True)
+        )
+        slash = r"\/" if escaped_slashes else "/"
+        file_prefix = f"file{slash}" if file_api else ""
+        token = f"123:{token_tail}"
+        escaped_suffix = suffix.replace("/", slash)
+        url = f"{scheme}:{slash}{slash}{host}{slash}{file_prefix}bot{token}{escaped_suffix}"
+        record = logging.LogRecord("telegram", logging.WARNING, __file__, 1, "%s", (url,), None)
+
+        TelegramTokenRedactingFilter().filter(record)
+
+        assert token not in record.getMessage()
+
+    @given(token_tail=TOKEN_TAILS, file_api=st.booleans())
+    def test_redacts_fully_percent_encoded_urls(self, token_tail, file_api):
+        token = f"123:{token_tail}"
+        file_prefix = "file/" if file_api else ""
+        url = quote(
+            f"https://api.telegram.org/{file_prefix}bot{token}/getUpdates",
+            safe=".",
+        )
+        record = logging.LogRecord("telegram", logging.WARNING, __file__, 1, "%s", (url,), None)
+
+        TelegramTokenRedactingFilter().filter(record)
+
+        assert quote(token, safe="") not in record.getMessage()
+
+    def test_redacts_every_occurrence_in_one_record(self):
+        message = (
+            "https://api.telegram.org/bot123:FAKE/a https://api.telegram.org/file/bot456:FAKE/b"
+        )
+        record = logging.LogRecord("telegram", logging.WARNING, __file__, 1, message, (), None)
+
+        TelegramTokenRedactingFilter().filter(record)
+
+        assert "123:FAKE" not in record.getMessage()
+        assert "456:FAKE" not in record.getMessage()
+
     def test_other_hosts_are_left_untouched(self, stdlib_logging_state):
         configure_logging(level="INFO")
         url = "https://example.com/bot123:KEEP/page"
@@ -129,3 +198,9 @@ class TestTelegramTokenStaysOutOfStdlibLogs:
         configure_logging(level="INFO")
         assert logging.getLogRecordFactory() is factory_after_first
         assert factory_after_first is not logging.LogRecord
+
+    def test_malformed_record_is_kept_unchanged(self):
+        record = logging.LogRecord("telegram.ext", logging.WARNING, __file__, 1, "%d", ("x",), None)
+        assert TelegramTokenRedactingFilter().filter(record) is True
+        assert record.msg == "%d"
+        assert record.args == ("x",)
