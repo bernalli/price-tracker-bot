@@ -36,9 +36,8 @@ from price_tracker.bot.ui.panels import (
     settings_section_screen,
 )
 from price_tracker.bot.ui.screens import Screen
-from price_tracker.db.models import NotificationPrefs
 from price_tracker.i18n.locales import AVAILABLE_LANGUAGES
-from price_tracker.notifier.preferences import PreferencesManager
+from price_tracker.notifier.preferences import PreferencesManager, update_prefs
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -102,24 +101,17 @@ async def _settings_section(
     await _show_section(query, db, user_id, str(action.args[0]))
 
 
-async def _write_prefs(db: Any, user_id: int, **changes: Any) -> None:
-    """Change fields of the global row, keeping the rest: the upsert replaces the whole row."""
-    existing = await db.get_notification_prefs(user_id=user_id, product_id=None)
-    base = existing if existing is not None else NotificationPrefs(user_id=user_id)
-    await db.upsert_notification_prefs(dataclasses.replace(base, **changes))
-
-
 async def _set_mute(
     query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, action: Action
 ) -> None:
     value = str(action.args[0])
     if value == "off":
-        await _write_prefs(db, user_id, mute=False, mute_until=None)
+        await update_prefs(db, user_id, None, mute=False, mute_until=None)
     elif value == "0":
-        await _write_prefs(db, user_id, mute=True, mute_until=None)
+        await update_prefs(db, user_id, None, mute=True, mute_until=None)
     else:
         until = datetime.now(UTC) + timedelta(hours=int(value))
-        await _write_prefs(db, user_id, mute=True, mute_until=until)
+        await update_prefs(db, user_id, None, mute=True, mute_until=until)
     await _show_section(query, db, user_id, "mu")
 
 
@@ -127,7 +119,7 @@ async def _set_digest(
     query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, action: Action
 ) -> None:
     enabled = action.args[0] == "on"
-    await _write_prefs(db, user_id, digest_mode=enabled, digest_interval_minutes=60)
+    await update_prefs(db, user_id, None, digest_mode=enabled)
     await _show_section(query, db, user_id, "dg")
 
 
@@ -136,7 +128,7 @@ async def _set_quiet(
 ) -> None:
     # "off" has no window: both ends are cleared.
     start, end = QUIET_WINDOWS.get(str(action.args[0]), (None, None))
-    await _write_prefs(db, user_id, quiet_hours_start=start, quiet_hours_end=end)
+    await update_prefs(db, user_id, None, quiet_hours_start=start, quiet_hours_end=end)
     await _show_section(query, db, user_id, "qh")
 
 

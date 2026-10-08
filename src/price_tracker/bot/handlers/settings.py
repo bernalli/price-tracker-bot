@@ -20,6 +20,7 @@ from price_tracker.bot.decorators import _config, _db, admin_only, restricted, w
 from price_tracker.bot.handlers._helpers import _parse_id
 from price_tracker.bot.messages import _
 from price_tracker.db.models import NotificationPrefs
+from price_tracker.notifier.preferences import update_prefs
 
 if TYPE_CHECKING:
     from telegram import Update
@@ -123,20 +124,7 @@ async def mute_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             return
         mute_until = datetime.now(UTC) + timedelta(hours=hours)
 
-    user_id = update.effective_user.id
-    # Read-before-write: preserve digest_mode/timezone/throttle/quiet_hours
-    # since upsert_notification_prefs does a full-row UPDATE.
-    existing = await repo.get_notification_prefs(user_id=user_id, product_id=product_id)
-    if existing is not None:
-        prefs = dataclasses.replace(existing, mute=True, mute_until=mute_until)
-    else:
-        prefs = NotificationPrefs(
-            user_id=user_id,
-            product_id=product_id,
-            mute=True,
-            mute_until=mute_until,
-        )
-    await repo.upsert_notification_prefs(prefs)
+    await update_prefs(repo, update.effective_user.id, product_id, mute=True, mute_until=mute_until)
     scope = "all products" if product_id is None else f"product {product_id}"
     when = "forever" if mute_until is None else f"until {mute_until.isoformat()}"
     await update.message.reply_text(f"Muted {scope} {when}.")
@@ -159,20 +147,7 @@ async def unmute_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         if await repo.get_product_for_user(product_id, update.effective_user.id) is None:
             await update.message.reply_text(_("❌ Prodotto non trovato."))
             return
-    user_id = update.effective_user.id
-    # Read-before-write: preserve digest_mode/timezone/throttle/quiet_hours
-    # since upsert_notification_prefs does a full-row UPDATE.
-    existing = await repo.get_notification_prefs(user_id=user_id, product_id=product_id)
-    if existing is not None:
-        prefs = dataclasses.replace(existing, mute=False, mute_until=None)
-    else:
-        prefs = NotificationPrefs(
-            user_id=user_id,
-            product_id=product_id,
-            mute=False,
-            mute_until=None,
-        )
-    await repo.upsert_notification_prefs(prefs)
+    await update_prefs(repo, update.effective_user.id, product_id, mute=False, mute_until=None)
     await update.message.reply_text("Unmuted.")
 
 

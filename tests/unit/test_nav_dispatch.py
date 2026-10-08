@@ -356,8 +356,15 @@ async def test_button_writes_what_the_command_writes(
         await press(repo, wire)
         await run_command(repo, OTHER, words)
     button_row = await global_row(repo, USER)
+    command_row = await global_row(repo, OTHER)
     assert button_row is not None
-    assert button_row == await global_row(repo, OTHER)
+    assert command_row is not None
+    if wire.startswith("s:dg:"):
+        # The On/Off button keeps the interval; the typed command without minutes sets 60.
+        expected_interval = CUSTOM.digest_interval_minutes if existing else 60
+        assert button_row.digest_interval_minutes == expected_interval
+        button_row = dataclasses.replace(button_row, digest_interval_minutes=60)
+    assert button_row == command_row
 
 
 @pytest.mark.parametrize(("wire", "_words"), CASES, ids=[wire for wire, _ in CASES])
@@ -405,7 +412,7 @@ def model_step(state: dict[str, object], wire: str) -> None:
                 mute_until=datetime(2026, 3, 1, 12, tzinfo=UTC) + timedelta(hours=int(value)),
             )
     elif section == "dg":
-        state.update(digest_mode=value == "on", digest_interval_minutes=60)
+        state.update(digest_mode=value == "on")
     elif value == "off":
         state.update(quiet_hours_start=None, quiet_hours_end=None)
     else:

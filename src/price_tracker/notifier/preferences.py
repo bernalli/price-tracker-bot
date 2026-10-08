@@ -7,13 +7,14 @@ NULL fields fall through.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields, replace
 from datetime import datetime, time, timedelta
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, Final, Protocol, TypeVar
 from zoneinfo import ZoneInfo
 
+from price_tracker.db.models import NotificationPrefs
+
 if TYPE_CHECKING:
-    from price_tracker.db.models import NotificationPrefs
     from price_tracker.db.repository import Repository
 
 T = TypeVar("T")
@@ -213,3 +214,52 @@ class ThrottleWindow:
 
     def exceeded(self, *, limit: int, now: datetime) -> bool:
         return self.count_within_hour(now) >= limit
+
+
+class PrefsStore(Protocol):
+    """Where preference rows are read and written."""
+
+    async def get_notification_prefs(
+        self, *, user_id: int, product_id: int | None
+    ) -> NotificationPrefs | None: ...
+
+    async def upsert_notification_prefs(self, prefs: NotificationPrefs) -> None: ...
+
+
+# Fields a product row takes from the global row when it is created: they are NOT NULL,
+# so a product row with the defaults would hide what the user chose globally.
+_INHERITED: Final = ("digest_mode", "digest_interval_minutes", "timezone")
+_KEYS: Final = frozenset({"user_id", "product_id", "updated_at"})
+
+
+def _check_id(name: str, value: object, *, optional: bool) -> None:
+    if value is None and optional:
+        return
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise TypeError(f"{name}: must be an int, got {value!r}")
+    if value <= 0:
+        raise ValueError(f"{name}: must be positive, got {value!r}")
+
+
+async def update_prefs(
+    store: PrefsStore, user_id: int, product_id: int | None, **changes: object
+) -> None:
+    """Change ``changes`` in the ``(user_id, product_id)`` row and keep every other field.
+
+    The upsert replaces the whole row, so the row is read first. A product row that does
+    not exist yet starts from the digest and time zone of the global row.
+    """
+    _check_id("user_id", user_id, optional=False)
+    _check_id("product_id", product_id, optional=True)
+    known = {f.name for f in fields(NotificationPrefs)} - _KEYS
+    unknown = set(changes) - known
+    if unknown:
+        raise TypeError(f"unknown preference fields: {sorted(unknown)}")
+    base = await store.get_notification_prefs(user_id=user_id, product_id=product_id)
+    if base is None:
+        base = NotificationPrefs(user_id=user_id, product_id=product_id)
+        if product_id is not None:
+            shared = await store.get_notification_prefs(user_id=user_id, product_id=None)
+            if shared is not None:
+                base = replace(base, **{name: getattr(shared, name) for name in _INHERITED})
+    await store.upsert_notification_prefs(replace(base, **changes))  # type: ignore[arg-type]
