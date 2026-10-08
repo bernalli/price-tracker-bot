@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 from price_tracker.app.views import HomeView, PrefsView
 from price_tracker.bot.ui.panels import (
+    add_screen,
     home_screen,
     product_prefs_screen,
     settings_screen,
@@ -57,6 +58,7 @@ SCREENS: dict[str, Callable[[], Screen]] = {
     "settings_timezone": lambda: settings_section_screen("tz", BUSY, now=NOW),
     "settings_throttle": lambda: settings_section_screen("th", BUSY, now=NOW),
     "product_prefs": lambda: product_prefs_screen("Kettle", 7, BUSY, now=NOW),
+    "add": add_screen,
     "home_user": lambda: home_screen(HomeView(active=3, paused=1, is_admin=False)),
     "home_admin": lambda: home_screen(HomeView(active=3, paused=1, is_admin=True)),
 }

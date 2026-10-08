@@ -14,6 +14,7 @@ from price_tracker.app.views import HomeView, PrefsView
 from price_tracker.bot.callbacks import Action, InvalidCallback, decode
 from price_tracker.bot.messages import set_locale
 from price_tracker.bot.ui.panels import (
+    add_screen,
     home_screen,
     product_prefs_screen,
     settings_screen,
@@ -331,3 +332,25 @@ def test_home_shows_the_counts(ui_locales: Path) -> None:
 def test_the_home_view_refuses_malformed_values(changes: dict[str, object]) -> None:
     with pytest.raises(ValueError, match=r"."):
         HomeView(**{"active": 1, "paused": 1, "is_admin": False, **changes})  # type: ignore[arg-type]
+
+
+# --- Add -------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_add_asks_for_a_link_and_leads_back_to_the_list_and_home(
+    locale: str, ui_locales: Path
+) -> None:
+    set_locale(locale)
+    screen = add_screen()
+    assert _callbacks(screen) == ["l:a:1", "h"]
+    assert _is_valid_telegram_markup(screen.text)
+    assert "/add" not in screen.text
+
+
+def test_add_says_to_paste_a_link(ui_locales: Path) -> None:
+    set_locale("en")
+    assert "Paste" in add_screen().text
+    set_locale("it")
+    assert "Incolla" in add_screen().text
+    set_locale("en")

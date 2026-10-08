@@ -298,3 +298,13 @@ def test_five_hostile_rows_stay_inside_the_limit(locale: str, ui_locales: Path) 
     screen = list_page(ListPage("a", 1, 1, 5, items))
     assert visible_length(screen.text) < 2000
     assert _is_valid_telegram_markup(screen.text)
+
+
+@pytest.mark.parametrize("list_filter", ["a", "p", "e", "o"])
+@pytest.mark.parametrize("count", [0, 1, 12])
+def test_every_list_page_offers_add_next_to_home(
+    count: int, list_filter: ListFilter, ui_locales: Path
+) -> None:
+    set_locale("en")
+    data = callbacks(list_page(build(count, list_filter, 1)))
+    assert data[-2:] == ["ad", "h"]

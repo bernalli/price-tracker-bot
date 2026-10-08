@@ -69,6 +69,8 @@ PANEL_SINGULAR: tuple[str, ...] = (
     "Pending alerts sent: {n}",
     "◀️ Admin",
     "◀️ Status & info",
+    "➕ Add",
+    "➕ <b>Add a product</b>\n\nPaste the link of a product page here to start tracking it.",
 )
 
 PANEL_PLURAL: tuple[str, str] = ("{n} active", "{n} active")

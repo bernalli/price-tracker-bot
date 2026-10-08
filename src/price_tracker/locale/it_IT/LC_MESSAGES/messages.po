@@ -1614,3 +1614,11 @@ msgstr "◀️ Stato e info"
 #: src/price_tracker/bot/handlers/callbacks/_admin.py
 msgid "🏥 Scraper health"
 msgstr "🏥 Salute scraper"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "➕ Add"
+msgstr "➕ Aggiungi"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "➕ <b>Add a product</b>\n\nPaste the link of a product page here to start tracking it."
+msgstr "➕ <b>Aggiungi un prodotto</b>\n\nIncolla qui il link della pagina di un prodotto per iniziare a seguirlo."

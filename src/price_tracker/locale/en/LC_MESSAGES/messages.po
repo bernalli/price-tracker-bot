@@ -1589,3 +1589,11 @@ msgstr "◀️ Status & info"
 #: src/price_tracker/bot/handlers/callbacks/_admin.py
 msgid "🏥 Scraper health"
 msgstr "🏥 Scraper health"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "➕ Add"
+msgstr "➕ Add"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "➕ <b>Add a product</b>\n\nPaste the link of a product page here to start tracking it."
+msgstr "➕ <b>Add a product</b>\n\nPaste the link of a product page here to start tracking it."

@@ -86,6 +86,20 @@ def home_button() -> Button:
     return button(_("🏠 Home"), callback=encode(Action("home")))
 
 
+def add_button() -> Button:
+    """The button that explains how to add a product."""
+    return button(_("➕ Add"), callback=encode(Action("add")))
+
+
+def add_screen() -> Screen:
+    """How to add a product: paste its link. Back to the product list, or Home."""
+    back = button(_("◀️ List"), callback=encode(Action("list.page", ("a", 1))))
+    text = _(
+        "➕ <b>Add a product</b>\n\nPaste the link of a product page here to start tracking it."
+    )
+    return Screen(text=text, rows=layout_rows([back, home_button()]))
+
+
 def _preset(label: str, action: Action, *, current: bool) -> Button:
     return button(f"{label} ✓" if current else label, callback=encode(action))
 

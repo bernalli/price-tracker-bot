@@ -114,6 +114,7 @@ MODEL: dict[str, tuple[Any, ...]] = {
     "admin.debug": ("a", "dbg"),
     "admin.health": ("a", "hl"),
     "errors": ("er",),
+    "add": ("ad",),
 }
 
 _ID_TEXT = r"[1-9][0-9]{0,18}"
@@ -307,6 +308,7 @@ def test_the_nodes_reached_by_tapping_round_trip() -> None:
         "p:7:mua": Action("product.mute_ask", (7,)),
         "a:hl": Action("admin.health"),
         "er": Action("errors"),
+        "ad": Action("add"),
     }
     for value in ("1", "8", "24", "0", "off"):
         pairs[f"p:7:mu:{value}"] = Action("product.mute", (7, value))
@@ -484,6 +486,10 @@ REJECTED_WITH_REASON = [
     ("er:x", InvalidReason.UNKNOWN_ACTION),
     ("ER", InvalidReason.UNKNOWN_ACTION),
     ("er\x00", InvalidReason.BAD_TOKENS),
+    ("ad:x", InvalidReason.UNKNOWN_ACTION),
+    ("AD", InvalidReason.UNKNOWN_ACTION),
+    ("ad:", InvalidReason.BAD_TOKENS),
+    ("add", InvalidReason.UNKNOWN_ACTION),
     ("s:th:3", InvalidReason.UNKNOWN_ACTION),
     ("s:lang:xx", InvalidReason.UNKNOWN_ACTION),
     ("s:lang:AUTO", InvalidReason.UNKNOWN_ACTION),
@@ -567,6 +573,7 @@ def test_not_well_formed_is_rejected(data: object) -> None:
         Action("product.mute_ask", ("1",)),
         Action("admin.health", (1,)),
         Action("errors", ("x",)),
+        Action("add", (1,)),
     ],
     ids=repr,
 )
@@ -641,6 +648,7 @@ def test_no_new_wire_starts_with_a_legacy_entry() -> None:
         "product.mute_ask",
         "admin.health",
         "errors",
+        "add",
     )
     wires = [
         render(

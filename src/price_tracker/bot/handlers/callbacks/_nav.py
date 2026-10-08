@@ -31,6 +31,8 @@ from price_tracker.bot.ui.cards import list_page, product_card
 from price_tracker.bot.ui.labels import button, layout_rows
 from price_tracker.bot.ui.panels import (
     QUIET_WINDOWS,
+    add_button,
+    add_screen,
     help_screen,
     home_button,
     home_screen,
@@ -228,7 +230,7 @@ async def _list_screen(
 ) -> Screen:
     records = await db.get_all_products(user_id)
     if not records:
-        return Screen(text=empty_list_text(), rows=((home_button(),),))
+        return Screen(text=empty_list_text(), rows=layout_rows([add_button(), home_button()]))
     interval = await default_interval(context)
     return list_page(list_view(records, list_filter, page, default_interval_minutes=interval))
 
@@ -318,6 +320,12 @@ async def _home(
     await _edit(query, home_screen(await home_view(db, user_id)))
 
 
+async def _add(
+    query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, action: Action
+) -> None:
+    await _edit(query, add_screen())
+
+
 async def _help(
     query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, action: Action
 ) -> None:
@@ -342,6 +350,7 @@ _HANDLERS: Final[dict[str, Callable[..., Awaitable[None]]]] = {
     "product.mute": _product_mute,
     "admin.health": _admin_health,
     "errors": _errors,
+    "add": _add,
 }
 
 

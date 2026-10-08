@@ -83,6 +83,7 @@ HANDLED = frozenset(
         "product.mute",
         "admin.health",
         "errors",
+        "add",
     }
 )
 
@@ -602,7 +603,7 @@ async def test_nothing_left_shows_the_empty_text_and_home(repo: Repository) -> N
     query = await press(repo, "l:a:1")
     text, markup = shown(query)
     assert "Non hai prodotti tracciati" in text
-    assert [b.callback_data for r in markup.inline_keyboard for b in r] == ["h"]
+    assert [b.callback_data for r in markup.inline_keyboard for b in r] == ["ad", "h"]
 
 
 async def test_pressing_pages_out_of_order_always_renders_the_page_asked(
@@ -975,3 +976,11 @@ async def test_a_long_error_report_is_cut_to_one_message(repo: Repository) -> No
     text = edited_text(query)
     assert visible_length(text) <= TELEGRAM_MESSAGE_LIMIT
     assert "Product 0" in text
+
+
+async def test_add_shows_the_paste_a_link_screen(repo: Repository) -> None:
+    query = await press(repo, "ad")
+    query.edit_message_text.assert_awaited_once()
+    text, markup = shown(query)
+    assert "Paste" in text
+    assert [b.callback_data for r in markup.inline_keyboard for b in r] == ["l:a:1", "h"]

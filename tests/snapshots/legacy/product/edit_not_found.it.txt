@@ -14,7 +14,7 @@
    | [#1 → l:a:1:1]
    | [✅ Attivi ✓ → l:a:1] [⏸ In pausa → l:p:1]
    | [⚠️ Errori → l:e:1] [🚫 Esaurito → l:o:1]
-   | [🏠 Home → h]
+   | [➕ Aggiungi → ad] [🏠 Home → h]
 ## db after step 1
 ~ users user_id=10 display_name: NULL -> "U10"
 ## step 2: press "edit_999" user=10 on=1 synthetic

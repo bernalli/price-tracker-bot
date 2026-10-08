@@ -443,6 +443,7 @@ def build_registry() -> ActionRegistry:
         ActionSpec("admin.debug", (_lit("a"), _lit("dbg"))),
         ActionSpec("admin.health", (_lit("a"), _lit("hl"))),
         ActionSpec("errors", (_lit("er"),)),
+        ActionSpec("add", (_lit("ad"),)),
     ]
     return ActionRegistry(specs)
 

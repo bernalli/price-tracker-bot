@@ -10,7 +10,7 @@ from price_tracker.bot.callbacks import Action, encode
 from price_tracker.bot.messages import _, current_locale, ngettext
 from price_tracker.bot.ui.escape import escape_html
 from price_tracker.bot.ui.labels import button, layout_rows
-from price_tracker.bot.ui.panels import home_button
+from price_tracker.bot.ui.panels import add_button, home_button
 from price_tracker.bot.ui.screens import Button, Screen
 from price_tracker.bot.ui.width import sanitize_label, truncate_to_width
 from price_tracker.core.textlimits import DOMAIN_BUDGET, NAME_BUDGET
@@ -242,7 +242,7 @@ def _list_keyboard(page: ListPage) -> tuple[tuple[Button, ...], ...]:
     footer = []
     if page.filter == "a" and page.total > 1:
         footer.append(button(_("🗑 Delete all"), callback="delete_all"))
-    footer.append(home_button())
+    footer += [add_button(), home_button()]
     return (*rows, *layout_rows(footer))
 
 
