@@ -12,7 +12,7 @@ import logging
 import re as _re
 import time
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler
@@ -380,9 +380,13 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 @admin_only
 async def health_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Admin: show scraper health report (English output)."""
+    await update.message.reply_html(health_text(context.bot_data["health_manager"]))
+
+
+def health_text(health_mgr: Any) -> str:
+    """The scraper health report: domain counts by state, locks and the last block events."""
     from price_tracker.core.health import QuarantineState  # noqa: PLC0415
 
-    health_mgr = context.bot_data["health_manager"]
     records = health_mgr.all_records()
 
     # Classify by EFFECTIVE state: an expired lockout is HALF_OPEN on read
@@ -435,8 +439,7 @@ async def health_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             domain = _escape_html(r.domain)
             reason = _escape_html(r.last_block_reason or "?")
             lines.append(f"  • {domain} — {reason} — {ts}")
-
-    await update.message.reply_html("\n".join(lines))
+    return "\n".join(lines)
 
 
 @with_locale
@@ -444,23 +447,37 @@ async def health_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 async def cmd_errori(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """User-facing: products with recent scrape errors + domain quarantine state.
 
-    Complements the admin-only English /health (domain-level) with a per-product,
-    Italian view that surfaces the persisted ``last_error`` for debugging.
+    Complements the admin-only English /health (domain-level) with a per-product
+    view that surfaces the persisted ``last_error`` for debugging.
+    """
+    text = await errors_text(
+        _db(context), context.bot_data.get("health_manager"), update.effective_user.id
+    )
+    if text is None:
+        await update.message.reply_text(no_errors_text())
+        return
+    await update.message.reply_html(text)
+
+
+def no_errors_text() -> str:
+    """What the error report says when no product of the user has errors."""
+    return _("✅ No recent errors on your products.")
+
+
+async def errors_text(db: Any, health_mgr: Any, user_id: int) -> str | None:
+    """The products of ``user_id`` with recent read errors and their domain's quarantine.
+
+    ``None`` when no product has errors.
     """
     from price_tracker.core.health import QuarantineState  # noqa: PLC0415
 
-    db = _db(context)
-    user_id = update.effective_user.id
-    health_mgr = context.bot_data.get("health_manager")
-
     errored = await db.list_products_with_errors(user_id=user_id)
     if not errored:
-        await update.message.reply_text("✅ Nessun errore recente sui tuoi prodotti.")
-        return
+        return None
 
-    lines: list[str] = [f"⚠️ <b>Errori recenti ({len(errored)})</b>", ""]
+    lines: list[str] = [_("⚠️ <b>Recent errors ({n})</b>").format(n=len(errored)), ""]
     for row in errored:
-        name = _escape_html(truncate_to_width(row.name or "Sconosciuto", 50))
+        name = _escape_html(truncate_to_width(row.name or _("Unknown"), 50))
         lines.append(f"<b>#{row.id}</b> {name}")
 
         state_label = ""
@@ -468,9 +485,13 @@ async def cmd_errori(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             state = health_mgr.state(row.domain)
             if state != QuarantineState.CLOSED:
                 until = _format_remaining(health_mgr.locked_until(row.domain))
-                state_label = f" — 🔒 {_tier_label(state.value)} (riprende tra {until})"
+                resumes = _("🔒 {tier} (resumes in {until})").format(
+                    tier=_tier_label(state.value), until=until
+                )
+                state_label = f" — {resumes}"
         lines.append(f"  🌐 {_escape_html(row.domain or '?')}{state_label}")
-        lines.append(f"  ❌ {row.consecutive_errors} letture fallite")
+        failed = _("❌ {n} failed reads").format(n=row.consecutive_errors)
+        lines.append(f"  {failed}")
         if row.last_error:
             when = _format_relative_time(row.last_error_at)
             when_str = f" — {when}" if when else ""
@@ -478,10 +499,12 @@ async def cmd_errori(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         lines.append("")
 
     lines.append(
-        "ℹ️ I siti in 🔒 quarantena riprendono da soli; "
-        "usa /reactivate per riattivare un prodotto sospeso."
+        _(
+            "ℹ️ Sites in 🔒 quarantine resume on their own; "
+            "use /reactivate to reactivate a suspended product."
+        )
     )
-    await update.message.reply_html("\n".join(lines))
+    return "\n".join(lines)
 
 
 def register(app: Application) -> None:

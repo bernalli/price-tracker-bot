@@ -42,25 +42,25 @@ async def handle_admin_menu(
         saved = await db.get_config("check_interval_minutes")
         interval = int(saved) if saved else config.check_interval_minutes
         rows = [
-            [InlineKeyboardButton("👥 Lista utenti", callback_data="menu_admin_users")],
+            [InlineKeyboardButton(_("👥 User list"), callback_data="menu_admin_users")],
             [
-                InlineKeyboardButton("➕ Aggiungi utente", callback_data="menu_admin_adduser"),
-                InlineKeyboardButton("🚫 Rimuovi utente", callback_data="menu_admin_removeuser"),
+                InlineKeyboardButton(_("➕ Add user"), callback_data="menu_admin_adduser"),
+                InlineKeyboardButton(_("🚫 Remove user"), callback_data="menu_admin_removeuser"),
             ],
-            [InlineKeyboardButton("✏️ Nickname utente", callback_data="menu_admin_nick")],
+            [InlineKeyboardButton(_("✏️ User nickname"), callback_data="menu_admin_nick")],
             [
                 InlineKeyboardButton(
-                    f"⏱ Intervallo globale: {interval} min",
+                    _("⏱ Global interval: {interval} min").format(interval=interval),
                     callback_data="menu_admin_interval",
                 )
             ],
-            [InlineKeyboardButton("🔧 Debug scraper", callback_data="menu_admin_debug")],
+            [InlineKeyboardButton(_("🔧 Debug scraper"), callback_data="menu_admin_debug")],
             menu_back_button(),
         ]
         await query.edit_message_text(
-            f"👑 <b>Impostazioni</b>\n\n"
-            f"👥 Utenti attivi: {len(users)}\n"
-            f"⏱ Intervallo globale: {interval} min",
+            _(
+                "👑 <b>Admin</b>\n\n👥 Active users: {users}\n⏱ Global interval: {interval} min"
+            ).format(users=len(users), interval=interval),
             parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup(rows),
         )

@@ -34,7 +34,7 @@ from price_tracker.bot.handlers import (
 )
 from price_tracker.bot.handlers._cards import home_view, reply_screen
 from price_tracker.bot.handlers._helpers import _escape_html
-from price_tracker.bot.messages import user_locale
+from price_tracker.bot.messages import _, user_locale
 from price_tracker.bot.ui.panels import help_screen, home_screen
 
 logger = logging.getLogger(__name__)
@@ -73,7 +73,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 def _menu_back_button() -> list[InlineKeyboardButton]:
     """Single-row 'back to main menu' button (legacy alias)."""
-    return [InlineKeyboardButton("◀️ Menu", callback_data="menu_main")]
+    return [InlineKeyboardButton(_("◀️ Menu"), callback_data="menu_main")]
 
 
 # ── Error handler ─────────────────────────────────────────────────

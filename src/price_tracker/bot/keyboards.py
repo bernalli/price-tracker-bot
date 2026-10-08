@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
+from price_tracker.bot.messages import _
+
 
 def build_threshold_keyboard(product_id: int) -> InlineKeyboardMarkup:
     """Build the standard threshold/notification choice keyboard."""
@@ -42,4 +44,4 @@ def build_threshold_keyboard(product_id: int) -> InlineKeyboardMarkup:
 
 def menu_back_button() -> list[InlineKeyboardButton]:
     """Single-row 'back to main menu' button."""
-    return [InlineKeyboardButton("◀️ Menu", callback_data="menu_main")]
+    return [InlineKeyboardButton(_("◀️ Menu"), callback_data="menu_main")]

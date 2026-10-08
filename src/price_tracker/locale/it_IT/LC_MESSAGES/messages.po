@@ -1488,3 +1488,91 @@ msgstr "❓ Aiuto"
 #: src/price_tracker/bot/flows.py
 msgid "Send the link of the product page to analyse."
 msgstr "Invia il link della pagina prodotto da analizzare."
+
+#: src/price_tracker/bot/handlers/callbacks/_admin.py
+msgid "👥 User list"
+msgstr "👥 Lista utenti"
+
+#: src/price_tracker/bot/handlers/callbacks/_admin.py
+msgid "➕ Add user"
+msgstr "➕ Aggiungi utente"
+
+#: src/price_tracker/bot/handlers/callbacks/_admin.py
+msgid "🚫 Remove user"
+msgstr "🚫 Rimuovi utente"
+
+#: src/price_tracker/bot/handlers/callbacks/_admin.py
+msgid "✏️ User nickname"
+msgstr "✏️ Nickname utente"
+
+#: src/price_tracker/bot/handlers/callbacks/_admin.py
+msgid "⏱ Global interval: {interval} min"
+msgstr "⏱ Intervallo globale: {interval} min"
+
+#: src/price_tracker/bot/handlers/callbacks/_admin.py
+msgid "🔧 Debug scraper"
+msgstr "🔧 Debug scraper"
+
+#: src/price_tracker/bot/handlers/callbacks/_admin.py
+msgid "👑 <b>Admin</b>\n\n👥 Active users: {users}\n⏱ Global interval: {interval} min"
+msgstr "👑 <b>Impostazioni</b>\n\n👥 Utenti attivi: {users}\n⏱ Intervallo globale: {interval} min"
+
+#: src/price_tracker/bot/handlers/callbacks/_actions.py
+msgid "not set"
+msgstr "non impostato"
+
+#: src/price_tracker/bot/handlers/callbacks/_actions.py
+msgid "🔔 Any drop"
+msgstr "🔔 Ogni ribasso"
+
+#: src/price_tracker/bot/handlers/callbacks/_actions.py
+msgid "📉 Threshold % or €"
+msgstr "📉 Soglia % o €"
+
+#: src/price_tracker/bot/handlers/callbacks/_actions.py
+msgid "💰 Target price"
+msgstr "💰 Prezzo target"
+
+#: src/price_tracker/bot/handlers/callbacks/_actions.py
+msgid "🔄 Reset base price"
+msgstr "🔄 Azzera prezzo base"
+
+#: src/price_tracker/bot/handlers/callbacks/_actions.py
+msgid "✏️ <b>Edit #{id}</b> {name}\n\n🎯 Current threshold: <b>{threshold}</b>\n🏁 Current target: <b>{target}</b>\n📌 Base price: <b>{base}</b>\n\n<b>What do you want to change?</b>"
+msgstr "✏️ <b>Modifica #{id}</b> {name}\n\n🎯 Soglia attuale: <b>{threshold}</b>\n🏁 Target attuale: <b>{target}</b>\n📌 Prezzo base: <b>{base}</b>\n\n<b>Cosa vuoi modificare?</b>"
+
+#: src/price_tracker/bot/handlers/callbacks/_menu.py
+msgid "🔔 <b>Notifications</b>\n\nTap a product to change its threshold or target."
+msgstr "🔔 <b>Notifiche</b>\n\nTocca un prodotto per cambiare soglia o target."
+
+#: src/price_tracker/bot/handlers/callbacks/_menu.py
+msgid "ℹ️ <b>Statistics</b>\n\n📦 Active products: {active}\n📁 Total: {total}\n🔄 Checks: {checks}\n⏱ Interval: every {interval}"
+msgstr "ℹ️ <b>Statistiche</b>\n\n📦 Prodotti attivi: {active}\n📁 Totali: {total}\n🔄 Check: {checks}\n⏱ Intervallo: ogni {interval}"
+
+#: src/price_tracker/bot/handlers/callbacks/_menu.py
+msgid "👑 <b>Admin</b>\n👥 Active users: {users}\n📦 Global products: {products}\n🔄 Global checks: {checks}"
+msgstr "👑 <b>Admin</b>\n👥 Utenti attivi: {users}\n📦 Prodotti globali: {products}\n🔄 Check globali: {checks}"
+
+#: src/price_tracker/bot/keyboards.py
+msgid "◀️ Menu"
+msgstr "◀️ Menu"
+
+#: src/price_tracker/bot/handlers/debug.py
+msgid "✅ No recent errors on your products."
+msgstr "✅ Nessun errore recente sui tuoi prodotti."
+
+#: src/price_tracker/bot/handlers/debug.py
+msgid "⚠️ <b>Recent errors ({n})</b>"
+msgstr "⚠️ <b>Errori recenti ({n})</b>"
+
+#: src/price_tracker/bot/handlers/debug.py
+msgid "🔒 {tier} (resumes in {until})"
+msgstr "🔒 {tier} (riprende tra {until})"
+
+#: src/price_tracker/bot/handlers/debug.py
+msgid "❌ {n} failed reads"
+msgstr "❌ {n} letture fallite"
+
+#: src/price_tracker/bot/handlers/debug.py
+msgid "ℹ️ Sites in 🔒 quarantine resume on their own; use /reactivate to reactivate a suspended product."
+msgstr "ℹ️ I siti in 🔒 quarantena riprendono da soli; usa /reactivate per riattivare un prodotto sospeso."

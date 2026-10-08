@@ -202,7 +202,7 @@ async def handle_menu_navigation(
             )
         rows.append(menu_back_button())
         await query.edit_message_text(
-            "🔔 <b>Notifiche</b>\n\nTocca un prodotto per cambiare soglia o target.",
+            _("🔔 <b>Notifications</b>\n\nTap a product to change its threshold or target."),
             parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup(rows),
         )
@@ -354,22 +354,28 @@ async def _handle_menu_info(
     saved = await db.get_config("check_interval_minutes")
     interval = int(saved) if saved else config.check_interval_minutes
     int_str = f"{interval // 60}h" if interval >= 60 and interval % 60 == 0 else f"{interval}min"
-    text = (
-        f"ℹ️ <b>Statistiche</b>\n\n"
-        f"📦 Prodotti attivi: {stats['active_products']}\n"
-        f"📁 Totali: {stats['total_products']}\n"
-        f"🔄 Check: {stats['total_checks']}\n"
-        f"⏱ Intervallo: ogni {int_str}"
+    text = _(
+        "ℹ️ <b>Statistics</b>\n\n"
+        "📦 Active products: {active}\n"
+        "📁 Total: {total}\n"
+        "🔄 Checks: {checks}\n"
+        "⏱ Interval: every {interval}"
+    ).format(
+        active=stats["active_products"],
+        total=stats["total_products"],
+        checks=stats["total_checks"],
+        interval=int_str,
     )
     if is_admin:
         gs = await db.get_stats()
         users = await db.list_active_users()
-        text += (
-            f"\n\n👑 <b>Admin</b>\n"
-            f"👥 Utenti attivi: {len(users)}\n"
-            f"📦 Prodotti globali: {gs['active_products']}\n"
-            f"🔄 Check globali: {gs['total_checks']}"
-        )
+        admin_block = _(
+            "👑 <b>Admin</b>\n"
+            "👥 Active users: {users}\n"
+            "📦 Global products: {products}\n"
+            "🔄 Global checks: {checks}"
+        ).format(users=len(users), products=gs["active_products"], checks=gs["total_checks"])
+        text += f"\n\n{admin_block}"
     await query.edit_message_text(
         text,
         parse_mode=ParseMode.HTML,

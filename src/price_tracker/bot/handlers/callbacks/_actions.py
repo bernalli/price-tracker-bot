@@ -40,40 +40,52 @@ async def handle_edit_button(
 
     product_id = _parse_id(data.replace("edit_", ""))
     if product_id is None:
-        await query.edit_message_text("❌ ID non valido.")
+        await query.edit_message_text(_("❌ Invalid ID."))
         return True
     product = await _get_user_product(context, product_id, user_id)
     if not product:
-        await query.edit_message_text("❌ Prodotto non trovato.")
+        await query.edit_message_text(_("❌ Product not found."))
         return True
 
-    name = truncate_to_width(product.get("name") or "Sconosciuto", 60)
+    name = truncate_to_width(product.get("name") or _("Unknown"), 60)
     threshold_type = product.get("threshold_type", "percentage")
     threshold_value = product.get("threshold_value", "10")
     threshold_str = _format_threshold(threshold_type, threshold_value)
     target = _safe_dec(product.get("target_price"))
-    target_str = f"€{target:.2f}" if target else "non impostato"
+    target_str = f"€{target:.2f}" if target else _("not set")
 
     initial = _safe_dec(product.get("initial_price"))
     current = _safe_dec(product.get("current_price"))
-    initial_str = f"€{initial:.2f}" if initial else "N/D"
+    initial_str = f"€{initial:.2f}" if initial else _("N/A")
 
     edit_buttons = [
-        [InlineKeyboardButton("🔔 Ogni ribasso", callback_data=f"track_any_{product_id}")],
-        [InlineKeyboardButton("📉 Soglia % o €", callback_data=f"track_threshold_{product_id}")],
-        [InlineKeyboardButton("💰 Prezzo target", callback_data=f"track_target_{product_id}")],
+        [InlineKeyboardButton(_("🔔 Any drop"), callback_data=f"track_any_{product_id}")],
+        [
+            InlineKeyboardButton(
+                _("📉 Threshold % or €"), callback_data=f"track_threshold_{product_id}"
+            )
+        ],
+        [InlineKeyboardButton(_("💰 Target price"), callback_data=f"track_target_{product_id}")],
     ]
     if initial and current and initial != current:
         edit_buttons.append(
-            [InlineKeyboardButton("🔄 Azzera prezzo base", callback_data=f"reset_{product_id}")]
+            [InlineKeyboardButton(_("🔄 Reset base price"), callback_data=f"reset_{product_id}")]
         )
 
     await query.message.reply_text(
-        f"✏️ <b>Modifica #{product_id}</b> {_escape_html(name)}\n\n"
-        f"🎯 Soglia attuale: <b>{threshold_str}</b>\n"
-        f"🏁 Target attuale: <b>{target_str}</b>\n"
-        f"📌 Prezzo base: <b>{initial_str}</b>\n\n"
-        f"<b>Cosa vuoi modificare?</b>",
+        _(
+            "✏️ <b>Edit #{id}</b> {name}\n\n"
+            "🎯 Current threshold: <b>{threshold}</b>\n"
+            "🏁 Current target: <b>{target}</b>\n"
+            "📌 Base price: <b>{base}</b>\n\n"
+            "<b>What do you want to change?</b>"
+        ).format(
+            id=product_id,
+            name=_escape_html(name),
+            threshold=threshold_str,
+            target=target_str,
+            base=initial_str,
+        ),
         parse_mode=ParseMode.HTML,
         reply_markup=InlineKeyboardMarkup(edit_buttons),
     )
