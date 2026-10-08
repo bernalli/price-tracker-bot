@@ -1,188 +1,219 @@
 <p align="center">
-  <img src="docs/img/cover.png" alt="price-tracker-bot — self-hosted Telegram bot for multi-site price tracking" width="100%">
+  <img src="docs/img/cover.png" alt="price-tracker-bot — price alerts in Telegram" width="100%">
 </p>
 
 # price-tracker-bot
 
+[![Version](https://img.shields.io/github/v/release/bernalli/price-tracker-bot)](https://github.com/bernalli/price-tracker-bot/releases)
 [![CI](https://github.com/bernalli/price-tracker-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/bernalli/price-tracker-bot/actions/workflows/ci.yml)
 [![Security](https://github.com/bernalli/price-tracker-bot/actions/workflows/security.yml/badge.svg)](https://github.com/bernalli/price-tracker-bot/actions/workflows/security.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![Version](https://img.shields.io/badge/version-1.0.0-brightgreen.svg)](https://github.com/bernalli/price-tracker-bot/releases)
 
-Self-hosted Telegram bot for multi-site price tracking with auto-quarantine, structured observability, fine-grained notification preferences, and a plugin architecture for adding new sites.
+A self-hosted Telegram bot that watches the product links you send and alerts you when their prices drop.
 
-<p align="center">
-  <img src="docs/img/price-chart.png" alt="Price-history chart with target line, as sent by the /chart command" width="790">
-  <br>
-  <em>The <code>/chart</code> command: price history with your target line, rendered by the bot.</em>
-</p>
-
-## Why this bot
-
-| Feature                          | price-tracker-bot | Camelcamelcamel | Keepa | Pricepulse |
-| -------------------------------- | ----------------- | --------------- | ----- | ---------- |
-| Self-host                        | ✅                 | ❌               | ❌     | ❌          |
-| Multi-site (17 built-in)         | ✅                 | ❌ (Amazon only) | ❌     | partial    |
-| Plugin extension point           | ✅                 | ❌               | ❌     | ❌          |
-| Full observability (Prom+Grafana)| ✅                 | ❌               | ❌     | ❌          |
-| Fine-grained notifications       | ✅                 | basic           | basic | basic      |
-| Open-source (MIT)                | ✅                 | ❌               | ❌     | ❌          |
-
-## Key features
-
-- 17 built-in scrapers (Amazon, eBay, Shopify-generic, Walmart, Target, BestBuy, Etsy, Newegg, Wayfair, MediaMarkt, Otto, Zalando, Apple Store, Google Store, AliExpress, Generic JSON-LD/microdata/OG/RDFa chain, Playwright fallback)
-- Per-domain auto-quarantine with tier-based exponential backoff (closes infinite-429 loops)
-- Multi-currency price tracking (Decimal precision, ECB rates with persistent TTL cache)
-- Outlier detection via median ratio (rejects bogus parses without polluting price history)
-- Notification preferences: mute, digest, quiet hours, throttle, timezone-aware, per-product
-- Prometheus exporter on `127.0.0.1:9090` + structured JSON logging via structlog
-- Grafana dashboard with 14 panels (latency, block rate, quarantine map, alerts, currency)
-- Plugin extension point at `plugins/` for custom scrapers
-- Bilingual UI (English + Italian) with auto-detect from Telegram `language_code`
-- Hardened Docker deploy: non-root, read-only root fs, dropped capabilities, no-new-privileges, resource limits
+- Paste a product link to track its price on that site.
+- Set a price-drop threshold or a target price for each product.
+- View price history as a chart with your target line.
+- Control notifications with mute, quiet hours, a digest and hourly limits.
+- Choose English or Italian, or follow your Telegram app's language.
 
 ## Quick start
+
+You need Docker with Compose and a Telegram bot token. No clone is needed.
+The published image supports `linux/amd64` and `linux/arm64`.
+Release tags are `X.Y.Z`, `X.Y` and `latest`; `latest` follows the newest stable release.
+Use an exact `X.Y.Z` tag when you want to choose when to upgrade.
+
+**1. Save this as `docker-compose.yml` in a new directory.**
+
+```yaml
+services:
+  price-tracker:
+    image: ghcr.io/bernalli/price-tracker-bot:latest
+    container_name: price-tracker-bot
+    restart: unless-stopped
+    env_file: .env
+    user: "1000:1000"
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+      - /home/botuser/.cache:size=512m,mode=0755,uid=1000,gid=1000
+    volumes:
+      - price-tracker-data:/data
+      - ./plugins:/app/plugins:ro
+    mem_limit: 768m
+    mem_reservation: 384m
+    cpus: 1.0
+    pids_limit: 256
+    cap_drop:
+      - ALL
+    cap_add: []
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sqlite3; sqlite3.connect('/data/pricetracker.db').execute('SELECT 1')"]
+      interval: 5m
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+volumes:
+  price-tracker-data:
+```
+
+**2. Create your bot with @BotFather in Telegram and copy its token.**
+Save a `.env` beside `docker-compose.yml`, replacing both placeholders:
+
+```dotenv
+TELEGRAM_BOT_TOKEN=PASTE_BOT_TOKEN_HERE
+ALLOWED_USERS=YOUR_NUMERIC_TELEGRAM_ID
+```
+
+Use your numeric Telegram user ID for `ALLOWED_USERS`. Every ID listed there
+becomes an administrator. To authorize someone without admin privileges, use
+`/adduser <telegram_id>` after startup.
+
+If you need to find your ID, temporarily leave `ALLOWED_USERS` empty, start the
+bot as below and send `/start`. The access-denied reply includes your ID.
+Put it in `.env`, then run `docker compose up -d` again.
+
+**3. Start the bot and send it `/start` in Telegram.**
+
+```bash
+mkdir -p plugins
+docker compose up -d
+```
+
+Paste a product link into the chat to start tracking. To inspect startup logs:
+
+```bash
+docker compose logs -f price-tracker
+```
+
+## Using the bot
+
+`/start` and `/menu` open Home: **Products**, **Prices**, **Notifications**,
+**Data**, **Status & info** and **Settings**. Administrators also see **Admin**.
+Telegram's Menu button lists `/menu`, `/list`, `/checkall`, `/status` and `/help`.
+
+Use the buttons or type these commands; `/help` shows the full command list.
+Product commands use the ID shown in `/list`.
+
+| Command | What it does |
+| --- | --- |
+| `/add <url>` | Track a product; pasting its link also works. |
+| `/list` | Browse your products and open their cards. |
+| `/check <id>` / `/checkall` | Check one product or all your active products now. |
+| `/target <id> <price>` | Set a target price; use `0` to clear it. |
+| `/threshold <id> <value>` | Set a drop rule, such as `10%` or an absolute amount. |
+| `/history <id>` | Show the price-history chart. |
+| `/refresh <id> <minutes>` | Set a product's check interval; `0` restores the global interval. |
+| `/pause <id>` / `/reactivate <id>` | Pause or resume tracking. |
+| `/delete <id>` | Stop tracking and delete the product's history after confirmation. |
+| `/export` / `/import` | Export or import products as CSV. |
+| `/prefs` | Show your notification preferences. |
+| `/cancel` | Cancel the current guided action. |
+
+Administrators can change the global interval with `/setinterval <minutes>`.
+Existing Italian aliases, such as `/lista` for `/list`, also work.
+
+In **Settings**, adjust mute, digest, quiet hours, timezone and notification
+throttle. **Settings → Language** offers Automatic, English and Italiano.
+Automatic uses your Telegram language, then the server's `LOCALE`, then English.
+See [notification preferences](docs/notifications.md) and [translations](docs/i18n.md).
+
+<p align="center">
+  <img src="docs/img/price-chart.png" alt="Price-history chart with a target line" width="790">
+  <br>
+  <em>The <code>/history</code> command: price history with your target line, rendered by the bot.</em>
+</p>
+
+## Configuration
+
+The Compose setup loads environment variables from `.env`.
+These are the essentials; see [operations](docs/operations.md#environment-variables)
+and the [configuration template](.env.example) for more settings.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `TELEGRAM_BOT_TOKEN` | Required | Token from @BotFather. |
+| `ALLOWED_USERS` | Empty | Comma-separated administrator IDs; set yours for first use. |
+| `DATABASE_PATH` | `/data/pricetracker.db` | SQLite database; keep this path with the supplied Compose healthcheck. |
+| `CHECK_INTERVAL_MINUTES` | `360` | Global check interval in minutes, unless overridden in the bot. |
+| `LOCALE` | `en` | Fallback language (`en` or `it`). |
+| `LOG_LEVEL` | `INFO` | Logging verbosity. |
+
+## Supported sites
+
+The bot includes 17 built-in scrapers:
+
+- Site scrapers: Amazon, eBay, Walmart, Target, BestBuy, Etsy, Newegg, Wayfair,
+  MediaMarkt, Otto, Zalando, Apple Store, Google Store and AliExpress.
+- Shopify scraper for Shopify product pages.
+- Generic scraper: tries JSON-LD, microdata, OpenGraph and RDFa, then other
+  page-extraction strategies. Success depends on the page's available data.
+- Playwright fallback: retained in the registry, but browser rendering is disabled.
+
+Each link is tracked on its own site. Browser-only pages may not yield a price.
+See [scrapers](docs/scrapers.md) and the [current fetch restrictions](docs/operations.md#outbound-destination-policy).
+Add a custom scraper as a Python file in `plugins/`; the Compose setup mounts
+that directory read-only. See the [plugin contract](docs/plugins.md#contract).
+
+## Self-hosting notes
+
+**Hardening.** The Compose setup runs as a non-root user with a read-only root
+filesystem, drops all capabilities and prevents privilege escalation. It includes
+memory, CPU and process limits, a database healthcheck and log rotation.
+See [deployment details](docs/operations.md#hardened-deployment).
+
+**Backups.** The `price-tracker-data` volume stores the SQLite database. Take a
+consistent database backup before upgrades: use SQLite's backup API, or stop the
+bot before copying the database. See [backup and restore](docs/operations.md#backup--restore).
+The Compose service name for stop/start/logs commands is `price-tracker`.
+
+**Upgrades.** For the image setup above, back up the database, update the image
+tag if pinned, then run:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+Schema migrations run automatically at startup. See [upgrade and rollback](docs/operations.md#upgrade-procedure)
+and the [changelog](CHANGELOG.md).
+
+**Observability.** Prometheus metrics and structured JSON logs are available.
+The exporter binds to container loopback by default; the Compose setup publishes
+no ports. See [observability](docs/observability.md) for metrics and the Grafana dashboard,
+and [architecture](docs/architecture.md) for scheduler and scraper-health internals.
+
+## Build from source
+
+To build with the repository's Compose file:
 
 ```bash
 git clone https://github.com/bernalli/price-tracker-bot.git
 cd price-tracker-bot
 cp .env.example .env
-# edit .env: set TELEGRAM_BOT_TOKEN and ALLOWED_USERS
-docker compose up -d
-docker compose logs -f price-tracker-bot
-```
-
-Send `/start` to your bot from Telegram. The first user listed in `ALLOWED_USERS` is auto-promoted to admin.
-
-## Configuration
-
-All configuration is via environment variables. Copy `.env.example` to `.env` and fill in:
-
-| Variable                | Default                  | Description                                                                      |
-| ----------------------- | ------------------------ | -------------------------------------------------------------------------------- |
-| `TELEGRAM_BOT_TOKEN`    | (required)               | Telegram bot API token                                                           |
-| `ALLOWED_USERS`         | (required)               | Comma-separated Telegram user IDs authorized to use the bot (first listed becomes admin) |
-| `DATABASE_PATH`         | `/data/pricetracker.db`  | SQLite database path                                                             |
-| `LOCALE`                | `en`                     | Default locale fallback when the Telegram `language_code` is missing             |
-| `CHECK_INTERVAL_MINUTES`| `360`                    | Global sweep interval                                                            |
-| `MAX_CONSECUTIVE_ERRORS`| `10`                     | Failed checks before a product is auto-suspended                                 |
-| `LISTING_GONE_CONFIRMATIONS` | `3`                  | Consecutive HTTP 404/410 answers before a removed listing is suspended           |
-| `READ_CONFIRMATIONS`    | `3`                      | Agreeing checks required before an implausible price raises an alert             |
-| `PROMETHEUS_BIND`       | `127.0.0.1:9090`         | Prometheus exporter bind address (host:port)                                     |
-| `LOG_LEVEL`             | `INFO`                   | structlog log level                                                              |
-
-See [docs/operations.md](docs/operations.md) for full operational reference.
-
-## Commands
-
-Every command has an English name and, where it existed first, an Italian alias — both
-are registered, so `/list` and `/lista` are the same command.
-The Menu button in Telegram lists `/menu`, `/list`, `/checkall`, `/status` and `/help`; every
-other command works when typed.
-Everything else is reachable by tapping the buttons of the main menu.
-
-### Tracking
-- `/start` — register and view the main menu
-- `/menu` — open the inline menu
-- `/help` — command reference
-- `/add <url>` (`/aggiungi`) — start tracking a product
-- `/list` (`/lista`) — tracked products with current price, drop since tracking start, and per-product buttons
-- `/delete <id>` (`/elimina`) — stop tracking
-- `/check <id>` (`/controlla`) — check one product now
-- `/checkall` — check every product now
-- `/pause <id>` (`/pausa`) / `/reactivate <id>` (`/riattiva`) — suspend and resume checks
-- `/history <id>` (`/storia`) — price history chart
-- `/reset <id>` (`/azzera`) — rebase the reference price to the current one
-
-### Thresholds and targets
-- `/threshold <id> <pct|off>` (`/soglia`) — percentage alert threshold
-- `/target <id> <price>` — alert when the price reaches this value
-- `/setinterval <id> <minutes>` (`/intervallo`) — per-product check interval
-- `/refresh` — global check interval
-
-### Notification preferences (per user)
-- `/mute <id|all> [duration]` / `/unmute <id|all>` — silence alerts
-- `/digest_mode <on|off>` — batch alerts into a periodic digest
-- `/digest_now` — flush the pending digest immediately
-- `/quiet_hours <HH:MM-HH:MM>` — silent window (timezone-aware)
-- `/timezone <IANA>` — your timezone (e.g. `Europe/Rome`)
-- `/throttle <max_per_hour>` — sliding-window rate limit
-- `/prefs` — current preferences
-
-### Data
-- `/export` (`/esporta`) — CSV export of tracked products
-- `/importa` — import products from a CSV file
-- `/status` (`/stato`) — bot status and counters
-- `/errors` (`/errori`) — recent per-product read failures with the reason
-
-### Admin
-- `/adduser <telegram_id>` — authorize a user
-- `/removeuser <telegram_id>` — revoke authorization
-- `/users` (`/utenti`) — list authorized users
-- `/nick <telegram_id> <nickname>` — assign a display nickname
-- `/health` — scraper health and quarantine state
-- `/debug <url>` — run a scraper against a URL without tracking it
-
-## Supported sites
-
-See [docs/scrapers.md](docs/scrapers.md) for the full list of 17 built-in scrapers with status, coverage, and notes. Generic fallback (`GenericScraper`) handles any site exposing JSON-LD, microdata, OpenGraph, or RDFa product metadata.
-
-## Observability
-
-Prometheus metrics exposed on `127.0.0.1:9090/metrics` (counter, gauge, histogram for scraper duration, block events, quarantine state, alerts, notifications, currency lookups). Structured JSON logs via structlog. Grafana dashboard at `docs/grafana/price-tracker-dashboard.json` (14 panels). See [docs/observability.md](docs/observability.md).
-
-## Plugin extension
-
-Drop a custom scraper file in `plugins/<name>.py` (gitignored except `README.md`) or install a pip package with the `price_tracker.scrapers` entry-point group. See [docs/plugins.md](docs/plugins.md) for the contract and a minimal example.
-
-## Localization
-
-Two locales shipped: `en` (source language) and `it` (Italian translation). Runtime selection auto-detects from Telegram `language_code`, falls back to the `LOCALE` environment variable, then to `en`. To add a translation, see [docs/i18n.md](docs/i18n.md).
-
-## Project structure
-
-```
-src/price_tracker/
-├── bot/            # Telegram interface (handlers, decorators, messages)
-├── core/           # scheduler, alert engine, outlier detection, health, currency
-├── scrapers/       # 17 built-in site-specific scrapers + generic chain
-├── db/             # SQLite repository, models, versioned migrations
-├── notifier/       # delivery, preferences, digest, throttle
-├── observability/  # metrics, structured logging
-└── locale/         # gettext catalogs (en, it_IT)
-plugins/            # extension point for custom scrapers
-docs/               # user + contributor documentation
-tests/              # pytest suite (about 3,800 tests, ≥90% coverage)
+# Edit .env: set TELEGRAM_BOT_TOKEN and ALLOWED_USERS.
+docker compose up -d --build
 ```
 
 ## Stability
 
-**1.0 means the two things you build habits around are now stable**: the SQLite schema and
-the command surface. Migrations from any 1.x to a later 1.x apply forward without data loss,
-and a command that exists in 1.0 keeps its name and its arguments for the whole 1.x line.
-Removing a command or breaking the schema would be a 2.0, not a 1.x.
+The [1.x stability promise](CHANGELOG.md#100---2026-09-02) covers the SQLite schema
+and command surface: migrations from any 1.x to a later 1.x apply forward without
+data loss, and commands present in 1.0 keep their names and arguments throughout 1.x.
+Removing a command or breaking the schema requires 2.0.
 
-What is explicitly *not* covered: the internal Python API (`price_tracker.*` is not a library),
-the wording of notification texts, and the scraper set — sites change their markup and scrapers
-follow them, which is maintenance rather than a breaking change.
+The internal Python API, notification wording and scraper set are outside this
+promise. Sites change their markup, and scrapers change with them.
 
-## Roadmap
+## Contributing, security and license
 
-- v0.1.0 — first public release: GitHub + ghcr.io image
-- v0.2.0 — confirmation-based alerting: a single bad scrape can no longer raise a price-drop alert
-- **v1.0.0 — stable schema and command surface**; per-domain quarantine reachable from every
-  scraper, public metadata and artwork carrying no real tracked listing
-- v1.1.0 — operational notices grouped per store and explaining themselves, removed-listing
-  detection
-- v1.3.0 — per-product check intervals honoured by the scheduler, the localised product card in
-  `/lista`, product pages fetched only from validated public IPv4 addresses
-- next — the remaining screens on the localised UI, one shared fetch pipeline for every scraper
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md). All contributions welcome: bug reports, feature suggestions, scraper plugins, translations, dashboard panels.
-
-## License
-
-MIT — see [LICENSE](LICENSE).
+See [Contributing](CONTRIBUTING.md) for development and contribution guidelines,
+[Security](SECURITY.md) to report a vulnerability, and [LICENSE](LICENSE) for the MIT license.
