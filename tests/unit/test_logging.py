@@ -1,4 +1,6 @@
+import io
 import json
+import logging
 
 import pytest
 import structlog
@@ -61,3 +63,69 @@ class TestBindRequestContext:
         log.info("after")
         rec = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
         assert "request_id" not in rec
+
+
+FAKE_TOKEN = "123:FAKE"
+
+
+@pytest.fixture
+def stdlib_logging_state():
+    """Snapshot and restore the stdlib logging state touched by these tests."""
+    root = logging.getLogger()
+    saved_factory = logging.getLogRecordFactory()
+    saved_root_level = root.level
+    saved_root_handlers = list(root.handlers)
+    saved_levels = {name: logging.getLogger(name).level for name in ("httpx", "httpcore")}
+    stream = io.StringIO()
+    handler = logging.StreamHandler(stream)
+    handler.setFormatter(logging.Formatter("%(name)s %(levelname)s %(message)s"))
+    root.addHandler(handler)
+    root.setLevel(logging.DEBUG)
+    try:
+        yield stream
+    finally:
+        root.removeHandler(handler)
+        root.handlers[:] = saved_root_handlers
+        root.setLevel(saved_root_level)
+        logging.setLogRecordFactory(saved_factory)
+        for name, level in saved_levels.items():
+            logging.getLogger(name).setLevel(level)
+
+
+class TestTelegramTokenStaysOutOfStdlibLogs:
+    def test_httpx_request_log_is_silenced_even_at_debug(self, stdlib_logging_state):
+        configure_logging(level="DEBUG")
+        logging.getLogger("httpx").info(
+            'HTTP Request: %s %s "%s %d %s"',
+            "POST",
+            f"https://api.telegram.org/bot{FAKE_TOKEN}/getMe",
+            "HTTP/1.1",
+            200,
+            "OK",
+        )
+        out = stdlib_logging_state.getvalue()
+        assert "HTTP Request" not in out
+        assert FAKE_TOKEN not in out
+
+    def test_token_redacted_in_records_from_any_logger(self, stdlib_logging_state):
+        configure_logging(level="INFO")
+        logging.getLogger("telegram.ext").warning(
+            "request failed: %s",
+            f"https://api.telegram.org/bot{FAKE_TOKEN}/sendMessage",
+        )
+        out = stdlib_logging_state.getvalue()
+        assert FAKE_TOKEN not in out
+        assert "https://api.telegram.org/bot***/sendMessage" in out
+
+    def test_other_hosts_are_left_untouched(self, stdlib_logging_state):
+        configure_logging(level="INFO")
+        url = "https://example.com/bot123:KEEP/page"
+        logging.getLogger("telegram.ext").warning("fetched %s", url)
+        assert url in stdlib_logging_state.getvalue()
+
+    def test_configure_logging_twice_installs_redaction_once(self, stdlib_logging_state):
+        configure_logging(level="INFO")
+        factory_after_first = logging.getLogRecordFactory()
+        configure_logging(level="INFO")
+        assert logging.getLogRecordFactory() is factory_after_first
+        assert factory_after_first is not logging.LogRecord
