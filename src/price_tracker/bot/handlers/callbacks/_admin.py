@@ -195,14 +195,4 @@ async def handle_admin_menu(
         )
         return True
 
-    if data == "menu_admin_debug":
-        if not await db.is_user_admin(user_id):
-            return True
-        context.user_data["pending_action"] = ("admin_debug", 0)
-        await query.edit_message_text(
-            "🔧 <b>Debug scraper</b>\n\nIncolla l'URL del prodotto da analizzare:",
-            parse_mode=ParseMode.HTML,
-        )
-        return True
-
     return False

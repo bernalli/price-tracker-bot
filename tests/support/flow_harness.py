@@ -59,6 +59,7 @@ class Harness:
         self.config = config
         self.routed: list[Action] = []
         self.help_calls = 0
+        self.debug_runs: list[tuple[int, str]] = []
         self.legacy_handlers_present = legacy_handlers_present
         self._build()
 
@@ -75,6 +76,7 @@ class Harness:
             config=self.config,
             registry=self.registry,
             locale_resolver=self._language,
+            debug_runner=self._debug,
         )
         register_guided_flow(
             self.app, self.flow, legacy_handlers_present=self.legacy_handlers_present
@@ -89,6 +91,14 @@ class Harness:
 
     async def _language(self, user_id: int, fallback: str | None) -> str | None:
         return await user_locale(self.app.bot_data["db"], user_id, fallback)
+
+    async def _debug(
+        self, update: Update, context: CallbackContext[Any, Any, Any, Any], url: str
+    ) -> None:
+        """Stand-in for the scraper debug run: records who asked for which link."""
+        del context
+        assert update.effective_user is not None
+        self.debug_runs.append((update.effective_user.id, url))
 
     async def _route(self, update: Update, context: CallbackContext[Any, Any, Any, Any]) -> None:
         del context

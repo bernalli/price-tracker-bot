@@ -373,6 +373,11 @@ async def _handle_menu_info(
     await query.edit_message_text(
         text,
         parse_mode=ParseMode.HTML,
-        reply_markup=InlineKeyboardMarkup([menu_back_button()]),
+        reply_markup=InlineKeyboardMarkup(
+            [
+                [InlineKeyboardButton(_("❓ Help"), callback_data=encode(Action("help")))],
+                menu_back_button(),
+            ]
+        ),
     )
     return True

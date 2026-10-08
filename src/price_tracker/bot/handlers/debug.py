@@ -117,8 +117,14 @@ async def cmd_debug(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not context.args:
         await update.message.reply_text("❌ Uso: /debug &lt;url&gt;", parse_mode=ParseMode.HTML)
         return
+    await debug_url(update, context, context.args[0])
 
-    url = context.args[0]
+
+async def debug_url(update: Update, context: ContextTypes.DEFAULT_TYPE, url: str) -> None:
+    """Run every detection path on ``url`` and reply with what each one finds.
+
+    The caller checks that the user may run it: ``/debug`` and the admin debug prompt.
+    """
     msg = await update.message.reply_text(_("🔍 Analisi in corso..."))
 
     from bs4 import BeautifulSoup  # noqa: PLC0415 — heavy import deferred

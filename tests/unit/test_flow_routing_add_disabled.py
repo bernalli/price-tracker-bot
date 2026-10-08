@@ -12,9 +12,19 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
+from hypothesis import example, given, settings
+from hypothesis import strategies as st
 
+from price_tracker.app.inputs import InputError, InputErrorCode
 from price_tracker.bot.callbacks import Action
-from price_tracker.bot.flows import FlowConfig, Route, RouteKind
+from price_tracker.bot.flows import (
+    URL_PATTERN,
+    FlowConfig,
+    FlowKind,
+    Route,
+    RouteKind,
+    _parse_for,
+)
 from tests.support.fake_telegram import (
     FakeServices,
     callback_update,
@@ -159,3 +169,94 @@ async def test_route_carries_the_sender_language(h: Harness, language_code: str 
     assert [route.language_code if route is not None else "missing" for route in routes] == [
         language_code
     ] * 3
+
+
+# --- the admin debug prompt --------------------------------------------------
+
+
+async def _debug_harness(*, add_entry: bool) -> Harness:
+    services = FakeServices(active={USER}, products={1: (USER, "Kettle")}, admins={USER})
+    harness = Harness(services, config=FlowConfig(add_entry=add_entry))
+    await harness.start()
+    return harness
+
+
+@pytest.mark.parametrize("data", ["menu_admin_debug", "a:dbg"])
+@pytest.mark.parametrize("with_prompt", [False, True])
+async def test_debug_entry_routes_as_entry_callback(
+    h: Harness, data: str, with_prompt: bool
+) -> None:
+    if with_prompt:
+        await _open_prompt(h)
+
+    route = h.flow.check_update(callback_update(h.app.bot, PRIVATE, USER, data))
+
+    assert route is not None
+    assert route.kind is RouteKind.ENTRY_CALLBACK
+    assert route.action == Action("admin.debug", ())
+
+
+@pytest.mark.parametrize("add_entry", [False, True])
+@pytest.mark.parametrize(
+    ("text", "kind"),
+    [
+        (URL, RouteKind.ANSWER),
+        (f"look at this {URL} please", RouteKind.ANSWER),
+        ("hello", RouteKind.ANSWER),
+        ("/cancel", RouteKind.CANCEL),
+        ("/help", RouteKind.OTHER_COMMAND),
+    ],
+)
+async def test_with_the_debug_prompt_open_any_text_is_its_answer(
+    add_entry: bool, text: str, kind: RouteKind
+) -> None:
+    h = await _debug_harness(add_entry=add_entry)
+    try:
+        await h.press(PRIVATE, USER, "menu_admin_debug")
+        flow = h.flow.registry.get((PRIVATE, USER))
+        assert flow is not None
+
+        route = _route(h, text)
+
+        assert route is not None
+        assert route.kind is kind
+        assert route.snapshot == flow.snapshot((PRIVATE, USER))
+    finally:
+        await h.stop()
+
+
+@settings(max_examples=300, deadline=None)
+@given(
+    text=st.one_of(
+        st.text(),
+        st.builds(
+            lambda before, url, after: f"{before}{url}{after}",
+            st.text(max_size=10),
+            st.from_regex(URL_PATTERN, fullmatch=True),
+            st.text(max_size=10),
+        ),
+    )
+)
+@example(text="https://.")
+@example(text="(see http://),")
+def test_a_debug_answer_is_a_link_found_in_the_text_or_not_a_link(text: str) -> None:
+    result = _parse_for(FlowKind.DEBUG, text)
+
+    if isinstance(result, InputError):
+        assert result.code is InputErrorCode.NOT_A_URL
+    else:
+        assert isinstance(result, str)
+        assert result in text
+        assert URL_PATTERN.fullmatch(result)
+
+
+@settings(max_examples=200, deadline=None)
+@given(
+    before=st.text(st.characters(exclude_characters="hH"), max_size=10),
+    path=st.text("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/-_", max_size=20),
+    after=st.sampled_from(["", " ", ".", ").", "!? more"]),
+)
+def test_a_link_set_apart_in_the_answer_is_always_found(before: str, path: str, after: str) -> None:
+    url = f"https://a.example/{path}"
+
+    assert _parse_for(FlowKind.DEBUG, f"{before} {url}{after}") == url

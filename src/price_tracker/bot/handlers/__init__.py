@@ -8,13 +8,13 @@ is registered in front of them.
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 
 from telegram import (
     InlineKeyboardButton,
     Update,
 )
-from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler, ContextTypes
 
 from price_tracker.bot.decorators import _db, restricted, with_locale
@@ -46,16 +46,12 @@ logger = logging.getLogger(__name__)
 @with_locale
 @restricted
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """`/start` — welcome message."""
+    """`/start` — a greeting above the Home screen."""
     user = update.effective_user
-    await update.message.reply_text(
-        f"👋 <b>Ciao {_escape_html(user.first_name)}!</b>\n\n"
-        "Monitoro i prezzi online e ti avviso quando scendono.\n\n"
-        "🚀 <b>Per iniziare:</b> incolla un link in chat\n"
-        "🎯 <b>Supporto:</b> Amazon, eBay, Shopify e altri\n"
-        "🛡 <b>Amazon:</b> filtro nuovo/usato e venditore\n\n"
-        "Premi /menu per tutte le funzioni.",
-        parse_mode=ParseMode.HTML,
+    screen = home_screen(await home_view(_db(context), user.id))
+    greeting = f"👋 <b>Ciao {_escape_html(user.first_name)}!</b>"
+    await reply_screen(
+        update.message, dataclasses.replace(screen, text=f"{greeting}\n\n{screen.text}")
     )
 
 
@@ -145,6 +141,7 @@ def register_handlers(app: Application) -> None:
         locale_resolver=lambda user_id, fallback: user_locale(
             app.bot_data["db"], user_id, fallback
         ),
+        debug_runner=debug.debug_url,
     )
     register_guided_flow(app, flow, legacy_handlers_present=True)
 

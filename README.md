@@ -78,6 +78,8 @@ See [docs/operations.md](docs/operations.md) for full operational reference.
 
 Every command has an English name and, where it existed first, an Italian alias — both
 are registered, so `/list` and `/lista` are the same command.
+The Menu button in Telegram lists `/menu`, `/list`, `/checkall`, `/status` and `/help`; every
+other command works when typed.
 
 ### Tracking
 - `/start` — register and view the main menu

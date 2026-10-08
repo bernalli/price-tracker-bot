@@ -10,17 +10,20 @@
 (no changes)
 ## step 2: command "/start" user=10
 -> sendMessage chat=10
+   param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
    | 👋 <b>Ciao U10!</b>
    |
-   | Monitoro i prezzi online e ti avviso quando scendono.
+   | 🏠 <b>Price Tracker</b>
    |
-   | 🚀 <b>Per iniziare:</b> incolla un link in chat
-   | 🎯 <b>Supporto:</b> Amazon, eBay, Shopify e altri
-   | 🛡 <b>Amazon:</b> filtro nuovo/usato e venditore
+   | 📦 0 attivi · ⏸ 0 in pausa
    |
-   | Premi /menu per tutte le funzioni.
+   | Incolla il link di un prodotto per iniziare a seguirlo.
+   keyboard:
+   | [📦 Prodotti → l:a:1] [💶 Prezzi → menu_prezzi]
+   | [🔔 Notifiche → menu_notifiche] [💾 Dati → menu_dati]
+   | [ℹ️ Stato e info → menu_info] [⚙️ Impostazioni → s]
 -> sendMessage chat=10
    text:
    | ❌ Si è verificato un errore. Riprova tra qualche istante.

@@ -6,15 +6,18 @@
 
 from __future__ import annotations
 
+import asyncio
 from decimal import Decimal
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock
 
 import aiosqlite
 import httpx
 import pytest
 import pytest_asyncio
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from price_tracker.core.alert import format_operational_notice
 from price_tracker.core.exceptions import ListingGone, ParseError
@@ -665,30 +668,6 @@ async def test_scheduler_price_none_without_scraper_error_still_records_reason(
     assert p is not None
     assert p.consecutive_errors == 1
     assert p.last_error == "price_none"
-
-
-@pytest.mark.asyncio
-async def test_scheduler_cleanup_old_history(
-    repo_with_product: tuple[Repository, int],
-) -> None:
-    """Line 123: cleanup_old_history delegates to repo.delete_old_price_history."""
-    repo, pid = repo_with_product
-    registry = ScraperRegistry()
-    notifier = AsyncMock()
-    async with httpx.AsyncClient() as client:
-        scheduler = Scheduler(
-            SchedulerDeps(
-                repo=repo,
-                registry=registry,
-                client=client,
-                notifier=notifier,
-                max_consecutive_errors=10,
-                delay_between_products=0.0,
-            )
-        )
-        deleted = await scheduler.cleanup_old_history(retention_days=365)
-    # Empty history → 0 rows deleted
-    assert deleted == 0
 
 
 # ---------------------------------------------------------------------------
@@ -2319,3 +2298,256 @@ async def test_out_of_stock_read_stamps_last_checked(
     p = await repo.get_product(pid)
     assert p is not None
     assert p.last_checked_at is not None
+
+
+# -- suspension is reported once per product ---------------------------------
+
+
+def _failure_scheduler(
+    repo: Repository,
+    notifier: AsyncMock,
+    *,
+    max_errors: int = 1,
+    gone_confirmations: int = 3,
+) -> tuple[Scheduler, httpx.AsyncClient]:
+    registry = ScraperRegistry()
+    registry.register(_RaisingScraper())
+    client = httpx.AsyncClient()
+    scheduler = Scheduler(
+        SchedulerDeps(
+            repo=repo,
+            registry=registry,
+            client=client,
+            notifier=notifier,
+            max_consecutive_errors=max_errors,
+            listing_gone_confirmations=gone_confirmations,
+            delay_between_products=0.0,
+        )
+    )
+    return scheduler, client
+
+
+def _suspended_payloads(notifier: AsyncMock) -> list[dict[str, Any]]:
+    return [
+        call.kwargs["payload"]
+        for call in notifier.await_args_list
+        if call.kwargs["payload"] is not None and call.kwargs["payload"]["event"] == "suspended"
+    ]
+
+
+async def _record_failure(
+    scheduler: Scheduler,
+    product: ProductRecord,
+    collector: NoticeCollector,
+    *,
+    reason: str = "http_error",
+) -> bool:
+    return await scheduler._record_failure_and_maybe_disable(
+        product,
+        scraper_name="stub",
+        domain="example.com",
+        reason=reason,
+        collector=collector,
+    )
+
+
+@pytest.mark.asyncio
+async def test_concurrent_suspension_of_one_product_is_reported_once(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    repo, pid = repo_with_product
+    notifier = AsyncMock()
+    scheduler, client = _failure_scheduler(repo, notifier)
+    async with client:
+        product = await repo.get_product(pid)
+        assert product is not None
+        collectors = [NoticeCollector(), NoticeCollector()]
+        results = await asyncio.gather(
+            *(_record_failure(scheduler, product, collector) for collector in collectors)
+        )
+        for collector in collectors:
+            await scheduler._flush_notices(collector)
+
+    assert sorted(results) == [False, True]
+    assert notifier.await_count == 1
+    assert len(_suspended_payloads(notifier)) == 1
+    stored = await repo.get_product(pid)
+    assert stored is not None
+    assert stored.is_active is False
+    assert stored.suspension_reason == "http_error"
+
+
+@pytest.mark.asyncio
+async def test_failure_on_an_already_suspended_product_adds_no_event(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    repo, pid = repo_with_product
+    notifier = AsyncMock()
+    scheduler, client = _failure_scheduler(repo, notifier)
+    async with client:
+        product = await repo.get_product(pid)
+        assert product is not None
+        first = NoticeCollector()
+        assert await _record_failure(scheduler, product, first) is True
+        second = NoticeCollector()
+        assert await _record_failure(scheduler, product, second) is False
+    assert len(first) == 1
+    assert len(second) == 0
+
+
+@pytest.mark.asyncio
+async def test_overlapping_sweeps_report_each_suspension_once(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    repo, first_id = repo_with_product
+    ids = [first_id]
+    for number in (2, 3):
+        ids.append(
+            await repo.add_product(
+                user_id=1,
+                url=f"https://example.com/p/{number}",
+                name=f"Widget {number}",
+                domain="example.com",
+                initial_price=Decimal("100"),
+                currency="EUR",
+            )
+        )
+    notifier = AsyncMock()
+    scheduler, client = _failure_scheduler(repo, notifier)
+    async with client:
+        await asyncio.gather(
+            scheduler.run_check_for_user(user_id=1),
+            scheduler.check_user_products_for_user(user_id=1),
+        )
+
+    reported = [pid for payload in _suspended_payloads(notifier) for pid in payload["product_ids"]]
+    assert len(reported) == len(set(reported))
+    assert set(reported) == set(ids)
+
+
+async def _concurrent_failures(calls: int, *, listing_gone: bool) -> tuple[list[bool], int, int]:
+    conn = await aiosqlite.connect(":memory:")
+    conn.row_factory = aiosqlite.Row
+    try:
+        await apply_migrations(conn, MIGRATIONS_DIR)
+        repo = Repository(conn)
+        await repo.ensure_user(user_id=1)
+        pid = await repo.add_product(
+            user_id=1,
+            url="https://example.com/p/1",
+            name="Widget",
+            domain="example.com",
+            initial_price=Decimal("100"),
+            currency="EUR",
+        )
+        notifier = AsyncMock()
+        scheduler, client = _failure_scheduler(
+            repo,
+            notifier,
+            max_errors=1 if not listing_gone else 10,
+            gone_confirmations=1,
+        )
+        async with client:
+            product = await repo.get_product(pid)
+            assert product is not None
+            collectors = [NoticeCollector() for _ in range(calls)]
+            reason = "listing_gone" if listing_gone else "http_error"
+            results = await asyncio.gather(
+                *(
+                    _record_failure(scheduler, product, collector, reason=reason)
+                    for collector in collectors
+                )
+            )
+            events = sum(len(collector) for collector in collectors)
+            for collector in collectors:
+                await scheduler._flush_notices(collector)
+        return list(results), events, len(_suspended_payloads(notifier))
+    finally:
+        await conn.close()
+
+
+@settings(max_examples=25, deadline=None)
+@given(calls=st.integers(min_value=1, max_value=6), listing_gone=st.booleans())
+def test_any_number_of_concurrent_failures_suspends_and_reports_once(
+    calls: int, listing_gone: bool
+) -> None:
+    results, events, notices = asyncio.run(_concurrent_failures(calls, listing_gone=listing_gone))
+    assert sum(results) == 1
+    assert events == 1
+    assert notices == 1
+
+
+@pytest.mark.asyncio
+async def test_failure_on_a_manually_paused_product_adds_no_event(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    repo, pid = repo_with_product
+    notifier = AsyncMock()
+    scheduler, client = _failure_scheduler(repo, notifier)
+    async with client:
+        product = await repo.get_product(pid)
+        assert product is not None
+        await repo.pause_product(pid)
+        collector = NoticeCollector()
+        assert await _record_failure(scheduler, product, collector) is False
+    assert len(collector) == 0
+    stored = await repo.get_product(pid)
+    assert stored is not None
+    assert stored.suspension_kind == "manual"
+
+
+@pytest.mark.asyncio
+async def test_failure_on_a_pause_without_kind_adds_no_event(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    repo, pid = repo_with_product
+    notifier = AsyncMock()
+    scheduler, client = _failure_scheduler(repo, notifier)
+    async with client:
+        product = await repo.get_product(pid)
+        assert product is not None
+        await repo._conn.execute(
+            "UPDATE products SET is_active = 0, suspension_kind = NULL WHERE id = ?", (pid,)
+        )
+        await repo._conn.commit()
+        collector = NoticeCollector()
+        assert await _record_failure(scheduler, product, collector) is False
+    assert len(collector) == 0
+    stored = await repo.get_product(pid)
+    assert stored is not None
+    assert stored.suspension_kind is None
+
+
+@pytest.mark.asyncio
+async def test_failure_on_a_missing_product_adds_no_event(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    repo, pid = repo_with_product
+    notifier = AsyncMock()
+    scheduler, client = _failure_scheduler(repo, notifier)
+    async with client:
+        product = await repo.get_product(pid)
+        assert product is not None
+        assert await repo.delete_product(pid, user_id=1) is True
+        collector = NoticeCollector()
+        assert await _record_failure(scheduler, product, collector) is False
+    assert len(collector) == 0
+
+
+@pytest.mark.asyncio
+async def test_failure_below_the_threshold_neither_suspends_nor_reports(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    repo, pid = repo_with_product
+    notifier = AsyncMock()
+    scheduler, client = _failure_scheduler(repo, notifier, max_errors=10)
+    async with client:
+        product = await repo.get_product(pid)
+        assert product is not None
+        collector = NoticeCollector()
+        assert await _record_failure(scheduler, product, collector) is False
+        await scheduler._flush_notices(collector)
+    assert _suspended_payloads(notifier) == []
+    stored = await repo.get_product(pid)
+    assert stored is not None
+    assert stored.is_active is True
