@@ -618,7 +618,7 @@ async def test_start_greets_and_shows_the_home_screen_of_menu(w: Wired, user_id:
     (start,) = _sent_since(w, before)
     assert start.params["text"] == f"👋 <b>Hello U{user_id}!</b>\n\n{menu.params['text']}"
     assert start.callback_data() == menu.callback_data()
-    assert ("menu_admin" in start.callback_data()) is (user_id == ADMIN)
+    assert ("a" in start.callback_data()) is (user_id == ADMIN)
     assert w.errors == []
 
 
@@ -698,7 +698,7 @@ async def test_status_and_info_offers_help_errors_and_the_way_back(
     markup = edit.params["reply_markup"]
     markup = json.loads(markup) if isinstance(markup, str) else markup
     rows = [[(b["text"], b["callback_data"]) for b in row] for row in markup["inline_keyboard"]]
-    assert rows == [[(label, HELP_DATA), (errors, "er")], [("◀️ Menu", "menu_main")]]
+    assert rows == [[(label, HELP_DATA), (errors, "er")], [("◀️ Menu", "h")]]
 
 
 # --- the admin debug prompt ----------------------------------------------------

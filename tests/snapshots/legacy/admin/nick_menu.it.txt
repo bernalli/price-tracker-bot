@@ -11,9 +11,9 @@
    |
    | Scegli utente:
    keyboard:
-   | [✏️ 1 → admin_nick_1]
-   | [✏️ 10 → admin_nick_10]
-   | [✏️ 11 → admin_nick_11]
-   | [◀️ Impostazioni → menu_admin]
+   | [✏️ 1 → a:nk:1]
+   | [✏️ 10 → a:nk:10]
+   | [✏️ 11 → a:nk:11]
+   | [◀️ Impostazioni → a]
 ## db after step 1
 (no changes)

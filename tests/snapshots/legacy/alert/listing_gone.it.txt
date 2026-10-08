@@ -28,8 +28,8 @@
    |
    | Eliminarli tiene pulita la lista. Riattivali solo se lo store li rimette in vendita.
    keyboard:
-   | [🗑 Elimina tutti (1) → ops_del_1]
-   | [▶️ Riattiva e ricontrolla (1) → ops_react_1]
+   | [🗑 Elimina tutti (1) → o:1:rm]
+   | [▶️ Riattiva e ricontrolla (1) → o:1:ra]
 ## db after step 3
 ~ products id=1 is_active: 1 -> 0
 ~ products id=1 consecutive_errors: 2 -> 3

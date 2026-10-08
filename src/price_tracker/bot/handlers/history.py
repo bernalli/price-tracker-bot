@@ -18,6 +18,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, InputFile, Upda
 from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler, ContextTypes
 
+from price_tracker.bot.callbacks import Action, encode
 from price_tracker.bot.decorators import _db, restricted, with_locale
 from price_tracker.bot.handlers._helpers import (
     _escape_html,
@@ -168,7 +169,12 @@ async def cmd_history(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         for p in products:
             name = truncate_to_width(p.get("name") or _("Unknown"), 35)
             buttons.append(
-                [InlineKeyboardButton(f"#{p['id']} {name}", callback_data=f"chart_{p['id']}")]
+                [
+                    InlineKeyboardButton(
+                        f"#{p['id']} {name}",
+                        callback_data=encode(Action("product.chart", (p["id"], "all"))),
+                    )
+                ]
             )
 
         await update.message.reply_text(

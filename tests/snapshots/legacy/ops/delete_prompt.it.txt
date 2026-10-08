@@ -11,7 +11,7 @@
    text:
    | 🗑 Eliminare 2 prodotti su example.com e il loro storico prezzi? Non si può annullare.
    keyboard:
-   | [🗑 Sì, elimina 2 → ops_delok_1]
-   | [❌ Annulla → cancel_delete]
+   | [🗑 Sì, elimina 2 → o:1:rmok]
+   | [❌ Annulla → l:x]
 ## db after step 3
 (no changes)

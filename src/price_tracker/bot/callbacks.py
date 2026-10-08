@@ -379,6 +379,12 @@ def build_registry() -> ActionRegistry:
         ActionSpec("noop", (_lit("noop"),)),
         ActionSpec("stats", (_lit("st"),)),
         ActionSpec("check_all", (_lit("ca"),)),
+        ActionSpec("prices", (_lit("pc"),)),
+        ActionSpec("history", (_lit("hi"),)),
+        ActionSpec("notifications", (_lit("nt"),)),
+        ActionSpec("products", (_lit("pd"),)),
+        ActionSpec("products.command", (_lit("pdc"),)),
+        ActionSpec("paused", (_lit("pz"),)),
         ActionSpec("help", (_lit("hp"),)),
         ActionSpec("help.section", (_lit("hp"), Choice("section", HELP_SECTIONS))),
         ActionSpec("back", (_lit("x"), BackArg())),
@@ -386,6 +392,7 @@ def build_registry() -> ActionRegistry:
         ActionSpec("list.open", (_lit("l"), Choice("filter", LIST_FILTERS), IdArg("page"), PID)),
         ActionSpec("list.remove_all", (_lit("l"), _lit("rmall"))),
         ActionSpec("list.remove_all_ok", (_lit("l"), _lit("rmallok"))),
+        ActionSpec("delete.cancel", (_lit("l"), _lit("x"))),
         ActionSpec("product.card", _product("c")),
         ActionSpec("product.check", _product("ck")),
         ActionSpec("product.chart", _product("ch", Choice("period", PERIODS))),
@@ -406,6 +413,9 @@ def build_registry() -> ActionRegistry:
         ActionSpec("product.prefs", _product("pr")),
         ActionSpec("product.scope_picker", _product("sco")),
         ActionSpec("product.scope", _product("sco", Choice("scope", CARD_SCOPE_CHOICES))),
+        ActionSpec("ops.reactivate", (_lit("o"), PID, _lit("ra"))),
+        ActionSpec("ops.delete", (_lit("o"), PID, _lit("rm"))),
+        ActionSpec("ops.delete_ok", (_lit("o"), PID, _lit("rmok"))),
         ActionSpec(
             "flow.currency",
             (_lit("p"), TOK, _lit("cur"), Choice("currency", currency_choices())),
@@ -451,38 +461,11 @@ def build_registry() -> ActionRegistry:
 REGISTRY: Final = build_registry()
 
 
-LEGACY_ENTRY_PREFIXES: Final = {
-    "setsoglia": "product.threshold",
-    "track_threshold": "product.threshold",
-    "settarget": "product.target",
-    "track_target": "product.target",
-    "setrefresh": "product.interval",
-}
-
-
-_LEGACY_ENTRY_RE: Final = re.compile(r"([a-z]+(?:_[a-z]+)?)_([0-9]+)")
-
-
 def decode_legacy_entry(data: object) -> Action | None:
-    """Map a pre-registry entry button to its registry action; never raises.
+    """Compatibility alias for the pre-registry guided-flow entry decoder."""
+    from price_tracker.bot.handlers.callbacks._legacy import decode_legacy_entry as compat_decode
 
-    Accepts exactly ``<prefix>_<id>`` with a prefix of :data:`LEGACY_ENTRY_PREFIXES`
-    and an id in the canonical form of an id argument (no sign, no leading zero,
-    at most :data:`ID_MAX`). These strings stay outside the registry: none of them
-    decodes there, and no registry encoding is accepted here.
-    """
-    if not isinstance(data, str) or not data or not data.isascii():
-        return None
-    if len(data) > MAX_CALLBACK_BYTES:
-        return None
-    match = _LEGACY_ENTRY_RE.fullmatch(data)
-    if match is None:
-        return None
-    name = LEGACY_ENTRY_PREFIXES.get(match.group(1))
-    product_id = _parse_id(match.group(2))
-    if name is None or product_id is None:
-        return None
-    return Action(name, (product_id,))
+    return compat_decode(data)
 
 
 def encode(action: Action) -> str:

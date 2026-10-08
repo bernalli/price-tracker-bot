@@ -35,8 +35,8 @@
    |
    | Riattiva per fare subito un nuovo controllo.
    keyboard:
-   | [▶️ Riattiva e ricontrolla (1) → ops_react_1]
-   | [🗑 Elimina tutti (1) → ops_del_1]
+   | [▶️ Riattiva e ricontrolla (1) → o:1:ra]
+   | [🗑 Elimina tutti (1) → o:1:rm]
 -> editMessageText chat=10 message_id=1001
    param parse_mode="HTML"
    text:

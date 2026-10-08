@@ -18,6 +18,7 @@ from telegram.constants import ParseMode
 from price_tracker.bot.callbacks import Action, encode
 from price_tracker.bot.decorators import _config
 from price_tracker.bot.handlers._helpers import _escape_html, _parse_id
+from price_tracker.bot.handlers.callbacks._legacy import resolve_callback
 from price_tracker.bot.keyboards import menu_back_button
 from price_tracker.bot.messages import _
 
@@ -29,20 +30,25 @@ logger = logging.getLogger(__name__)
 
 def _cancel_prompt() -> InlineKeyboardMarkup:
     """The Cancel button of a prompt waiting for typed text: back to the admin menu."""
-    return InlineKeyboardMarkup([[InlineKeyboardButton(_("Cancel"), callback_data="menu_admin")]])
+    return InlineKeyboardMarkup(
+        [[InlineKeyboardButton(_("Cancel"), callback_data=encode(Action("admin")))]]
+    )
 
 
 def _back_to_admin() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
-        [[InlineKeyboardButton(_("◀️ Settings"), callback_data="menu_admin")]]
+        [[InlineKeyboardButton(_("◀️ Settings"), callback_data=encode(Action("admin")))]]
     )
 
 
 async def handle_admin_menu(
-    query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, data: str
+    query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, data: object
 ) -> bool:
     """Handle the admin menu callbacks. Returns True if data was handled."""
-    if data == "menu_admin":
+    action = resolve_callback(data)
+    if action is None:
+        return False
+    if action.name == "admin":
         if not await db.is_user_admin(user_id):
             return True  # silent reject — handled
         # Back here from a prompt: the next message is no longer an answer to it.
@@ -52,19 +58,31 @@ async def handle_admin_menu(
         saved = await db.get_config("check_interval_minutes")
         interval = int(saved) if saved else config.check_interval_minutes
         rows = [
-            [InlineKeyboardButton(_("👥 User list"), callback_data="menu_admin_users")],
+            [InlineKeyboardButton(_("👥 User list"), callback_data=encode(Action("admin.users")))],
             [
-                InlineKeyboardButton(_("➕ Add user"), callback_data="menu_admin_adduser"),
-                InlineKeyboardButton(_("🚫 Remove user"), callback_data="menu_admin_removeuser"),
+                InlineKeyboardButton(
+                    _("➕ Add user"), callback_data=encode(Action("admin.add_user"))
+                ),
+                InlineKeyboardButton(
+                    _("🚫 Remove user"), callback_data=encode(Action("admin.remove_user"))
+                ),
             ],
-            [InlineKeyboardButton(_("✏️ User nickname"), callback_data="menu_admin_nick")],
+            [
+                InlineKeyboardButton(
+                    _("✏️ User nickname"), callback_data=encode(Action("admin.nick"))
+                )
+            ],
             [
                 InlineKeyboardButton(
                     _("⏱ Global interval: {interval} min").format(interval=interval),
-                    callback_data="menu_admin_interval",
+                    callback_data=encode(Action("admin.interval")),
                 )
             ],
-            [InlineKeyboardButton(_("🔧 Debug scraper"), callback_data="menu_admin_debug")],
+            [
+                InlineKeyboardButton(
+                    _("🔧 Debug scraper"), callback_data=encode(Action("admin.debug"))
+                )
+            ],
             [
                 InlineKeyboardButton(
                     _("🏥 Scraper health"), callback_data=encode(Action("admin.health"))
@@ -81,7 +99,7 @@ async def handle_admin_menu(
         )
         return True
 
-    if data == "menu_admin_users":
+    if action.name == "admin.users":
         if not await db.is_user_admin(user_id):
             return True
         users = await db.list_active_users()
@@ -106,7 +124,7 @@ async def handle_admin_menu(
         )
         return True
 
-    if data == "menu_admin_adduser":
+    if action.name == "admin.add_user":
         if not await db.is_user_admin(user_id):
             return True
         context.user_data["pending_action"] = ("admin_adduser", 0)
@@ -117,7 +135,7 @@ async def handle_admin_menu(
         )
         return True
 
-    if data == "menu_admin_removeuser":
+    if action.name == "admin.remove_user":
         if not await db.is_user_admin(user_id):
             return True
         users = await db.list_active_users()
@@ -131,9 +149,14 @@ async def handle_admin_menu(
         for u in removable:
             nm = u.get("display_name") or u.get("username") or str(u["user_id"])
             rows.append(
-                [InlineKeyboardButton(f"🚫 {nm}", callback_data=f"admin_rm_{u['user_id']}")]
+                [
+                    InlineKeyboardButton(
+                        f"🚫 {nm}",
+                        callback_data=encode(Action("admin.remove_user_id", (u["user_id"],))),
+                    )
+                ]
             )
-        rows.append([InlineKeyboardButton(_("◀️ Settings"), callback_data="menu_admin")])
+        rows.append([InlineKeyboardButton(_("◀️ Settings"), callback_data=encode(Action("admin")))])
         await query.edit_message_text(
             _("🚫 <b>Remove user</b>\n\nTap a user to remove them:"),
             parse_mode=ParseMode.HTML,
@@ -141,10 +164,11 @@ async def handle_admin_menu(
         )
         return True
 
-    if data.startswith("admin_rm_"):
+    if action.name == "admin.remove_user_id":
         if not await db.is_user_admin(user_id):
             return True
-        target_id = _parse_id(data.replace("admin_rm_", ""))
+        raw = action.args[0]
+        target_id = raw if isinstance(raw, int) else _parse_id(raw)
         if target_id is None:
             await query.edit_message_text(_("❌ Invalid ID."))
             return True
@@ -170,7 +194,7 @@ async def handle_admin_menu(
             await query.edit_message_text(_("❌ User not found."), reply_markup=_back_to_admin())
         return True
 
-    if data == "menu_admin_nick":
+    if action.name == "admin.nick":
         if not await db.is_user_admin(user_id):
             return True
         users = await db.list_active_users()
@@ -178,9 +202,13 @@ async def handle_admin_menu(
         for u in users:
             nm = u.get("display_name") or u.get("username") or str(u["user_id"])
             rows.append(
-                [InlineKeyboardButton(f"✏️ {nm}", callback_data=f"admin_nick_{u['user_id']}")]
+                [
+                    InlineKeyboardButton(
+                        f"✏️ {nm}", callback_data=encode(Action("admin.nick_id", (u["user_id"],)))
+                    )
+                ]
             )
-        rows.append([InlineKeyboardButton(_("◀️ Settings"), callback_data="menu_admin")])
+        rows.append([InlineKeyboardButton(_("◀️ Settings"), callback_data=encode(Action("admin")))])
         await query.edit_message_text(
             _("✏️ <b>Nickname</b>\n\nChoose a user:"),
             parse_mode=ParseMode.HTML,
@@ -188,10 +216,11 @@ async def handle_admin_menu(
         )
         return True
 
-    if data.startswith("admin_nick_"):
+    if action.name == "admin.nick_id":
         if not await db.is_user_admin(user_id):
             return True
-        target_id = _parse_id(data.replace("admin_nick_", ""))
+        raw = action.args[0]
+        target_id = raw if isinstance(raw, int) else _parse_id(raw)
         if target_id is None:
             await query.edit_message_text(_("❌ Invalid ID."))
             return True
@@ -207,7 +236,7 @@ async def handle_admin_menu(
         )
         return True
 
-    if data == "menu_admin_interval":
+    if action.name == "admin.interval":
         if not await db.is_user_admin(user_id):
             return True
         context.user_data["pending_action"] = ("admin_interval", 0)

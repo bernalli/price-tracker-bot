@@ -13,9 +13,9 @@
    |
    | Incolla il link di un prodotto per iniziare a seguirlo.
    keyboard:
-   | [📦 Prodotti → l:a:1] [💶 Prezzi → menu_prezzi]
-   | [🔔 Notifiche → menu_notifiche] [💾 Dati → menu_dati]
-   | [ℹ️ Stato e info → menu_info] [⚙️ Impostazioni → s]
+   | [📦 Prodotti → l:a:1] [💶 Prezzi → pc]
+   | [🔔 Notifiche → nt] [💾 Dati → d]
+   | [ℹ️ Stato e info → st] [⚙️ Impostazioni → s]
 ## db after step 1
 ~ users user_id=10 display_name: NULL -> "U10"
 ## step 2: press "menu_prodotti" user=10 on=1 synthetic
@@ -27,9 +27,9 @@
    |
    | Tocca un prodotto per modificarlo.
    keyboard:
-   | [#1 Kettle €80.00 → edit_1]
-   | [#2 Fan → edit_2]
-   | [◀️ Menu → menu_main]
+   | [#1 Kettle €80.00 → p:1:ed]
+   | [#2 Fan → p:2:ed]
+   | [◀️ Menu → h]
 ## db after step 2
 (no changes)
 ## step 3: press "cmd_lista" user=10 on=1000
@@ -40,6 +40,6 @@
    | 📦 Hai <b>2</b> prodotti tracciati.
    | Usa /lista per vederli tutti.
    keyboard:
-   | [◀️ Menu → menu_main]
+   | [◀️ Menu → h]
 ## db after step 3
 (no changes)

@@ -128,12 +128,12 @@ async def test_the_card_opened_in_place_is_the_localised_product_card(
         if b.callback_data
     }
     assert callbacks == {
-        f"check_{pid}",
-        f"chart_{pid}",
-        f"pause_{pid}",
-        f"remove_{pid}",
-        f"edit_{pid}",
-        f"setrefresh_{pid}",
+        f"p:{pid}:ck",
+        f"p:{pid}:ch:all",
+        f"p:{pid}:pa",
+        f"p:{pid}:rm",
+        f"p:{pid}:ed",
+        f"p:{pid}:iv",
         "l:e:2",
     }
 
@@ -154,7 +154,7 @@ async def test_lista_sends_one_message_with_the_page(repo: Repository) -> None:
         b.callback_data for row in call.kwargs["reply_markup"].inline_keyboard for b in row
     ]
     assert callbacks[:5] == [f"l:a:1:{pid}" for pid in ids[:5]]
-    assert "delete_all" in callbacks
+    assert "l:rmall" in callbacks
 
 
 async def test_lista_without_products_keeps_the_old_text_and_no_keyboard(repo: Repository) -> None:

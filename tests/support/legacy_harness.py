@@ -45,6 +45,7 @@ from telegram.ext import CallbackContext
 from price_tracker.bot import decorators
 from price_tracker.bot.flows import GuidedFlow
 from price_tracker.bot.handlers import error_handler, register_handlers
+from price_tracker.bot.handlers.callbacks._legacy import resolve_callback
 from price_tracker.bot.messages import get_translation
 from price_tracker.config import Config
 from price_tracker.core import http_client as public_http
@@ -406,7 +407,16 @@ class LegacyWorld:
             if on.message_id is None:
                 raise HarnessFault(f"press {data!r}: the {on.method} call has no message_id")
             return on.message_id, False
-        showing = [mid for mid, datas in self.current_keyboards(user).items() if data in datas]
+        action = resolve_callback(data)
+        showing = [
+            mid
+            for mid, datas in self.current_keyboards(user).items()
+            if data in datas
+            or (
+                action is not None
+                and any(resolve_callback(candidate) == action for candidate in datas)
+            )
+        ]
         return (max(showing), False) if showing else (1, True)
 
     def current_keyboards(self, chat_id: int) -> dict[int, list[str]]:

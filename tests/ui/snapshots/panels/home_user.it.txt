@@ -9,6 +9,6 @@ text:
    | 
    | Incolla il link di un prodotto per iniziare a seguirlo.
 keyboard:
-   [📦 Prodotti](cb:l:a:1)  [💶 Prezzi](cb:menu_prezzi)
-   [🔔 Notifiche](cb:menu_notifiche)  [💾 Dati](cb:menu_dati)
-   [ℹ️ Stato e info](cb:menu_info)  [⚙️ Impostazioni](cb:s)
+   [📦 Prodotti](cb:l:a:1)  [💶 Prezzi](cb:pc)
+   [🔔 Notifiche](cb:nt)  [💾 Dati](cb:d)
+   [ℹ️ Stato e info](cb:st)  [⚙️ Impostazioni](cb:s)

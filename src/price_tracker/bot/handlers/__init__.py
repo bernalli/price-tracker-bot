@@ -17,6 +17,7 @@ from telegram import (
 )
 from telegram.ext import Application, CommandHandler, ContextTypes
 
+from price_tracker.bot.callbacks import Action, encode
 from price_tracker.bot.decorators import _db, restricted, with_locale
 from price_tracker.bot.flow_services import RepositoryFlowServices
 from price_tracker.bot.flows import FlowConfig, GuidedFlow, JobQueueTimer, register_guided_flow
@@ -73,7 +74,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 def _menu_back_button() -> list[InlineKeyboardButton]:
     """Single-row 'back to main menu' button (legacy alias)."""
-    return [InlineKeyboardButton(_("◀️ Menu"), callback_data="menu_main")]
+    return [InlineKeyboardButton(_("◀️ Menu"), callback_data=encode(Action("home")))]
 
 
 # ── Error handler ─────────────────────────────────────────────────

@@ -242,7 +242,7 @@ def test_operational_notice_listing_gone_copy_and_buttons() -> None:
     assert all(f"Widget {index}" in text for index in range(1, 6))
     assert "HTTP 404" in text
     assert "Delete" in buttons[0][0]["text"]
-    assert buttons[0][0]["callback_data"] == "ops_del_1"
+    assert buttons[0][0]["callback_data"] == "o:1:rm"
 
 
 def test_operational_notice_parse_error_puts_reactivate_first() -> None:
@@ -367,16 +367,16 @@ def test_warning_notice_format_and_has_no_buttons() -> None:
 @pytest.mark.parametrize(
     ("reason", "title", "callbacks"),
     [
-        ("listing_gone", "Listings removed on", ["ops_del_1", "ops_react_1"]),
-        ("parse_error", "Price unreadable on", ["ops_react_1", "ops_del_1"]),
-        ("price_none", "Price unreadable on", ["ops_react_1", "ops_del_1"]),
-        ("no_scraper", "Price unreadable on", ["ops_react_1", "ops_del_1"]),
-        ("condition_mismatch", "Price unreadable on", ["ops_react_1", "ops_del_1"]),
-        ("implausible_read", "Price unreadable on", ["ops_react_1", "ops_del_1"]),
-        ("http_error", "Site unreachable:", ["ops_react_1", "ops_del_1"]),
-        ("unexpected", "Site unreachable:", ["ops_react_1", "ops_del_1"]),
-        ("block", "Blocked by", ["ops_react_1", "ops_del_1"]),
-        ("unknown_reason", "Tracking suspended on", ["ops_react_1", "ops_del_1"]),
+        ("listing_gone", "Listings removed on", ["o:1:rm", "o:1:ra"]),
+        ("parse_error", "Price unreadable on", ["o:1:ra", "o:1:rm"]),
+        ("price_none", "Price unreadable on", ["o:1:ra", "o:1:rm"]),
+        ("no_scraper", "Price unreadable on", ["o:1:ra", "o:1:rm"]),
+        ("condition_mismatch", "Price unreadable on", ["o:1:ra", "o:1:rm"]),
+        ("implausible_read", "Price unreadable on", ["o:1:ra", "o:1:rm"]),
+        ("http_error", "Site unreachable:", ["o:1:ra", "o:1:rm"]),
+        ("unexpected", "Site unreachable:", ["o:1:ra", "o:1:rm"]),
+        ("block", "Blocked by", ["o:1:ra", "o:1:rm"]),
+        ("unknown_reason", "Tracking suspended on", ["o:1:ra", "o:1:rm"]),
     ],
 )
 def test_closed_reason_copy_and_exact_callback_contract(
