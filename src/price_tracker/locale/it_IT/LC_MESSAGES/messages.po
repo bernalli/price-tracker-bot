@@ -1480,3 +1480,7 @@ msgid "🗑 Deleted {n} product and its price history."
 msgid_plural "🗑 Deleted {n} products and their price history."
 msgstr[0] "🗑 Eliminato {n} prodotto e il suo storico prezzi."
 msgstr[1] "🗑 Eliminati {n} prodotti e il loro storico prezzi."
+
+#: src/price_tracker/bot/handlers/callbacks/_menu.py
+msgid "❓ Help"
+msgstr "❓ Aiuto"

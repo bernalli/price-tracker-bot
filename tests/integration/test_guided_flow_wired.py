@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import dataclasses
 import itertools
+import json
 import re
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -544,3 +545,122 @@ async def test_repository_failure_reaches_the_error_handler_once(
     assert len(replies) == 1
     assert "errore" in str(replies[0].params["text"])
     assert len(w.calls_since(before)) == 1
+
+
+# --- /start and the Help button ---------------------------------------------------
+
+STRANGER = 12
+HELP_DATA = "hp"
+
+
+def _start_update(w: Wired, user_id: int, first_name: str) -> Update:
+    from telegram import Update as TelegramUpdate
+
+    payload = {
+        "update_id": next(_message_ids) + 90_000,
+        "message": {
+            "message_id": next(_message_ids) + 90_000,
+            "date": int(datetime.now(tz=UTC).timestamp()),
+            "chat": {"id": PRIVATE, "type": "private"},
+            "from": {"id": user_id, "is_bot": False, "first_name": first_name},
+            "text": "/start",
+            "entities": [{"type": "bot_command", "offset": 0, "length": 6}],
+        },
+    }
+    update = TelegramUpdate.de_json(payload, w.app.bot)
+    assert update is not None
+    return update
+
+
+def _sent_since(w: Wired, before: int) -> list[Call]:
+    return [c for c in w.calls_since(before) if c.method == "sendMessage"]
+
+
+@pytest.mark.parametrize("user_id", [OWNER, ADMIN])
+async def test_start_greets_and_shows_the_home_screen_of_menu(w: Wired, user_id: int) -> None:
+    await w.text(PRIVATE, user_id, "/menu")
+    (menu,) = w.sent(PRIVATE)
+    before = len(w.request.calls)
+
+    await w.text(PRIVATE, user_id, "/start")
+
+    (start,) = _sent_since(w, before)
+    assert start.params["text"] == f"👋 <b>Ciao U{user_id}!</b>\n\n{menu.params['text']}"
+    assert start.callback_data() == menu.callback_data()
+    assert ("menu_admin" in start.callback_data()) is (user_id == ADMIN)
+    assert w.errors == []
+
+
+async def test_start_escapes_a_hostile_first_name(w: Wired) -> None:
+    before = len(w.request.calls)
+
+    await w.process(_start_update(w, OWNER, '<b>x</b>&"'))
+
+    (start,) = _sent_since(w, before)
+    assert str(start.params["text"]).startswith("👋 <b>Ciao &lt;b&gt;x&lt;/b&gt;&amp;")
+    assert "<b>x</b>" not in str(start.params["text"])
+
+
+async def test_start_twice_answers_twice_without_errors(w: Wired) -> None:
+    await w.text(PRIVATE, OWNER, "/start")
+    await w.text(PRIVATE, OWNER, "/start")
+
+    assert len(w.sent(PRIVATE)) == 2
+    assert w.errors == []
+
+
+async def test_start_for_a_stranger_is_still_the_refusal(w: Wired) -> None:
+    await w.text(PRIVATE, STRANGER, "/start")
+
+    assert w.texts_to(PRIVATE) == [
+        "⛔ You are not authorized.\n"
+        "Your Telegram ID: <code>12</code>\n\n"
+        "Ask the administrator to add you with:\n"
+        "<code>/adduser 12</code>"
+    ]
+
+
+@pytest.mark.parametrize("user_id", [OWNER, ADMIN])
+async def test_help_button_shows_the_text_of_the_help_command(w: Wired, user_id: int) -> None:
+    await w.text(PRIVATE, user_id, "/help")
+    (help_reply,) = w.sent(PRIVATE)
+
+    await w.press(PRIVATE, user_id, HELP_DATA)
+
+    (edit,) = w.request.calls_of("editMessageText")
+    assert edit.params["text"] == help_reply.params["text"]
+    assert edit.callback_data() == help_reply.callback_data() == ["h"]
+    assert ("Admin" in str(edit.params["text"])) is (user_id == ADMIN)
+    assert w.errors == []
+
+
+async def test_help_button_follows_the_language(w: Wired) -> None:
+    await w.press(PRIVATE, OWNER, HELP_DATA, language_code="it")
+
+    (edit,) = w.request.calls_of("editMessageText")
+    assert str(edit.params["text"]).startswith("❓ <b>Comandi</b>")
+
+
+@pytest.mark.parametrize("user_id", [STRANGER, OWNER])
+async def test_help_button_edits_nothing_for_a_user_without_access(w: Wired, user_id: int) -> None:
+    await w.repo.remove_user(OWNER)
+
+    await w.press(PRIVATE, user_id, HELP_DATA)
+
+    assert w.request.calls_of("editMessageText") == []
+
+
+@pytest.mark.parametrize(
+    ("user_id", "language_code", "label"),
+    [(OWNER, "en", "❓ Help"), (ADMIN, "en", "❓ Help"), (OWNER, "it", "❓ Aiuto")],
+)
+async def test_status_and_info_offers_help_and_the_way_back(
+    w: Wired, user_id: int, language_code: str, label: str
+) -> None:
+    await w.press(PRIVATE, user_id, "menu_info", language_code=language_code)
+
+    (edit,) = w.request.calls_of("editMessageText")
+    markup = edit.params["reply_markup"]
+    markup = json.loads(markup) if isinstance(markup, str) else markup
+    rows = [[(b["text"], b["callback_data"]) for b in row] for row in markup["inline_keyboard"]]
+    assert rows == [[(label, HELP_DATA)], [("◀️ Menu", "menu_main")]]

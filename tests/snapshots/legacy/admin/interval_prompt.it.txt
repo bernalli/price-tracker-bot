@@ -128,6 +128,7 @@
    | 📦 Prodotti globali: 0
    | 🔄 Check globali: 0
    keyboard:
+   | [❓ Aiuto → hp]
    | [◀️ Menu → menu_main]
 ## db after step 14
 (no changes)

@@ -14,7 +14,7 @@ from telegram.ext import CommandHandler
 from price_tracker.bot.commands import ALIAS_COMMANDS, COMMANDS, GROUPS
 from price_tracker.bot.handlers import register_handlers
 from price_tracker.bot.messages import get_translation
-from tests.support.fake_telegram import FakeRequest, make_application
+from tests.support.fake_telegram import FakeRequest, make_application, message_update
 
 HANDLERS_DIR = Path(__file__).resolve().parents[2] / "src/price_tracker/bot/handlers"
 NAME_RE = re.compile(r"[a-z0-9_]{1,32}")
@@ -100,3 +100,35 @@ def test_the_registry_is_immutable() -> None:
     spec: Any = COMMANDS[0]
     with pytest.raises(AttributeError):
         spec.name = "other"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("name", [*(spec.name for spec in COMMANDS), *ALIAS_COMMANDS])
+async def test_every_command_and_alias_still_works_when_typed(name: str) -> None:
+    app = make_application(FakeRequest(), with_job_queue=True)
+    register_handlers(app)
+    await app.initialize()
+    try:
+        command_handlers = [
+            handler
+            for handlers in app.handlers.values()
+            for handler in handlers
+            if isinstance(handler, CommandHandler)
+        ]
+        for text in (f"/{name}", f"/{name} 1"):
+            update = message_update(app.bot, 10, 10, text)
+            assert any(handler.check_update(update) for handler in command_handlers), text
+        unknown = message_update(app.bot, 10, 10, f"/{name}x_unregistered")
+        assert not any(handler.check_update(unknown) for handler in command_handlers)
+    finally:
+        await app.shutdown()
+
+
+def test_the_commands_left_out_of_the_menu_are_still_registered() -> None:
+    from price_tracker.bot.commands import MENU_COMMANDS
+
+    registered = set(_registered())
+    hidden = {spec.name for spec in COMMANDS} - set(MENU_COMMANDS)
+    assert len(hidden) == 30
+    assert hidden <= registered
+    assert set(MENU_COMMANDS) <= registered
