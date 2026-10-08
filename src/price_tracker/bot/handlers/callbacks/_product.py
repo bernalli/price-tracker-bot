@@ -138,6 +138,12 @@ async def handle_check_button(
     if not product:
         await show_list(query, context, db, user_id, notice=_("Product not found."))
         return True
+    if product["user_id"] != user_id:
+        # An admin reaches another user's card, but the scheduler only checks the
+        # presser's own products: say so instead of claiming a check.
+        notice = _("⛔ This product belongs to another user: it was not checked.")
+        await show_card(query, context, product, notice=notice)
+        return True
     if not product.get("is_active"):
         # The scheduler skips an inactive product: nothing would be checked.
         notice = _("⏸ Not checked: tracking is paused. Reactivate it first.")

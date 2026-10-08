@@ -1468,6 +1468,10 @@ msgid "⏸ Not checked: tracking is paused. Reactivate it first."
 msgstr "⏸ Non controllato: il monitoraggio è in pausa. Riattivalo prima."
 
 #: src/price_tracker/bot/handlers/callbacks/_product.py
+msgid "⛔ This product belongs to another user: it was not checked."
+msgstr "⛔ Questo prodotto appartiene a un altro utente: non è stato controllato."
+
+#: src/price_tracker/bot/handlers/callbacks/_product.py
 msgid "🗑 Deleted: {name}"
 msgstr "🗑 Eliminato: {name}"
 

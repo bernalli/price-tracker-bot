@@ -490,6 +490,24 @@ async def test_a_failing_check_logs_its_traceback(
     assert warnings[0].exc_info is not None
 
 
+async def test_an_admin_checking_a_foreign_product_does_not_claim_a_check(
+    repo: Repository,
+) -> None:
+    foreign = await add_product(repo, "Secret Fan", user_id=OTHER)
+    before = await rows(repo)
+    scheduler = FakeScheduler()
+    query = await press(repo, f"check_{foreign}", user_id=ADMIN, scheduler=scheduler)
+    assert scheduler.calls == []
+    assert edited_texts(query) == [shown(query)[0]]
+    expected = with_notice(
+        await card_screen(repo, foreign, back="l:a:1"),
+        "⛔ This product belongs to another user: it was not checked.",
+    )
+    assert_shows(query, expected)
+    assert "Checked" not in shown(query)[0]
+    assert await rows(repo) == before
+
+
 @pytest.mark.parametrize("kind", ["manual", "automatic"])
 async def test_check_on_an_inactive_product_does_not_check(repo: Repository, kind: str) -> None:
     pid = await add_product(repo, "Kettle")

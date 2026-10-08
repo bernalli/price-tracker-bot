@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Check now on a paused product no longer reports a check that did not happen.
+- Check now on a product that belongs to another user says it was not checked, instead of
+  claiming a check that never ran.
 
 ## [1.4.2] - 2026-10-07
 

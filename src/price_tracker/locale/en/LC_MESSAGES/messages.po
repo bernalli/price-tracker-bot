@@ -1443,6 +1443,10 @@ msgid "⏸ Not checked: tracking is paused. Reactivate it first."
 msgstr "⏸ Not checked: tracking is paused. Reactivate it first."
 
 #: src/price_tracker/bot/handlers/callbacks/_product.py
+msgid "⛔ This product belongs to another user: it was not checked."
+msgstr "⛔ This product belongs to another user: it was not checked."
+
+#: src/price_tracker/bot/handlers/callbacks/_product.py
 msgid "🗑 Deleted: {name}"
 msgstr "🗑 Deleted: {name}"
 
