@@ -776,7 +776,7 @@ class Scheduler:
                 ).inc()
             return (p.user_id, None, False, "out_of_stock")
 
-        if info.available or info.price is not None:
+        if info.available and info.price is not None:
             self._sold_out_streaks[p.id] = 0
 
         if info.price is None:

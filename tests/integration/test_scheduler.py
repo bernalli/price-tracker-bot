@@ -2261,6 +2261,20 @@ async def test_single_sold_out_flickers_do_not_trigger_restock_alerts(
     assert notifier.await_count == 0
 
 
+@pytest.mark.asyncio
+async def test_error_read_between_sold_out_reads_keeps_the_streak(
+    repo_with_product: tuple[Repository, int],
+) -> None:
+    """A failed read says nothing about stock: sold-out, error, sold-out is a sold-out spell."""
+    repo, pid = repo_with_product
+    await _run_ticks(
+        repo, [_SOLD_OUT, _LAYOUT_BROKEN, _SOLD_OUT], notifier=AsyncMock(), max_errors=10
+    )
+    p = await repo.get_product(pid)
+    assert p is not None
+    assert p.is_available is False
+
+
 class _BlockingInStockScraper(AbstractScraper):
     name = "blocking-in-stock"
     priority = 100
