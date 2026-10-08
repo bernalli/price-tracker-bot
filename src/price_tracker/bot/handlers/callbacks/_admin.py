@@ -32,9 +32,10 @@ def _cancel_prompt() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([[InlineKeyboardButton(_("Cancel"), callback_data="menu_admin")]])
 
 
-_BACK_TO_ADMIN = InlineKeyboardMarkup(
-    [[InlineKeyboardButton("◀️ Impostazioni", callback_data="menu_admin")]]
-)
+def _back_to_admin() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        [[InlineKeyboardButton(_("◀️ Settings"), callback_data="menu_admin")]]
+    )
 
 
 async def handle_admin_menu(
@@ -84,19 +85,24 @@ async def handle_admin_menu(
         if not await db.is_user_admin(user_id):
             return True
         users = await db.list_active_users()
-        txt = ["👥 <b>Utenti attivi</b>\n"]
+        txt = [_("👥 <b>Active users</b>\n")]
         for u in users:
             uid = u["user_id"]
-            nm = u.get("display_name") or u.get("username") or "N/D"
+            nm = u.get("display_name") or u.get("username") or _("N/A")
             role = "👑" if u.get("is_admin") else "👤"
             st = await db.get_stats(uid)
             txt.append(
-                f"{role} <code>{uid}</code> {_escape_html(str(nm))} — {st['active_products']} prod."
+                _("{role} <code>{user_id}</code> {name} — {count} products").format(
+                    role=role,
+                    user_id=uid,
+                    name=_escape_html(str(nm)),
+                    count=st["active_products"],
+                )
             )
         await query.edit_message_text(
             chr(10).join(txt),
             parse_mode=ParseMode.HTML,
-            reply_markup=_BACK_TO_ADMIN,
+            reply_markup=_back_to_admin(),
         )
         return True
 
@@ -105,7 +111,7 @@ async def handle_admin_menu(
             return True
         context.user_data["pending_action"] = ("admin_adduser", 0)
         await query.edit_message_text(
-            "➕ <b>Aggiungi utente</b>\n\nScrivi l'ID Telegram dell'utente da aggiungere:",
+            _("➕ <b>Add user</b>\n\nEnter the Telegram ID of the user to add:"),
             parse_mode=ParseMode.HTML,
             reply_markup=_cancel_prompt(),
         )
@@ -118,7 +124,7 @@ async def handle_admin_menu(
         removable = [u for u in users if not u.get("is_admin") and u["user_id"] != user_id]
         if not removable:
             await query.edit_message_text(
-                "❌ Nessun utente rimovibile.", reply_markup=_BACK_TO_ADMIN
+                _("❌ No removable users."), reply_markup=_back_to_admin()
             )
             return True
         rows = []
@@ -127,9 +133,9 @@ async def handle_admin_menu(
             rows.append(
                 [InlineKeyboardButton(f"🚫 {nm}", callback_data=f"admin_rm_{u['user_id']}")]
             )
-        rows.append([InlineKeyboardButton("◀️ Impostazioni", callback_data="menu_admin")])
+        rows.append([InlineKeyboardButton(_("◀️ Settings"), callback_data="menu_admin")])
         await query.edit_message_text(
-            "🚫 <b>Rimuovi utente</b>\n\nTocca per rimuovere:",
+            _("🚫 <b>Remove user</b>\n\nTap a user to remove them:"),
             parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup(rows),
         )
@@ -140,27 +146,28 @@ async def handle_admin_menu(
             return True
         target_id = _parse_id(data.replace("admin_rm_", ""))
         if target_id is None:
-            await query.edit_message_text("❌ ID non valido.")
+            await query.edit_message_text(_("❌ Invalid ID."))
             return True
         if target_id == user_id:
             await query.edit_message_text(
-                _("❌ You cannot remove yourself."), reply_markup=_BACK_TO_ADMIN
+                _("❌ You cannot remove yourself."), reply_markup=_back_to_admin()
             )
             return True
         if await db.is_user_admin(target_id):
             await query.edit_message_text(
-                _("❌ You cannot remove another administrator."), reply_markup=_BACK_TO_ADMIN
+                _("❌ You cannot remove another administrator."),
+                reply_markup=_back_to_admin(),
             )
             return True
         removed = await db.remove_user(target_id)
         if removed:
             await query.edit_message_text(
-                f"✅ Utente <code>{target_id}</code> rimosso.",
+                _("✅ User <code>{user_id}</code> removed.").format(user_id=target_id),
                 parse_mode=ParseMode.HTML,
-                reply_markup=_BACK_TO_ADMIN,
+                reply_markup=_back_to_admin(),
             )
         else:
-            await query.edit_message_text("❌ Utente non trovato.", reply_markup=_BACK_TO_ADMIN)
+            await query.edit_message_text(_("❌ User not found."), reply_markup=_back_to_admin())
         return True
 
     if data == "menu_admin_nick":
@@ -173,9 +180,9 @@ async def handle_admin_menu(
             rows.append(
                 [InlineKeyboardButton(f"✏️ {nm}", callback_data=f"admin_nick_{u['user_id']}")]
             )
-        rows.append([InlineKeyboardButton("◀️ Impostazioni", callback_data="menu_admin")])
+        rows.append([InlineKeyboardButton(_("◀️ Settings"), callback_data="menu_admin")])
         await query.edit_message_text(
-            "✏️ <b>Nickname</b>\n\nScegli utente:",
+            _("✏️ <b>Nickname</b>\n\nChoose a user:"),
             parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup(rows),
         )
@@ -186,15 +193,15 @@ async def handle_admin_menu(
             return True
         target_id = _parse_id(data.replace("admin_nick_", ""))
         if target_id is None:
-            await query.edit_message_text("❌ ID non valido.")
+            await query.edit_message_text(_("❌ Invalid ID."))
             return True
         context.user_data["pending_action"] = ("admin_nick", target_id)
         u = await db.get_user(target_id)
-        current_name = u.get("display_name", "N/D") if u else "N/D"
+        current_name = u.get("display_name", _("N/A")) if u else _("N/A")
         await query.edit_message_text(
-            f"✏️ <b>Nickname per {target_id}</b>\n"
-            f"Attuale: {_escape_html(str(current_name))}\n\n"
-            "Scrivi il nuovo nickname:",
+            _(
+                "✏️ <b>Nickname for {user_id}</b>\nCurrent: {current}\n\nEnter the new nickname:"
+            ).format(user_id=target_id, current=_escape_html(str(current_name))),
             parse_mode=ParseMode.HTML,
             reply_markup=_cancel_prompt(),
         )
@@ -205,8 +212,10 @@ async def handle_admin_menu(
             return True
         context.user_data["pending_action"] = ("admin_interval", 0)
         await query.edit_message_text(
-            "⏱ <b>Intervallo globale</b>\n\n"
-            "Scrivi i minuti (es. <code>60</code>, <code>360</code>):",
+            _(
+                "⏱ <b>Global interval</b>\n\n"
+                "Enter the minutes (e.g. <code>60</code>, <code>360</code>):"
+            ),
             parse_mode=ParseMode.HTML,
             reply_markup=_cancel_prompt(),
         )

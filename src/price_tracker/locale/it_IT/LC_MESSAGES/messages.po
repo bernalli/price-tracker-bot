@@ -1968,3 +1968,427 @@ msgstr "📦 Prodotti totali (globali): {count}"
 #, python-brace-format
 msgid "🔄 Total checks (global): {count}"
 msgstr "🔄 Check totali (globali): {count}"
+
+#: src/price_tracker/bot/handlers/monitoring.py
+#, python-brace-format
+msgid ""
+"⏸ Tracking paused: <b>{name}</b>\n"
+"Use /reactivate {pid} to resume tracking."
+msgstr ""
+"⏸ Tracking in pausa: <b>{name}</b>\n"
+"Usa /riattiva {pid} per riprendere."
+
+#: src/price_tracker/bot/handlers/product_io.py
+msgid "📭 You have no products to export."
+msgstr "📭 Non hai prodotti da esportare."
+
+#: src/price_tracker/bot/handlers/product_io.py
+#: src/price_tracker/bot/handlers/callbacks/_menu.py
+#, python-brace-format
+msgid "products_{date}.csv"
+msgstr "prodotti_{date}.csv"
+
+#: src/price_tracker/bot/handlers/product_io.py
+#: src/price_tracker/bot/handlers/callbacks/_menu.py
+#, python-brace-format
+msgid "💾 {count} products exported."
+msgstr "💾 {count} prodotti esportati."
+
+#: src/price_tracker/bot/handlers/product_io.py
+msgid ""
+"📁 <b>Import products from CSV</b>\n"
+"\n"
+"Send a CSV file (exported with /export) as an attachment.\n"
+"Duplicate products (same URL) will be skipped."
+msgstr ""
+"📁 <b>Importa prodotti da CSV</b>\n"
+"\n"
+"Invia un file CSV (esportato con /esporta) come allegato.\n"
+"I prodotti duplicati (stesso URL) verranno saltati."
+
+#: src/price_tracker/bot/handlers/product_io.py
+msgid "❌ The file must be a CSV."
+msgstr "❌ Il file deve essere un CSV."
+
+#: src/price_tracker/bot/handlers/product_io.py
+#, python-brace-format
+msgid "❌ Error parsing the CSV: {error}"
+msgstr "❌ Errore nel parsing del CSV: {error}"
+
+#: src/price_tracker/bot/handlers/product_io.py
+msgid "⏳ Import in progress..."
+msgstr "⏳ Importazione in corso..."
+
+#: src/price_tracker/bot/handlers/product_io.py
+msgid "Imported"
+msgstr "Importato"
+
+#: src/price_tracker/bot/handlers/product_io.py
+msgid "📁 <b>Import complete</b>"
+msgstr "📁 <b>Importazione completata</b>"
+
+#: src/price_tracker/bot/handlers/product_io.py
+#, python-brace-format
+msgid "✅ Imported: {count}"
+msgstr "✅ Importati: {count}"
+
+#: src/price_tracker/bot/handlers/product_io.py
+#, python-brace-format
+msgid "⏭️ Duplicates skipped: {count}"
+msgstr "⏭️ Duplicati saltati: {count}"
+
+#: src/price_tracker/bot/handlers/product_io.py
+#, python-brace-format
+msgid "❌ Errors: {count}"
+msgstr "❌ Errori: {count}"
+
+#: src/price_tracker/bot/handlers/settings.py
+#, python-brace-format
+msgid ""
+"⏱ Current interval: <b>every {minutes} minutes</b>\n"
+"\n"
+"Usage: /setinterval &lt;minutes&gt;\n"
+"Example: <code>/setinterval 120</code> for every 2 hours"
+msgstr ""
+"⏱ Intervallo attuale: <b>ogni {minutes} minuti</b>\n"
+"\n"
+"Uso: /intervallo &lt;minuti&gt;\n"
+"Esempio: <code>/intervallo 120</code> per ogni 2 ore"
+
+#: src/price_tracker/bot/handlers/settings.py
+msgid "❌ Invalid value."
+msgstr "❌ Valore non valido."
+
+#: src/price_tracker/bot/handlers/settings.py
+#: src/price_tracker/bot/handlers/text_input.py
+#, python-brace-format
+msgid "{hours:.0f} hours"
+msgstr "{hours:.0f} ore"
+
+#: src/price_tracker/bot/handlers/settings.py
+#: src/price_tracker/bot/handlers/text_input.py
+#, python-brace-format
+msgid "{hours:.1f} hours"
+msgstr "{hours:.1f} ore"
+
+#: src/price_tracker/bot/handlers/settings.py
+#: src/price_tracker/bot/handlers/text_input.py
+#, python-brace-format
+msgid "{minutes} minutes"
+msgstr "{minutes} minuti"
+
+#: src/price_tracker/bot/handlers/settings.py
+#: src/price_tracker/bot/handlers/text_input.py
+#, python-brace-format
+msgid "✅ Interval updated: <b>every {display}</b>"
+msgstr "✅ Intervallo aggiornato: <b>ogni {display}</b>"
+
+#: src/price_tracker/bot/handlers/text_input.py
+msgid "👍 Okay, no changes."
+msgstr "👍 Ok, nessuna modifica."
+
+#: src/price_tracker/bot/handlers/text_input.py
+#, python-brace-format
+msgid "ℹ️ User <code>{user_id}</code> is already authorized."
+msgstr "ℹ️ Utente <code>{user_id}</code> già autorizzato."
+
+#: src/price_tracker/bot/handlers/text_input.py
+#, python-brace-format
+msgid "✅ User <code>{user_id}</code> added!"
+msgstr "✅ Utente <code>{user_id}</code> aggiunto!"
+
+#: src/price_tracker/bot/handlers/text_input.py
+msgid "🎉 You have been authorized! Send /start."
+msgstr "🎉 Sei stato autorizzato! Invia /start."
+
+#: src/price_tracker/bot/handlers/text_input.py
+msgid "❌ Empty nickname."
+msgstr "❌ Nickname vuoto."
+
+#: src/price_tracker/bot/handlers/text_input.py
+#, python-brace-format
+msgid "✅ Nickname updated: <b>{nickname}</b>"
+msgstr "✅ Nickname aggiornato: <b>{nickname}</b>"
+
+#: src/price_tracker/bot/handlers/text_input.py
+msgid "❌ Invalid number."
+msgstr "❌ Numero non valido."
+
+#: src/price_tracker/bot/handlers/text_input.py
+msgid "❌ Minimum is 5 minutes."
+msgstr "❌ Minimo 5 minuti."
+
+#: src/price_tracker/bot/handlers/callbacks/_actions.py
+msgid "🗑 Yes, delete everything"
+msgstr "🗑 Sì, elimina tutto"
+
+#: src/price_tracker/bot/handlers/callbacks/_actions.py
+msgid "⏸ Pause only"
+msgstr "⏸ Solo pausa"
+
+#: src/price_tracker/bot/handlers/callbacks/_actions.py
+#, python-brace-format
+msgid "❓ What do you want to do with <b>{name}</b>?"
+msgstr "❓ Cosa vuoi fare con <b>{name}</b>?"
+
+#: src/price_tracker/bot/handlers/callbacks/_actions.py
+#, python-brace-format
+msgid ""
+"✅ Base price updated!\n"
+"\n"
+"📦 <b>#{product_id}</b> {name}\n"
+"💰 New base: <b>{price}</b>"
+msgstr ""
+"✅ Prezzo base aggiornato!\n"
+"\n"
+"📦 <b>#{product_id}</b> {name}\n"
+"💰 Nuovo base: <b>{price}</b>"
+
+#: src/price_tracker/bot/handlers/callbacks/_actions.py
+msgid "❌ Could not update."
+msgstr "❌ Impossibile aggiornare."
+
+#: src/price_tracker/bot/handlers/callbacks/_admin.py
+msgid "👥 <b>Active users</b>\n"
+msgstr "👥 <b>Utenti attivi</b>\n"
+
+#: src/price_tracker/bot/handlers/callbacks/_admin.py
+#, python-brace-format
+msgid "{role} <code>{user_id}</code> {name} — {count} products"
+msgstr "{role} <code>{user_id}</code> {name} — {count} prod."
+
+#: src/price_tracker/bot/handlers/callbacks/_admin.py
+msgid "➕ <b>Add user</b>\n\nEnter the Telegram ID of the user to add:"
+msgstr "➕ <b>Aggiungi utente</b>\n\nScrivi l'ID Telegram dell'utente da aggiungere:"
+
+#: src/price_tracker/bot/handlers/callbacks/_admin.py
+msgid "❌ No removable users."
+msgstr "❌ Nessun utente rimovibile."
+
+#: src/price_tracker/bot/handlers/callbacks/_admin.py
+msgid "🚫 <b>Remove user</b>\n\nTap a user to remove them:"
+msgstr "🚫 <b>Rimuovi utente</b>\n\nTocca per rimuovere:"
+
+#: src/price_tracker/bot/handlers/callbacks/_admin.py
+#, python-brace-format
+msgid "✅ User <code>{user_id}</code> removed."
+msgstr "✅ Utente <code>{user_id}</code> rimosso."
+
+#: src/price_tracker/bot/handlers/callbacks/_admin.py
+msgid "❌ User not found."
+msgstr "❌ Utente non trovato."
+
+#: src/price_tracker/bot/handlers/callbacks/_admin.py
+msgid "✏️ <b>Nickname</b>\n\nChoose a user:"
+msgstr "✏️ <b>Nickname</b>\n\nScegli utente:"
+
+#: src/price_tracker/bot/handlers/callbacks/_admin.py
+#, python-brace-format
+msgid ""
+"✏️ <b>Nickname for {user_id}</b>\n"
+"Current: {current}\n"
+"\n"
+"Enter the new nickname:"
+msgstr ""
+"✏️ <b>Nickname per {user_id}</b>\n"
+"Attuale: {current}\n"
+"\n"
+"Scrivi il nuovo nickname:"
+
+#: src/price_tracker/bot/handlers/callbacks/_admin.py
+msgid ""
+"⏱ <b>Global interval</b>\n"
+"\n"
+"Enter the minutes (e.g. <code>60</code>, <code>360</code>):"
+msgstr ""
+"⏱ <b>Intervallo globale</b>\n"
+"\n"
+"Scrivi i minuti (es. <code>60</code>, <code>360</code>):"
+
+#: src/price_tracker/bot/handlers/callbacks/_menu.py
+msgid "📭 You have no tracked products.\nPaste a link to get started!"
+msgstr "📭 Non hai prodotti tracciati.\nIncollami un link per iniziare!"
+
+#: src/price_tracker/bot/handlers/callbacks/_menu.py
+#, python-brace-format
+msgid "📦 You have <b>{count}</b> tracked products.\nUse /list to see them all."
+msgstr "📦 Hai <b>{count}</b> prodotti tracciati.\nUsa /lista per vederli tutti."
+
+#: src/price_tracker/bot/handlers/callbacks/_menu.py
+#, python-brace-format
+msgid "... {count} more → /list"
+msgstr "... altri {count} → /lista"
+
+#: src/price_tracker/bot/handlers/callbacks/_menu.py
+msgid "📭 No products — paste a link!"
+msgstr "📭 Nessun prodotto — incolla un link!"
+
+#: src/price_tracker/bot/handlers/callbacks/_menu.py
+#, python-brace-format
+msgid "⏸ {count} paused → reactivate"
+msgstr "⏸ {count} in pausa → riattiva"
+
+#: src/price_tracker/bot/handlers/callbacks/_menu.py
+#, python-brace-format
+msgid "📦 <b>Your products</b> ({count} active)\n\nTap a product to edit it."
+msgstr "📦 <b>I tuoi prodotti</b> ({count} attivi)\n\nTocca un prodotto per modificarlo."
+
+#: src/price_tracker/bot/handlers/callbacks/_menu.py
+#, python-brace-format
+msgid "⏸ <b>Paused products</b> ({count})\n\nTap to reactivate."
+msgstr "⏸ <b>Prodotti in pausa</b> ({count})\n\nTocca per riattivare."
+
+#: src/price_tracker/bot/handlers/callbacks/_menu.py
+msgid "🔄 Check all prices"
+msgstr "🔄 Controlla tutti i prezzi"
+
+#: src/price_tracker/bot/handlers/callbacks/_menu.py
+msgid "📈 Price history"
+msgstr "📈 Storico prezzo"
+
+#: src/price_tracker/bot/handlers/callbacks/_menu.py
+msgid "💶 <b>Price check</b>\n\nTap a product to check it."
+msgstr "💶 <b>Controllo prezzi</b>\n\nTocca un prodotto per controllarlo."
+
+#: src/price_tracker/bot/handlers/callbacks/_menu.py
+msgid "📈 <b>Price history</b>\n\nTap a product to see its chart."
+msgstr "📈 <b>Storico prezzi</b>\n\nTocca un prodotto per il grafico."
+
+#: src/price_tracker/bot/handlers/callbacks/_menu.py
+msgid "💾 Export CSV"
+msgstr "💾 Esporta CSV"
+
+#: src/price_tracker/bot/handlers/callbacks/_menu.py
+msgid "📂 Import CSV — send a file in chat"
+msgstr "📂 Importa CSV — invia file in chat"
+
+#: src/price_tracker/bot/handlers/callbacks/_menu.py
+#, python-brace-format
+msgid ""
+"💾 <b>Import / Export</b>\n"
+"\n"
+"📦 {active} active, {total} total\n"
+"🔄 {checks} checks performed"
+msgstr ""
+"💾 <b>Import / Export</b>\n"
+"\n"
+"📦 {active} attivi, {total} totali\n"
+"🔄 {checks} check effettuati"
+
+#: src/price_tracker/bot/handlers/callbacks/_menu.py
+msgid ""
+"📂 <b>Import products</b>\n"
+"\n"
+"Send a CSV file in chat (exported with Export).\n"
+"Duplicates will be skipped."
+msgstr ""
+"📂 <b>Importa prodotti</b>\n"
+"\n"
+"Invia un file CSV in chat (esportato con Esporta).\n"
+"I duplicati verranno saltati."
+
+#: src/price_tracker/bot/handlers/callbacks/_menu.py
+msgid "📭 No products."
+msgstr "📭 Nessun prodotto."
+
+#: src/price_tracker/bot/handlers/callbacks/_menu.py
+#, python-brace-format
+msgid "🔄 Checking {count} products..."
+msgstr "🔄 Controllo {count} prodotti..."
+
+#: src/price_tracker/bot/handlers/callbacks/_menu.py
+#, python-brace-format
+msgid "✅ <b>Complete</b> — {count} products"
+msgstr "✅ <b>Completato</b> — {count} prodotti"
+
+#: src/price_tracker/bot/handlers/callbacks/_menu.py
+#, python-brace-format
+msgid "🔔 <b>{count} changes!</b>"
+msgstr "🔔 <b>{count} variazioni!</b>"
+
+#: src/price_tracker/bot/handlers/callbacks/_product.py
+msgid "👍 Operation cancelled."
+msgstr "👍 Operazione annullata."
+
+#: src/price_tracker/bot/handlers/callbacks/_product.py
+msgid "📭 No products to delete."
+msgstr "📭 Nessun prodotto da eliminare."
+
+#: src/price_tracker/bot/handlers/callbacks/_product.py
+#, python-brace-format
+msgid "⚠️ Yes, delete all ({count})"
+msgstr "⚠️ Sì, elimina tutti ({count})"
+
+#: src/price_tracker/bot/handlers/callbacks/_product.py
+#, python-brace-format
+msgid ""
+"🚨 <b>Warning!</b>\n"
+"\n"
+"You are about to <b>permanently delete {count} products</b> and their entire price history.\n"
+"\n"
+"This action <b>cannot be undone</b>."
+msgstr ""
+"🚨 <b>Attenzione!</b>\n"
+"\n"
+"Stai per eliminare <b>definitivamente {count} prodotti</b> e tutto il loro storico prezzi.\n"
+"\n"
+"Questa azione <b>non è reversibile</b>."
+
+#: src/price_tracker/bot/handlers/callbacks/_product.py
+msgid "🆕 Preference: <b>New only</b>"
+msgstr "🆕 Preferenza: <b>Solo Nuovo</b>"
+
+#: src/price_tracker/bot/handlers/callbacks/_product.py
+msgid "♻️ Preference: <b>Used only</b>"
+msgstr "♻️ Preferenza: <b>Solo Usato</b>"
+
+#: src/price_tracker/bot/handlers/callbacks/_product.py
+msgid "📦 Preference: <b>Sold by Amazon only</b>"
+msgstr "📦 Preferenza: <b>Solo venduto da Amazon</b>"
+
+#: src/price_tracker/bot/handlers/callbacks/_product.py
+msgid "🏪 Preference: <b>Any seller</b>"
+msgstr "🏪 Preferenza: <b>Qualsiasi venditore</b>"
+
+#: src/price_tracker/bot/handlers/callbacks/_product.py
+msgid "👍 Preference: <b>No filter</b>"
+msgstr "👍 Preferenza: <b>Nessun filtro</b>"
+
+#: src/price_tracker/bot/handlers/callbacks/_product.py
+#, python-brace-format
+msgid ""
+"{preference} for #{product_id}\n"
+"📦 {name}\n"
+"\n"
+"<b>How do you want to be notified?</b>"
+msgstr ""
+"{preference} per #{product_id}\n"
+"📦 {name}\n"
+"\n"
+"<b>Come vuoi essere avvisato?</b>"
+
+#: src/price_tracker/bot/handlers/callbacks/_product.py
+#, python-brace-format
+msgid ""
+"🔔 <b>Any drop</b> enabled for #{product_id}\n"
+"📦 {name}\n"
+"\n"
+"You will be notified whenever the price drops."
+msgstr ""
+"🔔 <b>Ogni ribasso</b> attivato per #{product_id}\n"
+"📦 {name}\n"
+"\n"
+"Riceverai una notifica ad ogni calo di prezzo."
+
+#: src/price_tracker/bot/handlers/callbacks/_product.py
+#, python-brace-format
+msgid ""
+"👍 <b>Default threshold -10%</b> for #{product_id}\n"
+"📦 {name}\n"
+"\n"
+"You will be notified when the price drops by ten percent from the initial price."
+msgstr ""
+"👍 <b>Soglia default -10%</b> per #{product_id}\n"
+"📦 {name}\n"
+"\n"
+"Riceverai una notifica quando il prezzo scende del 10% dal prezzo iniziale."

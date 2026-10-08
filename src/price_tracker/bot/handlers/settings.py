@@ -39,9 +39,11 @@ async def cmd_set_interval(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     if not context.args:
         config = _config(context)
         await update.message.reply_text(
-            f"⏱ Intervallo attuale: <b>ogni {config.check_interval_minutes} minuti</b>\n\n"
-            f"Uso: /intervallo &lt;minuti&gt;\n"
-            f"Esempio: <code>/intervallo 120</code> per ogni 2 ore",
+            _(
+                "⏱ Current interval: <b>every {minutes} minutes</b>\n\n"
+                "Usage: /setinterval &lt;minutes&gt;\n"
+                "Example: <code>/setinterval 120</code> for every 2 hours"
+            ).format(minutes=config.check_interval_minutes),
             parse_mode=ParseMode.HTML,
         )
         return
@@ -49,13 +51,13 @@ async def cmd_set_interval(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     try:
         minutes = int(context.args[0])
     except ValueError:
-        await update.message.reply_text(_("❌ Valore non valido."))
+        await update.message.reply_text(_("❌ Invalid value."))
         return
     if minutes < 5:
-        await update.message.reply_text(_("❌ L'intervallo minimo è 5 minuti."))
+        await update.message.reply_text(_("❌ Minimum interval is 5 minutes."))
         return
     if minutes > 1440 * 7:
-        await update.message.reply_text(_("❌ L'intervallo massimo è 7 giorni."))
+        await update.message.reply_text(_("❌ Maximum interval is 7 days."))
         return
 
     # The periodic job reads the stored value on every tick, so it applies from the next one.
@@ -63,11 +65,15 @@ async def cmd_set_interval(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     if minutes >= 60:
         hours = minutes / 60
-        display = f"{hours:.0f} ore" if hours == int(hours) else f"{hours:.1f} ore"
+        display = (
+            _("{hours:.0f} hours").format(hours=hours)
+            if hours == int(hours)
+            else _("{hours:.1f} hours").format(hours=hours)
+        )
     else:
-        display = f"{minutes} minuti"
+        display = _("{minutes} minutes").format(minutes=minutes)
     await update.message.reply_text(
-        f"✅ Intervallo aggiornato: <b>ogni {display}</b>",
+        _("✅ Interval updated: <b>every {display}</b>").format(display=display),
         parse_mode=ParseMode.HTML,
     )
 
@@ -105,7 +111,7 @@ async def mute_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             await update.message.reply_text("Usage: /mute [product_id|all] [hours|forever]")
             return
         if await repo.get_product_for_user(product_id, update.effective_user.id) is None:
-            await update.message.reply_text(_("❌ Prodotto non trovato."))
+            await update.message.reply_text(_("❌ Product not found."))
             return
 
     mute_until: datetime | None
@@ -145,7 +151,7 @@ async def unmute_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             await update.message.reply_text("Usage: /unmute [product_id|all]")
             return
         if await repo.get_product_for_user(product_id, update.effective_user.id) is None:
-            await update.message.reply_text(_("❌ Prodotto non trovato."))
+            await update.message.reply_text(_("❌ Product not found."))
             return
     await clear_mute(repo, update.effective_user.id, product_id)
     await update.message.reply_text("Unmuted.")
