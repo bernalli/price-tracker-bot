@@ -20,7 +20,7 @@ from price_tracker.bot.decorators import _config, _db, admin_only, restricted, w
 from price_tracker.bot.handlers._helpers import _parse_id
 from price_tracker.bot.messages import _
 from price_tracker.db.models import NotificationPrefs
-from price_tracker.notifier.preferences import update_prefs
+from price_tracker.notifier.preferences import clear_mute, update_prefs
 
 if TYPE_CHECKING:
     from telegram import Update
@@ -147,7 +147,7 @@ async def unmute_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         if await repo.get_product_for_user(product_id, update.effective_user.id) is None:
             await update.message.reply_text(_("❌ Prodotto non trovato."))
             return
-    await update_prefs(repo, update.effective_user.id, product_id, mute=False, mute_until=None)
+    await clear_mute(repo, update.effective_user.id, product_id)
     await update.message.reply_text("Unmuted.")
 
 

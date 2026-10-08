@@ -84,7 +84,7 @@ VALUE_PATHS: Final[dict[str, tuple[int, tuple[str, ...], End]]] = {
     "typed quiet hours": (OWNER, ("s", "s:qh", "s:ask:qh"), "prompt"),
     "notifications of one product": (OWNER, NOTIFICATIONS, "panel"),
     "mute one product": (OWNER, (*NOTIFICATIONS, "p:{P}:mu:8"), "prefs"),
-    "unmute one product": (OWNER, (*NOTIFICATIONS, "p:{P}:mu:off"), "prefs"),
+    "unmute one product": (OWNER, (*NOTIFICATIONS, "p:{P}:mu:8", "p:{P}:mu:off"), "prefs"),
     "mute one product for a typed time": (OWNER, (*NOTIFICATIONS, "p:{P}:mua"), "prompt"),
 }
 

@@ -217,9 +217,14 @@ async def test_unmute_command_on_a_product_keeps_the_global_digest_and_time_zone
     await repo.upsert_notification_prefs(
         NotificationPrefs(user_id=USER, mute=True, digest_mode=True, timezone="Asia/Tokyo")
     )
+    await run_command(repo, USER, ["/mute", str(pid), "8"])
     await run_command(repo, USER, ["/unmute", str(pid)])
+    row = await _row(repo, pid)
+    assert row is not None
+    assert (row.mute, row.mute_until) == (False, None)
     effective = await PreferencesManager(repo=repo).resolve(user_id=USER, product_id=pid)
-    assert effective.mute is False
+    # Unmuting the product clears its own mute only; everything is still muted.
+    assert (effective.mute, effective.mute_until) == (True, None)
     assert (effective.digest_mode, effective.timezone) == (True, "Asia/Tokyo")
 
 

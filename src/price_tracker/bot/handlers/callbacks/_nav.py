@@ -43,7 +43,7 @@ from price_tracker.bot.ui.panels import (
 from price_tracker.bot.ui.screens import Button, Screen
 from price_tracker.core.textlimits import split_message
 from price_tracker.i18n.locales import AVAILABLE_LANGUAGES
-from price_tracker.notifier.preferences import PreferencesManager, update_prefs
+from price_tracker.notifier.preferences import PreferencesManager, clear_mute, update_prefs
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -164,7 +164,11 @@ async def _product_mute(
     if record is None:
         await show_list(query, context, db, user_id, notice=_("Product not found."))
         return
-    await update_prefs(db, user_id, product_id, **_mute_changes(value))
+    if value == "off":
+        # Only the product's own mute: a global mute still applies to it.
+        await clear_mute(db, user_id, product_id)
+    else:
+        await update_prefs(db, user_id, product_id, **_mute_changes(value))
     await _show_product_prefs(query, context, db, user_id, record)
 
 

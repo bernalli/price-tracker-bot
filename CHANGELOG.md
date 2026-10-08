@@ -33,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The /debug report shows values read from the page as plain text; page content can no longer
   break the message. The /health report shows domain names and block reasons the same way.
 - Muting one product no longer overrides the digest and time zone that apply to it.
+- A muted product stays muted when everything is muted too, and unmuting a product no longer
+  exempts it from muting everything.
 
 ## [1.6.0] - 2026-10-08
 
