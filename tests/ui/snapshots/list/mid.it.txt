@@ -17,5 +17,5 @@ keyboard:
    [◀️](cb:l:a:1)  [2/3](cb:noop)  [▶️](cb:l:a:3)
    [✅ Attivi ✓](cb:l:a:1)  [⏸ In pausa](cb:l:p:1)
    [⚠️ Errori](cb:l:e:1)  [🚫 Esaurito](cb:l:o:1)
-   [🗑 Elimina tutti](cb:delete_all)  [➕ Aggiungi](cb:ad)
+   [🗑 Elimina tutti](cb:l:rmall)  [➕ Aggiungi](cb:ad)
    [🏠 Home](cb:h)

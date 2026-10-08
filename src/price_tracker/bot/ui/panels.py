@@ -272,8 +272,7 @@ def product_prefs_screen(name: str, product_id: int, view: PrefsView, *, now: da
 
 
 def home_screen(view: HomeView) -> Screen:
-    """The Home screen: counts, and a way into every area. Legacy buttons stay for the areas
-    that have no screen of their own yet."""
+    """The Home screen: counts, and a way into every area."""
     counts = _("📦 {active} · ⏸ {paused}").format(
         # The English adjective does not change; other languages inflect it.
         active=ngettext("{n} active", "{n} active", view.active).format(n=view.active),
@@ -284,15 +283,15 @@ def home_screen(view: HomeView) -> Screen:
     ).format(counts=counts)
     areas = [
         button(_("📦 Products"), callback=encode(Action("list.page", ("a", 1)))),
-        button(_("💶 Prices"), callback="menu_prezzi"),
-        button(_("🔔 Notifications"), callback="menu_notifiche"),
-        button(_("💾 Data"), callback="menu_dati"),
-        button(_("ℹ️ Status & info"), callback="menu_info"),
+        button(_("💶 Prices"), callback=encode(Action("prices"))),
+        button(_("🔔 Notifications"), callback=encode(Action("notifications"))),
+        button(_("💾 Data"), callback=encode(Action("data"))),
+        button(_("ℹ️ Status & info"), callback=encode(Action("stats"))),
         button(_("⚙️ Settings"), callback=encode(Action("settings"))),
     ]
     groups = [areas]
     if view.is_admin:
-        groups.append([button(_("👑 Admin"), callback="menu_admin")])
+        groups.append([button(_("👑 Admin"), callback=encode(Action("admin")))])
     return Screen(text=text, rows=layout_rows(*groups))
 
 

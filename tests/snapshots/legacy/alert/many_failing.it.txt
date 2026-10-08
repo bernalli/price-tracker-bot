@@ -100,8 +100,8 @@
    |
    | Riattiva per fare subito un nuovo controllo.
    keyboard:
-   | [▶️ Riattiva e ricontrolla (11) → ops_react_1]
-   | [🗑 Elimina tutti (11) → ops_del_1]
+   | [▶️ Riattiva e ricontrolla (11) → o:1:ra]
+   | [🗑 Elimina tutti (11) → o:1:rm]
 ## db after step 2
 ~ products id=1 is_active: 1 -> 0
 ~ products id=1 consecutive_errors: 1 -> 2

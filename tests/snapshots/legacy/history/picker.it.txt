@@ -8,8 +8,8 @@
    text:
    | 📈 <b>Scegli un prodotto per lo storico:</b>
    keyboard:
-   | [#1 Kettle → chart_1]
-   | [#2 Fan → chart_2]
+   | [#1 Kettle → p:1:ch:all]
+   | [#2 Fan → p:2:ch:all]
 ## db after step 1
 ~ users user_id=10 display_name: NULL -> "U10"
 ## step 2: command "/storia" user=10
@@ -18,8 +18,8 @@
    text:
    | 📈 <b>Scegli un prodotto per lo storico:</b>
    keyboard:
-   | [#1 Kettle → chart_1]
-   | [#2 Fan → chart_2]
-   | [#3 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNN… → chart_3]
+   | [#1 Kettle → p:1:ch:all]
+   | [#2 Fan → p:2:ch:all]
+   | [#3 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNN… → p:3:ch:all]
 ## db after step 2
 (no changes)

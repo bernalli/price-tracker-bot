@@ -30,6 +30,7 @@ from price_tracker.app.inputs import (
     Percentage,
     parse_threshold,
 )
+from price_tracker.bot.callbacks import Action, encode
 from price_tracker.bot.decorators import (
     _client,
     _convert_display,
@@ -79,12 +80,15 @@ async def _product_picker(
         name = truncate_to_width(p.get("name") or _("Unknown"), 35)
         current = _safe_dec(p.get("current_price"))
         price_tag = f" €{current:.2f}" if current else ""
-        prefix = callback_prefix or action
+        action_name = {
+            "settarget": "product.target",
+            "setsoglia": "product.threshold",
+        }[callback_prefix or action]
         buttons.append(
             [
                 InlineKeyboardButton(
                     f"#{p['id']} {name}{price_tag}",
-                    callback_data=f"{prefix}_{p['id']}",
+                    callback_data=encode(Action(action_name, (p["id"],))),
                 )
             ]
         )
@@ -136,11 +140,21 @@ async def cmd_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             label = f"#{p['id']} {name}"
             if price:
                 label += f" €{price:.2f}"
-            buttons.append([InlineKeyboardButton(label, callback_data=f"remove_{p['id']}")])
+            buttons.append(
+                [
+                    InlineKeyboardButton(
+                        label, callback_data=encode(Action("product.remove", (p["id"],)))
+                    )
+                ]
+            )
 
         if len(products) > 1:
             buttons.append(
-                [InlineKeyboardButton(_("🗑 Delete all products"), callback_data="delete_all")]
+                [
+                    InlineKeyboardButton(
+                        _("🗑 Delete all products"), callback_data=encode(Action("list.remove_all"))
+                    )
+                ]
             )
 
         await update.message.reply_text(
@@ -164,9 +178,10 @@ async def cmd_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         [
             [
                 InlineKeyboardButton(
-                    _("🗑 Yes, delete"), callback_data=f"confirm_delete_{product_id}"
+                    _("🗑 Yes, delete"),
+                    callback_data=encode(Action("product.remove_ok", (product_id,))),
                 ),
-                InlineKeyboardButton(_("❌ Cancel"), callback_data="cancel_delete"),
+                InlineKeyboardButton(_("❌ Cancel"), callback_data=encode(Action("delete.cancel"))),
             ]
         ]
     )
@@ -444,22 +459,29 @@ async def _add_product(
         keyboard = InlineKeyboardMarkup(
             [
                 [
-                    InlineKeyboardButton(_("🆕 New only"), callback_data=f"pref_new_{product_id}"),
-                    InlineKeyboardButton(_("♻️ Used only"), callback_data=f"pref_used_{product_id}"),
+                    InlineKeyboardButton(
+                        _("🆕 New only"),
+                        callback_data=encode(Action("product.offer_filter", (product_id, "n"))),
+                    ),
+                    InlineKeyboardButton(
+                        _("♻️ Used only"),
+                        callback_data=encode(Action("product.offer_filter", (product_id, "u"))),
+                    ),
                 ],
                 [
                     InlineKeyboardButton(
-                        _("📦 Amazon only"), callback_data=f"pref_amazon_{product_id}"
+                        _("📦 Amazon only"),
+                        callback_data=encode(Action("product.offer_filter", (product_id, "s1"))),
                     ),
                     InlineKeyboardButton(
                         _("🏪 Any seller"),
-                        callback_data=f"pref_anyseller_{product_id}",
+                        callback_data=encode(Action("product.offer_filter", (product_id, "s0"))),
                     ),
                 ],
                 [
                     InlineKeyboardButton(
                         _("👍 Anything is fine (default)"),
-                        callback_data=f"pref_default_{product_id}",
+                        callback_data=encode(Action("product.offer_filter", (product_id, "0"))),
                     ),
                 ],
             ]

@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from price_tracker.app.views import PAGE_SIZE, ListPage
-from price_tracker.bot.callbacks import ID_MAX, Action, decode
+from price_tracker.bot.callbacks import ID_MAX, Action, decode, encode
 from price_tracker.bot.handlers._cards import list_view
 from price_tracker.bot.messages import set_locale
 from price_tracker.bot.ui.cards import list_page
@@ -27,7 +27,6 @@ _NOW_TEXT = "2026-03-01T12:00:00Z"
 HALF_WIDTH = 17
 ROW_WIDTH = 34
 LOCALES = ("en", "it", "zh_Hans", "fr", "es", "de", "uk", "pt_BR", "ja")
-LEGACY_CALLBACKS = {"delete_all"}
 
 
 def build(count: int, list_filter: ListFilter, page: int) -> ListPage:
@@ -137,7 +136,7 @@ def test_every_callback_decodes_or_is_a_legacy_one(ui_locales: Path) -> None:
         for list_filter in ("a", "p", "e", "o"):
             screen = list_page(build(count, list_filter, asked))
             for data in callbacks(screen):
-                assert isinstance(decode(data), Action) or data in LEGACY_CALLBACKS, data
+                assert isinstance(decode(data), Action), data
 
 
 def test_products_open_the_card_on_this_page_and_filter(ui_locales: Path) -> None:
@@ -207,7 +206,8 @@ def test_delete_all_only_for_several_active_products(
 ) -> None:
     set_locale("en")
     screen = list_page(build(count, list_filter, 1))
-    assert ("delete_all" in callbacks(screen)) is expected
+    remove_all = encode(Action("list.remove_all"))
+    assert (remove_all in callbacks(screen)) is expected
     assert "h" in callbacks(screen)
 
 

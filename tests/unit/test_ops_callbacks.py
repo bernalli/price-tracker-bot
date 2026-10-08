@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
@@ -12,6 +13,7 @@ import aiosqlite
 import pytest
 import pytest_asyncio
 
+from price_tracker.bot.callbacks import Action
 from price_tracker.db.migrator import apply_migrations
 from price_tracker.db.repository import Repository
 
@@ -282,8 +284,8 @@ async def test_ops_del_shows_confirmation_with_count_and_cancel(repo: Repository
     text = query.edit_message_text.await_args.args[0]
     markup = query.edit_message_text.await_args.kwargs["reply_markup"]
     assert "Delete 2 products on example.com" in text
-    assert markup.inline_keyboard[0][0].callback_data == f"ops_delok_{first_id}"
-    assert markup.inline_keyboard[1][0].callback_data == "cancel_delete"
+    assert markup.inline_keyboard[0][0].callback_data == f"o:{first_id}:rmok"
+    assert markup.inline_keyboard[1][0].callback_data == "l:x"
 
 
 @pytest.mark.asyncio
@@ -360,14 +362,25 @@ async def test_ops_delok_never_deletes_manual_or_unknown_provenance(repo: Reposi
 
 
 @pytest.mark.asyncio
-async def test_dispatcher_routes_ops_prefix_before_actions(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The operational handler precedes legacy action callbacks in dispatcher order."""
+@pytest.mark.parametrize(
+    ("legacy_wire", "expected"),
+    [
+        ("ops_react_1", Action("ops.reactivate", (1,))),
+        ("ops_del_1", Action("ops.delete", (1,))),
+    ],
+)
+async def test_dispatcher_routes_legacy_ops_buttons_from_stored_digest_payload(
+    monkeypatch: pytest.MonkeyPatch, legacy_wire: str, expected: Action
+) -> None:
+    """Pre-registry digest payloads still enter the operational action route."""
     import price_tracker.bot.handlers.callbacks as callbacks
 
+    stored = json.dumps({"buttons": [[{"text": "Legacy operation", "callback_data": legacy_wire}]]})
+    restored = json.loads(stored)
     query = _query()
     query.answer = AsyncMock()
     query.from_user.id = USER_ID
-    query.data = "ops_react_1"
+    query.data = restored["buttons"][0][0]["callback_data"]
     update = MagicMock(callback_query=query, effective_user=MagicMock(language_code="en"))
     context = MagicMock()
     context.bot_data = {"db": AsyncMock(is_user_allowed=AsyncMock(return_value=True))}
@@ -379,4 +392,6 @@ async def test_dispatcher_routes_ops_prefix_before_actions(monkeypatch: pytest.M
     await callbacks.handle_callback(update, context)
 
     ops.assert_awaited_once()
+    assert ops.await_args is not None
+    assert ops.await_args.args[-1] == expected
     actions.assert_not_awaited()

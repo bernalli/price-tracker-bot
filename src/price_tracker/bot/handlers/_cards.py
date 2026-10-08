@@ -25,6 +25,7 @@ from price_tracker.app.views import (
     ProductView,
     ThresholdType,
 )
+from price_tracker.bot.callbacks import Action, encode
 from price_tracker.bot.decorators import _config, _db, _get_conversion_rate
 from price_tracker.bot.messages import _
 from price_tracker.bot.ui.cards import CardActions
@@ -136,16 +137,16 @@ def product_view(record: _Record, *, default_interval_minutes: int) -> ProductVi
 
 
 def card_actions(view: ProductView, *, back: str) -> CardActions:
-    """The legacy callbacks the card buttons trigger for this product, and ``back`` to the list."""
+    """The registered callbacks the card buttons trigger, and ``back`` to the list."""
     pid = view.id
-    toggle = f"pause_{pid}" if view.status == "active" else f"reactivate_{pid}"
+    toggle = Action("product.pause" if view.status == "active" else "product.reactivate", (pid,))
     return CardActions(
-        check=f"check_{pid}",
-        history=f"chart_{pid}",
-        toggle=toggle,
-        delete=f"remove_{pid}",
-        alert_rule=f"edit_{pid}",
-        interval=f"setrefresh_{pid}",
+        check=encode(Action("product.check", (pid,))),
+        history=encode(Action("product.chart", (pid, "all"))),
+        toggle=encode(toggle),
+        delete=encode(Action("product.remove", (pid,))),
+        alert_rule=encode(Action("product.edit", (pid,))),
+        interval=encode(Action("product.interval", (pid,))),
         back=back,
     )
 
