@@ -60,7 +60,7 @@ def test_po_files_have_no_fuzzy_and_no_obsolete() -> None:
             assert msgid in ids, (locale, msgid)
         assert CARD_PLURAL in ids, locale
         if locale == "it_IT":
-            assert len(list(catalog)) == 524
+            assert len(list(catalog)) == 518
 
 
 def _as_key(value: str | tuple[str, ...] | list[str] | None) -> str | tuple[str, ...] | None:

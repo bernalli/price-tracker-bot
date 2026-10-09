@@ -90,6 +90,40 @@ async def test_upgrade_only_includes_unseen_releases(repo, monkeypatch, skipped)
     assert await repo.get_config("last_announced_version") == "1.8.0"
 
 
+async def test_empty_skipped_release_is_omitted_from_catch_up(repo, monkeypatch):
+    notes = {
+        "1.7.1": ("Already seen",),
+        "1.7.2": (),
+        "1.7.3": ("Intermediate improvement",),
+        "1.8.0": ("Newest improvement",),
+    }
+    monkeypatch.setattr(release_notes, "RELEASE_NOTES", notes)
+    monkeypatch.setattr(price_tracker, "__version__", "1.8.0")
+    await repo.ensure_user(123456789)
+    await repo.set_config("last_announced_version", "1.7.1")
+    bot = Mock(send_message=AsyncMock())
+
+    await release_updates.announce_release(bot, repo, "en")
+
+    text = bot.send_message.await_args.kwargs["text"]
+    assert "1.7.3: Intermediate improvement" in text
+    assert "1.7.2:" not in text
+
+
+async def test_empty_newest_and_skipped_releases_are_recorded_without_message(repo, monkeypatch):
+    notes = {"1.7.1": ("Already seen",), "1.7.2": (), "1.8.0": ()}
+    monkeypatch.setattr(release_notes, "RELEASE_NOTES", notes)
+    monkeypatch.setattr(price_tracker, "__version__", "1.8.0")
+    await repo.ensure_user(123456789)
+    await repo.set_config("last_announced_version", "1.7.1")
+    bot = Mock(send_message=AsyncMock())
+
+    await release_updates.announce_release(bot, repo, "en")
+
+    bot.send_message.assert_not_awaited()
+    assert await repo.get_config("last_announced_version") == "1.8.0"
+
+
 def test_cap_drops_oldest_lines_and_escapes_html(monkeypatch):
     notes = {
         f"1.{minor}.0": (f"Improvement {minor} " + "x" * 180, "Detail") for minor in range(1, 12)

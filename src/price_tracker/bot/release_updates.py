@@ -31,13 +31,16 @@ async def announce_release(bot: Bot, repo: Repository, fallback_language: str) -
         return
 
     for index, user in enumerate(await repo.list_active_users()):
-        if index:
-            await sleep(SEND_DELAY_SECONDS)
         token = set_locale(await user_locale(repo, user.user_id, fallback_language))
         try:
+            text = render_release_notes(previous, current)
+            if not text:
+                continue
+            if index:
+                await sleep(SEND_DELAY_SECONDS)
             await bot.send_message(
                 chat_id=user.user_id,
-                text=render_release_notes(previous, current),
+                text=text,
                 parse_mode="HTML",
             )
         except TelegramError as exc:
