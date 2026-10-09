@@ -48,6 +48,10 @@ RELEASE_NOTES: dict[str, tuple[str, ...]] = {
         N_("Manage one product's notifications without changing your other settings."),
     ),
     "1.7.1": (N_("Get just one back-in-stock alert when a sold-out product returns."),),
+    "1.8.0": (
+        N_("Product lists fit on one line per product, even on small phones."),
+        N_("After each update you get a short message with what's new."),
+    ),
 }
 
 MESSAGE_LIMIT = 1200
