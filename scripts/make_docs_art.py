@@ -1,42 +1,60 @@
 #!/usr/bin/env python3
 """Regenerate the artwork shipped in ``docs/img/``.
 
-Three images live in the README and in the repository's social preview. They are
-generated here rather than drawn by hand so that a change of repository URL, of
-tagline, or of chart style is a one-line edit followed by a re-run:
-
-    uv run python scripts/make_docs_art.py
-
-* ``price-chart.png`` — the ``/history`` output. It is rendered through the bot's
-  own ``_render_chart`` so the README always shows what the code actually draws,
-  and it is fed a **synthetic** series: the screenshot must never expose a real
-  product, a real price history, or a real target from anyone's deployment.
-* ``cover.png`` / ``social-preview.png`` — the banner and the 2:1 social card.
-
-Only Pillow and matplotlib are needed; both are already runtime dependencies.
+``price-chart.png`` uses the bot's chart renderer with a synthetic price series.
+The cover, social preview, and Telegram description image are SVG compositions
+rendered with ``rsvg-convert``.
 """
 
 from __future__ import annotations
 
+import shutil
+import subprocess
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont
-
 REPO_ROOT = Path(__file__).resolve().parent.parent
 IMG_DIR = REPO_ROOT / "docs" / "img"
 
-REPO_URL = "github.com/bernalli/price-tracker-bot"
-TITLE = "price-tracker-bot"
-TAGLINE = "Self-hosted Telegram bot for multi-site price tracking"
-CHIPS = ("auto-quarantine", "plugin scrapers", "Prometheus metrics")
+YELLOW = "#FFD60A"
+DARK = "#1C1C1C"
+MUTED = "#4A3F00"
+FONT = "Lato"
 
-YELLOW = "#FFD500"
-GLOW = "#FFE04D"
-INK = "#1A1A1A"
-MUTED = "#6B6B6B"
-RED = "#E01B24"
+ALERT_NAME = "Noise-cancelling headphones"
+ALERT_OLD = "129.00"
+ALERT_NEW = "99.00"
+ALERT_DROP = "30.00"
+ALERT_PERCENT = "23.3"
+ALERT_SYMBOL = "€"
+
+# The measured transform centres the visible bag before fitting the complete mark.
+LOGO_ART = """
+<g transform="translate(256 256) scale(0.9032) translate(-236 -259)">
+  <path d="M178.4,206 V172.96 a57.6,57.6 0 0 1 115.2,0 V206"
+        fill="none" stroke="#1C1C1C" stroke-width="26" stroke-linecap="round"/>
+  <rect x="116" y="196" width="240" height="220" rx="36" fill="#1C1C1C"/>
+  <circle cx="192" cy="262" r="22" fill="none" stroke="#FFD60A" stroke-width="14"/>
+  <circle cx="280" cy="350" r="22" fill="none" stroke="#FFD60A" stroke-width="14"/>
+  <line x1="296" y1="244" x2="176" y2="368" stroke="#FFD60A"
+        stroke-width="18" stroke-linecap="round"/>
+  <polygon points="372,102 392.2,118.7 418,114.3 427.2,138.8 451.7,148
+                   447.3,173.8 464,194 447.3,214.2 451.7,240 427.2,249.2
+                   418,273.7 392.2,269.3 372,286 351.8,269.3 326,273.7
+                   316.8,249.2 292.3,240 296.7,214.2 280,194 296.7,173.8
+                   292.3,148 316.8,138.8 326,114.3 351.8,118.7"
+           fill="#FFD60A" stroke="#FFD60A" stroke-width="10" stroke-linejoin="round"/>
+  <polygon points="372,118 388,134.1 410,128.2 415.8,150.2 437.8,156
+                   431.9,178 448,194 431.9,210 437.8,232 415.8,237.8
+                   410,259.8 388,253.9 372,270 356,253.9 334,259.8
+                   328.2,237.8 306.2,232 312.1,210 296,194 312.1,178
+                   306.2,156 328.2,150.2 334,128.2 356,134.1"
+           fill="#E11D48" stroke="#E11D48" stroke-width="10" stroke-linejoin="round"/>
+  <path d="M354.84,158 H389.16 V193.64 H406.32 L372,231.92
+           L337.68,193.64 H354.84 Z" fill="#FFFFFF"/>
+</g>
+"""
 
 # A made-up listing: generic name, invented series, invented target.
 DEMO_NAME = "Wireless Headphones XZ-900 — example-store.com"
@@ -97,132 +115,175 @@ DEMO_SERIES = [
 ]
 
 
-def _font(
-    size: int, *, bold: bool = False, mono: bool = False
-) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
-    """Best-effort font lookup, falling back to Pillow's bundled default."""
-    candidates = (
-        [
-            "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf",
-            "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
-        ]
-        if mono
-        else [
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-            if bold
-            else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        ]
-    )
-    for path in candidates:
-        if Path(path).exists():
-            return ImageFont.truetype(path, size)
-    return ImageFont.load_default(size)
-
-
 def render_chart(out: Path) -> None:
-    """Render the demo chart through the bot's own chart function."""
+    """Render the synthetic demo data through the bot's chart function."""
     sys.path.insert(0, str(REPO_ROOT / "src"))
     from price_tracker.bot.handlers.history import _render_chart  # noqa: PLC0415
 
     start = datetime(2026, 5, 8, tzinfo=UTC)
     dates = [start + timedelta(days=i) for i in range(len(DEMO_SERIES))]
-    buf = _render_chart(dates, [float(p) for p in DEMO_SERIES], DEMO_TARGET, DEMO_NAME)
+    buf = _render_chart(dates, [float(price) for price in DEMO_SERIES], DEMO_TARGET, DEMO_NAME)
     out.write_bytes(buf.getvalue())
 
 
-def _bag(draw: ImageDraw.ImageDraw, cx: int, cy: int, size: int) -> None:
-    """Draw the shopping-bag mark with its discount slash and lightning badge."""
-    half = size // 2
-    body = (cx - half, cy - half + size // 8, cx + half, cy + half + size // 8)
-    draw.rounded_rectangle(body, radius=size // 6, fill=INK)
-
-    handle_w = int(size * 0.56)
-    lw = max(4, size // 11)
-    draw.arc(
-        (cx - handle_w // 2, cy - half - size // 4, cx + handle_w // 2, cy - half + size // 3),
-        start=180,
-        end=360,
-        fill="#4A4A4A",
-        width=lw,
+def logo(x: float, y: float, size: float) -> str:
+    """Place the statically centred brand mark in an SVG composition."""
+    return (
+        f'<svg x="{x}" y="{y}" width="{size}" height="{size}" '
+        f'viewBox="0 0 512 512">{LOGO_ART}</svg>'
     )
 
-    r = size // 9
-    off = size // 5
-    for dx, dy in ((-off, -off), (off, off)):
-        draw.ellipse(
-            (cx + dx - r, cy + dy - r + size // 8, cx + dx + r, cy + dy + r + size // 8),
-            outline=YELLOW,
-            width=max(3, size // 22),
-        )
-    draw.line(
-        (cx - off - r // 2, cy + off + size // 8, cx + off + r // 2, cy - off + size // 8),
-        fill=YELLOW,
-        width=max(4, size // 16),
+
+def _chart_emoji(x: float, y: float, font_size: float) -> str:
+    """Draw a small falling chart in place of the colour emoji glyph."""
+    size = font_size * 1.15
+    grid = "".join(
+        f'<line x1="{x + size * step / 4}" y1="{y}" '
+        f'x2="{x + size * step / 4}" y2="{y + size}" '
+        f'stroke="#C9D7E8" stroke-width="{font_size * 0.05}"/>'
+        f'<line x1="{x}" y1="{y + size * step / 4}" '
+        f'x2="{x + size}" y2="{y + size * step / 4}" '
+        f'stroke="#C9D7E8" stroke-width="{font_size * 0.05}"/>'
+        for step in (1, 2, 3)
+    )
+    return (
+        f'<rect x="{x}" y="{y}" width="{size}" height="{size}" rx="{size * 0.14}" '
+        f'fill="#FFFFFF" stroke="#B8C4D2" stroke-width="{font_size * 0.06}"/>{grid}'
+        f'<polyline points="{x + size * 0.12},{y + size * 0.2} '
+        f"{x + size * 0.4},{y + size * 0.5} "
+        f"{x + size * 0.58},{y + size * 0.38} "
+        f'{x + size * 0.88},{y + size * 0.8}" fill="none" stroke="#E53935" '
+        f'stroke-width="{font_size * 0.13}" stroke-linecap="round" '
+        'stroke-linejoin="round"/>'
     )
 
-    br = size // 5
-    bx, by = cx + half - br // 3, cy - half + size // 10
-    draw.ellipse((bx - br, by - br, bx + br, by + br), fill=RED)
-    bolt = [
-        (bx + br // 5, by - br // 2),
-        (bx - br // 3, by + br // 12),
-        (bx, by + br // 12),
-        (bx - br // 5, by + br // 2),
-        (bx + br // 3, by - br // 12),
-        (bx, by - br // 12),
+
+def alert_bubble(x: float, y: float, width: float, font_size: float) -> str:
+    """Draw the price-drop message defined by ``core.alert.format_alert``."""
+    line_height = font_size * 1.45
+    rows = [
+        ('<tspan font-weight="bold">Price drop!</tspan>', DARK),
+        ("", DARK),
+        (f'<tspan font-weight="bold">{ALERT_NAME}</tspan>', DARK),
+        ("View product", "#2A7FC1"),
+        ("", DARK),
+        (
+            f'Was: <tspan text-decoration="line-through">{ALERT_OLD} {ALERT_SYMBOL}</tspan>',
+            DARK,
+        ),
+        (f'Now: <tspan font-weight="bold">{ALERT_NEW} {ALERT_SYMBOL}</tspan>', DARK),
+        (f"Drop: -{ALERT_DROP} {ALERT_SYMBOL} ({ALERT_PERCENT}%)", DARK),
     ]
-    draw.polygon(bolt, fill=YELLOW)
+    padding = font_size * 1.1
+    height = padding * 2 + line_height * len(rows) + font_size * 0.6
+    parts = [
+        f'<rect x="{x + 6}" y="{y + 8}" width="{width}" height="{height}" '
+        f'rx="{font_size * 1.1}" fill="#000000" opacity="0.10"/>',
+        f'<rect x="{x}" y="{y}" width="{width}" height="{height}" '
+        f'rx="{font_size * 1.1}" fill="#FFFFFF"/>',
+        f'<path d="M{x},{y + height - font_size * 1.6} '
+        f"q-{font_size * 0.2},{font_size * 1.4} -{font_size * 0.9},{font_size * 1.6} "
+        f'q{font_size * 1.4},{font_size * 0.2} {font_size * 2.2},-{font_size * 0.6} z" '
+        'fill="#FFFFFF"/>',
+        _chart_emoji(x + padding, y + padding, font_size),
+    ]
+    emoji_size = font_size * 1.15
 
+    for index, (text, colour) in enumerate(rows):
+        if not text:
+            continue
+        text_x = x + padding + (emoji_size + font_size * 0.35 if index == 0 else 0)
+        parts.append(
+            f'<text x="{text_x}" y="{y + padding + font_size + index * line_height}" '
+            f'font-family="{FONT}" font-size="{font_size}" fill="{colour}">{text}</text>'
+        )
 
-def render_banner(out: Path, width: int, height: int, *, scale: float) -> None:
-    """Draw a cover/social card at the given size."""
-    img = Image.new("RGB", (width, height), YELLOW)
-    draw = ImageDraw.Draw(img)
-
-    mark_cx = int(width * 0.80)
-    mark_cy = height // 2
-    glow_r = int(min(width, height) * 0.37)
-    draw.ellipse(
-        (mark_cx - glow_r, mark_cy - glow_r, mark_cx + glow_r, mark_cy + glow_r), fill=GLOW
+    parts.append(
+        f'<text x="{x + width - padding}" y="{y + height - padding * 0.6}" '
+        f'text-anchor="end" font-family="{FONT}" font-size="{font_size * 0.7}" '
+        'fill="#8A8A8A">09:41</text>'
     )
-    for dx, dy, s in ((-glow_r - 30, -30, 11), (glow_r + 10, 0, 9), (-glow_r + 40, glow_r - 20, 9)):
-        px, py = mark_cx + dx, mark_cy + dy
-        draw.line((px - s, py, px + s, py), fill="#E6BF00", width=4)
-        draw.line((px, py - s, px, py + s), fill="#E6BF00", width=4)
-    _bag(draw, mark_cx, mark_cy, int(min(width, height) * 0.42))
+    return "".join(parts)
 
-    x = int(width * 0.055)
-    title_f = _font(int(60 * scale), bold=True)
-    tag_f = _font(int(26 * scale))
-    chip_f = _font(int(19 * scale), mono=True)
-    url_f = _font(int(19 * scale), mono=True)
 
-    y = int(height * 0.28)
-    draw.text((x, y), TITLE, font=title_f, fill=INK)
-    y += int(78 * scale)
-    draw.text((x, y), TAGLINE, font=tag_f, fill=INK)
+def svg_document(width: int, height: int, body: str) -> str:
+    """Wrap a composition in the yellow brand canvas."""
+    return (
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
+        f'viewBox="0 0 {width} {height}"><rect width="{width}" height="{height}" '
+        f'fill="{YELLOW}"/>{body}</svg>\n'
+    )
 
-    y += int(48 * scale)
-    cx = x
-    for chip in CHIPS:
-        w = int(draw.textlength(chip, font=chip_f))
-        pad = int(16 * scale)
-        h = int(34 * scale)
-        draw.rounded_rectangle((cx, y, cx + w + 2 * pad, y + h), radius=h // 2, fill=GLOW)
-        draw.text((cx + pad, y + h // 2), chip, font=chip_f, fill=MUTED, anchor="lm")
-        cx += w + 2 * pad + int(14 * scale)
 
-    draw.text((x, int(height * 0.87)), REPO_URL, font=url_f, fill=MUTED)
-    img.save(out, "PNG", optimize=True)
+def cover_svg() -> str:
+    """Return the 1600×400 README cover."""
+    return svg_document(
+        1600,
+        400,
+        logo(70, 70, 260) + f'<text x="360" y="178" font-family="{FONT}" font-weight="900" '
+        f'font-size="74" fill="{DARK}">price-tracker-bot</text>'
+        + f'<text x="362" y="232" font-family="{FONT}" font-size="31" '
+        f'fill="{DARK}">Send a link. Get a message when the price drops.</text>'
+        + f'<text x="362" y="282" font-family="{FONT}" font-size="21" '
+        f'fill="{MUTED}">Self-hosted Telegram bot · open source (MIT) · one Docker container</text>'
+        + alert_bubble(1150, 62, 360, 20),
+    )
+
+
+def social_preview_svg() -> str:
+    """Return the 1280×640 repository social preview."""
+    return svg_document(
+        1280,
+        640,
+        logo(80, 120, 300) + f'<text x="80" y="500" font-family="{FONT}" font-weight="900" '
+        f'font-size="68" fill="{DARK}">price-tracker-bot</text>'
+        + f'<text x="82" y="552" font-family="{FONT}" font-size="30" '
+        f'fill="{DARK}">Send a link. Get a message when the price drops.</text>'
+        + alert_bubble(740, 110, 440, 25)
+        + f'<text x="1200" y="590" text-anchor="end" font-family="{FONT}" '
+        f'font-size="20" fill="{MUTED}">github.com/bernalli/price-tracker-bot</text>',
+    )
+
+
+def telegram_description_svg() -> str:
+    """Return the 640×360 Telegram bot description image."""
+    return svg_document(
+        640,
+        360,
+        logo(40, 60, 190)
+        + alert_bubble(268, 46, 320, 16)
+        + f'<text x="320" y="330" text-anchor="middle" font-family="{FONT}" '
+        f'font-size="22" fill="{DARK}">Send a link. Get a message when the price drops.</text>',
+    )
+
+
+def render_svg(renderer: str, source: str, output: Path, width: int) -> None:
+    """Render one in-memory SVG to a PNG file."""
+    subprocess.run(
+        [renderer, "-w", str(width), "-o", str(output), "-"],
+        input=source.encode(),
+        check=True,
+    )
 
 
 def main() -> None:
+    """Regenerate every documentation image."""
+    renderer = shutil.which("rsvg-convert")
+    if renderer is None:
+        raise SystemExit("rsvg-convert is required to render the documentation images")
+
     IMG_DIR.mkdir(parents=True, exist_ok=True)
     render_chart(IMG_DIR / "price-chart.png")
-    render_banner(IMG_DIR / "cover.png", 1600, 400, scale=1.0)
-    render_banner(IMG_DIR / "social-preview.png", 1280, 640, scale=1.05)
-    for name in ("price-chart.png", "cover.png", "social-preview.png"):
-        print(f"wrote {IMG_DIR / name}")
+    images = (
+        ("cover.png", cover_svg(), 1600),
+        ("social-preview.png", social_preview_svg(), 1280),
+        ("telegram-description.png", telegram_description_svg(), 640),
+    )
+    for name, source, width in images:
+        output = IMG_DIR / name
+        render_svg(renderer, source, output, width)
+        print(f"wrote {output}")
+    print(f"wrote {IMG_DIR / 'price-chart.png'}")
 
 
 if __name__ == "__main__":
