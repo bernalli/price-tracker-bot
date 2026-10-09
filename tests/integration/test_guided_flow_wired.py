@@ -669,7 +669,7 @@ async def test_help_button_follows_the_language(w: Wired) -> None:
     await w.press(PRIVATE, OWNER, HELP_DATA, language_code="it")
 
     (edit,) = w.request.calls_of("editMessageText")
-    assert str(edit.params["text"]).startswith("ℹ️ <b>Comandi</b>")
+    assert str(edit.params["text"]).startswith("❓ <b>Comandi</b>")
 
 
 @pytest.mark.parametrize("user_id", [STRANGER, OWNER])
@@ -684,9 +684,9 @@ async def test_help_button_edits_nothing_for_a_user_without_access(w: Wired, use
 @pytest.mark.parametrize(
     ("user_id", "language_code", "label", "errors"),
     [
-        (OWNER, "en", "ℹ️ Help", "⚠️ Errors"),
-        (ADMIN, "en", "ℹ️ Help", "⚠️ Errors"),
-        (OWNER, "it", "ℹ️ Aiuto", "⚠️ Errori"),
+        (OWNER, "en", "❓ Help", "⚠️ Errors"),
+        (ADMIN, "en", "❓ Help", "⚠️ Errors"),
+        (OWNER, "it", "❓ Aiuto", "⚠️ Errori"),
     ],
 )
 async def test_status_and_info_offers_help_errors_and_the_way_back(
