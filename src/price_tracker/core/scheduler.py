@@ -225,6 +225,8 @@ class Scheduler:
         # When each product was last attempted by this process, whatever the
         # outcome; run_check_due falls back to the stored timestamps after a restart.
         self._attempted_at: dict[int, datetime] = {}
+        self._sold_out_streaks: dict[int, int] = {}
+        self._product_locks: dict[int, asyncio.Lock] = {}
 
     async def _scrape_one(self, product: ProductRecord, *, collector: NoticeCollector) -> None:
         """Scrape a single product and persist results (delegates to _check_product).
@@ -687,6 +689,24 @@ class Scheduler:
         domain: str = "unknown",
         collector: NoticeCollector,
     ) -> tuple[int, PriceAlert | None, bool, str | None] | None:
+        """Serialize every check of one product within this scheduler."""
+        lock = self._product_locks.setdefault(product_id, asyncio.Lock())
+        async with lock:
+            return await self._check_product_core_unlocked(
+                product_id,
+                scraper_name=scraper_name,
+                domain=domain,
+                collector=collector,
+            )
+
+    async def _check_product_core_unlocked(
+        self,
+        product_id: int,
+        *,
+        scraper_name: str = "unknown",
+        domain: str = "unknown",
+        collector: NoticeCollector,
+    ) -> tuple[int, PriceAlert | None, bool, str | None] | None:
         """Scrape one product, persist, and return ``(user_id, alert, disabled, reason)``.
 
         * ``alert`` is set only when the new price actually crossed the threshold.
@@ -740,7 +760,9 @@ class Scheduler:
             # max_consecutive_errors and the user would never hear about the
             # restock. Only an explicit False counts: a missing price with the
             # default availability is a layout change and stays a failure below.
-            if p.is_available is not False:
+            sold_out_streak = self._sold_out_streaks.get(p.id, 0) + 1
+            self._sold_out_streaks[p.id] = sold_out_streak
+            if sold_out_streak >= 2 and p.is_available is not False:
                 await self.deps.repo.set_availability(p.id, available=False)
             if p.pending_read_count or p.pending_read_streak:
                 await self.deps.repo.clear_pending_read(p.id)
@@ -753,6 +775,9 @@ class Scheduler:
                     scraper=scraper_name, domain=domain, status="success"
                 ).inc()
             return (p.user_id, None, False, "out_of_stock")
+
+        if info.available and info.price is not None:
+            self._sold_out_streaks[p.id] = 0
 
         if info.price is None:
             if metrics is not None:

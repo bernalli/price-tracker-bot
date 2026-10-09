@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Any
 
 import aiosqlite
-import httpx  # noqa: F401  — kept for future direct use; build_client returns AsyncClient
 import structlog
 from telegram.ext import Application, ContextTypes
 

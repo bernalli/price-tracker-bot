@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
+from price_tracker.bot.callbacks import Action, encode
 from price_tracker.bot.messages import _
 
 
@@ -17,25 +18,25 @@ def build_threshold_keyboard(product_id: int) -> InlineKeyboardMarkup:
             [
                 InlineKeyboardButton(
                     "\U0001f514 Ogni ribasso",
-                    callback_data=f"track_any_{product_id}",
+                    callback_data=encode(Action("product.threshold_any", (product_id,))),
                 ),
             ],
             [
                 InlineKeyboardButton(
                     "\U0001f4c9 Soglia % o €",
-                    callback_data=f"track_threshold_{product_id}",
+                    callback_data=encode(Action("product.threshold", (product_id,))),
                 ),
             ],
             [
                 InlineKeyboardButton(
                     "\U0001f4b0 Prezzo target",
-                    callback_data=f"track_target_{product_id}",
+                    callback_data=encode(Action("product.target", (product_id,))),
                 ),
             ],
             [
                 InlineKeyboardButton(
                     "\U0001f44d Va bene -10% (default)",
-                    callback_data=f"track_default_{product_id}",
+                    callback_data=encode(Action("product.threshold_default", (product_id,))),
                 ),
             ],
         ]
@@ -44,4 +45,4 @@ def build_threshold_keyboard(product_id: int) -> InlineKeyboardMarkup:
 
 def menu_back_button() -> list[InlineKeyboardButton]:
     """Single-row 'back to main menu' button."""
-    return [InlineKeyboardButton(_("◀️ Menu"), callback_data="menu_main")]
+    return [InlineKeyboardButton(_("◀️ Menu"), callback_data=encode(Action("home")))]

@@ -27,6 +27,7 @@ from price_tracker.bot.handlers._helpers import (
     _format_threshold,
     _safe_dec,
 )
+from price_tracker.bot.handlers.callbacks._legacy import resolve_callback
 from price_tracker.bot.handlers.callbacks._nav import _edit
 from price_tracker.bot.keyboards import menu_back_button
 from price_tracker.bot.messages import _
@@ -40,34 +41,39 @@ logger = logging.getLogger(__name__)
 
 
 async def handle_menu_navigation(
-    query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, data: str
+    query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, data: object
 ) -> bool:
     """Handle the non-admin menu callbacks (`menu_*`, `cmd_lista`).
 
     Returns `True` if the callback was a known menu action; `False` lets
     the caller try the next handler.
     """
-    if data == "cmd_lista":
+    action = resolve_callback(data)
+    if action is None:
+        return False
+    if action.name == "products.command":
         products = await db.get_active_products(user_id)
         back_kb = InlineKeyboardMarkup([[*menu_back_button()]])
         if not products:
             await query.edit_message_text(
-                "📭 Non hai prodotti tracciati.\nIncollami un link per iniziare!",
+                _("📭 You have no tracked products.\nPaste a link to get started!"),
                 reply_markup=back_kb,
             )
         else:
             await query.edit_message_text(
-                f"📦 Hai <b>{len(products)}</b> prodotti tracciati.\nUsa /lista per vederli tutti.",
+                _(
+                    "📦 You have <b>{count}</b> tracked products.\nUse /list to see them all."
+                ).format(count=len(products)),
                 parse_mode=ParseMode.HTML,
                 reply_markup=back_kb,
             )
         return True
 
-    if data == "menu_main":
+    if action.name == "home":
         await _edit(query, home_screen(await home_view(db, user_id)))
         return True
 
-    if data == "menu_prodotti":
+    if action.name == "products":
         products = await db.get_active_products(user_id)
         all_prods = await db.get_all_products(user_id)
         paused = [p for p in all_prods if not p.get("is_active")]
@@ -78,14 +84,19 @@ async def handle_menu_navigation(
                 cur = _safe_dec(p.get("current_price"))
                 tag = f" €{cur:.2f}" if cur else ""
                 rows.append(
-                    [InlineKeyboardButton(f"#{p['id']} {nm}{tag}", callback_data=f"edit_{p['id']}")]
+                    [
+                        InlineKeyboardButton(
+                            f"#{p['id']} {nm}{tag}",
+                            callback_data=encode(Action("product.edit", (p["id"],))),
+                        )
+                    ]
                 )
             if len(products) > 10:
                 rows.append(
                     [
                         InlineKeyboardButton(
-                            f"... altri {len(products) - 10} → /lista",
-                            callback_data="cmd_lista",
+                            _("... {count} more → /list").format(count=len(products) - 10),
+                            callback_data=encode(Action("products.command")),
                         )
                     ]
                 )
@@ -93,8 +104,8 @@ async def handle_menu_navigation(
             rows.append(
                 [
                     InlineKeyboardButton(
-                        "📭 Nessun prodotto — incolla un link!",
-                        callback_data="menu_main",
+                        _("📭 No products — paste a link!"),
+                        callback_data=encode(Action("home")),
                     )
                 ]
             )
@@ -102,46 +113,61 @@ async def handle_menu_navigation(
             rows.append(
                 [
                     InlineKeyboardButton(
-                        f"⏸ {len(paused)} in pausa → riattiva",
-                        callback_data="menu_paused",
+                        _("⏸ {count} paused → reactivate").format(count=len(paused)),
+                        callback_data=encode(Action("paused")),
                     )
                 ]
             )
         rows.append(menu_back_button())
         await query.edit_message_text(
-            f"📦 <b>I tuoi prodotti</b> ({len(products)} attivi)\n\n"
-            "Tocca un prodotto per modificarlo.",
+            _("📦 <b>Your products</b> ({count} active)\n\nTap a product to edit it.").format(
+                count=len(products)
+            ),
             parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup(rows),
         )
         return True
 
-    if data == "menu_paused":
+    if action.name == "paused":
         all_prods = await db.get_all_products(user_id)
         paused = [p for p in all_prods if not p.get("is_active")]
         rows = []
         for p in paused[:10]:
             nm = truncate_to_width(p.get("name") or "?", 35)
             rows.append(
-                [InlineKeyboardButton(f"▶️ #{p['id']} {nm}", callback_data=f"reactivate_{p['id']}")]
+                [
+                    InlineKeyboardButton(
+                        f"▶️ #{p['id']} {nm}",
+                        callback_data=encode(Action("product.reactivate", (p["id"],))),
+                    )
+                ]
             )
         rows.append(menu_back_button())
         await query.edit_message_text(
-            f"⏸ <b>Prodotti in pausa</b> ({len(paused)})\n\nTocca per riattivare.",
+            _("⏸ <b>Paused products</b> ({count})\n\nTap to reactivate.").format(count=len(paused)),
             parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup(rows),
         )
         return True
 
-    if data == "menu_prezzi":
+    if action.name == "prices":
         products = await db.get_active_products(user_id)
         rows = [
-            [InlineKeyboardButton("🔄 Controlla tutti i prezzi", callback_data="menu_checkall")]
+            [
+                InlineKeyboardButton(
+                    _("🔄 Check all prices"), callback_data=encode(Action("check_all"))
+                )
+            ]
         ]
         for p in products[:8]:
             nm = truncate_to_width(p.get("name") or "?", 30)
             rows.append(
-                [InlineKeyboardButton(f"🔄 #{p['id']} {nm}", callback_data=f"check_{p['id']}")]
+                [
+                    InlineKeyboardButton(
+                        f"🔄 #{p['id']} {nm}",
+                        callback_data=encode(Action("product.check", (p["id"],))),
+                    )
+                ]
             )
         if len(products) > 8:
             rows.append(
@@ -153,35 +179,46 @@ async def handle_menu_navigation(
                 ]
             )
         if products:
-            rows.append([InlineKeyboardButton("📈 Storico prezzo", callback_data="menu_storia")])
+            rows.append(
+                [
+                    InlineKeyboardButton(
+                        _("📈 Price history"), callback_data=encode(Action("history"))
+                    )
+                ]
+            )
         rows.append(menu_back_button())
         await query.edit_message_text(
-            "💶 <b>Controllo prezzi</b>\n\nTocca un prodotto per controllarlo.",
+            _("💶 <b>Price check</b>\n\nTap a product to check it."),
             parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup(rows),
         )
         return True
 
-    if data == "menu_checkall":
+    if action.name == "check_all":
         return await _handle_menu_checkall(query, context, db, user_id)
 
-    if data == "menu_storia":
+    if action.name == "history":
         products = await db.get_active_products(user_id)
         rows = []
         for p in products[:10]:
             nm = truncate_to_width(p.get("name") or "?", 35)
             rows.append(
-                [InlineKeyboardButton(f"📈 #{p['id']} {nm}", callback_data=f"chart_{p['id']}")]
+                [
+                    InlineKeyboardButton(
+                        f"📈 #{p['id']} {nm}",
+                        callback_data=encode(Action("product.chart", (p["id"], "all"))),
+                    )
+                ]
             )
         rows.append(menu_back_button())
         await query.edit_message_text(
-            "📈 <b>Storico prezzi</b>\n\nTocca un prodotto per il grafico.",
+            _("📈 <b>Price history</b>\n\nTap a product to see its chart."),
             parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup(rows),
         )
         return True
 
-    if data == "menu_notifiche":
+    if action.name == "notifications":
         products = await db.get_active_products(user_id)
         rows = []
         for p in products[:10]:
@@ -196,7 +233,7 @@ async def handle_menu_navigation(
                 [
                     InlineKeyboardButton(
                         f"#{p['id']} {nm} [{th}]{t_str}",
-                        callback_data=f"edit_{p['id']}",
+                        callback_data=encode(Action("product.edit", (p["id"],))),
                     )
                 ]
             )
@@ -208,41 +245,49 @@ async def handle_menu_navigation(
         )
         return True
 
-    if data == "menu_dati":
+    if action.name == "data":
         stats = await db.get_stats(user_id)
         rows = [
-            [InlineKeyboardButton("💾 Esporta CSV", callback_data="menu_esporta")],
+            [InlineKeyboardButton(_("💾 Export CSV"), callback_data=encode(Action("data.export")))],
             [
                 InlineKeyboardButton(
-                    "📂 Importa CSV — invia file in chat",
-                    callback_data="menu_importa_info",
+                    _("📂 Import CSV — send a file in chat"),
+                    callback_data=encode(Action("data.import")),
                 )
             ],
             menu_back_button(),
         ]
         await query.edit_message_text(
-            f"💾 <b>Import / Export</b>\n\n"
-            f"📦 {stats['active_products']} attivi, {stats['total_products']} totali\n"
-            f"🔄 {stats['total_checks']} check effettuati",
+            _(
+                "💾 <b>Import / Export</b>\n\n"
+                "📦 {active} active, {total} total\n"
+                "🔄 {checks} checks performed"
+            ).format(
+                active=stats["active_products"],
+                total=stats["total_products"],
+                checks=stats["total_checks"],
+            ),
             parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup(rows),
         )
         return True
 
-    if data == "menu_esporta":
+    if action.name == "data.export":
         return await _handle_menu_esporta(query, db, user_id)
 
-    if data == "menu_importa_info":
+    if action.name == "data.import":
         await query.edit_message_text(
-            "📂 <b>Importa prodotti</b>\n\n"
-            "Invia un file CSV in chat (esportato con Esporta).\n"
-            "I duplicati verranno saltati.",
+            _(
+                "📂 <b>Import products</b>\n\n"
+                "Send a CSV file in chat (exported with Export).\n"
+                "Duplicates will be skipped."
+            ),
             parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup([menu_back_button()]),
         )
         return True
 
-    if data == "menu_info":
+    if action.name == "stats":
         return await _handle_menu_info(query, context, db, user_id)
 
     return False
@@ -255,11 +300,11 @@ async def _handle_menu_checkall(
     products = await db.get_active_products(user_id)
     if not products:
         await query.edit_message_text(
-            "📭 Nessun prodotto.",
+            _("📭 No products."),
             reply_markup=InlineKeyboardMarkup([menu_back_button()]),
         )
         return True
-    await query.edit_message_text(f"🔄 Controllo {len(products)} prodotti...")
+    await query.edit_message_text(_("🔄 Checking {count} products...").format(count=len(products)))
     from price_tracker.core.alert import format_alert  # noqa: PLC0415
 
     scheduler = context.bot_data["scheduler"]
@@ -269,7 +314,7 @@ async def _handle_menu_checkall(
     )
     alerts = [r.alert for r in results if r.alert is not None]
     updated = await db.get_active_products(user_id)
-    txt_lines = [f"✅ <b>Completato</b> — {len(updated)} prodotti" + chr(10)]
+    txt_lines = [_("✅ <b>Complete</b> — {count} products").format(count=len(updated)) + chr(10)]
     for p in updated:
         nm = truncate_to_width(p.get("name") or "?", 35)
         cur = _safe_dec(p.get("current_price"))
@@ -281,7 +326,7 @@ async def _handle_menu_checkall(
             diff = f" <i>(-{d:.1f}%)</i>" if d > 0 else f" <i>(+{abs(d):.1f}%)</i>"
         txt_lines.append(f"  #{p['id']} {_escape_html(nm)} — {tag}{diff}")
     if alerts:
-        txt_lines.append(chr(10) + f"🔔 <b>{len(alerts)} variazioni!</b>")
+        txt_lines.append(chr(10) + _("🔔 <b>{count} changes!</b>").format(count=len(alerts)))
     await query.edit_message_text(
         chr(10).join(txt_lines),
         parse_mode=ParseMode.HTML,
@@ -299,7 +344,7 @@ async def _handle_menu_esporta(query: Any, db: Any, user_id: int) -> bool:
     products = await db.get_all_products(user_id)
     if not products:
         await query.edit_message_text(
-            "📭 Nessun prodotto.",
+            _("📭 No products."),
             reply_markup=InlineKeyboardMarkup([menu_back_button()]),
         )
         return True
@@ -337,9 +382,9 @@ async def _handle_menu_esporta(query: Any, db: Any, user_id: int) -> bool:
     await query.message.reply_document(
         document=InputFile(
             io.BytesIO(buf.getvalue().encode("utf-8")),
-            filename=f"prodotti_{datetime.now().strftime('%Y%m%d')}.csv",
+            filename=_("products_{date}.csv").format(date=datetime.now().strftime("%Y%m%d")),
         ),
-        caption=f"💾 {len(products)} prodotti esportati.",
+        caption=_("💾 {count} products exported.").format(count=len(products)),
     )
     return True
 

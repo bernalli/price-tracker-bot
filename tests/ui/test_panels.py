@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from price_tracker.app.views import HomeView, PrefsView
-from price_tracker.bot.callbacks import Action, InvalidCallback, decode
+from price_tracker.bot.callbacks import Action, InvalidCallback, decode, encode
 from price_tracker.bot.messages import set_locale
 from price_tracker.bot.ui.panels import (
     add_screen,
@@ -297,29 +297,27 @@ def test_the_view_is_frozen() -> None:
 
 # --- Home ----------------------------------------------------------------------
 
-HOME_LEGACY = ["menu_prezzi", "menu_notifiche", "menu_info", "menu_dati"]
 
-
-@pytest.mark.parametrize(("is_admin", "extra"), [(False, []), (True, ["menu_admin"])])
+@pytest.mark.parametrize(("is_admin", "extra"), [(False, []), (True, [encode(Action("admin"))])])
 def test_home_offers_the_areas_and_only_admins_get_the_admin_button(
     is_admin: bool, extra: list[str]
 ) -> None:
     screen = home_screen(HomeView(active=2, paused=0, is_admin=is_admin))
     assert _callbacks(screen) == [
         "l:a:1",
-        "menu_prezzi",
-        "menu_notifiche",
-        "menu_dati",
-        "menu_info",
+        encode(Action("prices")),
+        encode(Action("notifications")),
+        encode(Action("data")),
+        encode(Action("stats")),
         "s",
         *extra,
     ]
     for data in _callbacks(screen):
-        assert data in [*HOME_LEGACY, "menu_admin"] or isinstance(decode(data), Action)
+        assert isinstance(decode(data), Action)
 
 
 @pytest.mark.parametrize("locale", ["it", "en"])
-@pytest.mark.parametrize(("is_admin", "tail"), [(False, []), (True, [["menu_admin"]])])
+@pytest.mark.parametrize(("is_admin", "tail"), [(False, []), (True, [[encode(Action("admin"))]])])
 def test_home_is_a_tree_of_pairs_with_admin_alone(
     ui_locales: Path, locale: str, is_admin: bool, tail: list[list[str]]
 ) -> None:
@@ -327,9 +325,9 @@ def test_home_is_a_tree_of_pairs_with_admin_alone(
     screen = home_screen(HomeView(active=2, paused=0, is_admin=is_admin))
     rows = [[btn.callback for btn in row] for row in screen.rows]
     assert rows == [
-        ["l:a:1", "menu_prezzi"],
-        ["menu_notifiche", "menu_dati"],
-        ["menu_info", "s"],
+        ["l:a:1", encode(Action("prices"))],
+        [encode(Action("notifications")), encode(Action("data"))],
+        [encode(Action("stats")), "s"],
         *tail,
     ]
 

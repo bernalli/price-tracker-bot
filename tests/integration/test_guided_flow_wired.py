@@ -574,7 +574,7 @@ async def test_repository_failure_reaches_the_error_handler_once(
     assert len(w.flow.registry) == 0
     replies = [c for c in w.calls_since(before) if c.method == "sendMessage"]
     assert len(replies) == 1
-    assert "errore" in str(replies[0].params["text"])
+    assert "error" in str(replies[0].params["text"])
     assert len(w.calls_since(before)) == 1
 
 
@@ -616,9 +616,9 @@ async def test_start_greets_and_shows_the_home_screen_of_menu(w: Wired, user_id:
     await w.text(PRIVATE, user_id, "/start")
 
     (start,) = _sent_since(w, before)
-    assert start.params["text"] == f"👋 <b>Ciao U{user_id}!</b>\n\n{menu.params['text']}"
+    assert start.params["text"] == f"👋 <b>Hello U{user_id}!</b>\n\n{menu.params['text']}"
     assert start.callback_data() == menu.callback_data()
-    assert ("menu_admin" in start.callback_data()) is (user_id == ADMIN)
+    assert ("a" in start.callback_data()) is (user_id == ADMIN)
     assert w.errors == []
 
 
@@ -628,7 +628,7 @@ async def test_start_escapes_a_hostile_first_name(w: Wired) -> None:
     await w.process(_start_update(w, OWNER, '<b>x</b>&"'))
 
     (start,) = _sent_since(w, before)
-    assert str(start.params["text"]).startswith("👋 <b>Ciao &lt;b&gt;x&lt;/b&gt;&amp;")
+    assert str(start.params["text"]).startswith("👋 <b>Hello &lt;b&gt;x&lt;/b&gt;&amp;")
     assert "<b>x</b>" not in str(start.params["text"])
 
 
@@ -698,7 +698,7 @@ async def test_status_and_info_offers_help_errors_and_the_way_back(
     markup = edit.params["reply_markup"]
     markup = json.loads(markup) if isinstance(markup, str) else markup
     rows = [[(b["text"], b["callback_data"]) for b in row] for row in markup["inline_keyboard"]]
-    assert rows == [[(label, HELP_DATA), (errors, "er")], [("◀️ Menu", "menu_main")]]
+    assert rows == [[(label, HELP_DATA), (errors, "er")], [("◀️ Menu", "h")]]
 
 
 # --- the admin debug prompt ----------------------------------------------------
@@ -999,4 +999,4 @@ async def test_a_failing_admin_check_at_the_answer_reaches_the_error_handler_and
     assert legacy_adds == []
     assert await _product_count(wd) == products
     assert len(wd.flow.registry) == 0
-    assert "errore" in wd.texts_to(PRIVATE)[-1]
+    assert "error" in wd.texts_to(PRIVATE)[-1]

@@ -8,7 +8,7 @@
    text:
    | ⏸ <b>Prodotti in pausa — scegli da riattivare:</b>
    keyboard:
-   | [#1 Old Fan → reactivate_1]
+   | [#1 Old Fan → p:1:ra]
 ## db after step 1
 ~ users user_id=10 display_name: NULL -> "U10"
 ## step 2: command "/riattiva 1" user=10
@@ -37,7 +37,7 @@
    text:
    | ⏸ <b>Prodotti in pausa — scegli da riattivare:</b>
    keyboard:
-   | [#3 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNN… → reactivate_3]
+   | [#3 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNN… → p:3:ra]
 ## db after step 5
 (no changes)
 ## step 6: command "/riattiva 3" user=10

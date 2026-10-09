@@ -241,7 +241,7 @@ def _list_keyboard(page: ListPage) -> tuple[tuple[Button, ...], ...]:
     )
     footer = []
     if page.filter == "a" and page.total > 1:
-        footer.append(button(_("🗑 Delete all"), callback="delete_all"))
+        footer.append(button(_("🗑 Delete all"), callback=encode(Action("list.remove_all"))))
     footer += [add_button(), home_button()]
     return (*rows, *layout_rows(footer))
 

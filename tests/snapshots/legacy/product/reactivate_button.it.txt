@@ -8,7 +8,7 @@
    text:
    | ⏸ <b>Prodotti in pausa — scegli da riattivare:</b>
    keyboard:
-   | [#1 Old Fan → reactivate_1]
+   | [#1 Old Fan → p:1:ra]
 ## db after step 1
 ~ users user_id=10 display_name: NULL -> "U10"
 ## step 2: press "reactivate_1" user=10 on=1000
@@ -28,9 +28,9 @@
    | 🔔 Avviso: ribasso del 10% dall'inizio
    | ⏱ Controlli: ogni 6 h · mai
    keyboard:
-   | [🔄 Controlla ora → check_1] [📈 Storico → chart_1]
-   | [⏸ Pausa → pause_1] [🗑 Elimina → remove_1]
-   | [🔔 Regola avviso → edit_1] [⏱ Intervallo → setrefresh_1]
+   | [🔄 Controlla ora → p:1:ck] [📈 Storico → p:1:ch:all]
+   | [⏸ Pausa → p:1:pa] [🗑 Elimina → p:1:rm]
+   | [🔔 Regola avviso → p:1:ed] [⏱ Intervallo → p:1:iv]
    | [🔗 Apri → url:https://shop.example.com/item/8]
    | [◀️ Lista → l:a:1]
 ## db after step 2

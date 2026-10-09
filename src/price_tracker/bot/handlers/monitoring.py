@@ -19,6 +19,7 @@ from telegram import (
 from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler
 
+from price_tracker.bot.callbacks import Action, encode
 from price_tracker.bot.decorators import (
     _config,
     _convert_display,
@@ -70,12 +71,16 @@ async def _product_picker(
         name = truncate_to_width(p.get("name") or _("Unknown"), 35)
         current = _safe_dec(p.get("current_price"))
         price_tag = f" €{current:.2f}" if current else ""
-        prefix = callback_prefix or action
+        action_name = {
+            "setrefresh": "product.interval",
+            "check": "product.check",
+            "pause": "product.pause",
+        }[callback_prefix or action]
         buttons.append(
             [
                 InlineKeyboardButton(
                     f"#{p['id']} {name}{price_tag}",
-                    callback_data=f"{prefix}_{p['id']}",
+                    callback_data=encode(Action(action_name, (p["id"],))),
                 )
             ]
         )
@@ -295,7 +300,12 @@ async def cmd_reactivate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         for p in paused:
             name = truncate_to_width(p.get("name") or _("Unknown"), 35)
             buttons.append(
-                [InlineKeyboardButton(f"#{p['id']} {name}", callback_data=f"reactivate_{p['id']}")]
+                [
+                    InlineKeyboardButton(
+                        f"#{p['id']} {name}",
+                        callback_data=encode(Action("product.reactivate", (p["id"],))),
+                    )
+                ]
             )
         await update.message.reply_text(
             _("⏸ <b>Paused products — choose to reactivate:</b>"),
@@ -341,9 +351,9 @@ async def cmd_pause(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await _db(context).deactivate_product(product_id)
     name = product.get("name") or _("Unknown")
     await update.message.reply_text(
-        _("⏸ Tracking paused: <b>{name}</b>").format(name=_escape_html(truncate_to_width(name, 80)))
-        + "\n"
-        + _("Use /reactivate {pid} to resume tracking.").format(pid=product_id),
+        _("⏸ Tracking paused: <b>{name}</b>\nUse /reactivate {pid} to resume tracking.").format(
+            name=_escape_html(truncate_to_width(name, 80)), pid=product_id
+        ),
         parse_mode=ParseMode.HTML,
     )
 

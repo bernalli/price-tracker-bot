@@ -15,7 +15,7 @@
    | [#1 → l:a:1:1] [#2 → l:a:1:2]
    | [✅ Attivi ✓ → l:a:1] [⏸ In pausa → l:p:1]
    | [⚠️ Errori → l:e:1] [🚫 Esaurito → l:o:1]
-   | [🗑 Elimina tutti → delete_all] [➕ Aggiungi → ad]
+   | [🗑 Elimina tutti → l:rmall] [➕ Aggiungi → ad]
    | [🏠 Home → h]
 ## db after step 1
 ~ users user_id=10 display_name: NULL -> "U10"
@@ -30,6 +30,6 @@
    |
    | Questa azione <b>non è reversibile</b>.
    keyboard:
-   | [⚠️ Sì, elimina tutti (2) → confirmdeleteall] [❌ Annulla → l:a:1]
+   | [⚠️ Sì, elimina tutti (2) → l:rmallok] [❌ Annulla → l:a:1]
 ## db after step 2
 (no changes)

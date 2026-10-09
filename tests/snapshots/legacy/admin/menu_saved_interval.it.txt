@@ -13,10 +13,10 @@
    |
    | Incolla il link di un prodotto per iniziare a seguirlo.
    keyboard:
-   | [📦 Prodotti → l:a:1] [💶 Prezzi → menu_prezzi]
-   | [🔔 Notifiche → menu_notifiche] [💾 Dati → menu_dati]
-   | [ℹ️ Stato e info → menu_info] [⚙️ Impostazioni → s]
-   | [👑 Admin → menu_admin]
+   | [📦 Prodotti → l:a:1] [💶 Prezzi → pc]
+   | [🔔 Notifiche → nt] [💾 Dati → d]
+   | [ℹ️ Stato e info → st] [⚙️ Impostazioni → s]
+   | [👑 Admin → a]
 ## db after step 1
 ~ users user_id=1 display_name: NULL -> "U1"
 ## step 2: press "menu_admin" user=1 on=1000
@@ -29,12 +29,12 @@
    | 👥 Utenti attivi: 3
    | ⏱ Intervallo globale: 90 min
    keyboard:
-   | [👥 Lista utenti → menu_admin_users]
-   | [➕ Aggiungi utente → menu_admin_adduser] [🚫 Rimuovi utente → menu_admin_removeuser]
-   | [✏️ Nickname utente → menu_admin_nick]
-   | [⏱ Intervallo globale: 90 min → menu_admin_interval]
-   | [🔧 Debug scraper → menu_admin_debug]
+   | [👥 Lista utenti → a:u]
+   | [➕ Aggiungi utente → a:add] [🚫 Rimuovi utente → a:rm]
+   | [✏️ Nickname utente → a:nk]
+   | [⏱ Intervallo globale: 90 min → a:iv]
+   | [🔧 Debug scraper → a:dbg]
    | [🏥 Salute scraper → a:hl]
-   | [◀️ Menu → menu_main]
+   | [◀️ Menu → h]
 ## db after step 2
 (no changes)

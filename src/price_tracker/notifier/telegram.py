@@ -22,6 +22,8 @@ from typing import TYPE_CHECKING, Any, cast
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 
+from price_tracker.bot.callbacks import encode
+from price_tracker.bot.handlers.callbacks._legacy import resolve_callback
 from price_tracker.core.textlimits import split_message
 from price_tracker.db.models import NotificationPrefs
 from price_tracker.notifier.preferences import (
@@ -304,13 +306,20 @@ def _markup(payload: dict[str, Any] | None) -> InlineKeyboardMarkup | None:
                 return None
             text = button.get("text")
             callback_data = button.get("callback_data")
+            action = resolve_callback(callback_data)
             if (
                 not isinstance(text, str)
                 or not isinstance(callback_data, str)
                 or len(callback_data.encode("utf-8")) > 64
+                or action is None
             ):
                 logger.warning("Ignoring malformed notification buttons")
                 return None
-            markup_row.append(InlineKeyboardButton(text=text, callback_data=callback_data))
+            try:
+                wire = encode(action)
+            except ValueError:
+                logger.warning("Ignoring malformed notification buttons")
+                return None
+            markup_row.append(InlineKeyboardButton(text=text, callback_data=wire))
         rows.append(markup_row)
     return InlineKeyboardMarkup(rows)

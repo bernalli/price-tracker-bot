@@ -18,6 +18,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, InputFile, Upda
 from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler, ContextTypes
 
+from price_tracker.bot.callbacks import Action, encode
 from price_tracker.bot.decorators import _db, restricted, with_locale
 from price_tracker.bot.handlers._helpers import (
     _escape_html,
@@ -145,7 +146,7 @@ async def _generate_chart(db: Any, product_id: int, product: dict[str, Any]) -> 
     # The repository orders normalized timestamps and uses id as the tie-breaker.
     dates, prices = zip(*points, strict=True)
 
-    name = truncate_to_width(product.get("name") or "Prodotto", 50)
+    name = truncate_to_width(product.get("name") or _("Product"), 50)
     return await asyncio.to_thread(
         _render_chart, list(dates), list(prices), product.get("target_price"), name
     )
@@ -161,36 +162,41 @@ async def cmd_history(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         user_id = update.effective_user.id
         products = await db.get_active_products(user_id)
         if not products:
-            await update.message.reply_text(_("📭 Non hai prodotti tracciati."))
+            await update.message.reply_text(_("📭 You have no tracked products."))
             return
 
         buttons = []
         for p in products:
-            name = truncate_to_width(p.get("name") or "Sconosciuto", 35)
+            name = truncate_to_width(p.get("name") or _("Unknown"), 35)
             buttons.append(
-                [InlineKeyboardButton(f"#{p['id']} {name}", callback_data=f"chart_{p['id']}")]
+                [
+                    InlineKeyboardButton(
+                        f"#{p['id']} {name}",
+                        callback_data=encode(Action("product.chart", (p["id"], "all"))),
+                    )
+                ]
             )
 
         await update.message.reply_text(
-            "📈 <b>Scegli un prodotto per lo storico:</b>",
+            _("📈 <b>Choose a product for its history:</b>"),
             parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup(buttons),
         )
         return
     product_id = _parse_id(context.args[0])
     if product_id is None:
-        await update.message.reply_text(_("❌ ID non valido."))
+        await update.message.reply_text(_("❌ Invalid ID."))
         return
 
     product = await _get_user_product(context, product_id, update.effective_user.id)
     if not product:
-        await update.message.reply_text(_("❌ Prodotto non trovato."))
+        await update.message.reply_text(_("❌ Product not found."))
         return
 
     db = _db(context)
     chart_buf = await _generate_chart(db, product_id, product)
     if chart_buf:
-        name = truncate_to_width(product.get("name") or "Prodotto", 50)
+        name = truncate_to_width(product.get("name") or _("Product"), 50)
         lowest = _safe_dec(product.get("lowest_price"))
         highest = _safe_dec(product.get("highest_price"))
         caption = f"📈 <b>#{product_id}</b> {_escape_html(name)}"
@@ -205,7 +211,7 @@ async def cmd_history(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         )
     else:
         await update.message.reply_text(
-            _("📭 Dati insufficienti per generare il grafico (servono almeno 2 punti).")
+            _("📭 Not enough data to generate the chart (at least 2 points are needed).")
         )
 
 
@@ -215,37 +221,41 @@ async def cmd_reset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Reset initial_price to current_price for a product."""
     if not context.args:
         await update.message.reply_text(
-            "❌ Uso: /reset &lt;id&gt;\n\n"
-            "Reimposta il prezzo iniziale al prezzo corrente.\n"
-            "Utile quando il prezzo è sceso e vuoi azzerare il confronto.",
+            _(
+                "❌ Usage: /reset &lt;id&gt;\n\n"
+                "Reset the initial price to the current price.\n"
+                "Useful when the price has dropped and you want to restart the comparison."
+            ),
             parse_mode=ParseMode.HTML,
         )
         return
 
     product_id = _parse_id(context.args[0])
     if product_id is None:
-        await update.message.reply_text(_("❌ ID non valido."))
+        await update.message.reply_text(_("❌ Invalid ID."))
         return
 
     product = await _get_user_product(context, product_id, update.effective_user.id)
     if not product:
-        await update.message.reply_text(_("❌ Prodotto non trovato."))
+        await update.message.reply_text(_("❌ Product not found."))
         return
 
     db = _db(context)
     success = await db.reset_initial_price(product_id)
     if success:
-        name = truncate_to_width(product.get("name") or "Sconosciuto", 60)
+        name = truncate_to_width(product.get("name") or _("Unknown"), 60)
         current = _safe_dec(product.get("current_price"))
-        price_str = f"€{current:.2f}" if current else "N/D"
+        price_str = f"€{current:.2f}" if current else _("N/A")
         await update.message.reply_text(
-            f"✅ Prezzo iniziale aggiornato!\n\n"
-            f"📦 <b>#{product_id}</b> {_escape_html(name)}\n"
-            f"💰 Nuovo prezzo base: <b>{price_str}</b>",
+            _(
+                "✅ Initial price updated!\n\n"
+                "📦 <b>#{product_id}</b> {name}\n"
+                "💰 New base price: <b>{price}</b>"
+            ).format(product_id=product_id, name=_escape_html(name), price=price_str),
             parse_mode=ParseMode.HTML,
         )
     else:
-        await update.message.reply_text(_("❌ Impossibile aggiornare il prezzo iniziale."))
+        await update.message.reply_text(_("❌ Could not update the initial price."))
 
 
 def register(app: Application) -> None:

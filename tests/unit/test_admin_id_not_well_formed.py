@@ -125,7 +125,7 @@ async def test_adduser_prompt_refuses_a_malformed_id(repo: Repository, raw: str)
 
     assert await _user_ids(repo) == before
     assert context.user_data["pending_action"] == ("admin_adduser", 0)
-    assert _replies(update) == ["❌ ID non valido. Deve essere un numero."]
+    assert _replies(update) == ["❌ Invalid ID. Must be a number."]
 
 
 @pytest.mark.parametrize("raw", NOT_WELL_FORMED, ids=ascii)

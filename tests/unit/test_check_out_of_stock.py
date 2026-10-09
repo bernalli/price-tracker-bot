@@ -96,7 +96,7 @@ _WITH_PRICE = ProductInfo(name="Kettle", price=Decimal("10"), currency="EUR", av
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("info", [_NO_PRICE, _WITH_PRICE], ids=["no-price", "placeholder-price"])
-async def test_sold_out_read_reports_out_of_stock_and_writes_no_price(
+async def test_first_sold_out_read_reports_out_of_stock_and_writes_no_price(
     repo_with_product: tuple[Repository, int], info: ProductInfo
 ) -> None:
     repo, pid = repo_with_product
@@ -105,7 +105,7 @@ async def test_sold_out_read_reports_out_of_stock_and_writes_no_price(
     assert result.alert is None
     product = await repo.get_product(pid)
     assert product is not None
-    assert product.is_available is False
+    assert product.is_available is True
     assert product.current_price == Decimal("100")
     assert await repo.get_price_history(pid) == []
 
@@ -143,6 +143,7 @@ async def test_back_in_stock_after_a_priced_sold_out_read_notifies_once(
         _Scripted(
             [
                 _WITH_PRICE,
+                _WITH_PRICE,
                 ProductInfo(name="Kettle", price=Decimal("100"), currency="EUR", available=True),
             ]
         )
@@ -158,6 +159,7 @@ async def test_back_in_stock_after_a_priced_sold_out_read_notifies_once(
                 delay_between_products=0.0,
             )
         )
+        await scheduler.run_check_for_user(user_id=1)
         await scheduler.run_check_for_user(user_id=1)
         await scheduler.run_check_for_user(user_id=1)
     notifier.assert_awaited_once()

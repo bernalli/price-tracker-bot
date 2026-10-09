@@ -21,9 +21,9 @@
    |
    | Incolla il link di un prodotto per iniziare a seguirlo.
    keyboard:
-   | [📦 Prodotti → l:a:1] [💶 Prezzi → menu_prezzi]
-   | [🔔 Notifiche → menu_notifiche] [💾 Dati → menu_dati]
-   | [ℹ️ Stato e info → menu_info] [⚙️ Impostazioni → s]
+   | [📦 Prodotti → l:a:1] [💶 Prezzi → pc]
+   | [🔔 Notifiche → nt] [💾 Dati → d]
+   | [ℹ️ Stato e info → st] [⚙️ Impostazioni → s]
 -> sendMessage chat=10
    text:
    | ❌ Si è verificato un errore. Riprova tra qualche istante.

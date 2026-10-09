@@ -9,11 +9,10 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Literal
 
+from price_tracker.bot.callbacks import Action, encode
 from price_tracker.bot.messages import _
 from price_tracker.core.notices import (
     MAX_LISTED_PRODUCTS,
-    OPS_DELETE_PREFIX,
-    OPS_REACTIVATE_PREFIX,
     NoticeGroup,
     OperationalEvent,
 )
@@ -230,11 +229,11 @@ def operational_buttons(group: NoticeGroup) -> list[list[dict[str, str]]]:
     count = len(group.events)
     reactivate = {
         "text": _("▶️ Reactivate and recheck ({n})").format(n=count),
-        "callback_data": f"{OPS_REACTIVATE_PREFIX}{group.anchor_product_id}",
+        "callback_data": encode(Action("ops.reactivate", (group.anchor_product_id,))),
     }
     delete = {
         "text": _("🗑 Delete all ({n})").format(n=count),
-        "callback_data": f"{OPS_DELETE_PREFIX}{group.anchor_product_id}",
+        "callback_data": encode(Action("ops.delete", (group.anchor_product_id,))),
     }
     return [[delete], [reactivate]] if delete_first else [[reactivate], [delete]]
 

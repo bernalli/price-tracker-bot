@@ -219,6 +219,7 @@ async def test_buttons_become_inline_keyboard_for_direct_send() -> None:
     markup = bot.send_message.await_args.kwargs["reply_markup"]
     assert isinstance(markup, InlineKeyboardMarkup)
     assert len(markup.inline_keyboard) == 2
+    assert [row[0].callback_data for row in markup.inline_keyboard] == ["o:10:ra", "o:10:rm"]
 
 
 @pytest.mark.asyncio

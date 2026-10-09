@@ -13,9 +13,9 @@
    |
    | Incolla il link di un prodotto per iniziare a seguirlo.
    keyboard:
-   | [📦 Prodotti → l:a:1] [💶 Prezzi → menu_prezzi]
-   | [🔔 Notifiche → menu_notifiche] [💾 Dati → menu_dati]
-   | [ℹ️ Stato e info → menu_info] [⚙️ Impostazioni → s]
+   | [📦 Prodotti → l:a:1] [💶 Prezzi → pc]
+   | [🔔 Notifiche → nt] [💾 Dati → d]
+   | [ℹ️ Stato e info → st] [⚙️ Impostazioni → s]
 ## db after step 1
 ~ users user_id=10 display_name: NULL -> "U10"
 ## step 2: press "menu_prezzi" user=10 on=1000
@@ -27,11 +27,11 @@
    |
    | Tocca un prodotto per controllarlo.
    keyboard:
-   | [🔄 Controlla tutti i prezzi → menu_checkall]
-   | [🔄 #1 Kettle → check_1]
-   | [🔄 #2 Fan → check_2]
-   | [📈 Storico prezzo → menu_storia]
-   | [◀️ Menu → menu_main]
+   | [🔄 Controlla tutti i prezzi → ca]
+   | [🔄 #1 Kettle → p:1:ck]
+   | [🔄 #2 Fan → p:2:ck]
+   | [📈 Storico prezzo → hi]
+   | [◀️ Menu → h]
 ## db after step 2
 (no changes)
 ## step 3: press "menu_checkall" user=10 on=1000
@@ -49,7 +49,7 @@
    |
    | 🔔 <b>1 variazioni!</b>
    keyboard:
-   | [◀️ Menu → menu_main]
+   | [◀️ Menu → h]
 -> sendMessage chat=10
    param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"

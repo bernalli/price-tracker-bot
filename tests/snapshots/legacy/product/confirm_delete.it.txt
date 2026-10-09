@@ -32,9 +32,9 @@
    | 🔔 Avviso: ribasso del 10% dall'inizio
    | ⏱ Controlli: ogni 6 h · ultimo 2 ore fa
    keyboard:
-   | [🔄 Controlla ora → check_1] [📈 Storico → chart_1]
-   | [⏸ Pausa → pause_1] [🗑 Elimina → remove_1]
-   | [🔔 Regola avviso → edit_1] [⏱ Intervallo → setrefresh_1]
+   | [🔄 Controlla ora → p:1:ck] [📈 Storico → p:1:ch:all]
+   | [⏸ Pausa → p:1:pa] [🗑 Elimina → p:1:rm]
+   | [🔔 Regola avviso → p:1:ed] [⏱ Intervallo → p:1:iv]
    | [🔗 Apri → url:https://shop.example.com/item/1]
    | [◀️ Lista → l:a:1]
 ## db after step 2
@@ -46,7 +46,7 @@
    text:
    | ❓ Cosa vuoi fare con <b>Kettle</b>?
    keyboard:
-   | [🗑 Sì, elimina tutto → confirm_delete_1] [⏸ Solo pausa → pause_1] [❌ Annulla → p:1:c]
+   | [🗑 Sì, elimina tutto → p:1:rmok] [⏸ Solo pausa → p:1:pa] [❌ Annulla → p:1:c]
 ## db after step 3
 (no changes)
 ## step 4: press "confirm_delete_1" user=10 on=1000

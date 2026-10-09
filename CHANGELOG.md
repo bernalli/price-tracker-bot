@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.1] - 2026-10-09
+
+### Security
+
+- The Telegram bot token no longer appears in logs: the `httpx` and `httpcore` loggers stay at
+  WARNING, and Bot API URLs in log records show `bot***` in place of the token.
+
+### Fixed
+
+- A back-in-stock alert is sent only once per real sold-out spell. A listing is marked
+  unavailable only after two consecutive sold-out readings; a failed reading does not end the
+  streak, and checks of the same product never overlap.
+- English users no longer see Italian text in the core handlers, callbacks, settings, CSV
+  import and export messages, or the debug report. Italian output is unchanged.
+
+### Changed
+
+- Every inline button is built from the action registry. Buttons in messages sent by older
+  versions keep working.
+
+### Removed
+
+- An unused import.
+
 ## [1.7.0] - 2026-10-08
 
 ### Added
@@ -761,7 +785,8 @@ auto-quarantine, and a plugin extension point.
 - osv-scanner dependency vulnerability scan in CI.
 - Pre-commit hooks block secrets at commit time.
 
-[Unreleased]: https://github.com/bernalli/price-tracker-bot/compare/v1.7.0...HEAD
+[Unreleased]: https://github.com/bernalli/price-tracker-bot/compare/v1.7.1...HEAD
+[1.7.1]: https://github.com/bernalli/price-tracker-bot/compare/v1.7.0...v1.7.1
 [1.7.0]: https://github.com/bernalli/price-tracker-bot/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/bernalli/price-tracker-bot/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/bernalli/price-tracker-bot/compare/v1.4.2...v1.5.0

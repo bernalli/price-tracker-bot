@@ -82,8 +82,8 @@ async def test_up_to_eight_products_have_no_overflow_row(repo: Repository, count
     await add_products(repo, count)
     buttons = await prices_menu(repo)
     assert overflow(buttons) == []
-    assert buttons[0][1] == "menu_checkall"
-    assert sum(data.startswith("check_") for _, data in buttons) == count
+    assert buttons[0][1] == "ca"
+    assert sum(data.endswith(":ck") for _, data in buttons) == count
 
 
 @pytest.mark.parametrize(("count", "more"), [(9, 1), (12, 4)])
@@ -92,7 +92,7 @@ async def test_more_than_eight_products_point_to_the_list(
 ) -> None:
     await add_products(repo, count)
     buttons = await prices_menu(repo)
-    assert sum(data.startswith("check_") for _, data in buttons) == 8
+    assert sum(data.endswith(":ck") for _, data in buttons) == 8
     assert overflow(buttons) == [(f"… {more} more → Products", "l:a:1")]
     assert decode("l:a:1") == Action("list.page", ("a", 1))
     labels = [label for label, _ in buttons]

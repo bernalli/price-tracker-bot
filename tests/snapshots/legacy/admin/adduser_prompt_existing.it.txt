@@ -11,7 +11,7 @@
    |
    | Scrivi l'ID Telegram dell'utente da aggiungere:
    keyboard:
-   | [Annulla → menu_admin]
+   | [Annulla → a]
 ## db after step 1
 (no changes)
 ## step 2: text "10" user=1

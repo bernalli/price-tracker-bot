@@ -20,6 +20,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from price_tracker.bot.callbacks import Action
 from price_tracker.bot.handlers import history, monitoring, product
 from price_tracker.bot.handlers.callbacks import _actions, _menu, _ops, _product
 from price_tracker.bot.handlers.debug import cmd_errori
@@ -219,7 +220,7 @@ async def _drive_ops_reactivate(name: str) -> Surfaces:
     surfaces, _update, context, query = _env(name)
     db = context.bot_data["db"]
     db.list_auto_suspended_products.return_value = [Suspended(_row(name))]
-    await _ops._handle_reactivate(query, context, db, USER_ID, "ops_react_1")
+    await _ops._handle_reactivate(query, context, db, USER_ID, Action("ops.reactivate", (1,)))
     return surfaces
 
 

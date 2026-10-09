@@ -15,10 +15,10 @@
    |
    | <b>Cosa vuoi modificare?</b>
    keyboard:
-   | [🔔 Ogni ribasso → track_any_1]
-   | [📉 Soglia % o € → track_threshold_1]
-   | [💰 Prezzo target → track_target_1]
-   | [🔄 Azzera prezzo base → reset_1]
+   | [🔔 Ogni ribasso → p:1:th:any]
+   | [📉 Soglia % o € → p:1:th]
+   | [💰 Prezzo target → p:1:tg]
+   | [🔄 Azzera prezzo base → p:1:rs]
    | [🔔 Notifiche → p:1:pr]
 ## db after step 1
 (no changes)
@@ -51,9 +51,9 @@
    | 🔔 Avviso: ribasso del 10% dall'inizio
    | ⏱ Controlli: ogni 6 h · ultimo 2 ore fa
    keyboard:
-   | [📈 Storico → chart_1] [▶️ Riattiva → reactivate_1]
-   | [🗑 Elimina → remove_1] [🔔 Regola avviso → edit_1]
-   | [⏱ Intervallo → setrefresh_1] [🔗 Apri → url:https://shop.example.com/item/1]
+   | [📈 Storico → p:1:ch:all] [▶️ Riattiva → p:1:ra]
+   | [🗑 Elimina → p:1:rm] [🔔 Regola avviso → p:1:ed]
+   | [⏱ Intervallo → p:1:iv] [🔗 Apri → url:https://shop.example.com/item/1]
    | [◀️ Lista → l:p:1]
 ## db after step 3
 ~ products id=1 is_active: 1 -> 0
@@ -75,9 +75,9 @@
    | 🔔 Avviso: ribasso del 10% dall'inizio
    | ⏱ Controlli: ogni 6 h · ultimo 2 ore fa
    keyboard:
-   | [🔄 Controlla ora → check_1] [📈 Storico → chart_1]
-   | [⏸ Pausa → pause_1] [🗑 Elimina → remove_1]
-   | [🔔 Regola avviso → edit_1] [⏱ Intervallo → setrefresh_1]
+   | [🔄 Controlla ora → p:1:ck] [📈 Storico → p:1:ch:all]
+   | [⏸ Pausa → p:1:pa] [🗑 Elimina → p:1:rm]
+   | [🔔 Regola avviso → p:1:ed] [⏱ Intervallo → p:1:iv]
    | [🔗 Apri → url:https://shop.example.com/item/1]
    | [◀️ Lista → l:a:1]
 ## db after step 4
@@ -90,7 +90,7 @@
    text:
    | ❓ Cosa vuoi fare con <b>Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN…</b>?
    keyboard:
-   | [🗑 Sì, elimina tutto → confirm_delete_1] [⏸ Solo pausa → pause_1] [❌ Annulla → p:1:c]
+   | [🗑 Sì, elimina tutto → p:1:rmok] [⏸ Solo pausa → p:1:pa] [❌ Annulla → p:1:c]
 ## db after step 5
 (no changes)
 ## step 6: press "check_1" user=10 on=1 synthetic
@@ -113,9 +113,9 @@
    | 🔔 Avviso: ribasso del 10% dall'inizio
    | ⏱ Controlli: ogni 6 h · adesso
    keyboard:
-   | [🔄 Controlla ora → check_1] [📈 Storico → chart_1]
-   | [⏸ Pausa → pause_1] [🗑 Elimina → remove_1]
-   | [🔔 Regola avviso → edit_1] [⏱ Intervallo → setrefresh_1]
+   | [🔄 Controlla ora → p:1:ck] [📈 Storico → p:1:ch:all]
+   | [⏸ Pausa → p:1:pa] [🗑 Elimina → p:1:rm]
+   | [🔔 Regola avviso → p:1:ed] [⏱ Intervallo → p:1:iv]
    | [🔗 Apri → url:https://shop.example.com/item/1]
    | [◀️ Lista → l:a:1]
 ## db after step 6
@@ -140,10 +140,10 @@
    |
    | <b>Come vuoi essere avvisato?</b>
    keyboard:
-   | [🔔 Ogni ribasso → track_any_1]
-   | [📉 Soglia % o € → track_threshold_1]
-   | [💰 Prezzo target → track_target_1]
-   | [👍 Va bene -10% (default) → track_default_1]
+   | [🔔 Ogni ribasso → p:1:th:any]
+   | [📉 Soglia % o € → p:1:th]
+   | [💰 Prezzo target → p:1:tg]
+   | [👍 Va bene -10% (default) → p:1:th:def]
 ## db after step 8
 ~ products id=1 preferred_condition: NULL -> "new"
 ## step 9: press "track_any_1" user=10 on=1

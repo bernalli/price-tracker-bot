@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 
+from price_tracker.bot.callbacks import Action, encode
 from price_tracker.bot.decorators import _convert_display
 from price_tracker.bot.handlers._helpers import (
     _escape_html,
@@ -14,15 +15,11 @@ from price_tracker.bot.handlers._helpers import (
     _parse_id,
     _safe_dec,
 )
+from price_tracker.bot.handlers.callbacks._legacy import resolve_callback
 from price_tracker.bot.messages import _
 from price_tracker.bot.ui.width import truncate_to_width
 from price_tracker.core.alert import _why
-from price_tracker.core.notices import (
-    OPS_DELETE_CONFIRM_PREFIX,
-    OPS_DELETE_PREFIX,
-    OPS_REACTIVATE_PREFIX,
-    group_key_for,
-)
+from price_tracker.core.notices import group_key_for
 from price_tracker.core.textlimits import split_message
 
 if TYPE_CHECKING:
@@ -57,13 +54,13 @@ async def _load_group(
     context: ContextTypes.DEFAULT_TYPE,
     db: Any,
     user_id: int,
-    data: str,
-    prefix: str,
+    action: Action,
 ) -> tuple[str, list[Any]] | None:
     """Parse and authorize an anchor, replying with the common error text."""
-    anchor_id = _parse_id(data.removeprefix(prefix))
+    raw = action.args[0]
+    anchor_id = raw if isinstance(raw, int) else _parse_id(raw)
     if anchor_id is None:
-        await query.edit_message_text(_("❌ ID non valido."))
+        await query.edit_message_text(_("❌ Invalid ID."))
         return None
     anchor, domain, group = await _automatic_group(context, db, user_id, anchor_id)
     if anchor is None:
@@ -78,10 +75,10 @@ async def _load_group(
 
 
 async def _handle_reactivate(
-    query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, data: str
+    query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, action: Action
 ) -> bool:
     """Reactivate the automatic group, then ask the pull-mode scheduler to recheck it."""
-    loaded = await _load_group(query, context, db, user_id, data, OPS_REACTIVATE_PREFIX)
+    loaded = await _load_group(query, context, db, user_id, action)
     if loaded is None:
         return True
     domain, group = loaded
@@ -127,14 +124,15 @@ async def _handle_reactivate(
 
 
 async def _handle_delete_prompt(
-    query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, data: str
+    query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, action: Action
 ) -> bool:
     """Show the non-destructive confirmation prompt for an automatic group."""
-    loaded = await _load_group(query, context, db, user_id, data, OPS_DELETE_PREFIX)
+    loaded = await _load_group(query, context, db, user_id, action)
     if loaded is None:
         return True
     domain, group = loaded
-    anchor_id = _parse_id(data.removeprefix(OPS_DELETE_PREFIX))
+    raw = action.args[0]
+    anchor_id = raw if isinstance(raw, int) else _parse_id(raw)
     assert anchor_id is not None
     count = len(group)
     keyboard = InlineKeyboardMarkup(
@@ -142,10 +140,10 @@ async def _handle_delete_prompt(
             [
                 InlineKeyboardButton(
                     _("🗑 Yes, delete {n}").format(n=count),
-                    callback_data=f"{OPS_DELETE_CONFIRM_PREFIX}{anchor_id}",
+                    callback_data=encode(Action("ops.delete_ok", (anchor_id,))),
                 )
             ],
-            [InlineKeyboardButton(_("❌ Cancel"), callback_data="cancel_delete")],
+            [InlineKeyboardButton(_("❌ Cancel"), callback_data=encode(Action("delete.cancel")))],
         ]
     )
     await query.edit_message_text(
@@ -162,10 +160,10 @@ async def _handle_delete_prompt(
 
 
 async def _handle_delete_confirm(
-    query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, data: str
+    query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, action: Action
 ) -> bool:
     """Recompute and delete only the current automatic group for the clicker."""
-    loaded = await _load_group(query, context, db, user_id, data, OPS_DELETE_CONFIRM_PREFIX)
+    loaded = await _load_group(query, context, db, user_id, action)
     if loaded is None:
         return True
     domain, group = loaded
@@ -184,13 +182,16 @@ async def _handle_delete_confirm(
 
 
 async def handle_ops_buttons(
-    query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, data: str
+    query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, data: object
 ) -> bool:
     """Handle operational notice callbacks, returning ``False`` for other prefixes."""
-    if data.startswith(OPS_REACTIVATE_PREFIX):
-        return await _handle_reactivate(query, context, db, user_id, data)
-    if data.startswith(OPS_DELETE_CONFIRM_PREFIX):
-        return await _handle_delete_confirm(query, context, db, user_id, data)
-    if data.startswith(OPS_DELETE_PREFIX):
-        return await _handle_delete_prompt(query, context, db, user_id, data)
+    action = resolve_callback(data)
+    if action is None:
+        return False
+    if action.name == "ops.reactivate":
+        return await _handle_reactivate(query, context, db, user_id, action)
+    if action.name == "ops.delete_ok":
+        return await _handle_delete_confirm(query, context, db, user_id, action)
+    if action.name == "ops.delete":
+        return await _handle_delete_prompt(query, context, db, user_id, action)
     return False
