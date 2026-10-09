@@ -155,8 +155,28 @@ def test_coordinator_modules_have_the_expected_importers() -> None:
         "price_tracker.bot.flow_services",
         "price_tracker.bot.handlers.__init__",
     ]
-    assert _importers("price_tracker.bot.callbacks") == [
+    assert _importers("price_tracker.bot.flow_state") == [
+        "price_tracker.bot.flow_callbacks",
+        "price_tracker.bot.flow_coordinator",
+        "price_tracker.bot.flow_rendering",
         "price_tracker.bot.flows",
+    ]
+    assert _importers("price_tracker.bot.flow_rendering") == [
+        "price_tracker.bot.flow_callbacks",
+        "price_tracker.bot.flow_coordinator",
+        "price_tracker.bot.flows",
+    ]
+    assert _importers("price_tracker.bot.flow_coordinator") == [
+        "price_tracker.bot.flow_callbacks",
+        "price_tracker.bot.flows",
+    ]
+    assert _importers("price_tracker.bot.flow_callbacks") == [
+        "price_tracker.bot.flows",
+    ]
+    assert _importers("price_tracker.bot.callbacks") == [
+        "price_tracker.bot.flow_callbacks",
+        "price_tracker.bot.flow_coordinator",
+        "price_tracker.bot.flow_state",
         "price_tracker.bot.handlers.__init__",
         "price_tracker.bot.handlers._cards",
         "price_tracker.bot.handlers.callbacks._actions",
@@ -176,8 +196,9 @@ def test_coordinator_modules_have_the_expected_importers() -> None:
         "price_tracker.notifier.telegram",
     ]
     assert _importers("price_tracker.app.inputs") == [
+        "price_tracker.bot.flow_coordinator",
+        "price_tracker.bot.flow_rendering",
         "price_tracker.bot.flow_services",
-        "price_tracker.bot.flows",
         "price_tracker.bot.handlers.product",
         "price_tracker.bot.handlers.product_io",
         "price_tracker.config",
