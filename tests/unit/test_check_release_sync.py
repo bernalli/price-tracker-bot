@@ -492,4 +492,4 @@ def test_running_and_project_versions_have_release_notes() -> None:
         re.findall(r"^## \[(1\.\d+\.\d+)\]", (ROOT / "CHANGELOG.md").read_text(), re.M)
     )
     assert historical <= RELEASE_NOTES.keys()
-    assert all(2 <= len(bullets) <= 4 for bullets in RELEASE_NOTES.values())
+    assert all(len(bullets) <= 4 for bullets in RELEASE_NOTES.values())

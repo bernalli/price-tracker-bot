@@ -1,4 +1,5 @@
-"""Ordered, translatable release highlights shown once after an update."""
+"""List only features: what users can now do and what works better for them.
+Exclude translations, branding/docs/repo, refactors, CI/tests, hardening, compatibility promises."""
 
 from __future__ import annotations
 
@@ -6,12 +7,9 @@ from html import escape
 
 from price_tracker.bot.messages import N_, _
 
-# Oldest first. Every release must add two to four short benefits for users.
+# Oldest first.
 RELEASE_NOTES: dict[str, tuple[str, ...]] = {
-    "1.0.0": (
-        N_("Keep your tracked products and familiar commands through 1.x updates."),
-        N_("Blocked sites pause automatically, avoiding repeated failed checks."),
-    ),
+    "1.0.0": (),
     "1.1.0": (
         N_("See 90 days of price history in your charts."),
         N_("Get grouped warnings when a site has trouble, with quick recovery buttons."),
@@ -19,7 +17,7 @@ RELEASE_NOTES: dict[str, tuple[str, ...]] = {
     ),
     "1.2.0": (
         N_("Cancel a pending question with /cancel; unanswered questions expire."),
-        N_("Set price rules and check intervals with clearer prompts in your language."),
+        N_("Set price rules and check intervals with clearer prompts."),
     ),
     "1.3.0": (
         N_("Choose how often each product is checked."),
@@ -27,14 +25,10 @@ RELEASE_NOTES: dict[str, tuple[str, ...]] = {
         N_("Import product lists with clearer feedback on invalid rows."),
     ),
     "1.4.0": (
-        N_("Choose your language in Settings, including for price alerts."),
         N_("Browse products by page and filter active, paused or failing items."),
         N_("Sold-out listings no longer trigger misleading price alerts."),
     ),
-    "1.4.1": (
-        N_("Find Prices and Notifications again in the grouped main menu."),
-        N_("Menu icons now match their actions."),
-    ),
+    "1.4.1": (N_("Find Prices and Notifications again in the grouped main menu."),),
     "1.4.2": (
         N_("Digests show the actual number of failed checks."),
         N_("Unsupported product links get a clearer explanation."),
@@ -53,11 +47,7 @@ RELEASE_NOTES: dict[str, tuple[str, ...]] = {
         N_("Set quiet hours, time zone and notification limits with guided prompts."),
         N_("Manage one product's notifications without changing your other settings."),
     ),
-    "1.7.1": (
-        N_("Get just one back-in-stock alert when a sold-out product returns."),
-        N_("English replies now stay in English throughout the bot."),
-        N_("Buttons in older messages keep working after updates."),
-    ),
+    "1.7.1": (N_("Get just one back-in-stock alert when a sold-out product returns."),),
 }
 
 MESSAGE_LIMIT = 1200
@@ -92,11 +82,14 @@ def render_release_notes(previous: str, current: str) -> str:
         (
             version
             for version in RELEASE_NOTES
-            if version_key(previous) < version_key(version) < version_key(current)
+            if RELEASE_NOTES[version]
+            and version_key(previous) < version_key(version) < version_key(current)
         ),
         key=version_key,
         reverse=True,
     )
+    if not newest and not older:
+        return ""
     if not older:
         return message
     heading = _escaped_short(_("Also since your last update:"), 120)
