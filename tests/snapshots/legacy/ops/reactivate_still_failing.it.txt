@@ -12,7 +12,7 @@
 -> editMessageText chat=10 message_id=1001
    param parse_mode="HTML"
    text:
-   | ▶️ <b>Ricontrollati 2 prodotti su example.com</b>
+   | 🔄 <b>Ricontrollati 2 prodotti su example.com</b>
    | <b>80,00 €</b> ▼20% ❌ prezzo non… Ket…
    | <b>40,00 €</b> ❌ prezzo non legg… Spe…
 ## db after step 3

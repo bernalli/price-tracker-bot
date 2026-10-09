@@ -10,7 +10,7 @@ from decimal import Decimal
 from typing import Literal
 
 from price_tracker.bot.callbacks import Action, encode
-from price_tracker.bot.messages import _
+from price_tracker.bot.messages import N_, _
 from price_tracker.bot.ui.product_rows import product_row
 from price_tracker.core.notices import (
     MAX_LISTED_PRODUCTS,
@@ -51,17 +51,20 @@ def _escape_html(text: str) -> str:
 
 
 _UNREADABLE_COPY = (
-    "Price unreadable on {domain}",
-    "The pages load, but the price could not be read anymore (layout change or a different offer).",
-    "Reactivate to run a fresh check right now.",
+    N_("Price unreadable on {domain}"),
+    N_(
+        "The pages load, but the price could not be read anymore "
+        "(layout change or a different offer)."
+    ),
+    N_("Reactivate to run a fresh check right now."),
     False,
 )
 
 _REASON_COPY: dict[str, tuple[str, str, str, bool]] = {
     "listing_gone": (
-        "Listings removed on {domain}",
-        "These pages answer HTTP 404/410: the store took them off the catalog.",
-        "Deleting keeps your list clean. Reactivate only if the store restores them.",
+        N_("Listings removed on {domain}"),
+        N_("These pages answer HTTP 404/410: the store took them off the catalog."),
+        N_("Deleting keeps your list clean. Reactivate only if the store restores them."),
         True,
     ),
     "parse_error": _UNREADABLE_COPY,
@@ -70,28 +73,28 @@ _REASON_COPY: dict[str, tuple[str, str, str, bool]] = {
     "condition_mismatch": _UNREADABLE_COPY,
     "implausible_read": _UNREADABLE_COPY,
     "http_error": (
-        "Site unreachable: {domain}",
-        "The site did not answer {max} checks in a row.",
-        "Try again later. Reactivate once the site is back.",
+        N_("Site unreachable: {domain}"),
+        N_("The site did not answer {max} checks in a row."),
+        N_("Try again later. Reactivate once the site is back."),
         False,
     ),
     "unexpected": (
-        "Site unreachable: {domain}",
-        "The site did not answer {max} checks in a row.",
-        "Try again later. Reactivate once the site is back.",
+        N_("Site unreachable: {domain}"),
+        N_("The site did not answer {max} checks in a row."),
+        N_("Try again later. Reactivate once the site is back."),
         False,
     ),
     "block": (
-        "Blocked by {domain}",
-        "The site is refusing automated checks (anti-bot).",
-        "Domain quarantine already paces retries. Reactivate once it clears.",
+        N_("Blocked by {domain}"),
+        N_("The site is refusing automated checks (anti-bot)."),
+        N_("Domain quarantine already paces retries. Reactivate once it clears."),
         False,
     ),
 }
 _DEFAULT_COPY = (
-    "Tracking suspended on {domain}",
-    "Checks kept failing.",
-    "Reactivate to retry.",
+    N_("Tracking suspended on {domain}"),
+    N_("Checks kept failing."),
+    N_("Reactivate to retry."),
     False,
 )
 _STATUS_RE = re.compile(r"\b(404|410)\b")

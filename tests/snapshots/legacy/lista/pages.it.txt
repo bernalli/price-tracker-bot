@@ -41,7 +41,7 @@
    | <b>18,00 €</b> ▼10% Blender
    keyboard:
    | [#6 Toaster → l:a:2:6] [#7 Blender → l:a:2:7]
-   | [◀️ → l:a:1] [2/2 → noop]
+   | [⬅️ → l:a:1] [2/2 → noop]
    | [✅ Attivi ✓ → l:a:1] [⏸ In pausa → l:p:1]
    | [⚠️ Errori → l:e:1] [🚫 Esaurito → l:o:1]
    | [🗑 Elimina tutti → l:rmall] [➕ Aggiungi → ad]
@@ -86,7 +86,7 @@
    | [⏸ Pausa → p:5:pa] [🗑 Elimina → p:5:rm]
    | [🔔 Regola avviso → p:5:ed] [⏱ Intervallo → p:5:iv]
    | [🔗 Apri → url:https://shop.example.com/item/84]
-   | [◀️ Lista → l:e:1]
+   | [⬅️ Lista → l:e:1]
 ## db after step 4
 (no changes)
 ## step 5: press "l:e:1" user=10 on=1000

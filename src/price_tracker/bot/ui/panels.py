@@ -93,7 +93,7 @@ def add_button() -> Button:
 
 def add_screen() -> Screen:
     """How to add a product: paste its link. Back to the product list, or Home."""
-    back = button(_("◀️ List"), callback=encode(Action("list.page", ("a", 1))))
+    back = button(_("⬅️ List"), callback=encode(Action("list.page", ("a", 1))))
     text = _(
         "➕ <b>Add a product</b>\n\nPaste the link of a product page here to start tracking it."
     )
@@ -115,7 +115,7 @@ def _value_lines(view: PrefsView, now: datetime, loc: str) -> list[str]:
         _("🔕 Mute: {mute}").format(mute=_mute_value(view, now, loc)),
         _("📬 Digest: {digest}").format(digest=_digest_value(view, loc)),
         _("🌙 Quiet hours: {quiet}").format(quiet=_quiet_value(view)),
-        _("⏱ Throttle: {throttle}").format(throttle=_throttle_value(view)),
+        _("🚦 Throttle: {throttle}").format(throttle=_throttle_value(view)),
         _("🌍 Timezone: {timezone}").format(timezone=escape_html(view.timezone)),
     ]
 
@@ -137,7 +137,7 @@ def settings_screen(view: PrefsView, *, now: datetime, language: str | None = No
         button(_("🔕 Mute"), callback=encode(Action("settings.section", ("mu",)))),
         button(_("📬 Digest"), callback=encode(Action("settings.section", ("dg",)))),
         button(_("🌙 Quiet hours"), callback=encode(Action("settings.section", ("qh",)))),
-        button(_("⏱ Throttle"), callback=encode(Action("settings.section", ("th",)))),
+        button(_("🚦 Throttle"), callback=encode(Action("settings.section", ("th",)))),
         button(_("🌍 Timezone"), callback=encode(Action("settings.section", ("tz",)))),
         button(_("🗣 Language"), callback=encode(Action("settings.section", ("lang",)))),
     ]
@@ -229,11 +229,11 @@ def settings_section_screen(
         title, value = _("🌍 <b>Timezone</b>"), escape_html(view.timezone)
         extra = [_ask(_("✏️ Change"), "tz")]
     elif section == "th":
-        title, value = _("⏱ <b>Throttle</b>"), _throttle_value(view)
+        title, value = _("🚦 <b>Throttle</b>"), _throttle_value(view)
         extra = [_ask(_("✏️ Change"), "th")]
     else:
         raise ValueError(f"section: must be one of mu, dg, qh, lang, tz, th, got {section!r}")
-    back = button(_("◀️ Settings"), callback=encode(Action("settings")))
+    back = button(_("⬅️ Settings"), callback=encode(Action("settings")))
     current = _("Current: {value}").format(value=value)
     return Screen(
         text=f"{title}\n\n{current}", rows=layout_rows(presets, extra, [back, home_button()])
@@ -266,7 +266,7 @@ def product_prefs_screen(name: str, product_id: int, view: PrefsView, *, now: da
     )
     links = [
         button(_("⚙️ Settings"), callback=encode(Action("settings"))),
-        button(_("◀️ Product"), callback=encode(Action("product.card", (product_id,)))),
+        button(_("⬅️ Product"), callback=encode(Action("product.card", (product_id,)))),
     ]
     return Screen(text="\n".join(lines), rows=layout_rows(presets, [other], links, [home_button()]))
 

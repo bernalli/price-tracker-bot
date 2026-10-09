@@ -6,7 +6,7 @@
 -> sendMessage chat=10
    param parse_mode="HTML"
    text:
-   | 📦 <b>Scegli prodotto per impostare soglia:</b>
+   | 📉 <b>Scegli prodotto per impostare soglia:</b>
    keyboard:
    | [80,00 € ▼20% Kettle → p:1:th]
 ## db after step 1
@@ -27,7 +27,7 @@
 -> sendMessage chat=10
    param parse_mode="HTML"
    text:
-   | 🎯 Soglia impostata: <b>-20%</b>
+   | 📉 Soglia impostata: <b>-20%</b>
    | 📦 #1 — Kettle
 ## db after step 3
 ~ products id=1 threshold_value: "10" -> "20"
@@ -35,7 +35,7 @@
 -> sendMessage chat=10
    param parse_mode="HTML"
    text:
-   | 🎯 Soglia impostata: <b>-€50.00</b>
+   | 📉 Soglia impostata: <b>-€50.00</b>
    | 📦 #1 — Kettle
 ## db after step 4
 ~ products id=1 threshold_type: "percentage" -> "absolute"
@@ -44,7 +44,7 @@
 -> sendMessage chat=10
    param parse_mode="HTML"
    text:
-   | 🎯 Soglia impostata: <b>🔔 Ogni ribasso</b>
+   | 📉 Soglia impostata: <b>🔔 Ogni ribasso</b>
    | 📦 #1 — Kettle
 ## db after step 5
 ~ products id=1 threshold_type: "absolute" -> "any_drop"
@@ -83,7 +83,7 @@
 -> sendMessage chat=10
    param parse_mode="HTML"
    text:
-   | 🎯 Soglia impostata: <b>-20%</b>
+   | 📉 Soglia impostata: <b>-20%</b>
    | 📦 #2 — Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN…
 ## db after step 11
 ~ products id=2 threshold_value: "10" -> "20"

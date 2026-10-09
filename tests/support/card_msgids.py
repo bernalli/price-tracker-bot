@@ -36,7 +36,7 @@ CARD_SINGULAR: tuple[str, ...] = (
     "🔔 Alert rule",
     "⏱ Interval",
     "🔗 Open",
-    "◀️ List",
+    "⬅️ List",
 )
 
 CARD_PLURAL: tuple[str, str] = (

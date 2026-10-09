@@ -15,4 +15,4 @@ keyboard:
    [📈 History](cb:p:9223372036854775807:ch:30d)  [▶️ Reactivate](cb:p:9223372036854775807:ra)
    [🗑 Delete](cb:p:9223372036854775807:rm)  [🔔 Alert rule](cb:p:9223372036854775807:th)
    [⏱ Interval](cb:p:9223372036854775807:iv)
-   [◀️ List](cb:l:a:1)
+   [⬅️ List](cb:l:a:1)

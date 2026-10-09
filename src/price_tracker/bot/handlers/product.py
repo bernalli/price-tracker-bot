@@ -152,7 +152,7 @@ async def cmd_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             )
 
         await update.message.reply_text(
-            _("📦 <b>Choose a product to delete:</b>"),
+            _("🗑 <b>Choose a product to delete:</b>"),
             parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup(buttons),
         )
@@ -202,7 +202,7 @@ async def cmd_target(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             update,
             context,
             "target",
-            _("📦 <b>Choose a product to set a target:</b>"),
+            _("🎯 <b>Choose a product to set a target:</b>"),
             "settarget",
         )
         return
@@ -274,7 +274,7 @@ async def cmd_threshold(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             update,
             context,
             "threshold",
-            _("📦 <b>Choose a product to set a threshold:</b>"),
+            _("📉 <b>Choose a product to set a threshold:</b>"),
             "setsoglia",
         )
         return
@@ -316,7 +316,7 @@ async def cmd_threshold(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     name = product.get("name") or _("Unknown")
     threshold_str = _format_threshold(threshold_type, threshold_value)
     await update.message.reply_text(
-        _("🎯 Threshold set: <b>{threshold}</b>\n📦 #{product_id} — {name}").format(
+        _("📉 Threshold set: <b>{threshold}</b>\n📦 #{product_id} — {name}").format(
             threshold=threshold_str,
             product_id=product_id,
             name=_escape_html(truncate_to_width(name, 80)),
@@ -383,7 +383,7 @@ async def _add_product(
             return
         await db.reactivate_product(existing["id"])
         await update.message.reply_text(
-            _("♻️ Product reactivated! (#{product_id})").format(product_id=existing["id"])
+            _("▶️ Product reactivated! (#{product_id})").format(product_id=existing["id"])
         )
         return
 

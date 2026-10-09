@@ -12,7 +12,7 @@
 -> editMessageText chat=10 message_id=1001
    param parse_mode="HTML"
    text:
-   | ▶️ <b>Ricontrollati 4 prodotti su example.com</b>
+   | 🔄 <b>Ricontrollati 4 prodotti su example.com</b>
    | <b>80,00 €</b> ▼20% ❌ bloccato Kettle
    | <b>40,00 €</b> ❌ pagina non trov… Spe…
    | <b>60,00 €</b> ❌ sito irraggiung… Mix…

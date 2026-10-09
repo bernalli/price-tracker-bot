@@ -97,7 +97,7 @@ async def handle_menu_navigation(
             rows.append(
                 [
                     InlineKeyboardButton(
-                        _("📭 No products — paste a link!"),
+                        _("🏠 No products — paste a link!"),
                         callback_data=encode(Action("home")),
                     )
                 ]
@@ -234,7 +234,7 @@ async def handle_menu_navigation(
             [InlineKeyboardButton(_("💾 Export CSV"), callback_data=encode(Action("data.export")))],
             [
                 InlineKeyboardButton(
-                    _("📂 Import CSV — send a file in chat"),
+                    _("📥 Import CSV — send a file in chat"),
                     callback_data=encode(Action("data.import")),
                 )
             ],
@@ -261,7 +261,7 @@ async def handle_menu_navigation(
     if action.name == "data.import":
         await query.edit_message_text(
             _(
-                "📂 <b>Import products</b>\n\n"
+                "📥 <b>Import products</b>\n\n"
                 "Send a CSV file in chat (exported with Export).\n"
                 "Duplicates will be skipped."
             ),
@@ -383,7 +383,7 @@ async def _handle_menu_info(
     text = _(
         "ℹ️ <b>Statistics</b>\n\n"
         "📦 Active products: {active}\n"
-        "📁 Total: {total}\n"
+        "📦 Total: {total}\n"
         "🔄 Checks: {checks}\n"
         "⏱ Interval: every {interval}"
     ).format(
@@ -408,7 +408,7 @@ async def _handle_menu_info(
         reply_markup=InlineKeyboardMarkup(
             [
                 [
-                    InlineKeyboardButton(_("❓ Help"), callback_data=encode(Action("help"))),
+                    InlineKeyboardButton(_("ℹ️ Help"), callback_data=encode(Action("help"))),
                     InlineKeyboardButton(_("⚠️ Errors"), callback_data=encode(Action("errors"))),
                 ],
                 menu_back_button(),

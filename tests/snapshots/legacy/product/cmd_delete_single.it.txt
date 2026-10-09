@@ -6,7 +6,7 @@
 -> sendMessage chat=10
    param parse_mode="HTML"
    text:
-   | 📦 <b>Scegli prodotto da eliminare:</b>
+   | 🗑 <b>Scegli prodotto da eliminare:</b>
    keyboard:
    | [80,00 € ▼20% Kettle → p:1:rm]
 ## db after step 1

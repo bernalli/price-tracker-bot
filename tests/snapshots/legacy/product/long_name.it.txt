@@ -9,16 +9,16 @@
    text:
    | ✏️ <b>Modifica #1</b> Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN…
    |
-   | 🎯 Soglia attuale: <b>-10%</b>
-   | 🏁 Target attuale: <b>non impostato</b>
+   | 📉 Soglia attuale: <b>-10%</b>
+   | 🎯 Target attuale: <b>non impostato</b>
    | 📌 Prezzo base: <b>€100.00</b>
    |
    | <b>Cosa vuoi modificare?</b>
    keyboard:
    | [🔔 Ogni ribasso → p:1:th:any]
    | [📉 Soglia % o € → p:1:th]
-   | [💰 Prezzo target → p:1:tg]
-   | [🔄 Azzera prezzo base → p:1:rs]
+   | [🎯 Prezzo target → p:1:tg]
+   | [📌 Azzera prezzo base → p:1:rs]
    | [🔔 Notifiche → p:1:pr]
 ## db after step 1
 (no changes)
@@ -54,7 +54,7 @@
    | [📈 Storico → p:1:ch:all] [▶️ Riattiva → p:1:ra]
    | [🗑 Elimina → p:1:rm] [🔔 Regola avviso → p:1:ed]
    | [⏱ Intervallo → p:1:iv] [🔗 Apri → url:https://shop.example.com/item/1]
-   | [◀️ Lista → l:p:1]
+   | [⬅️ Lista → l:p:1]
 ## db after step 3
 ~ products id=1 is_active: 1 -> 0
 ~ products id=1 suspension_kind: NULL -> "manual"
@@ -79,7 +79,7 @@
    | [⏸ Pausa → p:1:pa] [🗑 Elimina → p:1:rm]
    | [🔔 Regola avviso → p:1:ed] [⏱ Intervallo → p:1:iv]
    | [🔗 Apri → url:https://shop.example.com/item/1]
-   | [◀️ Lista → l:a:1]
+   | [⬅️ Lista → l:a:1]
 ## db after step 4
 ~ products id=1 is_active: 0 -> 1
 ~ products id=1 suspension_kind: "manual" -> NULL
@@ -117,7 +117,7 @@
    | [⏸ Pausa → p:1:pa] [🗑 Elimina → p:1:rm]
    | [🔔 Regola avviso → p:1:ed] [⏱ Intervallo → p:1:iv]
    | [🔗 Apri → url:https://shop.example.com/item/1]
-   | [◀️ Lista → l:a:1]
+   | [⬅️ Lista → l:a:1]
 ## db after step 6
 + price_history id=6 {product_id=1, price="80.00", checked_at=<now:9999-99-99 99:99:99>}
 ~ products id=1 last_checked_at: "2026-03-01 10:00:00" -> <now:9999-99-99 99:99:99>
@@ -142,8 +142,8 @@
    keyboard:
    | [🔔 Ogni ribasso → p:1:th:any]
    | [📉 Soglia % o € → p:1:th]
-   | [💰 Prezzo target → p:1:tg]
-   | [👍 Va bene -10% (default) → p:1:th:def]
+   | [🎯 Prezzo target → p:1:tg]
+   | [📉 Va bene -10% (default) → p:1:th:def]
 ## db after step 8
 ~ products id=1 preferred_condition: NULL -> "new"
 ## step 9: press "track_any_1" user=10 on=1

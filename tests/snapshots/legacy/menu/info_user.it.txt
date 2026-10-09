@@ -26,11 +26,11 @@
    | ℹ️ <b>Statistiche</b>
    |
    | 📦 Prodotti attivi: 1
-   | 📁 Totali: 2
+   | 📦 Totali: 2
    | 🔄 Check: 5
    | ⏱ Intervallo: ogni 6h
    keyboard:
-   | [❓ Aiuto → hp] [⚠️ Errori → er]
-   | [◀️ Menu → h]
+   | [ℹ️ Aiuto → hp] [⚠️ Errori → er]
+   | [⬅️ Menu → h]
 ## db after step 2
 (no changes)

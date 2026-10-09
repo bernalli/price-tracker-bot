@@ -25,6 +25,6 @@
    | 📭 Non hai prodotti tracciati.
    | Incollami un link per iniziare!
    keyboard:
-   | [◀️ Menu → h]
+   | [⬅️ Menu → h]
 ## db after step 2
 (no changes)

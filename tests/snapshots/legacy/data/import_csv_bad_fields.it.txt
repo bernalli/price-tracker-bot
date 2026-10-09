@@ -11,7 +11,7 @@
 -> editMessageText chat=10 message_id=1000
    param parse_mode="HTML"
    text:
-   | 📁 <b>Importazione completata</b>
+   | 📥 <b>Importazione completata</b>
    | ✅ Importati: 1
    | ❌ Righe con soglia non valida: 1
 ## db after step 1

@@ -28,6 +28,6 @@
    | Tocca un prodotto per controllarlo.
    keyboard:
    | [🔄 Controlla tutti i prezzi → ca]
-   | [◀️ Menu → h]
+   | [⬅️ Menu → h]
 ## db after step 2
 (no changes)

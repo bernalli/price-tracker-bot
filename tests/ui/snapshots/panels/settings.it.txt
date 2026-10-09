@@ -8,11 +8,11 @@ text:
    | 🔕 Silenzia: fino a 01/03/26, 21:00
    | 📬 Digest: attivo, ogni 30 min
    | 🌙 Ore silenziose: 22:00–08:00
-   | ⏱ Limite: 5 all'ora
+   | 🚦 Limite: 5 all'ora
    | 🌍 Fuso orario: Europe/Berlin
    | 🗣 Lingua: Automatica (Italiano)
 keyboard:
    [🔕 Silenzia](cb:s:mu)  [📬 Digest](cb:s:dg)
-   [🌙 Ore silenziose](cb:s:qh)  [⏱ Limite](cb:s:th)
+   [🌙 Ore silenziose](cb:s:qh)  [🚦 Limite](cb:s:th)
    [🌍 Fuso orario](cb:s:tz)  [🗣 Lingua](cb:s:lang)
    [🏠 Home](cb:h)

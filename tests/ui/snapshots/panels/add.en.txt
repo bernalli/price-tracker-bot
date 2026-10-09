@@ -7,4 +7,4 @@ text:
    | 
    | Paste the link of a product page here to start tracking it.
 keyboard:
-   [◀️ List](cb:l:a:1)  [🏠 Home](cb:h)
+   [⬅️ List](cb:l:a:1)  [🏠 Home](cb:h)

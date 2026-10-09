@@ -8,14 +8,14 @@ text:
    | [🔕 Mute: [until 01.03.26, 21:00 until 01.03.26, 21:00 until 01.03.26, 21:00] 🔕 Mute: [until 01.03.26, 21:00 until 01.03.26, 21:00 until 01.03.26, 21:00] 🔕 Mute: [until 01.03.26, 21:00 until 01.03.26, 21:00 until 01.03.26, 21:00]]
    | [📬 Digest: [on, every 30 Min. on, every 30 Min. on, every 30 Min.] 📬 Digest: [on, every 30 Min. on, every 30 Min. on, every 30 Min.] 📬 Digest: [on, every 30 Min. on, every 30 Min. on, every 30 Min.]]
    | [🌙 Quiet hours: 22:00–08:00 🌙 Quiet hours: 22:00–08:00 🌙 Quiet hours: 22:00–08:00]
-   | [⏱ Throttle: [5 per hour 5 per hour 5 per hour] ⏱ Throttle: [5 per hour 5 per hour 5 per hour] ⏱ Throttle: [5 per hour 5 per hour 5 per hour]]
+   | [🚦 Throttle: [5 per hour 5 per hour 5 per hour] 🚦 Throttle: [5 per hour 5 per hour 5 per hour] 🚦 Throttle: [5 per hour 5 per hour 5 per hour]]
    | [🌍 Timezone: Europe/Berlin 🌍 Timezone: Europe/Berlin 🌍 Timezone: Europe/Berlin]
    | [🗣 Language: [Automatic (Deutsch) Automatic (Deutsch) Automatic (Deutsch)] 🗣 Language: [Automatic (Deutsch) Automatic (Deutsch) Automatic (Deutsch)] 🗣 Language: [Automatic (Deutsch) Automatic (Deutsch) Automatic (Deutsch)]]
 keyboard:
    [[🔕 Mute 🔕 Mute 🔕 Mute]](cb:s:mu)
    [[📬 Digest 📬 Digest 📬 Digest]](cb:s:dg)
    [[🌙 Quiet hours 🌙 Quiet hours 🌙…](cb:s:qh)
-   [[⏱ Throttle ⏱ Throttle ⏱ Throt…](cb:s:th)
+   [[🚦 Throttle 🚦 Throttle 🚦 Throt…](cb:s:th)
    [[🌍 Timezone 🌍 Timezone 🌍 Timez…](cb:s:tz)
    [[🗣 Language 🗣 Language 🗣 Langu…](cb:s:lang)
    [[🏠 Home 🏠 Home 🏠 Home]](cb:h)

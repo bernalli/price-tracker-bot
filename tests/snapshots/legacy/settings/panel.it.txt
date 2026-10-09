@@ -13,12 +13,12 @@
    | 🔕 Silenzia: off
    | 📬 Digest: off
    | 🌙 Ore silenziose: off
-   | ⏱ Limite: illimitato
+   | 🚦 Limite: illimitato
    | 🌍 Fuso orario: Europe/Rome
    | 🗣 Lingua: Automatica (Italiano)
    keyboard:
    | [🔕 Silenzia → s:mu] [📬 Digest → s:dg]
-   | [🌙 Ore silenziose → s:qh] [⏱ Limite → s:th]
+   | [🌙 Ore silenziose → s:qh] [🚦 Limite → s:th]
    | [🌍 Fuso orario → s:tz] [🗣 Lingua → s:lang]
    | [🏠 Home → h]
 ## db after step 1
@@ -37,7 +37,7 @@
    | [1 giorno → s:mu:24] [Per sempre → s:mu:0]
    | [🔔 Riattiva ✓ → s:mu:off]
    | [✏️ Altra durata → s:ask:mu]
-   | [◀️ Impostazioni → s] [🏠 Home → h]
+   | [⬅️ Impostazioni → s] [🏠 Home → h]
 ## db after step 2
 (no changes)
 ## step 3: press "s:mu:8" user=10 on=1
@@ -54,7 +54,7 @@
    | [1 giorno → s:mu:24] [Per sempre → s:mu:0]
    | [🔔 Riattiva → s:mu:off]
    | [✏️ Altra durata → s:ask:mu]
-   | [◀️ Impostazioni → s] [🏠 Home → h]
+   | [⬅️ Impostazioni → s] [🏠 Home → h]
 ## db after step 3
 + notification_prefs user_id=10,product_id=NULL {mute=1, mute_until="2026-03-01T20:00:00+00:00", digest_mode=0, digest_interval_minutes=60, quiet_hours_start=NULL, quiet_hours_end=NULL, throttle_per_hour=NULL, timezone="Europe/Rome", throttle_state_json=NULL, updated_at=<now:9999-99-99 99:99:99>}
 ## step 4: press "s:dg" user=10 on=1 synthetic
@@ -69,7 +69,7 @@
    keyboard:
    | [Attivo → s:dg:on] [Disattivo ✓ → s:dg:off]
    | [✏️ Intervallo → s:ask:dg] [📨 Invia ora → s:dn]
-   | [◀️ Impostazioni → s] [🏠 Home → h]
+   | [⬅️ Impostazioni → s] [🏠 Home → h]
 ## db after step 4
 (no changes)
 ## step 5: press "s:dg:on" user=10 on=1
@@ -84,7 +84,7 @@
    keyboard:
    | [Attivo ✓ → s:dg:on] [Disattivo → s:dg:off]
    | [✏️ Intervallo → s:ask:dg] [📨 Invia ora → s:dn]
-   | [◀️ Impostazioni → s] [🏠 Home → h]
+   | [⬅️ Impostazioni → s] [🏠 Home → h]
 ## db after step 5
 ~ notification_prefs user_id=10,product_id=NULL digest_mode: 0 -> 1
 ## step 6: press "s:qh" user=10 on=1 synthetic
@@ -99,7 +99,7 @@
    keyboard:
    | [22:00–08:00 → s:qh:2208] [Disattivo ✓ → s:qh:off]
    | [✏️ Altro orario → s:ask:qh]
-   | [◀️ Impostazioni → s] [🏠 Home → h]
+   | [⬅️ Impostazioni → s] [🏠 Home → h]
 ## db after step 6
 (no changes)
 ## step 7: press "s:qh:2208" user=10 on=1
@@ -114,7 +114,7 @@
    keyboard:
    | [22:00–08:00 ✓ → s:qh:2208] [Disattivo → s:qh:off]
    | [✏️ Altro orario → s:ask:qh]
-   | [◀️ Impostazioni → s] [🏠 Home → h]
+   | [⬅️ Impostazioni → s] [🏠 Home → h]
 ## db after step 7
 ~ notification_prefs user_id=10,product_id=NULL quiet_hours_start: NULL -> "22:00"
 ~ notification_prefs user_id=10,product_id=NULL quiet_hours_end: NULL -> "08:00"

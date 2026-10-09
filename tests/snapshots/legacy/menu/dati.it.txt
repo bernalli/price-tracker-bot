@@ -29,7 +29,7 @@
    | 🔄 5 check effettuati
    keyboard:
    | [💾 Esporta CSV → d:x]
-   | [📂 Importa CSV — invia file in chat → d:i]
-   | [◀️ Menu → h]
+   | [📥 Importa CSV — invia file in chat → d:i]
+   | [⬅️ Menu → h]
 ## db after step 2
 (no changes)

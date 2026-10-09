@@ -89,30 +89,6 @@
    "string": "✅ Nickname: <b>{nick}</b>\nID: <code>{tg_id}</code>"
   },
   {
-   "id": "🔍 Analisi in corso...",
-   "string": "🔍 Analisi in corso..."
-  },
-  {
-   "id": "📭 Non hai prodotti tracciati.",
-   "string": "📭 Non hai prodotti tracciati."
-  },
-  {
-   "id": "❌ ID non valido.",
-   "string": "❌ ID non valido."
-  },
-  {
-   "id": "❌ Prodotto non trovato.",
-   "string": "❌ Prodotto non trovato."
-  },
-  {
-   "id": "📭 Dati insufficienti per generare il grafico (servono almeno 2 punti).",
-   "string": "📭 Dati insufficienti per generare il grafico (servono almeno 2 punti)."
-  },
-  {
-   "id": "❌ Impossibile aggiornare il prezzo iniziale.",
-   "string": "❌ Impossibile aggiornare il prezzo iniziale."
-  },
-  {
    "id": "📭 You have no tracked products.",
    "string": "📭 Non hai prodotti tracciati."
   },
@@ -147,14 +123,6 @@
   {
    "id": "❌ Maximum interval is 7 days.",
    "string": "❌ L'intervallo massimo è 7 giorni."
-  },
-  {
-   "id": "{n} hour",
-   "string": "{n} ora"
-  },
-  {
-   "id": "{n} minutes",
-   "string": "{n} minuti"
   },
   {
    "id": "⏱ Check interval: <b>every {display}</b>\n📦 #{pid} — {name}",
@@ -201,92 +169,12 @@
    "string": "⏸ <b>Prodotti in pausa — scegli da riattivare:</b>"
   },
   {
-   "id": "✅ Reactivated: <b>{name}</b>",
-   "string": "✅ Riattivato: <b>{name}</b>"
-  },
-  {
    "id": "Choose product to pause",
    "string": "Scegli prodotto da mettere in pausa"
   },
   {
-   "id": "⏸ Tracking paused: <b>{name}</b>",
-   "string": "⏸ Tracking in pausa: <b>{name}</b>"
-  },
-  {
-   "id": "Use /reactivate {pid} to resume tracking.",
-   "string": "Usa /riattiva {pid} per riprendere."
-  },
-  {
-   "id": "❌ Prezzo non valido.",
-   "string": "❌ Prezzo non valido."
-  },
-  {
-   "id": "🔍 Analizzo il prodotto...",
-   "string": "🔍 Analizzo il prodotto..."
-  },
-  {
-   "id": "📭 Non hai prodotti da esportare.",
-   "string": "📭 Non hai prodotti da esportare."
-  },
-  {
-   "id": "❌ Il file deve essere un CSV.",
-   "string": "❌ Il file deve essere un CSV."
-  },
-  {
-   "id": "⏳ Importazione in corso...",
-   "string": "⏳ Importazione in corso..."
-  },
-  {
    "id": "📭 Non hai prodotti tracciati.\nIncollami un link per iniziare!",
    "string": "📭 Non hai prodotti tracciati.\nIncollami un link per iniziare!"
-  },
-  {
-   "id": "❌ Valore non valido.",
-   "string": "❌ Valore non valido."
-  },
-  {
-   "id": "❌ L'intervallo minimo è 5 minuti.",
-   "string": "❌ L'intervallo minimo è 5 minuti."
-  },
-  {
-   "id": "❌ L'intervallo massimo è 7 giorni.",
-   "string": "❌ L'intervallo massimo è 7 giorni."
-  },
-  {
-   "id": "👍 Ok, nessuna modifica.",
-   "string": "👍 Ok, nessuna modifica."
-  },
-  {
-   "id": "❌ Prezzo non valido. Riprova.",
-   "string": "❌ Prezzo non valido. Riprova."
-  },
-  {
-   "id": "❌ Valore non valido. Riprova (es. 20% o 50).",
-   "string": "❌ Valore non valido. Riprova (es. 20% o 50)."
-  },
-  {
-   "id": "❌ ID non valido. Deve essere un numero.",
-   "string": "❌ ID non valido. Deve essere un numero."
-  },
-  {
-   "id": "❌ Nickname vuoto.",
-   "string": "❌ Nickname vuoto."
-  },
-  {
-   "id": "❌ URL non valido.",
-   "string": "❌ URL non valido."
-  },
-  {
-   "id": "❌ Numero non valido.",
-   "string": "❌ Numero non valido."
-  },
-  {
-   "id": "❌ Minimo 5 minuti.",
-   "string": "❌ Minimo 5 minuti."
-  },
-  {
-   "id": "❌ Numero non valido. Riprova.",
-   "string": "❌ Numero non valido. Riprova."
   },
   {
    "id": "❌ Nothing to do: no automatically suspended products on this site.",
@@ -295,18 +183,6 @@
   {
    "id": "⏳ Reactivating {n} products and checking them...",
    "string": "⏳ Riattivo {n} prodotti e li ricontrollo..."
-  },
-  {
-   "id": "▶️ <b>Rechecked {n} products on {domain}</b>",
-   "string": "▶️ <b>Ricontrollati {n} prodotti su {domain}</b>"
-  },
-  {
-   "id": "✅ {name} — {price}",
-   "string": "✅ {name} — {price}"
-  },
-  {
-   "id": "❌ {name} — {why}",
-   "string": "❌ {name} — {why}"
   },
   {
    "id": "🗑 Yes, delete {n}",
@@ -345,20 +221,8 @@
    "string": "controllo fallito"
   },
   {
-   "id": "Last good read: {price} {sym} on {date}",
-   "string": "Ultima lettura buona: {price} {sym} il {date}"
-  },
-  {
-   "id": "No successful read yet",
-   "string": "Nessuna lettura riuscita finora"
-  },
-  {
    "id": "unknown",
    "string": "sconosciuto"
-  },
-  {
-   "id": "Error: <code>{error}</code>",
-   "string": "Errore: <code>{error}</code>"
   },
   {
    "id": "… and {k} more",
@@ -383,66 +247,6 @@
   {
    "id": "🗑 Delete all ({n})",
    "string": "🗑 Elimina tutti ({n})"
-  },
-  {
-   "id": "Listings removed on {domain}",
-   "string": "Prodotti rimossi da {domain}"
-  },
-  {
-   "id": "These pages answer HTTP 404/410: the store took them off the catalog.",
-   "string": "Le pagine rispondono HTTP 404/410: lo store li ha tolti dal catalogo."
-  },
-  {
-   "id": "Deleting keeps your list clean. Reactivate only if the store restores them.",
-   "string": "Eliminarli tiene pulita la lista. Riattivali solo se lo store li rimette in vendita."
-  },
-  {
-   "id": "Price unreadable on {domain}",
-   "string": "Prezzo illeggibile su {domain}"
-  },
-  {
-   "id": "The pages load, but the price could not be read anymore (layout change or a different offer).",
-   "string": "Le pagine si aprono, ma il prezzo non si legge più (layout cambiato o offerta diversa)."
-  },
-  {
-   "id": "Reactivate to run a fresh check right now.",
-   "string": "Riattiva per fare subito un nuovo controllo."
-  },
-  {
-   "id": "Site unreachable: {domain}",
-   "string": "Sito irraggiungibile: {domain}"
-  },
-  {
-   "id": "The site did not answer {max} checks in a row.",
-   "string": "Il sito non ha risposto a {max} controlli di fila."
-  },
-  {
-   "id": "Try again later. Reactivate once the site is back.",
-   "string": "Riprova più tardi. Riattiva quando il sito torna raggiungibile."
-  },
-  {
-   "id": "Blocked by {domain}",
-   "string": "Bloccato da {domain}"
-  },
-  {
-   "id": "The site is refusing automated checks (anti-bot).",
-   "string": "Il sito rifiuta i controlli automatici (anti-bot)."
-  },
-  {
-   "id": "Domain quarantine already paces retries. Reactivate once it clears.",
-   "string": "La quarantena del dominio gestisce già i tentativi. Riattiva quando si sblocca."
-  },
-  {
-   "id": "Tracking suspended on {domain}",
-   "string": "Tracking sospeso su {domain}"
-  },
-  {
-   "id": "Checks kept failing.",
-   "string": "I controlli continuano a fallire."
-  },
-  {
-   "id": "Reactivate to retry.",
-   "string": "Riattiva per riprovare."
   },
   {
    "id": "⚠️ Operational notices",
@@ -757,30 +561,6 @@
    "string": "✅ Nickname: <b>{nick}</b>\nID: <code>{tg_id}</code>"
   },
   {
-   "id": "🔍 Analisi in corso...",
-   "string": "🔍 Analisi in corso..."
-  },
-  {
-   "id": "📭 Non hai prodotti tracciati.",
-   "string": "📭 Non hai prodotti tracciati."
-  },
-  {
-   "id": "❌ ID non valido.",
-   "string": "❌ ID non valido."
-  },
-  {
-   "id": "❌ Prodotto non trovato.",
-   "string": "❌ Prodotto non trovato."
-  },
-  {
-   "id": "📭 Dati insufficienti per generare il grafico (servono almeno 2 punti).",
-   "string": "📭 Dati insufficienti per generare il grafico (servono almeno 2 punti)."
-  },
-  {
-   "id": "❌ Impossibile aggiornare il prezzo iniziale.",
-   "string": "❌ Impossibile aggiornare il prezzo iniziale."
-  },
-  {
    "id": "📭 You have no tracked products.",
    "string": "📭 You have no tracked products."
   },
@@ -815,14 +595,6 @@
   {
    "id": "❌ Maximum interval is 7 days.",
    "string": "❌ Maximum interval is 7 days."
-  },
-  {
-   "id": "{n} hour",
-   "string": "{n} hour"
-  },
-  {
-   "id": "{n} minutes",
-   "string": "{n} minutes"
   },
   {
    "id": "⏱ Check interval: <b>every {display}</b>\n📦 #{pid} — {name}",
@@ -869,92 +641,12 @@
    "string": "⏸ <b>Paused products — choose to reactivate:</b>"
   },
   {
-   "id": "✅ Reactivated: <b>{name}</b>",
-   "string": "✅ Reactivated: <b>{name}</b>"
-  },
-  {
    "id": "Choose product to pause",
    "string": "Choose product to pause"
   },
   {
-   "id": "⏸ Tracking paused: <b>{name}</b>",
-   "string": "⏸ Tracking paused: <b>{name}</b>"
-  },
-  {
-   "id": "Use /reactivate {pid} to resume tracking.",
-   "string": "Use /reactivate {pid} to resume tracking."
-  },
-  {
-   "id": "❌ Prezzo non valido.",
-   "string": "❌ Prezzo non valido."
-  },
-  {
-   "id": "🔍 Analizzo il prodotto...",
-   "string": "🔍 Analizzo il prodotto..."
-  },
-  {
-   "id": "📭 Non hai prodotti da esportare.",
-   "string": "📭 Non hai prodotti da esportare."
-  },
-  {
-   "id": "❌ Il file deve essere un CSV.",
-   "string": "❌ Il file deve essere un CSV."
-  },
-  {
-   "id": "⏳ Importazione in corso...",
-   "string": "⏳ Importazione in corso..."
-  },
-  {
    "id": "📭 Non hai prodotti tracciati.\nIncollami un link per iniziare!",
    "string": "📭 Non hai prodotti tracciati.\nIncollami un link per iniziare!"
-  },
-  {
-   "id": "❌ Valore non valido.",
-   "string": "❌ Valore non valido."
-  },
-  {
-   "id": "❌ L'intervallo minimo è 5 minuti.",
-   "string": "❌ L'intervallo minimo è 5 minuti."
-  },
-  {
-   "id": "❌ L'intervallo massimo è 7 giorni.",
-   "string": "❌ L'intervallo massimo è 7 giorni."
-  },
-  {
-   "id": "👍 Ok, nessuna modifica.",
-   "string": "👍 Ok, nessuna modifica."
-  },
-  {
-   "id": "❌ Prezzo non valido. Riprova.",
-   "string": "❌ Prezzo non valido. Riprova."
-  },
-  {
-   "id": "❌ Valore non valido. Riprova (es. 20% o 50).",
-   "string": "❌ Valore non valido. Riprova (es. 20% o 50)."
-  },
-  {
-   "id": "❌ ID non valido. Deve essere un numero.",
-   "string": "❌ ID non valido. Deve essere un numero."
-  },
-  {
-   "id": "❌ Nickname vuoto.",
-   "string": "❌ Nickname vuoto."
-  },
-  {
-   "id": "❌ URL non valido.",
-   "string": "❌ URL non valido."
-  },
-  {
-   "id": "❌ Numero non valido.",
-   "string": "❌ Numero non valido."
-  },
-  {
-   "id": "❌ Minimo 5 minuti.",
-   "string": "❌ Minimo 5 minuti."
-  },
-  {
-   "id": "❌ Numero non valido. Riprova.",
-   "string": "❌ Numero non valido. Riprova."
   },
   {
    "id": "❌ Nothing to do: no automatically suspended products on this site.",
@@ -963,18 +655,6 @@
   {
    "id": "⏳ Reactivating {n} products and checking them...",
    "string": "⏳ Reactivating {n} products and checking them..."
-  },
-  {
-   "id": "▶️ <b>Rechecked {n} products on {domain}</b>",
-   "string": "▶️ <b>Rechecked {n} products on {domain}</b>"
-  },
-  {
-   "id": "✅ {name} — {price}",
-   "string": "✅ {name} — {price}"
-  },
-  {
-   "id": "❌ {name} — {why}",
-   "string": "❌ {name} — {why}"
   },
   {
    "id": "🗑 Yes, delete {n}",
@@ -1013,20 +693,8 @@
    "string": "check failed"
   },
   {
-   "id": "Last good read: {price} {sym} on {date}",
-   "string": "Last good read: {price} {sym} on {date}"
-  },
-  {
-   "id": "No successful read yet",
-   "string": "No successful read yet"
-  },
-  {
    "id": "unknown",
    "string": "unknown"
-  },
-  {
-   "id": "Error: <code>{error}</code>",
-   "string": "Error: <code>{error}</code>"
   },
   {
    "id": "… and {k} more",
@@ -1051,66 +719,6 @@
   {
    "id": "🗑 Delete all ({n})",
    "string": "🗑 Delete all ({n})"
-  },
-  {
-   "id": "Listings removed on {domain}",
-   "string": "Listings removed on {domain}"
-  },
-  {
-   "id": "These pages answer HTTP 404/410: the store took them off the catalog.",
-   "string": "These pages answer HTTP 404/410: the store took them off the catalog."
-  },
-  {
-   "id": "Deleting keeps your list clean. Reactivate only if the store restores them.",
-   "string": "Deleting keeps your list clean. Reactivate only if the store restores them."
-  },
-  {
-   "id": "Price unreadable on {domain}",
-   "string": "Price unreadable on {domain}"
-  },
-  {
-   "id": "The pages load, but the price could not be read anymore (layout change or a different offer).",
-   "string": "The pages load, but the price could not be read anymore (layout change or a different offer)."
-  },
-  {
-   "id": "Reactivate to run a fresh check right now.",
-   "string": "Reactivate to run a fresh check right now."
-  },
-  {
-   "id": "Site unreachable: {domain}",
-   "string": "Site unreachable: {domain}"
-  },
-  {
-   "id": "The site did not answer {max} checks in a row.",
-   "string": "The site did not answer {max} checks in a row."
-  },
-  {
-   "id": "Try again later. Reactivate once the site is back.",
-   "string": "Try again later. Reactivate once the site is back."
-  },
-  {
-   "id": "Blocked by {domain}",
-   "string": "Blocked by {domain}"
-  },
-  {
-   "id": "The site is refusing automated checks (anti-bot).",
-   "string": "The site is refusing automated checks (anti-bot)."
-  },
-  {
-   "id": "Domain quarantine already paces retries. Reactivate once it clears.",
-   "string": "Domain quarantine already paces retries. Reactivate once it clears."
-  },
-  {
-   "id": "Tracking suspended on {domain}",
-   "string": "Tracking suspended on {domain}"
-  },
-  {
-   "id": "Checks kept failing.",
-   "string": "Checks kept failing."
-  },
-  {
-   "id": "Reactivate to retry.",
-   "string": "Reactivate to retry."
   },
   {
    "id": "⚠️ Operational notices",

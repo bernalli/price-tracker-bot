@@ -6,7 +6,7 @@
 -> sendMessage chat=10
    param parse_mode="HTML"
    text:
-   | 📦 <b>Scegli prodotto da controllare:</b>
+   | 🔄 <b>Scegli prodotto da controllare:</b>
    keyboard:
    | [80,00 € ▼20% Kettle → p:1:ck]
    | [N/D Fan → p:2:ck]
@@ -16,7 +16,7 @@
 -> sendMessage chat=10
    param parse_mode="HTML"
    text:
-   | 📦 <b>Scegli prodotto da controllare:</b>
+   | 🔄 <b>Scegli prodotto da controllare:</b>
    keyboard:
    | [80,00 € ▼20% Kettle → p:1:ck]
    | [N/D Fan → p:2:ck]
