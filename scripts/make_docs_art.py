@@ -2,9 +2,9 @@
 """Regenerate the artwork shipped in ``docs/img/``.
 
 ``price-chart.png`` uses the bot's chart renderer with a synthetic price series.
-The cover, social preview, and Telegram description image are SVG compositions
-rendered with ``rsvg-convert``. Install it, Fontconfig (``fc-match``), and the
-Lato Regular, Bold and Black fonts before running:
+The other brand images are rendered from SVG with ``rsvg-convert``. Install it,
+Fontconfig (``fc-match``), and the Lato Regular, Bold and Black fonts before
+running:
 
     uv run python scripts/make_docs_art.py
 """
@@ -15,10 +15,14 @@ import shutil
 import subprocess
 import sys
 from datetime import UTC, datetime, timedelta
+from io import BytesIO
 from pathlib import Path
+
+from PIL import Image
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 IMG_DIR = REPO_ROOT / "docs" / "img"
+LOGO_DIR = IMG_DIR / "logo"
 
 YELLOW = "#FFD60A"
 DARK = "#1C1C1C"
@@ -269,6 +273,24 @@ def render_svg(renderer: str, source: str, output: Path, width: int) -> None:
     )
 
 
+def render_svg_supersampled(
+    renderer: str,
+    source: str,
+    output: Path,
+    width: int,
+    height: int,
+) -> None:
+    """Render an SVG at 2× and downsample it to the requested PNG size."""
+    rendered = subprocess.run(
+        [renderer, "-w", str(width * 2), "-"],
+        input=source.encode(),
+        capture_output=True,
+        check=True,
+    )
+    with Image.open(BytesIO(rendered.stdout)) as image:
+        image.resize((width, height), Image.Resampling.LANCZOS).save(output, optimize=True)
+
+
 def require_fonts() -> None:
     """Reject missing font faces instead of silently rendering substitutes."""
     matcher = shutil.which("fc-match")
@@ -294,15 +316,37 @@ def main() -> None:
 
     require_fonts()
     IMG_DIR.mkdir(parents=True, exist_ok=True)
+    LOGO_DIR.mkdir(parents=True, exist_ok=True)
     render_chart(IMG_DIR / "price-chart.png")
     images = (
-        ("cover.png", cover_svg(), 1600),
-        ("social-preview.png", social_preview_svg(), 1280),
-        ("telegram-description.png", telegram_description_svg(), 640),
+        ("cover.png", cover_svg(), 3200),
+        ("social-preview.png", social_preview_svg(), 2560),
     )
     for name, source, width in images:
         output = IMG_DIR / name
         render_svg(renderer, source, output, width)
+        print(f"wrote {output}")
+    telegram_output = IMG_DIR / "telegram-description.png"
+    render_svg_supersampled(
+        renderer,
+        telegram_description_svg(),
+        telegram_output,
+        640,
+        360,
+    )
+    print(f"wrote {telegram_output}")
+    logos = (
+        ("icon.svg", "icon-1024.png", 1024),
+        ("avatar.svg", "avatar-1280.png", 1280),
+    )
+    for source_name, output_name, width in logos:
+        output = LOGO_DIR / output_name
+        render_svg(
+            renderer,
+            (LOGO_DIR / source_name).read_text(encoding="utf-8"),
+            output,
+            width,
+        )
         print(f"wrote {output}")
     print(f"wrote {IMG_DIR / 'price-chart.png'}")
 
