@@ -3,7 +3,10 @@
 
 ``price-chart.png`` uses the bot's chart renderer with a synthetic price series.
 The cover, social preview, and Telegram description image are SVG compositions
-rendered with ``rsvg-convert``.
+rendered with ``rsvg-convert``. Install it, Fontconfig (``fc-match``), and the
+Lato Regular, Bold and Black fonts before running:
+
+    uv run python scripts/make_docs_art.py
 """
 
 from __future__ import annotations
@@ -266,12 +269,30 @@ def render_svg(renderer: str, source: str, output: Path, width: int) -> None:
     )
 
 
+def require_fonts() -> None:
+    """Reject missing font faces instead of silently rendering substitutes."""
+    matcher = shutil.which("fc-match")
+    if matcher is None:
+        raise SystemExit("fc-match (Fontconfig) is required to verify the artwork fonts")
+    for weight, style in (("regular", "Regular"), ("bold", "Bold"), ("black", "Black")):
+        match = subprocess.run(
+            [matcher, "--format", "%{family}|%{style}", f"{FONT}:weight={weight}"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        families, _, styles = match.stdout.strip().partition("|")
+        if FONT not in families.split(",") or style not in styles.split(","):
+            raise SystemExit(f"{FONT} {style} is required to render the documentation images")
+
+
 def main() -> None:
     """Regenerate every documentation image."""
     renderer = shutil.which("rsvg-convert")
     if renderer is None:
         raise SystemExit("rsvg-convert is required to render the documentation images")
 
+    require_fonts()
     IMG_DIR.mkdir(parents=True, exist_ok=True)
     render_chart(IMG_DIR / "price-chart.png")
     images = (
