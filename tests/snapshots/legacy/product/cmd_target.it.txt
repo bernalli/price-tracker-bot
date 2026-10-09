@@ -6,7 +6,7 @@
 -> sendMessage chat=10
    param parse_mode="HTML"
    text:
-   | 📦 <b>Scegli prodotto per impostare target:</b>
+   | 🎯 <b>Scegli prodotto per impostare target:</b>
    keyboard:
    | [80,00 € ▼20% Kettle → p:1:tg]
 ## db after step 1
@@ -76,7 +76,7 @@
 -> sendMessage chat=10
    param parse_mode="HTML"
    text:
-   | 📦 <b>Scegli prodotto per impostare target:</b>
+   | 🎯 <b>Scegli prodotto per impostare target:</b>
    keyboard:
    | [80,00 € ▼20% Kettle → p:1:tg]
    | [80,00 € Long NNNNNNNNNNNNNNNNNN… → p:2:tg]

@@ -9,11 +9,11 @@
    | ℹ️ <b>Le tue statistiche</b>
    |
    | 📦 Prodotti attivi: 1
-   | 📁 Prodotti totali: 2
+   | 📦 Prodotti totali: 2
    | 🔄 Controlli effettuati: 5
    | ⏱ Intervallo check: ogni 6h
    |
-   | <b>📡 Bot Status</b>
+   | <b>ℹ️ Bot Status</b>
    | Uptime: 1h 2m 5s
    | Products tracked: 0
 ## db after step 1

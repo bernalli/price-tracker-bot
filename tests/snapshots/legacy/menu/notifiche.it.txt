@@ -30,6 +30,6 @@
    | [80,00 € ▼20% Kettle → p:1:ed]
    | [N/D Fan → p:2:ed]
    | [20,00 € Speaker → p:3:ed]
-   | [◀️ Menu → h]
+   | [⬅️ Menu → h]
 ## db after step 2
 (no changes)

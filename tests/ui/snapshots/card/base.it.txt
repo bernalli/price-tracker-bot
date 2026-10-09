@@ -17,4 +17,4 @@ keyboard:
    [⏸ Pausa](cb:p:42:pa)  [🗑 Elimina](cb:p:42:rm)
    [🔔 Regola avviso](cb:p:42:th)  [⏱ Intervallo](cb:p:42:iv)
    [🔗 Apri](url:https://shop.example.com/item/42)
-   [◀️ Lista](cb:l:a:1)
+   [⬅️ Lista](cb:l:a:1)

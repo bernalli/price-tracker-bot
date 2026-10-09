@@ -8,11 +8,11 @@ text:
    | 🔕 Mute: until 3/1/26, 9:00 PM
    | 📬 Digest: on, every 30 min
    | 🌙 Quiet hours: 22:00–08:00
-   | ⏱ Throttle: 5 per hour
+   | 🚦 Throttle: 5 per hour
    | 🌍 Timezone: Europe/Berlin
    | 🗣 Language: Automatic (English)
 keyboard:
    [🔕 Mute](cb:s:mu)  [📬 Digest](cb:s:dg)
-   [🌙 Quiet hours](cb:s:qh)  [⏱ Throttle](cb:s:th)
+   [🌙 Quiet hours](cb:s:qh)  [🚦 Throttle](cb:s:th)
    [🌍 Timezone](cb:s:tz)  [🗣 Language](cb:s:lang)
    [🏠 Home](cb:h)

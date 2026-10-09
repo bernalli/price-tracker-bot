@@ -17,4 +17,4 @@ keyboard:
    [[🗑 Delete 🗑 Delete 🗑 Delete]](cb:p:9223372036854775807:rm)
    [[🔔 Alert rule 🔔 Alert rule 🔔 A…](cb:p:9223372036854775807:th)
    [[⏱ Interval ⏱ Interval ⏱ Inter…](cb:p:9223372036854775807:iv)
-   [[◀️ List ◀️ List ◀️ List]](cb:l:a:1)
+   [[⬅️ List ⬅️ List ⬅️ List]](cb:l:a:1)

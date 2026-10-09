@@ -9,4 +9,4 @@ text:
 keyboard:
    [On ✓](cb:s:dg:on)  [Off](cb:s:dg:off)
    [✏️ Interval](cb:s:ask:dg)  [📨 Send now](cb:s:dn)
-   [◀️ Settings](cb:s)  [🏠 Home](cb:h)
+   [⬅️ Settings](cb:s)  [🏠 Home](cb:h)

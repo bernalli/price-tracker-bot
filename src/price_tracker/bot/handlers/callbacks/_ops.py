@@ -94,7 +94,7 @@ async def _handle_reactivate(
         delay_between_products=0.5,
     )
     lines = [
-        _("▶️ <b>Rechecked {n} products on {domain}</b>").format(
+        _("🔄 <b>Rechecked {n} products on {domain}</b>").format(
             n=len(group), domain=_escape_html(domain)
         )
     ]

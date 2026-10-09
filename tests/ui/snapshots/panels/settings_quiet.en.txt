@@ -9,4 +9,4 @@ text:
 keyboard:
    [22:00–08:00 ✓](cb:s:qh:2208)  [Off](cb:s:qh:off)
    [✏️ Other hours](cb:s:ask:qh)
-   [◀️ Settings](cb:s)  [🏠 Home](cb:h)
+   [⬅️ Settings](cb:s)  [🏠 Home](cb:h)

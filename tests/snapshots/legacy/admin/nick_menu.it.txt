@@ -14,6 +14,6 @@
    | [✏️ 1 → a:nk:1]
    | [✏️ 10 → a:nk:10]
    | [✏️ 11 → a:nk:11]
-   | [◀️ Impostazioni → a]
+   | [⬅️ Impostazioni → a]
 ## db after step 1
 (no changes)

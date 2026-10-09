@@ -8,6 +8,6 @@
    text:
    | ❌ Nessun utente rimovibile.
    keyboard:
-   | [◀️ Impostazioni → a]
+   | [⬅️ Impostazioni → a]
 ## db after step 1
 (no changes)

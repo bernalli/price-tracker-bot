@@ -8,5 +8,5 @@ text:
    | [Current: Europe/Berlin Current: Europe/Berlin Current: Europe/Berlin]
 keyboard:
    [[✏️ Change ✏️ Change ✏️ Change]](cb:s:ask:tz)
-   [[◀️ Settings ◀️ Settings ◀️ Setti…](cb:s)
+   [[⬅️ Settings ⬅️ Settings ⬅️ Setti…](cb:s)
    [[🏠 Home 🏠 Home 🏠 Home]](cb:h)

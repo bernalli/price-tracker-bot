@@ -29,7 +29,7 @@
    keyboard:
    | [80,00 € ▼20% Kettle → p:1:ed]
    | [N/D Fan → p:2:ed]
-   | [◀️ Menu → h]
+   | [⬅️ Menu → h]
 ## db after step 2
 (no changes)
 ## step 3: press "cmd_lista" user=10 on=1000
@@ -40,6 +40,6 @@
    | 📦 Hai <b>2</b> prodotti tracciati.
    | Usa /lista per vederli tutti.
    keyboard:
-   | [◀️ Menu → h]
+   | [⬅️ Menu → h]
 ## db after step 3
 (no changes)

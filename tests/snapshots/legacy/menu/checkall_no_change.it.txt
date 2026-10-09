@@ -30,7 +30,7 @@
    | [🔄 Controlla tutti i prezzi → ca]
    | [80,00 € ▼20% Kettle → p:1:ck]
    | [📈 Storico prezzo → hi]
-   | [◀️ Menu → h]
+   | [⬅️ Menu → h]
 ## db after step 2
 (no changes)
 ## step 3: press "menu_checkall" user=10 on=1000
@@ -46,7 +46,7 @@
    |
    | <b>80,00 €</b> ▼20% Kettle
    keyboard:
-   | [◀️ Menu → h]
+   | [⬅️ Menu → h]
 ## db after step 3
 + price_history id=6 {product_id=1, price="80.00", checked_at=<now:9999-99-99 99:99:99>}
 ~ products id=1 last_checked_at: "2026-03-01 10:00:00" -> <now:9999-99-99 99:99:99>
@@ -82,7 +82,7 @@
    | [0,64 € ▼20% Cheap → p:2:ck]
    | [99,50 € ▼0,5% Near → p:3:ck]
    | [📈 Storico prezzo → hi]
-   | [◀️ Menu → h]
+   | [⬅️ Menu → h]
 ## db after step 5
 (no changes)
 ## step 6: press "menu_checkall" user=10 on=1001
@@ -100,7 +100,7 @@
    | <b>0,64 €</b> ▼20% Cheap
    | <b>99,50 €</b> ▼0,5% Near
    keyboard:
-   | [◀️ Menu → h]
+   | [⬅️ Menu → h]
 ## db after step 6
 + price_history id=7 {product_id=1, price="80.00", checked_at=<now:9999-99-99 99:99:99>}
 + price_history id=8 {product_id=2, price="0.64", checked_at=<now:9999-99-99 99:99:99>}

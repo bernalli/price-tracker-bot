@@ -29,7 +29,7 @@
    keyboard:
    | [80,00 € ▼20% Kettle → p:1:ed]
    | [⏸ 1 in pausa → riattiva → pz]
-   | [◀️ Menu → h]
+   | [⬅️ Menu → h]
 ## db after step 2
 (no changes)
 ## step 3: press "menu_paused" user=10 on=1
@@ -42,7 +42,7 @@
    | Tocca per riattivare.
    keyboard:
    | [45,00 € ⏸ Old Fan → p:2:ra]
-   | [◀️ Menu → h]
+   | [⬅️ Menu → h]
 ## db after step 3
 (no changes)
 ## step 4: command "/menu" user=10
@@ -72,7 +72,7 @@
    keyboard:
    | [80,00 € ▼20% Kettle → p:1:ed]
    | [⏸ 11 in pausa → riattiva → pz]
-   | [◀️ Menu → h]
+   | [⬅️ Menu → h]
 ## db after step 5
 (no changes)
 ## step 6: press "menu_paused" user=10 on=1001
@@ -94,6 +94,6 @@
    | [5,00 € ⏸ Paused 86 → p:9:ra]
    | [5,00 € ⏸ Paused 87 → p:10:ra]
    | [5,00 € ⏸ Paused 88 → p:11:ra]
-   | [◀️ Menu → h]
+   | [⬅️ Menu → h]
 ## db after step 6
 (no changes)

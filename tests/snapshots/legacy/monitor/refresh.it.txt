@@ -6,7 +6,7 @@
 -> sendMessage chat=10
    param parse_mode="HTML"
    text:
-   | 📦 <b>Scegli prodotto per impostare intervallo:</b>
+   | ⏱ <b>Scegli prodotto per impostare intervallo:</b>
    keyboard:
    | [80,00 € ▼20% Kettle → p:1:iv]
 ## db after step 1

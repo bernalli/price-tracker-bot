@@ -15,7 +15,7 @@
 -> sendMessage chat=10
    param parse_mode="HTML"
    text:
-   | ✅ Riattivato: <b>Old Fan</b>
+   | ▶️ Riattivato: <b>Old Fan</b>
 ## db after step 2
 ~ products id=1 is_active: 0 -> 1
 ~ products id=1 suspension_kind: "manual" -> NULL
@@ -44,7 +44,7 @@
 -> sendMessage chat=10
    param parse_mode="HTML"
    text:
-   | ✅ Riattivato: <b>Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN…</b>
+   | ▶️ Riattivato: <b>Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN…</b>
 ## db after step 6
 ~ products id=3 is_active: 0 -> 1
 ~ products id=3 suspension_kind: "manual" -> NULL

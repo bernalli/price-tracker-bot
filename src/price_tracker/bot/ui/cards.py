@@ -135,7 +135,7 @@ def _keyboard(view: ProductView, actions: CardActions) -> tuple[tuple[Button, ..
     ]
     if view.url:
         group_1.append(button(_("🔗 Open"), url=view.url))
-    group_2 = [button(_("◀️ List"), callback=actions.back)]
+    group_2 = [button(_("⬅️ List"), callback=actions.back)]
     return layout_rows(group_1, group_2)
 
 
@@ -214,7 +214,7 @@ def _list_keyboard(page: ListPage) -> tuple[tuple[Button, ...], ...]:
     if page.pages > 1:
         nav = []
         if page.page > 1:
-            nav.append(button("◀️", callback=go(page.page - 1)))
+            nav.append(button("⬅️", callback=go(page.page - 1)))
         nav.append(button(f"{page.page}/{page.pages}", callback=encode(Action("noop"))))
         if page.page < page.pages:
             nav.append(button("▶️", callback=go(page.page + 1)))

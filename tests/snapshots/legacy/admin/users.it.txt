@@ -30,12 +30,12 @@
    | ⏱ Intervallo globale: 360 min
    keyboard:
    | [👥 Lista utenti → a:u]
-   | [➕ Aggiungi utente → a:add] [🚫 Rimuovi utente → a:rm]
+   | [➕ Aggiungi utente → a:add] [🗑 Rimuovi utente → a:rm]
    | [✏️ Nickname utente → a:nk]
    | [⏱ Intervallo globale: 360 min → a:iv]
    | [🔧 Debug scraper → a:dbg]
    | [🏥 Salute scraper → a:hl]
-   | [◀️ Menu → h]
+   | [⬅️ Menu → h]
 ## db after step 2
 (no changes)
 ## step 3: press "menu_admin_users" user=1 on=1000
@@ -49,6 +49,6 @@
    | 👤 <code>10</code> N/D — 1 prod.
    | 👤 <code>11</code> N/D — 1 prod.
    keyboard:
-   | [◀️ Impostazioni → a]
+   | [⬅️ Impostazioni → a]
 ## db after step 3
 (no changes)

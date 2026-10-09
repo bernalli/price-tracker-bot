@@ -30,6 +30,6 @@
    | [80,00 € ▼20% Kettle → p:1:ed]
    | [N/D Fan → p:2:ed]
    | [⏸ 1 in pausa → riattiva → pz]
-   | [◀️ Menu → h]
+   | [⬅️ Menu → h]
 ## db after step 2
 (no changes)

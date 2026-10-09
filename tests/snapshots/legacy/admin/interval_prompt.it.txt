@@ -11,7 +11,7 @@
    |
    | Scrivi i minuti (es. <code>60</code>, <code>360</code>):
    keyboard:
-   | [Annulla → a]
+   | [❌ Annulla → a]
 ## db after step 1
 (no changes)
 ## step 2: text "abc" user=1
@@ -48,7 +48,7 @@
    |
    | Scrivi i minuti (es. <code>60</code>, <code>360</code>):
    keyboard:
-   | [Annulla → a]
+   | [❌ Annulla → a]
 ## db after step 6
 (no changes)
 ## step 7: text "30" user=1
@@ -67,7 +67,7 @@
    |
    | Scrivi i minuti (es. <code>60</code>, <code>360</code>):
    keyboard:
-   | [Annulla → a]
+   | [❌ Annulla → a]
 ## db after step 8
 (no changes)
 ## step 9: text "10081" user=1
@@ -92,7 +92,7 @@
    |
    | Scrivi i minuti (es. <code>60</code>, <code>360</code>):
    keyboard:
-   | [Annulla → a]
+   | [❌ Annulla → a]
 ## db after step 11
 (no changes)
 ## step 12: text "60" user=1
@@ -127,7 +127,7 @@
    | ℹ️ <b>Statistiche</b>
    |
    | 📦 Prodotti attivi: 0
-   | 📁 Totali: 0
+   | 📦 Totali: 0
    | 🔄 Check: 0
    | ⏱ Intervallo: ogni 1h
    |
@@ -136,7 +136,7 @@
    | 📦 Prodotti globali: 0
    | 🔄 Check globali: 0
    keyboard:
-   | [❓ Aiuto → hp] [⚠️ Errori → er]
-   | [◀️ Menu → h]
+   | [ℹ️ Aiuto → hp] [⚠️ Errori → er]
+   | [⬅️ Menu → h]
 ## db after step 14
 (no changes)

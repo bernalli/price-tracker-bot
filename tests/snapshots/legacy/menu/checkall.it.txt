@@ -31,7 +31,7 @@
    | [80,00 € ▼20% Kettle → p:1:ck]
    | [N/D Fan → p:2:ck]
    | [📈 Storico prezzo → hi]
-   | [◀️ Menu → h]
+   | [⬅️ Menu → h]
 ## db after step 2
 (no changes)
 ## step 3: press "menu_checkall" user=10 on=1000
@@ -50,7 +50,7 @@
    |
    | 🔔 <b>1 variazioni!</b>
    keyboard:
-   | [◀️ Menu → h]
+   | [⬅️ Menu → h]
 -> sendMessage chat=10
    param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"

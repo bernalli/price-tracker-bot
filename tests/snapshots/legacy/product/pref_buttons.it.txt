@@ -14,8 +14,8 @@
    keyboard:
    | [🔔 Ogni ribasso → p:1:th:any]
    | [📉 Soglia % o € → p:1:th]
-   | [💰 Prezzo target → p:1:tg]
-   | [👍 Va bene -10% (default) → p:1:th:def]
+   | [🎯 Prezzo target → p:1:tg]
+   | [📉 Va bene -10% (default) → p:1:th:def]
 ## db after step 1
 ~ products id=1 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
 ~ products id=1 preferred_condition: NULL -> "new"
@@ -31,8 +31,8 @@
    keyboard:
    | [🔔 Ogni ribasso → p:1:th:any]
    | [📉 Soglia % o € → p:1:th]
-   | [💰 Prezzo target → p:1:tg]
-   | [👍 Va bene -10% (default) → p:1:th:def]
+   | [🎯 Prezzo target → p:1:tg]
+   | [📉 Va bene -10% (default) → p:1:th:def]
 ## db after step 2
 ~ products id=1 preferred_condition: "new" -> "used"
 ## step 3: press "pref_amazon_1" user=10 on=1 synthetic
@@ -47,8 +47,8 @@
    keyboard:
    | [🔔 Ogni ribasso → p:1:th:any]
    | [📉 Soglia % o € → p:1:th]
-   | [💰 Prezzo target → p:1:tg]
-   | [👍 Va bene -10% (default) → p:1:th:def]
+   | [🎯 Prezzo target → p:1:tg]
+   | [📉 Va bene -10% (default) → p:1:th:def]
 ## db after step 3
 ~ products id=1 preferred_condition: "used" -> NULL
 ~ products id=1 preferred_seller: NULL -> "amazon"
@@ -64,8 +64,8 @@
    keyboard:
    | [🔔 Ogni ribasso → p:1:th:any]
    | [📉 Soglia % o € → p:1:th]
-   | [💰 Prezzo target → p:1:tg]
-   | [👍 Va bene -10% (default) → p:1:th:def]
+   | [🎯 Prezzo target → p:1:tg]
+   | [📉 Va bene -10% (default) → p:1:th:def]
 ## db after step 4
 ~ products id=1 preferred_seller: "amazon" -> "any"
 ## step 5: press "pref_default_1" user=10 on=1 synthetic
@@ -80,7 +80,7 @@
    keyboard:
    | [🔔 Ogni ribasso → p:1:th:any]
    | [📉 Soglia % o € → p:1:th]
-   | [💰 Prezzo target → p:1:tg]
-   | [👍 Va bene -10% (default) → p:1:th:def]
+   | [🎯 Prezzo target → p:1:tg]
+   | [📉 Va bene -10% (default) → p:1:th:def]
 ## db after step 5
 ~ products id=1 preferred_seller: "any" -> NULL

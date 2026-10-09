@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Update messages fit on small phones.
+- Icons match their actions; commands in the command menu have icons.
 
 ## [1.8.0] - 2026-10-09
 

@@ -49,18 +49,18 @@ def request_log() -> FakeRequest:
 MENU_METHODS = {"setMyCommands", "deleteMyCommands", "setChatMenuButton"}
 LANGUAGES: tuple[str | None, ...] = (None, "it")
 ENGLISH_MENU = [
-    ("menu", "Open the main menu"),
-    ("list", "List your products"),
-    ("checkall", "Check all your products now"),
-    ("status", "Show your statistics"),
-    ("help", "Show every command"),
+    ("menu", "🏠 Open the main menu"),
+    ("list", "📦 List your products"),
+    ("checkall", "🔄 Check all your products now"),
+    ("status", "ℹ️ Show your statistics"),
+    ("help", "ℹ️ Show every command"),
 ]
 ITALIAN_MENU = [
-    ("menu", "Apri il menu principale"),
-    ("list", "Elenca i tuoi prodotti"),
-    ("checkall", "Controlla subito tutti i tuoi prodotti"),
-    ("status", "Mostra le tue statistiche"),
-    ("help", "Mostra tutti i comandi"),
+    ("menu", "🏠 Apri il menu principale"),
+    ("list", "📦 Elenca i tuoi prodotti"),
+    ("checkall", "🔄 Controlla subito tutti i tuoi prodotti"),
+    ("status", "ℹ️ Mostra le tue statistiche"),
+    ("help", "ℹ️ Mostra tutti i comandi"),
 ]
 SHORT_NAMES = [name for name, _ in ENGLISH_MENU]
 USER_NAMES_1_5 = [spec.name for spec in COMMANDS if not spec.admin]
@@ -154,6 +154,16 @@ class _CommandStore:
 def test_menu_commands_are_the_five_short_entries_in_each_language() -> None:
     assert [(c.command, c.description) for c in menu_commands("en")] == ENGLISH_MENU
     assert [(c.command, c.description) for c in menu_commands("it")] == ITALIAN_MENU
+
+
+@pytest.mark.parametrize("language", ["en", "it"])
+def test_every_command_menu_entry_has_one_icon_within_telegram_limits(language: str) -> None:
+    for command in menu_commands(language):
+        icon, separator, text = command.description.partition(" ")
+        assert separator, command
+        assert text, command
+        assert not icon.isascii(), command
+        assert 1 <= len(command.description) <= 256, command
 
 
 def test_the_short_menu_names_registered_user_commands_once() -> None:
