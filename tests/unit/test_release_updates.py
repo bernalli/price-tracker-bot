@@ -45,7 +45,7 @@ async def test_first_start_catches_up_each_active_user_and_persists(repo, no_del
     assert [call.kwargs["chat_id"] for call in calls] == [123456789, 900000001]
     for call in calls:
         assert call.kwargs["parse_mode"] == "HTML"
-        assert "Updated to version 1.7.1" in call.kwargs["text"]
+        assert "Updated to version 1.8.0" in call.kwargs["text"]
         assert "Also since your last update:" in call.kwargs["text"]
         assert "1.7.0:" in call.kwargs["text"]
         assert "1.0.0:" not in call.kwargs["text"]
@@ -58,7 +58,7 @@ async def test_first_start_catches_up_each_active_user_and_persists(repo, no_del
     bot.send_message.assert_not_awaited()
 
 
-@pytest.mark.parametrize("stored", ["1.7.1", "1.8.0", "1.10.0"])
+@pytest.mark.parametrize("stored", ["1.8.0", "1.8.1", "1.10.0"])
 async def test_equal_or_older_running_version_does_nothing(repo, stored):
     await repo.ensure_user(123456789)
     await repo.set_config("last_announced_version", stored)
@@ -154,9 +154,9 @@ async def test_recipient_language_and_locale_restoration(repo):
     texts = {
         call.kwargs["chat_id"]: call.kwargs["text"] for call in bot.send_message.await_args_list
     }
-    assert "Aggiornato alla versione 1.7.1" in texts[123456789]
+    assert "Aggiornato alla versione 1.8.0" in texts[123456789]
     assert "Inoltre, dal tuo ultimo aggiornamento:" in texts[123456789]
-    assert "Updated to version 1.7.1" in texts[900000001]
+    assert "Updated to version 1.8.0" in texts[900000001]
     assert texts[900000002] == texts[123456789]
     assert current_locale() == "en"
 
