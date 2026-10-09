@@ -22,7 +22,7 @@ GROUP_TITLES: Final = {
     "admin": N_("👑 Admin"),
 }
 
-HELP_HEADER: Final = N_("ℹ️ <b>Commands</b>")
+HELP_HEADER: Final = N_("❓ <b>Commands</b>")
 
 
 @dataclass(frozen=True)
@@ -42,7 +42,7 @@ class CommandSpec:
 COMMANDS: Final = (
     CommandSpec("start", N_("🏠 Start the bot"), "track"),
     CommandSpec("menu", N_("🏠 Open the main menu"), "track"),
-    CommandSpec("help", N_("ℹ️ Show every command"), "track"),
+    CommandSpec("help", N_("❓ Show every command"), "track"),
     CommandSpec("cancel", N_("❌ Cancel the current action"), "track"),
     CommandSpec("add", N_("➕ Track a product from a link"), "track"),
     CommandSpec("list", N_("📦 List your products"), "track"),

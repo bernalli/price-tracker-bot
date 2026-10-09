@@ -136,7 +136,7 @@
    | 📦 Prodotti globali: 0
    | 🔄 Check globali: 0
    keyboard:
-   | [ℹ️ Aiuto → hp] [⚠️ Errori → er]
+   | [❓ Aiuto → hp] [⚠️ Errori → er]
    | [⬅️ Menu → h]
 ## db after step 14
 (no changes)

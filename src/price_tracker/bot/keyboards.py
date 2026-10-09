@@ -35,7 +35,7 @@ def build_threshold_keyboard(product_id: int) -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton(
-                    "📉 Va bene -10% (default)",
+                    "👍 Va bene -10% (default)",
                     callback_data=encode(Action("product.threshold_default", (product_id,))),
                 ),
             ],

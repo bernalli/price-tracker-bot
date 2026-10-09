@@ -146,7 +146,7 @@ msgid "👑 Admin"
 msgstr "👑 Admin"
 
 #: src/price_tracker/bot/commands.py:25
-msgid "ℹ️ <b>Commands</b>"
+msgid "❓ <b>Commands</b>"
 msgstr ""
 
 #: src/price_tracker/bot/commands.py:43
@@ -158,7 +158,7 @@ msgid "🏠 Open the main menu"
 msgstr ""
 
 #: src/price_tracker/bot/commands.py:45
-msgid "ℹ️ Show every command"
+msgid "❓ Show every command"
 msgstr ""
 
 #: src/price_tracker/bot/commands.py:46
@@ -1763,7 +1763,7 @@ msgstr ""
 "🔄 Global checks: {checks}"
 
 #: src/price_tracker/bot/handlers/callbacks/_menu.py:411
-msgid "ℹ️ Help"
+msgid "❓ Help"
 msgstr ""
 
 #: src/price_tracker/bot/handlers/callbacks/_menu.py:412
