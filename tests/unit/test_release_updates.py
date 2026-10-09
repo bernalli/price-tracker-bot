@@ -174,6 +174,21 @@ async def test_empty_newest_and_skipped_releases_are_recorded_without_message(re
     assert await repo.get_config("last_announced_version") == "1.8.0"
 
 
+async def test_upgrade_from_1_8_0_to_1_8_1_is_silent_and_stores_version(repo, monkeypatch):
+    monkeypatch.setattr(price_tracker, "__version__", "1.8.1")
+    assert release_notes.RELEASE_NOTES["1.8.1"] == ()
+    for uid, locale in enumerate(CATALOG_LOCALES, start=1):
+        await repo.ensure_user(uid)
+        await repo.set_user_telegram_tag(uid, locale.replace("_", "-"))
+    await repo.set_config("last_announced_version", "1.8.0")
+    bot = Mock(send_message=AsyncMock())
+
+    await release_updates.announce_release(bot, repo, "en")
+
+    bot.send_message.assert_not_awaited()
+    assert await repo.get_config("last_announced_version") == "1.8.1"
+
+
 def test_cap_drops_oldest_lines_and_escapes_html(monkeypatch):
     notes = {f"1.{minor}.0": (f"Improvement {minor}", "Detail") for minor in range(1, 100)}
     notes["1.100.0"] = ("Prices < 10 & > 5", "Keep <b>literal</b> text")
