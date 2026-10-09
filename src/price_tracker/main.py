@@ -207,7 +207,12 @@ async def amain() -> None:
 
     metrics = MetricsRegistry()
     application.bot_data["metrics"] = metrics
-    application.bot_data["start_time"] = time.monotonic()
+    start_time = time.monotonic()
+    products_tracked = 0
+    application.bot_data["start_time"] = start_time
+    application.bot_data["products_tracked"] = products_tracked
+    metrics.bot_uptime_seconds.set(time.monotonic() - start_time)
+    metrics.products_tracked_total.set(products_tracked)
 
     metrics_server: MetricsServer | None = None
     if config.metrics_enabled:

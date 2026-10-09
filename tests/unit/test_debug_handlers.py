@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import time
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -216,14 +218,21 @@ async def test_health_command_expired_lockout_listed_as_half_open() -> None:
 
 @pytest.mark.asyncio
 async def test_status_shows_uptime_and_products_tracked() -> None:
-    """status_command renders uptime + products_tracked from metrics gauges."""
+    """Status renders app state without reading prometheus_client internals."""
     update = MagicMock()
     update.message.reply_html = AsyncMock()
-    metrics = MagicMock()
-    metrics.bot_uptime_seconds._value.get = lambda: 3700.0  # ~1h 1m 40s
-    metrics.products_tracked_total._value.get = lambda: 42
+    uptime_gauge = SimpleNamespace(set=MagicMock())
+    products_gauge = SimpleNamespace(set=MagicMock())
+    metrics = SimpleNamespace(
+        bot_uptime_seconds=uptime_gauge,
+        products_tracked_total=products_gauge,
+    )
     context = MagicMock()
-    context.bot_data = {"metrics": metrics}
+    context.bot_data = {
+        "metrics": metrics,
+        "start_time": time.monotonic() - 3700.0,
+        "products_tracked": 42,
+    }
 
     await status_command(update, context)
 
@@ -231,6 +240,10 @@ async def test_status_shows_uptime_and_products_tracked() -> None:
     rendered: str = update.message.reply_html.call_args.args[0]
     assert "1h" in rendered or "uptime" in rendered.lower()
     assert "42" in rendered
+    uptime_gauge.set.assert_called_once()
+    products_gauge.set.assert_called_once_with(42)
+    assert not hasattr(uptime_gauge, "_value")
+    assert not hasattr(products_gauge, "_value")
 
 
 def _make_errori_context(
