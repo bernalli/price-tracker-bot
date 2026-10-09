@@ -20,6 +20,33 @@ class OpsRepositoryMixin(_RepositoryBase):
         )
         await self._conn.commit()
 
+    async def claim_announcement(self, user_id: int, version: str) -> bool:
+        """Durably claim a recipient/version before delivery, even across connections."""
+        cursor = await self._conn.execute(
+            "INSERT INTO bot_config(key, value) VALUES(?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value "
+            "WHERE bot_config.value != excluded.value",
+            (f"announced:{user_id}", version),
+        )
+        await self._conn.commit()
+        return cursor.rowcount == 1
+
+    async def delete_old_announcements(self, version: str) -> None:
+        """Keep current claims for overlapping broadcasts; remove older versions only."""
+        current = tuple(int(part) for part in version.split("."))
+        cursor = await self._conn.execute(
+            "SELECT DISTINCT value FROM bot_config WHERE key LIKE 'announced:%'"
+        )
+        older = [
+            (row[0],)
+            for row in await cursor.fetchall()
+            if tuple(int(part) for part in row[0].split(".")) < current
+        ]
+        await self._conn.executemany(
+            "DELETE FROM bot_config WHERE key LIKE 'announced:%' AND value = ?", older
+        )
+        await self._conn.commit()
+
     async def get_scraper_health(self, domain: str) -> ScraperHealth | None:
         cursor = await self._conn.execute(
             """

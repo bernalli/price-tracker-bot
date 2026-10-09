@@ -93,7 +93,6 @@ async def post_init(application: Application[Any, Any, Any, Any, Any, Any]) -> N
     )
 
     await sync_command_menus(application.bot, repo)
-    await announce_release(application.bot, repo, config.lang)
 
 
 async def _setup_scheduler(application: Application[Any, Any, Any, Any, Any, Any]) -> None:
@@ -257,9 +256,15 @@ async def amain() -> None:
     if application.updater is None:
         raise RuntimeError("Updater not initialized")
     await application.updater.start_polling()
+    announcement_task = application.create_task(
+        announce_release(application.bot, application.bot_data["repo"], config.lang),
+        name="release_announcement",
+    )
     try:
         await asyncio.Event().wait()
     finally:
+        announcement_task.cancel()
+        await asyncio.gather(announcement_task, return_exceptions=True)
         if metrics_server is not None:
             await metrics_server.stop()
             log.info("metrics_server.stop")

@@ -24,7 +24,7 @@ SEND_DELAY_SECONDS = 0.1
 
 
 async def announce_release(bot: Bot, repo: Repository, fallback_language: str) -> None:
-    """Attempt each active recipient once, then persist even partial delivery."""
+    """Claim before sending: a crash can lose an in-flight message, never repeat it."""
     current = price_tracker.__version__
     previous = await repo.get_config(ANNOUNCED_VERSION_KEY) or "1.0.0"
     if version_key(current) <= version_key(previous):
@@ -38,6 +38,11 @@ async def announce_release(bot: Bot, repo: Repository, fallback_language: str) -
                 continue
             if index:
                 await sleep(SEND_DELAY_SECONDS)
+            if not await repo.claim_announcement(user.user_id, current):
+                continue
+            # Recheck after all waits, immediately before starting the request.
+            if not await repo.is_user_allowed(user.user_id):
+                continue
             await bot.send_message(
                 chat_id=user.user_id,
                 text=text,
@@ -52,3 +57,4 @@ async def announce_release(bot: Bot, repo: Repository, fallback_language: str) -
         finally:
             reset_locale(token)
     await repo.set_config(ANNOUNCED_VERSION_KEY, current)
+    await repo.delete_old_announcements(current)
