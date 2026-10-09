@@ -86,22 +86,18 @@ def _render_metrics_lines(
 ) -> list[str]:
     """Return the metrics-snapshot lines for /status.
 
-    Reads `bot_uptime_seconds` and `products_tracked_total` gauges. When
-    `start_time` is provided, refreshes the uptime gauge to `monotonic - start`
-    before reading. When `products_tracked` is provided, refreshes that gauge
-    too. Uses the prometheus_client private `_value.get()` accessor to read the
-    current Gauge value (no public read API exists on Gauge).
+    Application state is the source of truth. The same values are written to
+    Prometheus and rendered for the user, so status output never depends on
+    prometheus_client internals.
     """
     if metrics is None:
         return ["Metrics unavailable"]
     try:
-        if start_time is not None:
-            metrics.bot_uptime_seconds.set(time.monotonic() - start_time)
-        if products_tracked is not None:
-            metrics.products_tracked_total.set(int(products_tracked))
-        uptime = metrics.bot_uptime_seconds._value.get()
-        tracked = metrics.products_tracked_total._value.get()
-    except (AttributeError, TypeError):
+        uptime = max(0.0, time.monotonic() - float(start_time or time.monotonic()))
+        tracked = int(products_tracked or 0)
+        metrics.bot_uptime_seconds.set(uptime)
+        metrics.products_tracked_total.set(tracked)
+    except (AttributeError, TypeError, ValueError):
         return ["Metrics unavailable"]
     return [
         "<b>📡 Bot Status</b>",
@@ -349,11 +345,10 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         _("⏱ Check interval: every {interval}").format(interval=interval_str),
     ]
 
-    products_tracked: int | None = None
     if is_admin:
         global_stats = await db.get_stats()
         users = await db.list_active_users()
-        products_tracked = int(global_stats["active_products"])
+        context.bot_data["products_tracked"] = int(global_stats["active_products"])
         lines.extend(
             [
                 "",
@@ -368,6 +363,7 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
     metrics = context.bot_data.get("metrics")
     start_time = context.bot_data.get("start_time")
+    products_tracked = context.bot_data.get("products_tracked")
     if metrics is not None:
         lines.append("")
         lines.extend(
@@ -390,8 +386,15 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     """
     metrics = context.bot_data.get("metrics")
     start_time = context.bot_data.get("start_time")
+    products_tracked = context.bot_data.get("products_tracked")
     lines = ["ℹ️ <b>Bot Status</b>", ""]
-    lines.extend(_render_metrics_lines(metrics, start_time=start_time))
+    lines.extend(
+        _render_metrics_lines(
+            metrics,
+            start_time=start_time,
+            products_tracked=products_tracked,
+        )
+    )
     await update.message.reply_html("\n".join(lines))
 
 
