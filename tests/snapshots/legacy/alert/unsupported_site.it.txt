@@ -10,7 +10,7 @@
    |
    | 1 prodotti hanno fallito 1/2 controlli di fila. Se continua, verranno sospesi automaticamente.
    |
-   | • <b>Bare IP</b> — prezzo non leggibile
+   | <b>10,00 €</b> ⚠️ Bare IP
    |
    | Dettagli con /errori.
    markup: {}
@@ -29,9 +29,7 @@
    |
    | Le pagine si aprono, ma il prezzo non si legge più (layout cambiato o offerta diversa).
    |
-   | • <b>Bare IP</b> — prezzo non leggibile
-   | Nessuna lettura riuscita finora
-   | Errore: <code>no_scraper</code>
+   | <b>10,00 €</b> ⚠️ Bare IP
    |
    | Riattiva per fare subito un nuovo controllo.
    keyboard:

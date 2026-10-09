@@ -68,7 +68,7 @@ async def test_flush_sends_message_and_marks_flushed(
     telegram_mock.send_message.assert_awaited()
     text = telegram_mock.send_message.call_args.kwargs["text"]
     assert "Widget" in text
-    assert "amazon.it" in text
+    assert "<b>€99.00</b> ▼17.5% Widget" in text
     repo_mock.mark_digest_flushed.assert_awaited_once_with([1])
 
 
@@ -314,7 +314,7 @@ async def test_flush_user_paginates_and_marks_only_sent_pages(
                 "domain": "example" * 10,
             },
         )
-        for entry_id in range(1, 51)
+        for entry_id in range(1, 201)
     ]
     repo_mock.list_pending_digest = AsyncMock(return_value=entries)
     repo_mock.mark_digest_flushed = AsyncMock()
@@ -322,7 +322,7 @@ async def test_flush_user_paginates_and_marks_only_sent_pages(
 
     flushed = await svc.flush_user(user_id=42)
 
-    assert flushed == 50
+    assert flushed == 200
     assert telegram_mock.send_message.await_count >= 2
     assert all(
         visible_length(call.kwargs["text"]) <= 4000
@@ -333,7 +333,7 @@ async def test_flush_user_paginates_and_marks_only_sent_pages(
         for call in repo_mock.mark_digest_flushed.await_args_list
         for entry_id in call.args[0]
     ]
-    assert marked_ids == list(range(1, 51))
+    assert marked_ids == list(range(1, 201))
     assert (
         len(repo_mock.mark_digest_flushed.await_args_list) == telegram_mock.send_message.await_count
     )
@@ -346,7 +346,7 @@ async def test_flush_user_paginates_and_marks_only_sent_pages(
         await svc.flush_user(user_id=42)
 
     assert repo_mock.mark_digest_flushed.await_count == 1
-    assert repo_mock.mark_digest_flushed.await_args.args[0] != list(range(1, 51))
+    assert repo_mock.mark_digest_flushed.await_args.args[0] != list(range(1, 201))
 
 
 def test_warning_without_counters_does_not_invent_one_of_one() -> None:

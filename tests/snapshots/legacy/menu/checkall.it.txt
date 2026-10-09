@@ -28,8 +28,8 @@
    | Tocca un prodotto per controllarlo.
    keyboard:
    | [🔄 Controlla tutti i prezzi → ca]
-   | [🔄 #1 Kettle → p:1:ck]
-   | [🔄 #2 Fan → p:2:ck]
+   | [80,00 € ▼20% Kettle → p:1:ck]
+   | [N/D Fan → p:2:ck]
    | [📈 Storico prezzo → hi]
    | [◀️ Menu → h]
 ## db after step 2
@@ -42,10 +42,11 @@
 -> editMessageText chat=10 message_id=1000
    param parse_mode="HTML"
    text:
-   | ✅ <b>Completato</b> — 2 prodotti
+   | ✅ <b>Completato</b>
+   | 2 prodotti
    |
-   |   #1 Kettle — €64.00 <i>(-36.0%)</i>
-   |   #2 Fan — €50.00
+   | <b>64,00 €</b> ▼36% Kettle
+   | <b>50,00 USD</b> Fan
    |
    | 🔔 <b>1 variazioni!</b>
    keyboard:

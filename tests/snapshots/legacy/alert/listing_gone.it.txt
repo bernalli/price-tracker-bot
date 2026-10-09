@@ -22,9 +22,7 @@
    |
    | Le pagine rispondono HTTP 404/410: lo store li ha tolti dal catalogo.
    |
-   | • <b>Kettle</b> — pagina non trovata (HTTP 404)
-   | Ultima lettura buona: 80.00 € il 2026-03-01 10:00 UTC
-   | Errore: <code>listing_gone: HTTP 404</code>
+   | <b>80,00 €</b> ⚠️ Kettle
    |
    | Eliminarli tiene pulita la lista. Riattivali solo se lo store li rimette in vendita.
    keyboard:

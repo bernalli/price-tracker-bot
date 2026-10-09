@@ -10,16 +10,16 @@
    |
    | 11 prodotti hanno fallito 1/2 controlli di fila. Se continua, verranno sospesi automaticamente.
    |
-   | • <b>Item 01</b> — prezzo non leggibile
-   | • <b>Item 02</b> — prezzo non leggibile
-   | • <b>Item 03</b> — prezzo non leggibile
-   | • <b>Item 04</b> — prezzo non leggibile
-   | • <b>Item 05</b> — prezzo non leggibile
-   | • <b>Item 06</b> — prezzo non leggibile
-   | • <b>Item 07</b> — prezzo non leggibile
-   | • <b>Item 08</b> — prezzo non leggibile
-   | • <b>Item 09</b> — prezzo non leggibile
-   | • <b>Item 10</b> — prezzo non leggibile
+   | <b>10,00 €</b> ⚠️ Item 01
+   | <b>10,00 €</b> ⚠️ Item 02
+   | <b>10,00 €</b> ⚠️ Item 03
+   | <b>10,00 €</b> ⚠️ Item 04
+   | <b>10,00 €</b> ⚠️ Item 05
+   | <b>10,00 €</b> ⚠️ Item 06
+   | <b>10,00 €</b> ⚠️ Item 07
+   | <b>10,00 €</b> ⚠️ Item 08
+   | <b>10,00 €</b> ⚠️ Item 09
+   | <b>10,00 €</b> ⚠️ Item 10
    | … e altri 1
    |
    | Dettagli con /errori.
@@ -66,36 +66,16 @@
    |
    | Le pagine si aprono, ma il prezzo non si legge più (layout cambiato o offerta diversa).
    |
-   | • <b>Item 01</b> — prezzo non leggibile
-   | Nessuna lettura riuscita finora
-   | Errore: <code>parse_error: no price</code>
-   | • <b>Item 02</b> — prezzo non leggibile
-   | Nessuna lettura riuscita finora
-   | Errore: <code>parse_error: no price</code>
-   | • <b>Item 03</b> — prezzo non leggibile
-   | Nessuna lettura riuscita finora
-   | Errore: <code>parse_error: no price</code>
-   | • <b>Item 04</b> — prezzo non leggibile
-   | Nessuna lettura riuscita finora
-   | Errore: <code>parse_error: no price</code>
-   | • <b>Item 05</b> — prezzo non leggibile
-   | Nessuna lettura riuscita finora
-   | Errore: <code>parse_error: no price</code>
-   | • <b>Item 06</b> — prezzo non leggibile
-   | Nessuna lettura riuscita finora
-   | Errore: <code>parse_error: no price</code>
-   | • <b>Item 07</b> — prezzo non leggibile
-   | Nessuna lettura riuscita finora
-   | Errore: <code>parse_error: no price</code>
-   | • <b>Item 08</b> — prezzo non leggibile
-   | Nessuna lettura riuscita finora
-   | Errore: <code>parse_error: no price</code>
-   | • <b>Item 09</b> — prezzo non leggibile
-   | Nessuna lettura riuscita finora
-   | Errore: <code>parse_error: no price</code>
-   | • <b>Item 10</b> — prezzo non leggibile
-   | Nessuna lettura riuscita finora
-   | Errore: <code>parse_error: no price</code>
+   | <b>10,00 €</b> ⚠️ Item 01
+   | <b>10,00 €</b> ⚠️ Item 02
+   | <b>10,00 €</b> ⚠️ Item 03
+   | <b>10,00 €</b> ⚠️ Item 04
+   | <b>10,00 €</b> ⚠️ Item 05
+   | <b>10,00 €</b> ⚠️ Item 06
+   | <b>10,00 €</b> ⚠️ Item 07
+   | <b>10,00 €</b> ⚠️ Item 08
+   | <b>10,00 €</b> ⚠️ Item 09
+   | <b>10,00 €</b> ⚠️ Item 10
    | … e altri 1
    |
    | Riattiva per fare subito un nuovo controllo.

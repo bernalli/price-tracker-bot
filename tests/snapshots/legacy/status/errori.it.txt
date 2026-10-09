@@ -11,15 +11,8 @@
    text:
    | ⚠️ <b>Errori recenti (2)</b>
    |
-   | <b>#1</b> Kettle
-   |   🌐 example.com — 🔒 T1 (1h) (riprende tra 1h 00m)
-   |   ❌ 3 letture fallite
-   |   🐞 parse_error: no price — 30min fa
-   |
-   | <b>#2</b> Fan
-   |   🌐 example.com — 🔒 T1 (1h) (riprende tra 1h 00m)
-   |   ❌ 1 letture fallite
-   |   🐞 http_error: 503 — 1g fa
+   | <b>N/D</b> 🔒3 Kettle
+   | <b>N/D</b> 🔒1 Fan
    |
    | ℹ️ I siti in 🔒 quarantena riprendono da soli; usa /reactivate per riattivare un prodotto sospeso.
 ## db after step 4
@@ -30,15 +23,8 @@
    text:
    | ⚠️ <b>Errori recenti (2)</b>
    |
-   | <b>#1</b> Kettle
-   |   🌐 example.com — 🔒 T1 (1h) (riprende tra 1h 00m)
-   |   ❌ 3 letture fallite
-   |   🐞 parse_error: no price — 30min fa
-   |
-   | <b>#2</b> Fan
-   |   🌐 example.com — 🔒 T1 (1h) (riprende tra 1h 00m)
-   |   ❌ 1 letture fallite
-   |   🐞 http_error: 503 — 1g fa
+   | <b>N/D</b> 🔒3 Kettle
+   | <b>N/D</b> 🔒1 Fan
    |
    | ℹ️ I siti in 🔒 quarantena riprendono da soli; usa /reactivate per riattivare un prodotto sospeso.
 ## db after step 5
@@ -49,25 +35,10 @@
    text:
    | ⚠️ <b>Errori recenti (4)</b>
    |
-   | <b>#1</b> Kettle
-   |   🌐 example.com — 🔒 T1 (1h) (riprende tra 1h 00m)
-   |   ❌ 3 letture fallite
-   |   🐞 parse_error: no price — 30min fa
-   |
-   | <b>#2</b> Fan
-   |   🌐 example.com — 🔒 T1 (1h) (riprende tra 1h 00m)
-   |   ❌ 1 letture fallite
-   |   🐞 http_error: 503 — 1g fa
-   |
-   | <b>#3</b> Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN…
-   |   🌐 example.com — 🔒 T1 (1h) (riprende tra 1h 00m)
-   |   ❌ 1 letture fallite
-   |   🐞 parse_error: eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee — 1h fa
-   |
-   | <b>#4</b> P4
-   |   🌐 example.com — 🔒 T1 (1h) (riprende tra 1h 00m)
-   |   ❌ 1 letture fallite
-   |   🐞 x — 1g fa
+   | <b>N/D</b> 🔒3 Kettle
+   | <b>N/D</b> 🔒1 Fan
+   | <b>N/D</b> 🔒1 Long NNNNNNNNNNNNNNNNNN…
+   | <b>N/D</b> 🔒1 P4
    |
    | ℹ️ I siti in 🔒 quarantena riprendono da soli; usa /reactivate per riattivare un prodotto sospeso.
 ## db after step 6

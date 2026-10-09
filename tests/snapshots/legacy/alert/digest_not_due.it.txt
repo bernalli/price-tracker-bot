@@ -18,14 +18,14 @@
    param parse_mode="HTML"
    text:
    | 📊 <b>Riepilogo — 2 variazioni di prezzo</b>
-   | 🔻 Kettle — EUR80.00 → EUR64.00 — example.com
-   | 🔻 Fan — USD50.00 → USD40.00 — example.com
+   | <b>64,00 €</b> ▼20% Kettle
+   | <b>40,00 USD</b> ▼20% Fan
    | Usa /lista per lo stato completo.
 -> sendMessage chat=11
    param parse_mode="HTML"
    text:
    | 📊 <b>Riepilogo — 1 variazione di prezzo</b>
-   | 🔻 Lamp — EUR30.00 → EUR25.00 — example.com
+   | <b>25,00 €</b> ▼16,7% Lamp
    | Usa /lista per lo stato completo.
 ## db after step 9
 ~ digest_queue id=1 flushed_at: NULL -> <now:9999-99-99 99:99:99>

@@ -27,6 +27,7 @@ from price_tracker.bot.handlers._helpers import (
     _safe_dec,
 )
 from price_tracker.bot.messages import _
+from price_tracker.bot.ui.product_rows import record_row
 from price_tracker.bot.ui.width import truncate_to_width
 
 logger = logging.getLogger(__name__)
@@ -167,11 +168,10 @@ async def cmd_history(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
         buttons = []
         for p in products:
-            name = truncate_to_width(p.get("name") or _("Unknown"), 35)
             buttons.append(
                 [
                     InlineKeyboardButton(
-                        f"#{p['id']} {name}",
+                        record_row(p, html=False),
                         callback_data=encode(Action("product.chart", (p["id"], "all"))),
                     )
                 ]

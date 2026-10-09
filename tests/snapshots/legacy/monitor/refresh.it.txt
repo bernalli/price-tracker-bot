@@ -8,7 +8,7 @@
    text:
    | 📦 <b>Scegli prodotto per impostare intervallo:</b>
    keyboard:
-   | [#1 Kettle €80.00 → p:1:iv]
+   | [80,00 € ▼20% Kettle → p:1:iv]
 ## db after step 1
 ~ users user_id=10 display_name: NULL -> "U10"
 ## step 2: command "/refresh 1" user=10

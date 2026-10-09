@@ -20,9 +20,9 @@
    |
    | 3 prodotti hanno fallito 1/2 controlli di fila. Se continua, verranno sospesi automaticamente.
    |
-   | • <b>Kettle</b> — bloccato
-   | • <b>Speaker</b> — bloccato
-   | • <b>Mixer</b> — bloccato
+   | <b>80,00 €</b> ⚠️ Kettle
+   | <b>40,00 €</b> ⚠️ Speaker
+   | <b>60,00 €</b> ⚠️ Mixer
    |
    | Dettagli con /errori.
    markup: {}

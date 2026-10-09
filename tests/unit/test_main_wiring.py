@@ -7,7 +7,9 @@ instance via ``SchedulerDeps.health_mgr`` (no silent no-op fallback).
 
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
@@ -76,3 +78,81 @@ async def test_post_init_wires_health_manager_into_bot_data(
     finally:
         await application.bot_data["http_client"].aclose()
         await db_conn.close()
+
+
+async def test_startup_runs_announcement_after_polling_and_cancels_on_shutdown(
+    fake_config, memory_db, monkeypatch
+):
+    from price_tracker import main
+
+    started = asyncio.Event()
+    cancelled = asyncio.Event()
+    events = []
+    tasks = []
+
+    async def broadcast(*args):
+        events.append("broadcast")
+        started.set()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            cancelled.set()
+
+    def create_task(coroutine, *, name=None):
+        task = asyncio.create_task(coroutine, name=name)
+        tasks.append(task)
+        return task
+
+    async def stop():
+        assert cancelled.is_set()
+        assert all(task.cancelled() for task in tasks)
+        events.append("stop")
+
+    application = Mock(
+        bot_data={},
+        bot=Mock(),
+        initialize=AsyncMock(),
+        start=AsyncMock(side_effect=lambda: events.append("start")),
+        stop=AsyncMock(side_effect=stop),
+        shutdown=AsyncMock(),
+        updater=Mock(
+            start_polling=AsyncMock(side_effect=lambda: events.append("polling")),
+            stop=AsyncMock(),
+        ),
+        create_task=Mock(side_effect=create_task),
+    )
+    builder = Mock()
+    builder.token.return_value.post_init.return_value.build.return_value = application
+    monkeypatch.setattr(main, "Application", Mock(builder=Mock(return_value=builder)))
+    monkeypatch.setattr(Config, "from_env", Mock(return_value=fake_config))
+    monkeypatch.setattr(main, "bootstrap_database", AsyncMock(return_value=memory_db))
+    monkeypatch.setattr(main, "configure_logging", Mock())
+    monkeypatch.setattr(main, "discover_builtin_scrapers", Mock())
+    monkeypatch.setattr(main, "discover_dropin_scrapers", Mock())
+    monkeypatch.setattr(main, "register_handlers", Mock())
+    monkeypatch.setattr(main, "build_client", Mock())
+    monkeypatch.setattr(main, "sync_command_menus", AsyncMock())
+    setup_scheduler = AsyncMock(side_effect=lambda app: events.append("scheduler"))
+    monkeypatch.setattr(main, "_setup_scheduler", setup_scheduler)
+    monkeypatch.setattr(main, "announce_release", broadcast)
+
+    runner = asyncio.create_task(main.amain())
+    try:
+        await asyncio.wait_for(started.wait(), timeout=2)
+        assert events == ["scheduler", "start", "polling", "broadcast"]
+        assert not runner.done()
+        application.create_task.assert_called_once()
+        assert not tasks[0].done()
+    finally:
+        runner.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await asyncio.wait_for(runner, timeout=2)
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+    assert cancelled.is_set()
+    assert events[-1] == "stop"
+    application.updater.stop.assert_awaited_once()
+    application.shutdown.assert_awaited_once()

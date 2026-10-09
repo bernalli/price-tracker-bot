@@ -25,7 +25,7 @@ from babel.messages.pofile import read_po
 from hypothesis import given
 from hypothesis import strategies as st
 
-from price_tracker.bot import flows
+from price_tracker.bot import flow_rendering, flows
 from price_tracker.bot.flows import FlowRegistry, FlowSnapshot, GuidedFlow, Route
 from price_tracker.bot.messages import _, reset_locale, set_locale
 from tests.support.fake_telegram import FakeServices, callback_update, message_update
@@ -554,7 +554,7 @@ async def test_b3_negative_control_the_log_sees_a_read_before_the_ticket() -> No
 
 @pytest.mark.parametrize("locale", ["it_IT", "en"])
 def test_every_flow_text_is_in_the_catalogs(locale: str) -> None:
-    tree = ast.parse(Path(inspect.getsourcefile(flows) or "").read_text())
+    tree = ast.parse(Path(inspect.getsourcefile(flow_rendering) or "").read_text())
     marked = {
         node.args[0].value
         for node in ast.walk(tree)

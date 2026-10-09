@@ -8,7 +8,7 @@
    text:
    | 📦 <b>Scegli prodotto per impostare target:</b>
    keyboard:
-   | [#1 Kettle €80.00 → p:1:tg]
+   | [80,00 € ▼20% Kettle → p:1:tg]
 ## db after step 1
 ~ users user_id=10 display_name: NULL -> "U10"
 ## step 2: command "/target 1" user=10
@@ -78,8 +78,8 @@
    text:
    | 📦 <b>Scegli prodotto per impostare target:</b>
    keyboard:
-   | [#1 Kettle €80.00 → p:1:tg]
-   | [#2 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNN… €80.00 → p:2:tg]
+   | [80,00 € ▼20% Kettle → p:1:tg]
+   | [80,00 € Long NNNNNNNNNNNNNNNNNN… → p:2:tg]
 ## db after step 10
 (no changes)
 ## step 11: command "/target 2 50" user=10

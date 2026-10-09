@@ -39,14 +39,8 @@
    text:
    | ⚠️ <b>Errori recenti (2)</b>
    |
-   | <b>#2</b> Amazon Widget
-   |   🌐 amazon.com
-   |   ❌ 2 letture fallite
-   |
-   | <b>#1</b> Kettle
-   |   🌐 example.com — 🔒 T1 half-open (riprende tra expired)
-   |   ❌ 1 letture fallite
-   |   🐞 parse_error: no price — 30min fa
+   | <b>N/D</b> ⚠️2 Amazon Widget
+   | <b>N/D</b> 🔒1 Kettle
    |
    | ℹ️ I siti in 🔒 quarantena riprendono da soli; usa /reactivate per riattivare un prodotto sospeso.
 ## db after step 12
