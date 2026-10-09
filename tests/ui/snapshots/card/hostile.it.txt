@@ -15,4 +15,4 @@ keyboard:
    [📈 Storico](cb:p:9223372036854775807:ch:30d)  [▶️ Riattiva](cb:p:9223372036854775807:ra)
    [🗑 Elimina](cb:p:9223372036854775807:rm)  [🔔 Regola avviso](cb:p:9223372036854775807:th)
    [⏱ Intervallo](cb:p:9223372036854775807:iv)
-   [◀️ Lista](cb:l:a:1)
+   [⬅️ Lista](cb:l:a:1)

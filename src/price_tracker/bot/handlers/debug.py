@@ -100,7 +100,7 @@ def _render_metrics_lines(
     except (AttributeError, TypeError, ValueError):
         return ["Metrics unavailable"]
     return [
-        "<b>📡 Bot Status</b>",
+        "<b>ℹ️ Bot Status</b>",
         f"Uptime: {_format_uptime(float(uptime or 0))}",
         f"Products tracked: {int(tracked or 0)}",
     ]
@@ -340,7 +340,7 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     lines = [
         _("ℹ️ <b>Your statistics</b>\n"),
         _("📦 Active products: {count}").format(count=user_stats["active_products"]),
-        _("📁 Total products: {count}").format(count=user_stats["total_products"]),
+        _("📦 Total products: {count}").format(count=user_stats["total_products"]),
         _("🔄 Checks performed: {count}").format(count=user_stats["total_checks"]),
         _("⏱ Check interval: every {interval}").format(interval=interval_str),
     ]

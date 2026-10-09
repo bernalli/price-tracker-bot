@@ -10,47 +10,47 @@
    | ❓ <b>Comandi</b>
    |
    | <b>📦 Prodotti</b>
-   | /start — Avvia il bot
-   | /menu — Apri il menu principale
-   | /help — Mostra tutti i comandi
-   | /cancel — Annulla l'azione in corso
-   | /add — Monitora un prodotto da un link
-   | /list — Elenca i tuoi prodotti
-   | /check — Controlla un prodotto adesso
-   | /checkall — Controlla subito tutti i tuoi prodotti
-   | /refresh — Imposta ogni quanto controllare un prodotto
-   | /pause — Metti in pausa un prodotto
-   | /reactivate — Riprendi il monitoraggio di un prodotto
-   | /delete — Elimina un prodotto
-   | /history — Mostra il grafico dei prezzi di un prodotto
-   | /reset — Azzera il prezzo iniziale di un prodotto
+   | /start — 🏠 Avvia il bot
+   | /menu — 🏠 Apri il menu principale
+   | /help — ❓ Mostra tutti i comandi
+   | /cancel — ❌ Annulla l'azione in corso
+   | /add — ➕ Monitora un prodotto da un link
+   | /list — 📦 Elenca i tuoi prodotti
+   | /check — 🔄 Controlla un prodotto adesso
+   | /checkall — 🔄 Controlla subito tutti i tuoi prodotti
+   | /refresh — ⏱ Imposta ogni quanto controllare un prodotto
+   | /pause — ⏸ Metti in pausa un prodotto
+   | /reactivate — ▶️ Riprendi il monitoraggio di un prodotto
+   | /delete — 🗑 Elimina un prodotto
+   | /history — 📈 Mostra il grafico dei prezzi di un prodotto
+   | /reset — 📌 Azzera il prezzo iniziale di un prodotto
    |
    | <b>🔔 Avvisi</b>
-   | /target — Imposta o rimuovi un prezzo obiettivo
-   | /threshold — Imposta quando avvisarti di un ribasso
-   | /mute — Silenzia le notifiche
-   | /unmute — Riattiva le notifiche
-   | /digest_mode — Attiva o disattiva il riepilogo delle notifiche
-   | /quiet_hours — Imposta le ore di silenzio
-   | /timezone — Imposta il tuo fuso orario
-   | /throttle — Limita le notifiche per ora
-   | /prefs — Mostra le tue impostazioni di notifica
-   | /digest_now — Invia subito il riepilogo in sospeso
+   | /target — 🎯 Imposta o rimuovi un prezzo obiettivo
+   | /threshold — 📉 Imposta quando avvisarti di un ribasso
+   | /mute — 🔕 Silenzia le notifiche
+   | /unmute — 🔔 Riattiva le notifiche
+   | /digest_mode — 📬 Attiva o disattiva il riepilogo delle notifiche
+   | /quiet_hours — 🌙 Imposta le ore di silenzio
+   | /timezone — 🌍 Imposta il tuo fuso orario
+   | /throttle — 🚦 Limita le notifiche per ora
+   | /prefs — ⚙️ Mostra le tue impostazioni di notifica
+   | /digest_now — 📨 Invia subito il riepilogo in sospeso
    |
    | <b>💾 Dati</b>
-   | /export — Esporta i tuoi prodotti in CSV
-   | /import — Importa prodotti da un file CSV
-   | /status — Mostra le tue statistiche
-   | /errors — Mostra i prodotti con errori
+   | /export — 💾 Esporta i tuoi prodotti in CSV
+   | /import — 📥 Importa prodotti da un file CSV
+   | /status — ℹ️ Mostra le tue statistiche
+   | /errors — ⚠️ Mostra i prodotti con errori
    |
    | <b>👑 Admin</b>
-   | /adduser — Autorizza un utente
-   | /removeuser — Rimuovi un utente
-   | /users — Elenca gli utenti autorizzati
-   | /nick — Imposta il soprannome di un utente
-   | /setinterval — Imposta l'intervallo globale di controllo
-   | /debug — Diagnostica la lettura di un link
-   | /health — Mostra lo stato degli scraper
+   | /adduser — ➕ Autorizza un utente
+   | /removeuser — 🗑 Rimuovi un utente
+   | /users — 👥 Elenca gli utenti autorizzati
+   | /nick — ✏️ Imposta il soprannome di un utente
+   | /setinterval — ⏱ Imposta l'intervallo globale di controllo
+   | /debug — 🔧 Diagnostica la lettura di un link
+   | /health — 🏥 Mostra lo stato degli scraper
    keyboard:
    | [🏠 Home → h]
 ## db after step 1

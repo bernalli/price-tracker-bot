@@ -698,7 +698,7 @@ async def test_status_and_info_offers_help_errors_and_the_way_back(
     markup = edit.params["reply_markup"]
     markup = json.loads(markup) if isinstance(markup, str) else markup
     rows = [[(b["text"], b["callback_data"]) for b in row] for row in markup["inline_keyboard"]]
-    assert rows == [[(label, HELP_DATA), (errors, "er")], [("◀️ Menu", "h")]]
+    assert rows == [[(label, HELP_DATA), (errors, "er")], [("⬅️ Menu", "h")]]
 
 
 # --- the admin debug prompt ----------------------------------------------------

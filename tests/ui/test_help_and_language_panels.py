@@ -93,7 +93,7 @@ def test_the_presets_are_automatic_then_each_language_in_its_own_name(ui_locales
     set_locale("en")
     screen = settings_section_screen("lang", BUSY, now=NOW, language=None)
     labels = [btn.label for row in screen.rows for btn in row]
-    assert labels == ["Automatic ✓", "English", "Italiano", "◀️ Settings", "🏠 Home"]
+    assert labels == ["Automatic ✓", "English", "Italiano", "⬅️ Settings", "🏠 Home"]
     for row in screen.rows:
         for btn in row:
             assert not isinstance(decode(btn.callback or ""), InvalidCallback)

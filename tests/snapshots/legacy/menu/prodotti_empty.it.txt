@@ -27,7 +27,7 @@
    |
    | Tocca un prodotto per modificarlo.
    keyboard:
-   | [📭 Nessun prodotto — incolla un link! → h]
-   | [◀️ Menu → h]
+   | [🏠 Nessun prodotto — incolla un link! → h]
+   | [⬅️ Menu → h]
 ## db after step 2
 (no changes)

@@ -29,7 +29,7 @@
    keyboard:
    | [80,00 € ▼20% Long NNNNNNNNNNNNN… → p:1:ed]
    | [⏸ 1 in pausa → riattiva → pz]
-   | [◀️ Menu → h]
+   | [⬅️ Menu → h]
 ## db after step 2
 (no changes)
 ## step 3: press "menu_paused" user=10 on=1000
@@ -42,7 +42,7 @@
    | Tocca per riattivare.
    keyboard:
    | [45,00 € ⏸ Long NNNNNNNNNNNNNNN… → p:2:ra]
-   | [◀️ Menu → h]
+   | [⬅️ Menu → h]
 ## db after step 3
 (no changes)
 ## step 4: command "/menu" user=10
@@ -73,7 +73,7 @@
    | [🔄 Controlla tutti i prezzi → ca]
    | [80,00 € ▼20% Long NNNNNNNNNNNNN… → p:1:ck]
    | [📈 Storico prezzo → hi]
-   | [◀️ Menu → h]
+   | [⬅️ Menu → h]
 ## db after step 5
 (no changes)
 ## step 6: press "menu_checkall" user=10 on=1001
@@ -89,7 +89,7 @@
    |
    | <b>80,00 €</b> ▼20% Long NNNNNNNNNNNNN…
    keyboard:
-   | [◀️ Menu → h]
+   | [⬅️ Menu → h]
 ## db after step 6
 + price_history id=6 {product_id=1, price="80.00", checked_at=<now:9999-99-99 99:99:99>}
 ~ products id=1 last_checked_at: "2026-03-01 10:00:00" -> <now:9999-99-99 99:99:99>
@@ -121,7 +121,7 @@
    | Tocca un prodotto per il grafico.
    keyboard:
    | [80,00 € ▼20% Long NNNNNNNNNNNNN… → p:1:ch:all]
-   | [◀️ Menu → h]
+   | [⬅️ Menu → h]
 ## db after step 8
 (no changes)
 ## step 9: command "/menu" user=10
@@ -150,6 +150,6 @@
    | Tocca un prodotto per cambiare soglia o target.
    keyboard:
    | [80,00 € ▼20% Long NNNNNNNNNNNNN… → p:1:ed]
-   | [◀️ Menu → h]
+   | [⬅️ Menu → h]
 ## db after step 10
 (no changes)

@@ -183,14 +183,14 @@ async def _admin_health(
     if not await db.is_user_admin(user_id):
         return  # silent, like the other admin buttons
     text = health_text(context.bot_data["health_manager"])
-    await _edit(query, _report_screen(text, button(_("◀️ Admin"), callback=encode(Action("admin")))))
+    await _edit(query, _report_screen(text, button(_("⬅️ Admin"), callback=encode(Action("admin")))))
 
 
 async def _errors(
     query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, action: Action
 ) -> None:
     text = await errors_text(db, context.bot_data.get("health_manager"), user_id)
-    back = button(_("◀️ Status & info"), callback=encode(Action("stats")))
+    back = button(_("⬅️ Status & info"), callback=encode(Action("stats")))
     chunks = split_message(text or no_errors_text())
     await _edit(query, _report_screen(chunks[0], back))
     for chunk in chunks[1:]:

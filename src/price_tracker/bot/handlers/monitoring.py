@@ -83,8 +83,9 @@ async def _product_picker(
             ]
         )
 
+    icon = {"refresh": "⏱", "setrefresh": "⏱", "check": "🔄", "pause": "⏸"}[action]
     await update.message.reply_text(
-        f"📦 <b>{label}:</b>",
+        f"{icon} <b>{label}:</b>",
         parse_mode=ParseMode.HTML,
         reply_markup=InlineKeyboardMarkup(buttons),
     )
@@ -316,7 +317,7 @@ async def cmd_reactivate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await _db(context).reactivate_product(product_id)
     name = product.get("name") or _("Unknown")
     await update.message.reply_text(
-        _("✅ Reactivated: <b>{name}</b>").format(name=_escape_html(truncate_to_width(name, 80))),
+        _("▶️ Reactivated: <b>{name}</b>").format(name=_escape_html(truncate_to_width(name, 80))),
         parse_mode=ParseMode.HTML,
     )
 

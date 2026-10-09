@@ -81,7 +81,7 @@ async def handle_edit_button(
         ],
         [
             InlineKeyboardButton(
-                _("💰 Target price"), callback_data=encode(Action("product.target", (product_id,)))
+                _("🎯 Target price"), callback_data=encode(Action("product.target", (product_id,)))
             )
         ],
     ]
@@ -89,7 +89,7 @@ async def handle_edit_button(
         edit_buttons.append(
             [
                 InlineKeyboardButton(
-                    _("🔄 Reset base price"),
+                    _("📌 Reset base price"),
                     callback_data=encode(Action("product.reset", (product_id,))),
                 )
             ]
@@ -105,8 +105,8 @@ async def handle_edit_button(
     await query.message.reply_text(
         _(
             "✏️ <b>Edit #{id}</b> {name}\n\n"
-            "🎯 Current threshold: <b>{threshold}</b>\n"
-            "🏁 Current target: <b>{target}</b>\n"
+            "📉 Current threshold: <b>{threshold}</b>\n"
+            "🎯 Current target: <b>{target}</b>\n"
             "📌 Base price: <b>{base}</b>\n\n"
             "<b>What do you want to change?</b>"
         ).format(

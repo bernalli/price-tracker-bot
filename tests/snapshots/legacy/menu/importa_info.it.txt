@@ -29,8 +29,8 @@
    | 🔄 0 check effettuati
    keyboard:
    | [💾 Esporta CSV → d:x]
-   | [📂 Importa CSV — invia file in chat → d:i]
-   | [◀️ Menu → h]
+   | [📥 Importa CSV — invia file in chat → d:i]
+   | [⬅️ Menu → h]
 ## db after step 2
 (no changes)
 ## step 3: press "menu_importa_info" user=10 on=1000
@@ -38,11 +38,11 @@
 -> editMessageText chat=10 message_id=1000
    param parse_mode="HTML"
    text:
-   | 📂 <b>Importa prodotti</b>
+   | 📥 <b>Importa prodotti</b>
    |
    | Invia un file CSV in chat (esportato con Esporta).
    | I duplicati verranno saltati.
    keyboard:
-   | [◀️ Menu → h]
+   | [⬅️ Menu → h]
 ## db after step 3
 (no changes)

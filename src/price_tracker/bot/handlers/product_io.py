@@ -124,7 +124,7 @@ async def cmd_import(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     if not update.message.document:
         await update.message.reply_text(
             _(
-                "📁 <b>Import products from CSV</b>\n\n"
+                "📥 <b>Import products from CSV</b>\n\n"
                 "Send a CSV file (exported with /export) as an attachment.\n"
                 "Duplicate products (same URL) will be skipped."
             ),
@@ -237,7 +237,7 @@ async def cmd_import(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             logger.error("Import error for %s: %s", url[:60], e)
             errors += 1
 
-    lines = [_("📁 <b>Import complete</b>")]
+    lines = [_("📥 <b>Import complete</b>")]
     lines.append(_("✅ Imported: {count}").format(count=imported))
     if skipped:
         lines.append(_("⏭️ Duplicates skipped: {count}").format(count=skipped))

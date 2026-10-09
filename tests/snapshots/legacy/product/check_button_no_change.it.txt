@@ -38,7 +38,7 @@
    | [⏸ Pausa → p:1:pa] [🗑 Elimina → p:1:rm]
    | [🔔 Regola avviso → p:1:ed] [⏱ Intervallo → p:1:iv]
    | [🔗 Apri → url:https://shop.example.com/item/1]
-   | [◀️ Lista → l:a:1]
+   | [⬅️ Lista → l:a:1]
 ## db after step 2
 (no changes)
 ## step 3: press "check_1" user=10 on=1000
@@ -65,7 +65,7 @@
    | [⏸ Pausa → p:1:pa] [🗑 Elimina → p:1:rm]
    | [🔔 Regola avviso → p:1:ed] [⏱ Intervallo → p:1:iv]
    | [🔗 Apri → url:https://shop.example.com/item/1]
-   | [◀️ Lista → l:a:1]
+   | [⬅️ Lista → l:a:1]
 ## db after step 3
 + price_history id=6 {product_id=1, price="80.00", checked_at=<now:9999-99-99 99:99:99>}
 ~ products id=1 last_checked_at: "2026-03-01 10:00:00" -> <now:9999-99-99 99:99:99>
@@ -112,7 +112,7 @@
    | [⏸ Pausa → p:2:pa] [🗑 Elimina → p:2:rm]
    | [🔔 Regola avviso → p:2:ed] [⏱ Intervallo → p:2:iv]
    | [🔗 Apri → url:https://shop.example.com/item/72]
-   | [◀️ Lista → l:a:1]
+   | [⬅️ Lista → l:a:1]
 ## db after step 6
 (no changes)
 ## step 7: press "check_2" user=10 on=1001
@@ -139,7 +139,7 @@
    | [⏸ Pausa → p:2:pa] [🗑 Elimina → p:2:rm]
    | [🔔 Regola avviso → p:2:ed] [⏱ Intervallo → p:2:iv]
    | [🔗 Apri → url:https://shop.example.com/item/72]
-   | [◀️ Lista → l:a:1]
+   | [⬅️ Lista → l:a:1]
 ## db after step 7
 + price_history id=7 {product_id=2, price="0.64", checked_at=<now:9999-99-99 99:99:99>}
 ~ products id=2 last_checked_at: NULL -> <now:9999-99-99 99:99:99>
@@ -185,7 +185,7 @@
    | [⏸ Pausa → p:3:pa] [🗑 Elimina → p:3:rm]
    | [🔔 Regola avviso → p:3:ed] [⏱ Intervallo → p:3:iv]
    | [🔗 Apri → url:https://shop.example.com/item/73]
-   | [◀️ Lista → l:a:1]
+   | [⬅️ Lista → l:a:1]
 ## db after step 9
 (no changes)
 ## step 10: press "check_3" user=10 on=1002
@@ -212,7 +212,7 @@
    | [⏸ Pausa → p:3:pa] [🗑 Elimina → p:3:rm]
    | [🔔 Regola avviso → p:3:ed] [⏱ Intervallo → p:3:iv]
    | [🔗 Apri → url:https://shop.example.com/item/73]
-   | [◀️ Lista → l:a:1]
+   | [⬅️ Lista → l:a:1]
 ## db after step 10
 + price_history id=8 {product_id=3, price="99.50", checked_at=<now:9999-99-99 99:99:99>}
 ~ products id=3 last_checked_at: NULL -> <now:9999-99-99 99:99:99>

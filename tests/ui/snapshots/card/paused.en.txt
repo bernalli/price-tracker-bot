@@ -14,4 +14,4 @@ keyboard:
    [📈 History](cb:p:43:ch:30d)  [▶️ Reactivate](cb:p:43:ra)
    [🗑 Delete](cb:p:43:rm)  [🔔 Alert rule](cb:p:43:th)
    [⏱ Interval](cb:p:43:iv)  [🔗 Open](url:https://shop.example.com/item/43)
-   [◀️ List](cb:l:a:1)
+   [⬅️ List](cb:l:a:1)

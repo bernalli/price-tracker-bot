@@ -32,7 +32,7 @@
    | [⏸ Pausa → p:1:pa] [🗑 Elimina → p:1:rm]
    | [🔔 Regola avviso → p:1:ed] [⏱ Intervallo → p:1:iv]
    | [🔗 Apri → url:https://shop.example.com/item/8]
-   | [◀️ Lista → l:a:1]
+   | [⬅️ Lista → l:a:1]
 ## db after step 2
 ~ products id=1 is_active: 0 -> 1
 ~ products id=1 suspension_kind: "manual" -> NULL

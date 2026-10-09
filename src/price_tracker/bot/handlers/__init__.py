@@ -74,7 +74,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 def _menu_back_button() -> list[InlineKeyboardButton]:
     """Single-row 'back to main menu' button (legacy alias)."""
-    return [InlineKeyboardButton(_("◀️ Menu"), callback_data=encode(Action("home")))]
+    return [InlineKeyboardButton(_("⬅️ Menu"), callback_data=encode(Action("home")))]
 
 
 # ── Error handler ─────────────────────────────────────────────────

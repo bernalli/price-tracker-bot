@@ -30,12 +30,12 @@
    | ⏱ Intervallo globale: 360 min
    keyboard:
    | [👥 Lista utenti → a:u]
-   | [➕ Aggiungi utente → a:add] [🚫 Rimuovi utente → a:rm]
+   | [➕ Aggiungi utente → a:add] [🗑 Rimuovi utente → a:rm]
    | [✏️ Nickname utente → a:nk]
    | [⏱ Intervallo globale: 360 min → a:iv]
    | [🔧 Debug scraper → a:dbg]
    | [🏥 Salute scraper → a:hl]
-   | [◀️ Menu → h]
+   | [⬅️ Menu → h]
 ## db after step 2
 (no changes)
 ## step 3: press "menu_admin_adduser" user=1 on=1000
@@ -47,7 +47,7 @@
    |
    | Scrivi l'ID Telegram dell'utente da aggiungere:
    keyboard:
-   | [Annulla → a]
+   | [❌ Annulla → a]
 ## db after step 3
 (no changes)
 ## step 4: text "abc" user=1
@@ -75,7 +75,7 @@
    |
    | Scrivi l'ID Telegram dell'utente da aggiungere:
    keyboard:
-   | [Annulla → a]
+   | [❌ Annulla → a]
 ## db after step 6
 (no changes)
 ## step 7: text "98" user=1

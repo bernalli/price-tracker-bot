@@ -29,8 +29,8 @@
    | 🔄 5 check effettuati
    keyboard:
    | [💾 Esporta CSV → d:x]
-   | [📂 Importa CSV — invia file in chat → d:i]
-   | [◀️ Menu → h]
+   | [📥 Importa CSV — invia file in chat → d:i]
+   | [⬅️ Menu → h]
 ## db after step 2
 (no changes)
 ## step 3: press "menu_esporta" user=10 on=1000

@@ -27,7 +27,7 @@
    | ℹ️ <b>Statistiche</b>
    |
    | 📦 Prodotti attivi: 0
-   | 📁 Totali: 0
+   | 📦 Totali: 0
    | 🔄 Check: 0
    | ⏱ Intervallo: ogni 90min
    |
@@ -37,6 +37,6 @@
    | 🔄 Check globali: 5
    keyboard:
    | [❓ Aiuto → hp] [⚠️ Errori → er]
-   | [◀️ Menu → h]
+   | [⬅️ Menu → h]
 ## db after step 2
 (no changes)

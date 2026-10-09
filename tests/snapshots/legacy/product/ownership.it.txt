@@ -16,15 +16,15 @@
    text:
    | ✏️ <b>Modifica #2</b> Lamp
    |
-   | 🎯 Soglia attuale: <b>-10%</b>
-   | 🏁 Target attuale: <b>non impostato</b>
+   | 📉 Soglia attuale: <b>-10%</b>
+   | 🎯 Target attuale: <b>non impostato</b>
    | 📌 Prezzo base: <b>€30.00</b>
    |
    | <b>Cosa vuoi modificare?</b>
    keyboard:
    | [🔔 Ogni ribasso → p:2:th:any]
    | [📉 Soglia % o € → p:2:th]
-   | [💰 Prezzo target → p:2:tg]
+   | [🎯 Prezzo target → p:2:tg]
    | [🔔 Notifiche → p:2:pr]
 ## db after step 2
 (no changes)

@@ -19,4 +19,4 @@ keyboard:
    [[🔔 Alert rule 🔔 Alert rule 🔔 A…](cb:p:47:th)
    [[⏱ Interval ⏱ Interval ⏱ Inter…](cb:p:47:iv)
    [[🔗 Open 🔗 Open 🔗 Open]](url:https://shop.example.com/item/47)
-   [[◀️ List ◀️ List ◀️ List]](cb:l:a:1)
+   [[⬅️ List ⬅️ List ⬅️ List]](cb:l:a:1)

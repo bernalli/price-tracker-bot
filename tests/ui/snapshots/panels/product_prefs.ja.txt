@@ -9,7 +9,7 @@ text:
    | [🔕 Mute: [until 2026/03/01 21:00 until 2026/03/01 21:00 until 2026/03/01 21:00] 🔕 Mute: [until 2026/03/01 21:00 until 2026/03/01 21:00 until 2026/03/01 21:00] 🔕 Mute: [until 2026/03/01 21:00 until 2026/03/01 21:00 until 2026/03/01 21:00]]
    | [📬 Digest: [on, every 30 分 on, every 30 分 on, every 30 分] 📬 Digest: [on, every 30 分 on, every 30 分 on, every 30 分] 📬 Digest: [on, every 30 分 on, every 30 分 on, every 30 分]]
    | [🌙 Quiet hours: 22:00–08:00 🌙 Quiet hours: 22:00–08:00 🌙 Quiet hours: 22:00–08:00]
-   | [⏱ Throttle: [5 per hour 5 per hour 5 per hour] ⏱ Throttle: [5 per hour 5 per hour 5 per hour] ⏱ Throttle: [5 per hour 5 per hour 5 per hour]]
+   | [🚦 Throttle: [5 per hour 5 per hour 5 per hour] 🚦 Throttle: [5 per hour 5 per hour 5 per hour] 🚦 Throttle: [5 per hour 5 per hour 5 per hour]]
    | [🌍 Timezone: Europe/Berlin 🌍 Timezone: Europe/Berlin 🌍 Timezone: Europe/Berlin]
 keyboard:
    [1 時間](cb:p:7:mu:1)  [8 時間](cb:p:7:mu:8)
@@ -18,5 +18,5 @@ keyboard:
    [[🔔 Unmute 🔔 Unmute 🔔 Unmute]](cb:p:7:mu:off)
    [[✏️ Other duration ✏️ Other durat…](cb:p:7:mua)
    [[⚙️ Settings ⚙️ Settings ⚙️ Setti…](cb:s)
-   [[◀️ Product ◀️ Product ◀️ Product]](cb:p:7:c)
+   [[⬅️ Product ⬅️ Product ⬅️ Product]](cb:p:7:c)
    [[🏠 Home 🏠 Home 🏠 Home]](cb:h)

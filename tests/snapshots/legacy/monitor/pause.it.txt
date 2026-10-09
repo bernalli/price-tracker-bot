@@ -6,7 +6,7 @@
 -> sendMessage chat=10
    param parse_mode="HTML"
    text:
-   | 📦 <b>Scegli prodotto da mettere in pausa:</b>
+   | ⏸ <b>Scegli prodotto da mettere in pausa:</b>
    keyboard:
    | [80,00 € ▼20% Kettle → p:1:pa]
    | [N/D Fan → p:2:pa]
