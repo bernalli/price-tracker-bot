@@ -36,7 +36,7 @@
    | 📦 Prodotti globali: 2
    | 🔄 Check globali: 5
    keyboard:
-   | [ℹ️ Aiuto → hp] [⚠️ Errori → er]
+   | [❓ Aiuto → hp] [⚠️ Errori → er]
    | [⬅️ Menu → h]
 ## db after step 2
 (no changes)

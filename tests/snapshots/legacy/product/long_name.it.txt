@@ -143,7 +143,7 @@
    | [🔔 Ogni ribasso → p:1:th:any]
    | [📉 Soglia % o € → p:1:th]
    | [🎯 Prezzo target → p:1:tg]
-   | [📉 Va bene -10% (default) → p:1:th:def]
+   | [👍 Va bene -10% (default) → p:1:th:def]
 ## db after step 8
 ~ products id=1 preferred_condition: NULL -> "new"
 ## step 9: press "track_any_1" user=10 on=1

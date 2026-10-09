@@ -73,6 +73,7 @@ async def repo(memory_db):
 
 @pytest.fixture(autouse=True)
 def no_delay(monkeypatch):
+    monkeypatch.setattr(price_tracker, "__version__", "1.8.0")
     sleep = AsyncMock()
     monkeypatch.setattr("price_tracker.bot.release_updates.sleep", sleep)
     get_translation.cache_clear()
@@ -174,13 +175,14 @@ async def test_empty_newest_and_skipped_releases_are_recorded_without_message(re
     assert await repo.get_config("last_announced_version") == "1.8.0"
 
 
-async def test_upgrade_from_1_8_0_to_1_8_1_is_silent_and_stores_version(repo, monkeypatch):
+@pytest.mark.parametrize("previous", ["1.0.0", "1.7.1", "1.8.0"])
+async def test_upgrade_to_empty_release_is_silent_and_stores_version(repo, monkeypatch, previous):
     monkeypatch.setattr(price_tracker, "__version__", "1.8.1")
     assert release_notes.RELEASE_NOTES["1.8.1"] == ()
     for uid, locale in enumerate(CATALOG_LOCALES, start=1):
         await repo.ensure_user(uid)
         await repo.set_user_telegram_tag(uid, locale.replace("_", "-"))
-    await repo.set_config("last_announced_version", "1.8.0")
+    await repo.set_config("last_announced_version", previous)
     bot = Mock(send_message=AsyncMock())
 
     await release_updates.announce_release(bot, repo, "en")

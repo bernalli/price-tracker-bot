@@ -7,12 +7,12 @@
    param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
-   | ℹ️ <b>Comandi</b>
+   | ❓ <b>Comandi</b>
    |
    | <b>📦 Prodotti</b>
    | /start — 🏠 Avvia il bot
    | /menu — 🏠 Apri il menu principale
-   | /help — ℹ️ Mostra tutti i comandi
+   | /help — ❓ Mostra tutti i comandi
    | /cancel — ❌ Annulla l'azione in corso
    | /add — ➕ Monitora un prodotto da un link
    | /list — 📦 Elenca i tuoi prodotti

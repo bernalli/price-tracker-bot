@@ -6,6 +6,8 @@ import ast
 from collections import defaultdict
 from pathlib import Path
 
+from price_tracker.bot.keyboards import build_threshold_keyboard
+
 ROOT = Path(__file__).resolve().parents[2]
 SOURCES = (
     ROOT / "src/price_tracker/bot/ui",
@@ -25,7 +27,7 @@ EXPECTED = {
     "digest_now": "📨",
     "errors": "⚠️",
     "export": "💾",
-    "help": "ℹ️",
+    "help": "❓",
     "history": "📈",
     "home": "🏠",
     "import": "📥",
@@ -41,6 +43,7 @@ EXPECTED = {
     "settings": "⚙️",
     "target": "🎯",
     "threshold": "📉",
+    "threshold_default": "👍",
     "throttle": "🚦",
     "timezone": "🌍",
 }
@@ -70,7 +73,7 @@ ACTION_KEYS = {
     "product.remove_ok": "delete",
     "product.target": "target",
     "product.threshold": "threshold",
-    "product.threshold_default": "threshold",
+    "product.threshold_default": "threshold_default",
     "product.threshold_any": "notifications",
     "settings": "settings",
     "settings.digest_now": "digest_now",
@@ -84,6 +87,14 @@ SECTION_KEYS = {
     "th": "throttle",
     "tz": "timezone",
 }
+
+
+def test_actions_on_threshold_keyboard_have_distinct_icons() -> None:
+    keyboard = build_threshold_keyboard(1)
+    buttons = [button for row in keyboard.inline_keyboard for button in row]
+    assert len({button.callback_data for button in buttons}) == len(buttons)
+    icons = [button.text.partition(" ")[0].replace("\ufe0f", "") for button in buttons]
+    assert len(icons) == len(set(icons)), [(b.callback_data, b.text) for b in buttons]
 
 
 def _files() -> list[Path]:

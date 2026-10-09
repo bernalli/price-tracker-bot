@@ -84,6 +84,8 @@ def _escaped_short(text: str, limit: int, width: int = 32) -> str:
 
 def render_release_notes(previous: str, current: str) -> str:
     """Render the current release and one line per skipped release, newest first."""
+    if not RELEASE_NOTES[current]:
+        return ""
     title = _escaped_short(_("Updated to version {version}").format(version=current), 160)
     newest = [f"• {_escaped_short(_(bullet), 230, 30)}" for bullet in RELEASE_NOTES[current]]
     message = "\n".join([title, *newest])

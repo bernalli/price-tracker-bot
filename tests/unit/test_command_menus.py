@@ -53,14 +53,14 @@ ENGLISH_MENU = [
     ("list", "📦 List your products"),
     ("checkall", "🔄 Check all your products now"),
     ("status", "ℹ️ Show your statistics"),
-    ("help", "ℹ️ Show every command"),
+    ("help", "❓ Show every command"),
 ]
 ITALIAN_MENU = [
     ("menu", "🏠 Apri il menu principale"),
     ("list", "📦 Elenca i tuoi prodotti"),
     ("checkall", "🔄 Controlla subito tutti i tuoi prodotti"),
     ("status", "ℹ️ Mostra le tue statistiche"),
-    ("help", "ℹ️ Mostra tutti i comandi"),
+    ("help", "❓ Mostra tutti i comandi"),
 ]
 SHORT_NAMES = [name for name, _ in ENGLISH_MENU]
 USER_NAMES_1_5 = [spec.name for spec in COMMANDS if not spec.admin]
@@ -154,6 +154,13 @@ class _CommandStore:
 def test_menu_commands_are_the_five_short_entries_in_each_language() -> None:
     assert [(c.command, c.description) for c in menu_commands("en")] == ENGLISH_MENU
     assert [(c.command, c.description) for c in menu_commands("it")] == ITALIAN_MENU
+
+
+@pytest.mark.parametrize("language", ["en", "it"])
+def test_command_menu_entries_have_distinct_icons(language: str) -> None:
+    commands = menu_commands(language)
+    icons = [command.description.partition(" ")[0].replace("\ufe0f", "") for command in commands]
+    assert len(icons) == len(set(icons)), [(c.command, c.description) for c in commands]
 
 
 @pytest.mark.parametrize("language", ["en", "it"])

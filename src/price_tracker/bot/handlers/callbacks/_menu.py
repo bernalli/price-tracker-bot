@@ -408,7 +408,7 @@ async def _handle_menu_info(
         reply_markup=InlineKeyboardMarkup(
             [
                 [
-                    InlineKeyboardButton(_("ℹ️ Help"), callback_data=encode(Action("help"))),
+                    InlineKeyboardButton(_("❓ Help"), callback_data=encode(Action("help"))),
                     InlineKeyboardButton(_("⚠️ Errors"), callback_data=encode(Action("errors"))),
                 ],
                 menu_back_button(),
