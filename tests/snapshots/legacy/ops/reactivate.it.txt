@@ -13,8 +13,8 @@
    param parse_mode="HTML"
    text:
    | ▶️ <b>Ricontrollati 2 prodotti su example.com</b>
-   | ✅ Kettle — €80.00
-   | ✅ Speaker — €80.00
+   | <b>80,00 €</b> ▼20% ✅ Kettle
+   | <b>80,00 €</b> ▲100% ✅ Speaker
 ## db after step 3
 + price_history id=6 {product_id=1, price="80.00", checked_at=<now:9999-99-99 99:99:99>}
 + price_history id=7 {product_id=2, price="80.00", checked_at=<now:9999-99-99 99:99:99>}

@@ -9,9 +9,10 @@
 -> editMessageText chat=10 message_id=1000
    param parse_mode="HTML"
    text:
-   | ✅ <b>Controllo completato</b> — 1 prodotti
+   | ✅ <b>Controllo completato</b>
+   | 1 prodotti
    |
-   |   #1 Kettle — €120.00 <i>(+20.0%)</i>
+   | <b>120,00 €</b> ▲20% Kettle
 ## db after step 1
 + price_history id=6 {product_id=1, price="120.00", checked_at=<now:9999-99-99 99:99:99>}
 ~ products id=1 current_price: "80.00" -> "120.00"

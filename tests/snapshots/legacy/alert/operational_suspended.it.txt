@@ -10,9 +10,9 @@
    |
    | 3 prodotti hanno fallito 1/2 controlli di fila. Se continua, verranno sospesi automaticamente.
    |
-   | • <b>Kettle</b> — prezzo non leggibile
-   | • <b>Speaker</b> — prezzo non leggibile
-   | • <b>Vault</b> — prezzo non leggibile
+   | <b>80,00 €</b> ⚠️ Kettle
+   | <b>40,00 €</b> ⚠️ Speaker
+   | <b>N/D</b> ⚠️ Vault
    |
    | Dettagli con /errori.
    markup: {}
@@ -34,15 +34,9 @@
    |
    | Le pagine si aprono, ma il prezzo non si legge più (layout cambiato o offerta diversa).
    |
-   | • <b>Kettle</b> — prezzo non leggibile
-   | Ultima lettura buona: 80.00 € il 2026-03-01 10:00 UTC
-   | Errore: <code>parse_error: no price</code>
-   | • <b>Speaker</b> — prezzo non leggibile
-   | Nessuna lettura riuscita finora
-   | Errore: <code>parse_error: no price</code>
-   | • <b>Vault</b> — prezzo non leggibile
-   | Ultima lettura buona: 123456789012345678.00 C… il 2026-03-01 10:00 UTC
-   | Errore: <code>parse_error: no price</code>
+   | <b>80,00 €</b> ⚠️ Kettle
+   | <b>40,00 €</b> ⚠️ Speaker
+   | <b>N/D</b> ⚠️ Vault
    |
    | Riattiva per fare subito un nuovo controllo.
    keyboard:

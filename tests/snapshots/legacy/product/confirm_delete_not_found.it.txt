@@ -10,11 +10,13 @@
    text:
    | Prodotto non trovato.
    |
-   | 📦 <b>I tuoi prodotti</b> · attivi (1) · pagina 1/1
+   | 📦 <b>I tuoi prodotti</b>
+   | attivi (1)
+   | pagina 1/1
    |
-   | <b>#1</b> Kettle · 80,00 €
+   | <b>80,00 €</b> ▼20% Kettle
    keyboard:
-   | [#1 → l:a:1:1]
+   | [#1 Kettle → l:a:1:1]
    | [✅ Attivi ✓ → l:a:1] [⏸ In pausa → l:p:1]
    | [⚠️ Errori → l:e:1] [🚫 Esaurito → l:o:1]
    | [➕ Aggiungi → ad] [🏠 Home → h]

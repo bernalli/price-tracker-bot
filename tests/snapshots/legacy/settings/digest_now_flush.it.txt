@@ -45,10 +45,10 @@
    param parse_mode="HTML"
    text:
    | 📊 <b>Riepilogo — 4 variazioni di prezzo</b>
-   | 🔻 Kettle — EUR80.00 → EUR64.00 — example.com
-   | 🔻 Fan — USD50.00 → USD40.00 — example.com
-   | 🔻 Ultra Quiet Stainless Steel Electric Kettle With Temperatur… — EUR40.00 → EUR30.00 — example.com
-   | 🔻 Prodotto #1 — EUR80.00 → EUR64.00 — example.com
+   | <b>64,00 €</b> ▼20% Kettle
+   | <b>40,00 USD</b> ▼20% Fan
+   | <b>30,00 €</b> ▼25% Ultra Quiet Stainl…
+   | <b>64,00 €</b> ▼20% Prodotto #1
    | ⚠️ Avvisi operativi
    | example.com — 1 prodotti: controlli in errore (?/?)
    | example.com — 1 prodotti: tracking sospeso (prezzo non leggibile)

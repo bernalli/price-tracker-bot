@@ -3,17 +3,19 @@
 # locale: it
 # now: 2026-03-01T12:00:00Z
 text:
-   | 📦 <b>I tuoi prodotti</b> · attivi (12) · pagina 2/3
+   | 📦 <b>I tuoi prodotti</b>
+   | attivi (12)
+   | pagina 2/3
    | 
-   | <b>#6</b> Kettle · 19,99 €
-   | ⚠️ <b>#7</b> Fan · 19,99 €
-   | <b>#8</b> Lamp · —
-   | <b>#9</b> Heater · 1.299,50 CHF
-   | <b>#10</b> Wireless Headphones X200 Pro Edition wi… · 19,99 €
+   | <b>19,99 €</b> Kettle
+   | <b>19,99 €</b> ⚠️ Fan
+   | <b>N/D</b> Lamp
+   | <b>1.299,50 CHF</b> Heater
+   | <b>19,99 €</b> Wireless Headphones X20…
 keyboard:
-   [#6](cb:l:a:2:6)  [#7](cb:l:a:2:7)
-   [#8](cb:l:a:2:8)  [#9](cb:l:a:2:9)
-   [#10](cb:l:a:2:10)
+   [#6 Kettle](cb:l:a:2:6)  [#7 Fan](cb:l:a:2:7)
+   [#8 Lamp](cb:l:a:2:8)  [#9 Heater](cb:l:a:2:9)
+   [#10 Wireless Hea…](cb:l:a:2:10)
    [◀️](cb:l:a:1)  [2/3](cb:noop)  [▶️](cb:l:a:3)
    [✅ Attivi ✓](cb:l:a:1)  [⏸ In pausa](cb:l:p:1)
    [⚠️ Errori](cb:l:e:1)  [🚫 Esaurito](cb:l:o:1)

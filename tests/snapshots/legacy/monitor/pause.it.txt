@@ -8,8 +8,8 @@
    text:
    | 📦 <b>Scegli prodotto da mettere in pausa:</b>
    keyboard:
-   | [#1 Kettle €80.00 → p:1:pa]
-   | [#2 Fan → p:2:pa]
+   | [80,00 € ▼20% Kettle → p:1:pa]
+   | [N/D Fan → p:2:pa]
 ## db after step 1
 ~ users user_id=10 display_name: NULL -> "U10"
 ## step 2: command "/pausa 1" user=10

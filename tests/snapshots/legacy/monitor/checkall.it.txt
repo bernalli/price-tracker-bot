@@ -9,10 +9,11 @@
 -> editMessageText chat=10 message_id=1000
    param parse_mode="HTML"
    text:
-   | ✅ <b>Controllo completato</b> — 2 prodotti
+   | ✅ <b>Controllo completato</b>
+   | 2 prodotti
    |
-   |   #1 Kettle — €64.00 <i>(-36.0%)</i>
-   |   #2 Fan — €50.00
+   | <b>64,00 €</b> ▼36% Kettle
+   | <b>50,00 USD</b> Fan
    |
    | 🔔 <b>1 variazioni trovate!</b>
 -> sendPhoto chat=10 photo=png filename=application.octet-stream

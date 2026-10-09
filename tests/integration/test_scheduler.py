@@ -1020,7 +1020,7 @@ async def test_product_auto_disabled_after_max_consecutive_errors(
         sent_user_id, sent_message = call_args.args
         assert sent_user_id == 1
         assert "Site unreachable" in sent_message
-        assert "Error: <code>http_error: simulated network failure</code>" in sent_message
+        assert "<b>€100.00</b> ⚠️ Widget" in sent_message
         assert call_args.kwargs["product_id"] is None
         payload = call_args.kwargs["payload"]
         assert payload is not None

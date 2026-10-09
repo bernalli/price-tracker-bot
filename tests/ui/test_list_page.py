@@ -230,23 +230,23 @@ def test_the_header_and_the_rows(ui_locales: Path) -> None:
         ),
     )
     lines = list_page(page).text.split("\n")
-    assert lines[0] == "📦 <b>Your products</b> · active ones (3) · page 1/1"
-    assert lines[2:] == [
-        "<b>#1</b> Kettle · €19.99",
-        "⏸ <b>#2</b> Fan · €19.99",
-        "⚠️ <b>#3</b> Lamp · —",
-        "🚫 <b>#4</b> Iron · €19.99",
-        "⚠️ <b>#5</b> Mixer · €19.99",
+    assert lines[:3] == ["📦 <b>Your products</b>", "active ones (3)", "page 1/1"]
+    assert lines[4:] == [
+        "<b>€19.99</b> Kettle",
+        "<b>€19.99</b> ⏸ Fan",
+        "<b>N/A</b> ⚠️ Lamp",
+        "<b>€19.99</b> 🚫 Iron",
+        "<b>€19.99</b> ⚠️ Mixer",
     ]
 
 
 def test_the_sold_out_header(ui_locales: Path) -> None:
     set_locale("en")
-    header = list_page(build(2, "o", 1)).text.split("\n")[0]
-    assert header == "📦 <b>Your products</b> · sold out (2) · page 1/1"
+    header = list_page(build(2, "o", 1)).text.split("\n")[1]
+    assert header == "sold out (2)"
     set_locale("it")
-    header = list_page(build(2, "o", 1)).text.split("\n")[0]
-    assert "· esauriti (2) ·" in header
+    header = list_page(build(2, "o", 1)).text.split("\n")[1]
+    assert header == "esauriti (2)"
     set_locale("en")
 
 
@@ -258,11 +258,11 @@ def test_an_empty_filter_says_so_and_keeps_filters_and_home(ui_locales: Path) ->
     assert {"l:a:1", "l:p:1", "l:e:1", "l:o:1", "h"} <= set(callbacks(screen))
 
 
-def test_a_long_name_is_cut_to_forty_cells(ui_locales: Path) -> None:
+def test_a_long_name_uses_only_the_remaining_cells(ui_locales: Path) -> None:
     set_locale("en")
-    row = list_page(ListPage("a", 1, 1, 1, (view(1, "N" * 100),))).text.split("\n")[2]
+    row = list_page(ListPage("a", 1, 1, 1, (view(1, "N" * 100),))).text.split("\n")[4]
     name = row.split("</b> ", 1)[1].split(" · ", 1)[0]
-    assert display_width(name) <= 40
+    assert display_width(name) == 25
     assert name.endswith("…")
 
 

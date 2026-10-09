@@ -21,18 +21,19 @@
    |
    | 1 prodotti hanno fallito 1/2 controlli di fila. Se continua, verranno sospesi automaticamente.
    |
-   | • <b>Amazon 1</b> — prezzo non leggibile
+   | <b>25,00 €</b> ⚠️ Amazon 1
    |
    | Dettagli con /errori.
    markup: {}
 -> editMessageText chat=10 message_id=1000
    param parse_mode="HTML"
    text:
-   | ✅ <b>Controllo completato</b> — 3 prodotti
+   | ✅ <b>Controllo completato</b>
+   | 3 prodotti
    |
-   |   #1 Kettle — €80.00 <i>(-20.0%)</i>
-   |   #2 Amazon 1 — €25.00 ⚠️
-   |   #3 Amazon 2 — €25.00
+   | <b>80,00 €</b> ▼20% Kettle
+   | <b>25,00 €</b> ⚠️ Amazon 1
+   | <b>25,00 €</b> Amazon 2
 ## db after step 9
 ~ products id=2 consecutive_errors: 0 -> 1
 ~ products id=2 last_error: NULL -> "parse_error: no price"
