@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
+from collections import Counter
 from unittest.mock import AsyncMock, Mock
 
+import aiosqlite
 import pytest
 from telegram.error import Forbidden, RetryAfter
 
@@ -212,7 +215,7 @@ def test_every_release_bullet_has_an_italian_translation():
             assert italian.gettext(bullet) != bullet
 
 
-async def test_post_init_wires_release_announcement_after_migrations(memory_db, monkeypatch):
+async def test_post_init_leaves_release_announcement_for_background_task(memory_db, monkeypatch):
     from price_tracker import main
 
     bot = Mock(send_message=AsyncMock())
@@ -228,8 +231,137 @@ async def test_post_init_wires_release_announcement_after_migrations(memory_db, 
         },
     )
     await main.post_init(application)
-    assert bot.send_message.await_count == 1
-    assert bot.send_message.await_args.kwargs["chat_id"] == 123456789
-    assert "Updated to version 1.7.1" in bot.send_message.await_args.kwargs["text"]
-    await main.post_init(application)
-    assert bot.send_message.await_count == 1
+    bot.send_message.assert_not_awaited()
+    assert await application.bot_data["repo"].is_user_allowed(123456789)
+
+
+@pytest.mark.parametrize("crash_after", [1, 3])
+async def test_announce_crash_then_restart_resumes_without_duplicates(tmp_path, crash_after):
+    database = tmp_path / "announcements.db"
+    received = []
+
+    async def send_then_crash(*, chat_id, **kwargs):
+        received.append(chat_id)
+        if len(received) == crash_after:
+            raise asyncio.CancelledError
+
+    async with aiosqlite.connect(database) as conn:
+        await apply_migrations(conn, MIGRATIONS_DIR)
+        repo = Repository(conn)
+        for uid in range(1, 5):
+            await repo.ensure_user(uid)
+        with pytest.raises(asyncio.CancelledError):
+            await release_updates.announce_release(
+                Mock(send_message=AsyncMock(side_effect=send_then_crash)), repo, "en"
+            )
+        assert await repo.get_config("last_announced_version") is None
+
+    async with aiosqlite.connect(database) as conn:
+        repo = Repository(conn)
+        bot = Mock(send_message=AsyncMock())
+        await release_updates.announce_release(bot, repo, "en")
+        received.extend(call.kwargs["chat_id"] for call in bot.send_message.await_args_list)
+        assert Counter(received) == Counter(range(1, 5))
+        assert await repo.get_config("last_announced_version") == price_tracker.__version__
+
+
+async def test_announce_claim_is_committed_before_send_and_survives_lost_message(tmp_path):
+    database = tmp_path / "announcements.db"
+    async with aiosqlite.connect(database) as conn, aiosqlite.connect(database) as observer:
+        await apply_migrations(conn, MIGRATIONS_DIR)
+        repo = Repository(conn)
+        await repo.ensure_user(1)
+        await repo.ensure_user(2)
+
+        async def crash_before_delivery(*, chat_id, **kwargs):
+            assert await Repository(observer).get_config(f"announced:{chat_id}") == (
+                price_tracker.__version__
+            )
+            raise asyncio.CancelledError
+
+        with pytest.raises(asyncio.CancelledError):
+            await release_updates.announce_release(
+                Mock(send_message=AsyncMock(side_effect=crash_before_delivery)), repo, "en"
+            )
+
+    async with aiosqlite.connect(database) as conn:
+        bot = Mock(send_message=AsyncMock())
+        await release_updates.announce_release(bot, Repository(conn), "en")
+        assert [call.kwargs["chat_id"] for call in bot.send_message.await_args_list] == [2]
+
+
+async def test_concurrent_announcements_claim_each_recipient_once(tmp_path, monkeypatch):
+    database = tmp_path / "announcements.db"
+    async with aiosqlite.connect(database) as first, aiosqlite.connect(database) as second:
+        await apply_migrations(first, MIGRATIONS_DIR)
+        repos = [Repository(first), Repository(second)]
+        for uid in range(1, 9):
+            await repos[0].ensure_user(uid)
+        # Both instances must read the pending version and take their user snapshot.
+        barrier = asyncio.Barrier(2)
+        list_users = Repository.list_active_users
+
+        async def snapshot(repo):
+            users = await list_users(repo)
+            await barrier.wait()
+            return users
+
+        monkeypatch.setattr(Repository, "list_active_users", snapshot)
+        bot = Mock(send_message=AsyncMock())
+        await asyncio.wait_for(
+            asyncio.gather(*(release_updates.announce_release(bot, repo, "en") for repo in repos)),
+            timeout=5,
+        )
+        received = [call.kwargs["chat_id"] for call in bot.send_message.await_args_list]
+        assert Counter(received) == Counter(range(1, 9))
+
+
+@pytest.mark.parametrize("delete", [False, True])
+@pytest.mark.parametrize("rate_limited", [False, True])
+async def test_announce_rechecks_revoked_user_after_wait(repo, no_delay, delete, rate_limited):
+    await repo.ensure_user(1)
+    await repo.ensure_user(2)
+
+    async def revoke_during_wait(delay):
+        if delete:
+            await repo._conn.execute("DELETE FROM users WHERE user_id = 2")
+            await repo._conn.commit()
+        else:
+            await repo.remove_user(2)
+
+    no_delay.side_effect = revoke_during_wait
+    bot = Mock(send_message=AsyncMock(side_effect=RetryAfter(3600) if rate_limited else None))
+    await release_updates.announce_release(bot, repo, "en")
+    assert [call.kwargs["chat_id"] for call in bot.send_message.await_args_list] == [1]
+    assert await repo.get_config("last_announced_version") == price_tracker.__version__
+
+
+async def test_announce_skips_current_claims_and_cleans_only_older_versions(repo, monkeypatch):
+    monkeypatch.setattr(price_tracker, "__version__", "1.10.0")
+    monkeypatch.setitem(release_notes.RELEASE_NOTES, "1.10.0", ("New improvement",))
+    for uid in (1, 2):
+        await repo.ensure_user(uid)
+    await repo.set_config("announced:1", "1.10.0")
+    await repo.set_config("announced:2", "1.9.0")
+    await repo.set_config("announced:3", "1.9.0")
+    await repo.set_config("announced:4", "1.11.0")
+    await repo.set_config("other_setting", "1.9.0")
+    bot = Mock(send_message=AsyncMock())
+    await release_updates.announce_release(bot, repo, "en")
+    assert [call.kwargs["chat_id"] for call in bot.send_message.await_args_list] == [2]
+    assert await repo.get_config("announced:1") == "1.10.0"
+    assert await repo.get_config("announced:2") == "1.10.0"
+    assert await repo.get_config("announced:3") is None
+    assert await repo.get_config("announced:4") == "1.11.0"
+    assert await repo.get_config("other_setting") == "1.9.0"
+
+
+def test_release_notes_omit_all_older_notes_when_none_fit(monkeypatch):
+    monkeypatch.setattr(
+        release_notes,
+        "RELEASE_NOTES",
+        {"1.1.0": ("Older detail " * 120,), "1.2.0": ("Newest improvement",)},
+    )
+    text = release_notes.render_release_notes("1.0.0", "1.2.0")
+    assert text == ("Updated to version 1.2.0\n• Newest improvement\n…and earlier improvements.")
+    assert len(text) <= release_notes.MESSAGE_LIMIT
