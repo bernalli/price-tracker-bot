@@ -35,8 +35,9 @@ from price_tracker.bot.handlers._helpers import (
     out_of_stock_line,
 )
 from price_tracker.bot.messages import _, current_locale
+from price_tracker.bot.ui.product_rows import record_row
 from price_tracker.bot.ui.width import truncate_to_width
-from price_tracker.core.textlimits import fit_html
+from price_tracker.core.textlimits import fit_html, split_message
 from price_tracker.i18n.format import duration
 
 if TYPE_CHECKING:
@@ -68,9 +69,6 @@ async def _product_picker(
 
     buttons = []
     for p in products:
-        name = truncate_to_width(p.get("name") or _("Unknown"), 35)
-        current = _safe_dec(p.get("current_price"))
-        price_tag = f" €{current:.2f}" if current else ""
         action_name = {
             "setrefresh": "product.interval",
             "check": "product.check",
@@ -79,7 +77,7 @@ async def _product_picker(
         buttons.append(
             [
                 InlineKeyboardButton(
-                    f"#{p['id']} {name}{price_tag}",
+                    record_row(p, html=False),
                     callback_data=encode(Action(action_name, (p["id"],))),
                 )
             ]
@@ -248,28 +246,21 @@ async def cmd_checkall(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     # Build summary of all products after check
     updated_products = await db.get_active_products(user_id)
     summary_lines = [
-        _("✅ <b>Check complete</b> — {n} products").format(n=len(updated_products)) + chr(10)
+        _("✅ <b>Check complete</b> — {n} products")
+        .format(n=len(updated_products))
+        .replace(" — ", "\n")
+        + chr(10)
     ]
     for p in updated_products:
-        name = truncate_to_width(p.get("name") or _("Unknown"), 40)
-        current = _safe_dec(p.get("current_price"))
-        initial = _safe_dec(p.get("initial_price"))
-        price_str = f"€{current:.2f}" if current else _("N/A")
-        diff_str = ""
-        if initial and current and initial > 0 and initial != current:
-            diff = (initial - current) / initial * 100
-            if diff > 0:
-                diff_str = f" <i>(-{diff:.1f}%)</i>"
-            elif diff < 0:
-                diff_str = f" <i>(+{abs(diff):.1f}%)</i>"
-        errors = p.get("consecutive_errors", 0)
-        err_str = " ⚠️" if errors and errors > 0 else ""
-        summary_lines.append(f"  #{p['id']} {_escape_html(name)} — {price_str}{diff_str}{err_str}")
+        summary_lines.append(record_row(p))
 
     if alerts:
         summary_lines.append(chr(10) + _("🔔 <b>{n} changes found!</b>").format(n=len(alerts)))
 
-    await msg.edit_text(chr(10).join(summary_lines), parse_mode=ParseMode.HTML)
+    pages = split_message(chr(10).join(summary_lines))
+    await msg.edit_text(pages[0], parse_mode=ParseMode.HTML)
+    for page in pages[1:]:
+        await update.message.reply_text(page, parse_mode=ParseMode.HTML)
 
     for alert in alerts:
         try:
@@ -298,11 +289,10 @@ async def cmd_reactivate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             return
         buttons = []
         for p in paused:
-            name = truncate_to_width(p.get("name") or _("Unknown"), 35)
             buttons.append(
                 [
                     InlineKeyboardButton(
-                        f"#{p['id']} {name}",
+                        record_row(p, html=False),
                         callback_data=encode(Action("product.reactivate", (p["id"],))),
                     )
                 ]

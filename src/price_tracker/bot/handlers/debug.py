@@ -26,10 +26,12 @@ from price_tracker.bot.decorators import (
     restricted,
     with_locale,
 )
-from price_tracker.bot.handlers._helpers import _escape_html, _format_relative_time
+from price_tracker.bot.handlers._helpers import _escape_html
 from price_tracker.bot.messages import _
+from price_tracker.bot.ui.product_rows import product_row
 from price_tracker.bot.ui.width import truncate_to_width
 from price_tracker.core.http_client import build_client, public_request
+from price_tracker.core.textlimits import split_message
 
 if TYPE_CHECKING:
     from telegram import Update
@@ -84,22 +86,18 @@ def _render_metrics_lines(
 ) -> list[str]:
     """Return the metrics-snapshot lines for /status.
 
-    Reads `bot_uptime_seconds` and `products_tracked_total` gauges. When
-    `start_time` is provided, refreshes the uptime gauge to `monotonic - start`
-    before reading. When `products_tracked` is provided, refreshes that gauge
-    too. Uses the prometheus_client private `_value.get()` accessor to read the
-    current Gauge value (no public read API exists on Gauge).
+    Application state is the source of truth. The same values are written to
+    Prometheus and rendered for the user, so status output never depends on
+    prometheus_client internals.
     """
     if metrics is None:
         return ["Metrics unavailable"]
     try:
-        if start_time is not None:
-            metrics.bot_uptime_seconds.set(time.monotonic() - start_time)
-        if products_tracked is not None:
-            metrics.products_tracked_total.set(int(products_tracked))
-        uptime = metrics.bot_uptime_seconds._value.get()
-        tracked = metrics.products_tracked_total._value.get()
-    except (AttributeError, TypeError):
+        uptime = max(0.0, time.monotonic() - float(start_time or time.monotonic()))
+        tracked = int(products_tracked or 0)
+        metrics.bot_uptime_seconds.set(uptime)
+        metrics.products_tracked_total.set(tracked)
+    except (AttributeError, TypeError, ValueError):
         return ["Metrics unavailable"]
     return [
         "<b>📡 Bot Status</b>",
@@ -347,11 +345,10 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         _("⏱ Check interval: every {interval}").format(interval=interval_str),
     ]
 
-    products_tracked: int | None = None
     if is_admin:
         global_stats = await db.get_stats()
         users = await db.list_active_users()
-        products_tracked = int(global_stats["active_products"])
+        context.bot_data["products_tracked"] = int(global_stats["active_products"])
         lines.extend(
             [
                 "",
@@ -366,6 +363,7 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
     metrics = context.bot_data.get("metrics")
     start_time = context.bot_data.get("start_time")
+    products_tracked = context.bot_data.get("products_tracked")
     if metrics is not None:
         lines.append("")
         lines.extend(
@@ -388,8 +386,15 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     """
     metrics = context.bot_data.get("metrics")
     start_time = context.bot_data.get("start_time")
+    products_tracked = context.bot_data.get("products_tracked")
     lines = ["ℹ️ <b>Bot Status</b>", ""]
-    lines.extend(_render_metrics_lines(metrics, start_time=start_time))
+    lines.extend(
+        _render_metrics_lines(
+            metrics,
+            start_time=start_time,
+            products_tracked=products_tracked,
+        )
+    )
     await update.message.reply_html("\n".join(lines))
 
 
@@ -473,7 +478,8 @@ async def cmd_errori(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     if text is None:
         await update.message.reply_text(no_errors_text())
         return
-    await update.message.reply_html(text)
+    for chunk in split_message(text):
+        await update.message.reply_html(chunk)
 
 
 def no_errors_text() -> str:
@@ -494,26 +500,17 @@ async def errors_text(db: Any, health_mgr: Any, user_id: int) -> str | None:
 
     lines: list[str] = [_("⚠️ <b>Recent errors ({n})</b>").format(n=len(errored)), ""]
     for row in errored:
-        name = _escape_html(truncate_to_width(row.name or _("Unknown"), 50))
-        lines.append(f"<b>#{row.id}</b> {name}")
-
-        state_label = ""
-        if health_mgr is not None and row.domain:
-            state = health_mgr.state(row.domain)
-            if state != QuarantineState.CLOSED:
-                until = _format_remaining(health_mgr.locked_until(row.domain))
-                resumes = _("🔒 {tier} (resumes in {until})").format(
-                    tier=_tier_label(state.value), until=until
-                )
-                state_label = f" — {resumes}"
-        lines.append(f"  🌐 {_escape_html(row.domain or '?')}{state_label}")
-        failed = _("❌ {n} failed reads").format(n=row.consecutive_errors)
-        lines.append(f"  {failed}")
-        if row.last_error:
-            when = _format_relative_time(row.last_error_at)
-            when_str = f" — {when}" if when else ""
-            lines.append(f"  🐞 {_escape_html(row.last_error[:140])}{when_str}")
-        lines.append("")
+        mark = "⚠️"
+        if (
+            health_mgr is not None
+            and row.domain
+            and health_mgr.state(row.domain) != QuarantineState.CLOSED
+        ):
+            mark = "🔒"
+        lines.append(
+            product_row(row.name or _("Unknown"), None, mark=f"{mark}{row.consecutive_errors}")
+        )
+    lines.append("")
 
     lines.append(
         _(

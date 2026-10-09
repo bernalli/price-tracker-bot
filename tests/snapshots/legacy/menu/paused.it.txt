@@ -27,7 +27,7 @@
    |
    | Tocca un prodotto per modificarlo.
    keyboard:
-   | [#1 Kettle €80.00 → p:1:ed]
+   | [80,00 € ▼20% Kettle → p:1:ed]
    | [⏸ 1 in pausa → riattiva → pz]
    | [◀️ Menu → h]
 ## db after step 2
@@ -41,7 +41,7 @@
    |
    | Tocca per riattivare.
    keyboard:
-   | [▶️ #2 Old Fan → p:2:ra]
+   | [45,00 € ⏸ Old Fan → p:2:ra]
    | [◀️ Menu → h]
 ## db after step 3
 (no changes)
@@ -70,7 +70,7 @@
    |
    | Tocca un prodotto per modificarlo.
    keyboard:
-   | [#1 Kettle €80.00 → p:1:ed]
+   | [80,00 € ▼20% Kettle → p:1:ed]
    | [⏸ 11 in pausa → riattiva → pz]
    | [◀️ Menu → h]
 ## db after step 5
@@ -84,16 +84,16 @@
    |
    | Tocca per riattivare.
    keyboard:
-   | [▶️ #2 Old Fan → p:2:ra]
-   | [▶️ #3 Paused 80 → p:3:ra]
-   | [▶️ #4 Paused 81 → p:4:ra]
-   | [▶️ #5 Paused 82 → p:5:ra]
-   | [▶️ #6 Paused 83 → p:6:ra]
-   | [▶️ #7 Paused 84 → p:7:ra]
-   | [▶️ #8 Paused 85 → p:8:ra]
-   | [▶️ #9 Paused 86 → p:9:ra]
-   | [▶️ #10 Paused 87 → p:10:ra]
-   | [▶️ #11 Paused 88 → p:11:ra]
+   | [45,00 € ⏸ Old Fan → p:2:ra]
+   | [5,00 € ⏸ Paused 80 → p:3:ra]
+   | [5,00 € ⏸ Paused 81 → p:4:ra]
+   | [5,00 € ⏸ Paused 82 → p:5:ra]
+   | [5,00 € ⏸ Paused 83 → p:6:ra]
+   | [5,00 € ⏸ Paused 84 → p:7:ra]
+   | [5,00 € ⏸ Paused 85 → p:8:ra]
+   | [5,00 € ⏸ Paused 86 → p:9:ra]
+   | [5,00 € ⏸ Paused 87 → p:10:ra]
+   | [5,00 € ⏸ Paused 88 → p:11:ra]
    | [◀️ Menu → h]
 ## db after step 6
 (no changes)

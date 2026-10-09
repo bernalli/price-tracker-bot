@@ -32,8 +32,8 @@
    param parse_mode="HTML"
    text:
    | 📊 <b>Riepilogo — 2 variazioni di prezzo</b>
-   | 🔻 Kettle — EUR80.00 → EUR64.00 — example.com
-   | 🔻 Fan — USD50.00 → USD40.00 — example.com
+   | <b>64,00 €</b> ▼20% Kettle
+   | <b>40,00 USD</b> ▼20% Fan
    | Usa /lista per lo stato completo.
 ## db after step 5
 ~ digest_queue id=1 flushed_at: NULL -> <now:9999-99-99 99:99:99>

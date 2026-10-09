@@ -48,6 +48,7 @@ from price_tracker.bot.handlers._helpers import (
 )
 from price_tracker.bot.keyboards import build_threshold_keyboard
 from price_tracker.bot.messages import _
+from price_tracker.bot.ui.product_rows import record_row
 from price_tracker.bot.ui.width import truncate_to_width
 from price_tracker.core.textlimits import truncate_visible
 
@@ -77,9 +78,6 @@ async def _product_picker(
 
     buttons = []
     for p in products:
-        name = truncate_to_width(p.get("name") or _("Unknown"), 35)
-        current = _safe_dec(p.get("current_price"))
-        price_tag = f" €{current:.2f}" if current else ""
         action_name = {
             "settarget": "product.target",
             "setsoglia": "product.threshold",
@@ -87,7 +85,7 @@ async def _product_picker(
         buttons.append(
             [
                 InlineKeyboardButton(
-                    f"#{p['id']} {name}{price_tag}",
+                    record_row(p, html=False),
                     callback_data=encode(Action(action_name, (p["id"],))),
                 )
             ]
@@ -135,11 +133,7 @@ async def cmd_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
         buttons = []
         for p in products:
-            name = truncate_to_width(p.get("name") or _("Unknown"), 35)
-            price = _safe_dec(p.get("current_price"))
-            label = f"#{p['id']} {name}"
-            if price:
-                label += f" €{price:.2f}"
+            label = record_row(p, html=False)
             buttons.append(
                 [
                     InlineKeyboardButton(

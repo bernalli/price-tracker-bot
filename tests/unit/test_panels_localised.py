@@ -205,10 +205,7 @@ ITALIAN: dict[str, str] = {
     ),
     "errors": (
         "⚠️ <b>Errori recenti (1)</b>\n\n"
-        "<b>#1</b> Sconosciuto\n"
-        "  🌐 shop.example — 🔒 T1 (1h) (riprende tra —)\n"
-        "  ❌ 3 letture fallite\n"
-        "  🐞 parse_error: no price\n\n"
+        "<b>N/D</b> 🔒3 Sconosciuto\n\n"
         "ℹ️ I siti in 🔒 quarantena riprendono da soli; "
         "usa /reactivate per riattivare un prodotto sospeso."
     ),
@@ -234,7 +231,7 @@ ITALIAN_LABELS: dict[str, list[str]] = {
         "🔄 Azzera prezzo base",
         "🔔 Notifiche",
     ],
-    "notifications": ["#1 Kettle [🔔 Ogni ribasso]", "◀️ Menu"],
+    "notifications": ["80,00\xa0€ ▼20% Kettle", "◀️ Menu"],
     "back_buttons": ["◀️ Menu", "◀️ Menu"],
 }
 

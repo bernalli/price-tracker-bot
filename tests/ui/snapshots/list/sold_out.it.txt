@@ -3,11 +3,13 @@
 # locale: it
 # now: 2026-03-01T12:00:00Z
 text:
-   | 📦 <b>I tuoi prodotti</b> · esauriti (1) · pagina 1/1
+   | 📦 <b>I tuoi prodotti</b>
+   | esauriti (1)
+   | pagina 1/1
    | 
-   | 🚫 <b>#11</b> Toaster · 19,99 €
+   | <b>19,99 €</b> 🚫 Toaster
 keyboard:
-   [#11](cb:l:o:1:11)
+   [#11 Toaster](cb:l:o:1:11)
    [✅ Attivi](cb:l:a:1)  [⏸ In pausa](cb:l:p:1)
    [⚠️ Errori](cb:l:e:1)  [🚫 Esaurito ✓](cb:l:o:1)
    [➕ Aggiungi](cb:ad)  [🏠 Home](cb:h)

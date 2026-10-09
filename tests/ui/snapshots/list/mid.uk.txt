@@ -3,17 +3,23 @@
 # locale: uk
 # now: 2026-03-01T12:00:00Z
 text:
-   | [📦 <b>Your products</b> · [active ones active ones active ones] (12) · page 2/3 📦 <b>Your products</b> · [active ones active ones active ones] (12) · page 2/3 📦 <b>Your products</b> · [active ones active ones active ones] (12) · page 2/3]
+   | [📦 <b>Your products</b>
+   | [active ones active ones active ones] (12)
+   | page 2/3 📦 <b>Your products</b>
+   | [active ones active ones active ones] (12)
+   | page 2/3 📦 <b>Your products</b>
+   | [active ones active ones active ones] (12)
+   | page 2/3]
    | 
-   | [<b>#6</b> Kettle · 19,99 EUR <b>#6</b> Kettle · 19,99 EUR <b>#6</b> Kettle · 19,99 EUR]
-   | [⚠️ <b>#7</b> Fan · 19,99 EUR ⚠️ <b>#7</b> Fan · 19,99 EUR ⚠️ <b>#7</b> Fan · 19,99 EUR]
-   | [<b>#8</b> Lamp · — <b>#8</b> Lamp · — <b>#8</b> Lamp · —]
-   | [<b>#9</b> Heater · 1 299,50 CHF <b>#9</b> Heater · 1 299,50 CHF <b>#9</b> Heater · 1 299,50 CHF]
-   | [<b>#10</b> Wireless Headphones X200 Pro Edition wi… · 19,99 EUR <b>#10</b> Wireless Headphones X200 Pro Edition wi… · 19,99 EUR <b>#10</b> Wireless Headphones X200 Pro Edition wi… · 19,99 EUR]
+   | <b>19,99 EUR</b> Kettle
+   | <b>19,99 EUR</b> ⚠️ Fan
+   | <b>[N/A N/A N/A]</b> Lamp
+   | <b>1 299,50 CHF</b> Heater
+   | <b>19,99 EUR</b> Wireless Headphones X…
 keyboard:
-   [#6](cb:l:a:2:6)  [#7](cb:l:a:2:7)
-   [#8](cb:l:a:2:8)  [#9](cb:l:a:2:9)
-   [#10](cb:l:a:2:10)
+   [#6 Kettle](cb:l:a:2:6)  [#7 Fan](cb:l:a:2:7)
+   [#8 Lamp](cb:l:a:2:8)  [#9 Heater](cb:l:a:2:9)
+   [#10 Wireless Hea…](cb:l:a:2:10)
    [◀️](cb:l:a:1)  [2/3](cb:noop)  [▶️](cb:l:a:3)
    [[✅ Active ✅ Active ✅ Active] ✓](cb:l:a:1)
    [[⏸ Paused ⏸ Paused ⏸ Paused]](cb:l:p:1)

@@ -13,8 +13,8 @@
    param parse_mode="HTML"
    text:
    | ▶️ <b>Ricontrollati 2 prodotti su example.com</b>
-   | ❌ Kettle — prezzo non leggibile
-   | ❌ Speaker — prezzo non leggibile
+   | <b>80,00 €</b> ▼20% ❌ prezzo non… Ket…
+   | <b>40,00 €</b> ❌ prezzo non legg… Spe…
 ## db after step 3
 ~ products id=1 is_active: 0 -> 1
 ~ products id=1 consecutive_errors: 2 -> 1

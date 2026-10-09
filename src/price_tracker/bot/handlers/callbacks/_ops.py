@@ -8,16 +8,14 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 
 from price_tracker.bot.callbacks import Action, encode
-from price_tracker.bot.decorators import _convert_display
 from price_tracker.bot.handlers._helpers import (
     _escape_html,
     _get_user_product,
     _parse_id,
-    _safe_dec,
 )
 from price_tracker.bot.handlers.callbacks._legacy import resolve_callback
 from price_tracker.bot.messages import _
-from price_tracker.bot.ui.width import truncate_to_width
+from price_tracker.bot.ui.product_rows import amount, product_row
 from price_tracker.core.alert import _why
 from price_tracker.core.notices import group_key_for
 from price_tracker.core.textlimits import split_message
@@ -104,21 +102,20 @@ async def _handle_reactivate(
         product = await db.get_product(original.id)
         name_source = product.get("name") if product is not None else original.get("name")
         url_source = product.get("url") if product is not None else original.get("url")
-        name = _escape_html(truncate_to_width(str(name_source or url_source), 60))
         result = results[index] if index < len(results) else None
         reason = getattr(result, "reason", None)
-        current_price = _safe_dec(product.get("current_price")) if product is not None else None
-        if reason is None and current_price is not None:
-            currency = str(product.get("currency", "EUR"))
-            price = _convert_display(current_price, currency)
-            lines.append(_("✅ {name} — {price}").format(name=name, price=_escape_html(price)))
-        else:
-            lines.append(
-                _("❌ {name} — {why}").format(
-                    name=name,
-                    why=_escape_html(_why(reason, None)),
-                )
+        current_price = amount(product.get("current_price")) if product is not None else None
+        lines.append(
+            product_row(
+                str(name_source or url_source),
+                current_price,
+                initial=amount(product.get("initial_price")) if product is not None else None,
+                currency=str(product.get("currency", "EUR")) if product is not None else "EUR",
+                mark="✅"
+                if reason is None and current_price is not None
+                else "❌ " + _why(reason, None).split(" (", 1)[0],
             )
+        )
     await _reply_chunked(query, "\n".join(lines))
     return True
 

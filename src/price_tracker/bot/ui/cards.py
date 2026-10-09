@@ -11,6 +11,7 @@ from price_tracker.bot.messages import _, current_locale, ngettext
 from price_tracker.bot.ui.escape import escape_html
 from price_tracker.bot.ui.labels import button, layout_rows
 from price_tracker.bot.ui.panels import add_button, home_button
+from price_tracker.bot.ui.product_rows import product_row
 from price_tracker.bot.ui.screens import Button, Screen
 from price_tracker.bot.ui.width import sanitize_label, truncate_to_width
 from price_tracker.core.textlimits import DOMAIN_BUDGET, NAME_BUDGET
@@ -176,9 +177,6 @@ def product_card(view: ProductView, actions: CardActions, *, now: datetime) -> S
     return Screen(text="\n".join(lines), rows=_keyboard(view, actions))
 
 
-_LIST_NAME_WIDTH = 40
-
-
 def _filter_word(list_filter: str) -> str:
     if list_filter == "a":
         return _("active ones")
@@ -187,7 +185,7 @@ def _filter_word(list_filter: str) -> str:
     return _("paused") if list_filter == "p" else _("errors")
 
 
-def _list_row(view: ProductView, *, loc: str) -> str:
+def _list_row(view: ProductView) -> str:
     if view.status != "active":
         mark = "⏸ "
     elif view.consecutive_errors > 0:
@@ -196,10 +194,8 @@ def _list_row(view: ProductView, *, loc: str) -> str:
         mark = "🚫 "
     else:
         mark = ""
-    name = escape_html(truncate_to_width(sanitize_label(view.name), _LIST_NAME_WIDTH))
-    price = "—" if view.current is None else money(view.current, view.currency, locale=loc)
-    return _("{mark}<b>#{id}</b> {name} · {price}").format(
-        mark=mark, id=view.id, name=name, price=price
+    return product_row(
+        view.name, view.current, initial=view.initial, currency=view.currency, mark=mark.strip()
     )
 
 
@@ -209,7 +205,8 @@ def _list_keyboard(page: ListPage) -> tuple[tuple[Button, ...], ...]:
 
     opens = [
         button(
-            f"#{item.id}", callback=encode(Action("list.open", (page.filter, page.page, item.id)))
+            truncate_to_width(f"#{item.id} {sanitize_label(item.name)}", 17),
+            callback=encode(Action("list.open", (page.filter, page.page, item.id))),
         )
         for item in page.items
     ]
@@ -248,9 +245,10 @@ def _list_keyboard(page: ListPage) -> tuple[tuple[Button, ...], ...]:
 
 def list_page(page: ListPage) -> Screen:
     """Render one page of the product list. Pure: the locale is the current one."""
-    loc = current_locale()
     header = _("📦 <b>Your products</b> · {filter} ({total}) · page {page}/{pages}").format(
         filter=_filter_word(page.filter), total=page.total, page=page.page, pages=page.pages
     )
-    body = [_list_row(item, loc=loc) for item in page.items] or [_("Nothing here.")]
-    return Screen(text="\n".join([header, "", *body]), rows=_list_keyboard(page))
+    body = [_list_row(item) for item in page.items] or [_("Nothing here.")]
+    return Screen(
+        text="\n".join([header.replace(" · ", "\n"), "", *body]), rows=_list_keyboard(page)
+    )

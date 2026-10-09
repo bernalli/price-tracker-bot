@@ -13,6 +13,7 @@ from telegram.ext import Application, ContextTypes
 
 from price_tracker.bot.command_menus import sync_command_menus
 from price_tracker.bot.handlers import register_handlers
+from price_tracker.bot.release_updates import announce_release
 from price_tracker.config import Config, parse_bind
 from price_tracker.core.health import HealthManager
 from price_tracker.core.http_client import build_client
@@ -205,7 +206,12 @@ async def amain() -> None:
 
     metrics = MetricsRegistry()
     application.bot_data["metrics"] = metrics
-    application.bot_data["start_time"] = time.monotonic()
+    start_time = time.monotonic()
+    products_tracked = 0
+    application.bot_data["start_time"] = start_time
+    application.bot_data["products_tracked"] = products_tracked
+    metrics.bot_uptime_seconds.set(time.monotonic() - start_time)
+    metrics.products_tracked_total.set(products_tracked)
 
     metrics_server: MetricsServer | None = None
     if config.metrics_enabled:
@@ -250,9 +256,15 @@ async def amain() -> None:
     if application.updater is None:
         raise RuntimeError("Updater not initialized")
     await application.updater.start_polling()
+    announcement_task = application.create_task(
+        announce_release(application.bot, application.bot_data["repo"], config.lang),
+        name="release_announcement",
+    )
     try:
         await asyncio.Event().wait()
     finally:
+        announcement_task.cancel()
+        await asyncio.gather(announcement_task, return_exceptions=True)
         if metrics_server is not None:
             await metrics_server.stop()
             log.info("metrics_server.stop")

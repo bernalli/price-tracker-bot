@@ -22,17 +22,13 @@ from telegram.constants import ParseMode
 from price_tracker.bot.callbacks import Action, encode
 from price_tracker.bot.decorators import _config
 from price_tracker.bot.handlers._cards import home_view
-from price_tracker.bot.handlers._helpers import (
-    _escape_html,
-    _format_threshold,
-    _safe_dec,
-)
 from price_tracker.bot.handlers.callbacks._legacy import resolve_callback
 from price_tracker.bot.handlers.callbacks._nav import _edit
 from price_tracker.bot.keyboards import menu_back_button
 from price_tracker.bot.messages import _
 from price_tracker.bot.ui.panels import home_screen
-from price_tracker.bot.ui.width import truncate_to_width
+from price_tracker.bot.ui.product_rows import record_row
+from price_tracker.core.textlimits import split_message
 
 if TYPE_CHECKING:
     from telegram.ext import ContextTypes
@@ -80,13 +76,10 @@ async def handle_menu_navigation(
         rows = []
         if products:
             for p in products[:10]:
-                nm = truncate_to_width(p.get("name") or "?", 28)
-                cur = _safe_dec(p.get("current_price"))
-                tag = f" €{cur:.2f}" if cur else ""
                 rows.append(
                     [
                         InlineKeyboardButton(
-                            f"#{p['id']} {nm}{tag}",
+                            record_row(p, html=False),
                             callback_data=encode(Action("product.edit", (p["id"],))),
                         )
                     ]
@@ -133,11 +126,10 @@ async def handle_menu_navigation(
         paused = [p for p in all_prods if not p.get("is_active")]
         rows = []
         for p in paused[:10]:
-            nm = truncate_to_width(p.get("name") or "?", 35)
             rows.append(
                 [
                     InlineKeyboardButton(
-                        f"▶️ #{p['id']} {nm}",
+                        record_row(p, html=False),
                         callback_data=encode(Action("product.reactivate", (p["id"],))),
                     )
                 ]
@@ -160,11 +152,10 @@ async def handle_menu_navigation(
             ]
         ]
         for p in products[:8]:
-            nm = truncate_to_width(p.get("name") or "?", 30)
             rows.append(
                 [
                     InlineKeyboardButton(
-                        f"🔄 #{p['id']} {nm}",
+                        record_row(p, html=False),
                         callback_data=encode(Action("product.check", (p["id"],))),
                     )
                 ]
@@ -201,11 +192,10 @@ async def handle_menu_navigation(
         products = await db.get_active_products(user_id)
         rows = []
         for p in products[:10]:
-            nm = truncate_to_width(p.get("name") or "?", 35)
             rows.append(
                 [
                     InlineKeyboardButton(
-                        f"📈 #{p['id']} {nm}",
+                        record_row(p, html=False),
                         callback_data=encode(Action("product.chart", (p["id"], "all"))),
                     )
                 ]
@@ -222,17 +212,10 @@ async def handle_menu_navigation(
         products = await db.get_active_products(user_id)
         rows = []
         for p in products[:10]:
-            nm = truncate_to_width(p.get("name") or "?", 22)
-            th = _format_threshold(
-                p.get("threshold_type", "percentage"),
-                p.get("threshold_value", "10"),
-            )
-            tgt = _safe_dec(p.get("target_price"))
-            t_str = f" 🎯€{tgt:.0f}" if tgt else ""
             rows.append(
                 [
                     InlineKeyboardButton(
-                        f"#{p['id']} {nm} [{th}]{t_str}",
+                        record_row(p, html=False),
                         callback_data=encode(Action("product.edit", (p["id"],))),
                     )
                 ]
@@ -314,24 +297,22 @@ async def _handle_menu_checkall(
     )
     alerts = [r.alert for r in results if r.alert is not None]
     updated = await db.get_active_products(user_id)
-    txt_lines = [_("✅ <b>Complete</b> — {count} products").format(count=len(updated)) + chr(10)]
+    txt_lines = [
+        _("✅ <b>Complete</b> — {count} products").format(count=len(updated)).replace(" — ", "\n")
+        + chr(10)
+    ]
     for p in updated:
-        nm = truncate_to_width(p.get("name") or "?", 35)
-        cur = _safe_dec(p.get("current_price"))
-        ini = _safe_dec(p.get("initial_price"))
-        tag = f"€{cur:.2f}" if cur else "N/D"
-        diff = ""
-        if ini and cur and ini > 0 and ini != cur:
-            d = (ini - cur) / ini * 100
-            diff = f" <i>(-{d:.1f}%)</i>" if d > 0 else f" <i>(+{abs(d):.1f}%)</i>"
-        txt_lines.append(f"  #{p['id']} {_escape_html(nm)} — {tag}{diff}")
+        txt_lines.append(record_row(p))
     if alerts:
         txt_lines.append(chr(10) + _("🔔 <b>{count} changes!</b>").format(count=len(alerts)))
+    pages = split_message(chr(10).join(txt_lines))
     await query.edit_message_text(
-        chr(10).join(txt_lines),
+        pages[0],
         parse_mode=ParseMode.HTML,
         reply_markup=InlineKeyboardMarkup([menu_back_button()]),
     )
+    for page in pages[1:]:
+        await query.message.reply_text(page, parse_mode=ParseMode.HTML)
     for a in alerts:
         await query.message.reply_text(
             format_alert(a), parse_mode=ParseMode.HTML, disable_web_page_preview=True

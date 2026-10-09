@@ -8,6 +8,6 @@
    text:
    | 📦 <b>Scegli prodotto da eliminare:</b>
    keyboard:
-   | [#1 Kettle €80.00 → p:1:rm]
+   | [80,00 € ▼20% Kettle → p:1:rm]
 ## db after step 1
 ~ users user_id=10 display_name: NULL -> "U10"

@@ -10,12 +10,12 @@
    |
    | 6 prodotti hanno fallito 1/2 controlli di fila. Se continua, verranno sospesi automaticamente.
    |
-   | • <b>Kettle</b> — prezzo non leggibile
-   | • <b>No Price</b> — prezzo non leggibile
-   | • <b>Used Offer</b> — prezzo non leggibile
-   | • <b>Offline</b> — sito irraggiungibile
-   | • <b>Gone</b> — pagina non trovata (HTTP 404)
-   | • <b>Broken</b> — sito irraggiungibile
+   | <b>80,00 €</b> ⚠️ Kettle
+   | <b>40,00 €</b> ⚠️ No Price
+   | <b>40,00 €</b> ⚠️ Used Offer
+   | <b>40,00 €</b> ⚠️ Offline
+   | <b>40,00 €</b> ⚠️ Gone
+   | <b>40,00 €</b> ⚠️ Broken
    |
    | Dettagli con /errori.
    markup: {}

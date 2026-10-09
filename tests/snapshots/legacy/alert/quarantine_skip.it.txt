@@ -18,7 +18,7 @@
    |
    | 1 prodotti hanno fallito 1/2 controlli di fila. Se continua, verranno sospesi automaticamente.
    |
-   | • <b>Amazon 1</b> — prezzo non leggibile
+   | <b>25,00 €</b> ⚠️ Amazon 1
    |
    | Dettagli con /errori.
    markup: {}

@@ -7,12 +7,14 @@
    param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
-   | 📦 <b>I tuoi prodotti</b> · attivi (2) · pagina 1/1
+   | 📦 <b>I tuoi prodotti</b>
+   | attivi (2)
+   | pagina 1/1
    |
-   | ⚠️ <b>#1</b> Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN… · 99,50 €
-   | <b>#2</b> Sticker · 0,80 €
+   | <b>99,50 €</b> ▼0,5% ⚠️ Long NNNNNNNNN…
+   | <b>0,80 €</b> ▼11,1% Sticker
    keyboard:
-   | [#1 → l:a:1:1] [#2 → l:a:1:2]
+   | [#1 Long NNNNNNNN… → l:a:1:1] [#2 Sticker → l:a:1:2]
    | [✅ Attivi ✓ → l:a:1] [⏸ In pausa → l:p:1]
    | [⚠️ Errori → l:e:1] [🚫 Esaurito → l:o:1]
    | [🗑 Elimina tutti → l:rmall] [➕ Aggiungi → ad]

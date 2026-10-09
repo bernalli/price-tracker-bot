@@ -8,8 +8,8 @@
    text:
    | 📦 <b>Scegli prodotto da controllare:</b>
    keyboard:
-   | [#1 Kettle €80.00 → p:1:ck]
-   | [#2 Fan → p:2:ck]
+   | [80,00 € ▼20% Kettle → p:1:ck]
+   | [N/D Fan → p:2:ck]
 ## db after step 1
 ~ users user_id=10 display_name: NULL -> "U10"
 ## step 2: command "/check" user=10
@@ -18,8 +18,8 @@
    text:
    | 📦 <b>Scegli prodotto da controllare:</b>
    keyboard:
-   | [#1 Kettle €80.00 → p:1:ck]
-   | [#2 Fan → p:2:ck]
-   | [#3 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNN… €80.00 → p:3:ck]
+   | [80,00 € ▼20% Kettle → p:1:ck]
+   | [N/D Fan → p:2:ck]
+   | [80,00 € Long NNNNNNNNNNNNNNNNNN… → p:3:ck]
 ## db after step 2
 (no changes)

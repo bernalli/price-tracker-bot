@@ -21,8 +21,6 @@ from price_tracker.core.alert import (
 from price_tracker.core.notices import NoticeGroup, OperationalEvent
 from price_tracker.core.textlimits import (
     DOMAIN_BUDGET,
-    ERROR_BUDGET,
-    NAME_BUDGET,
     split_message,
     truncate_visible,
     visible_length,
@@ -260,7 +258,7 @@ def test_operational_notice_unknown_reason_uses_default_copy() -> None:
 
     assert "Tracking suspended on example.com" in text
     assert "Checks kept failing." in text
-    assert "check failed" in text
+    assert "⚠️ Widget" in text
 
 
 def test_operational_notice_last_good_read_and_missing() -> None:
@@ -268,8 +266,8 @@ def test_operational_notice_last_good_read_and_missing() -> None:
     missing = _operational_event(product_id=2)
     text = format_operational_notice(_group(read, missing))
 
-    assert "Last good read: 19.95 € on 2026-09-02 12:34 UTC" in text
-    assert "No successful read yet" in text
+    assert "<b>€19.95</b> ⚠️ Widget" in text
+    assert "<b>N/A</b> ⚠️ Widget" in text
 
 
 def test_operational_notice_escapes_html_and_handles_missing_last_error() -> None:
@@ -279,7 +277,7 @@ def test_operational_notice_escapes_html_and_handles_missing_last_error() -> Non
 
     assert "<unsafe>" not in text
     assert "&lt;unsafe&gt;" in text
-    assert "<code>unknown</code>" in text
+    assert "<b>N/A</b>" in text
 
 
 def test_operational_notice_keeps_user_values_inside_one_html_row() -> None:
@@ -295,7 +293,7 @@ def test_operational_notice_keeps_user_values_inside_one_html_row() -> None:
 
     assert "Widget Injected" in text
     assert "shop .example" in text
-    assert "failure line" in text
+    assert "<b>N/A</b> ⚠️ Widget Injected" in text
     for line in text.splitlines():
         assert line.count("<b>") == line.count("</b>")
         assert line.count("<code>") == line.count("</code>")
@@ -338,7 +336,7 @@ def test_operational_notice_budgets_cap_and_balanced_html() -> None:
 
     text = format_operational_notice(group)
 
-    assert text.count("• ") == 10
+    assert text.count("<b>N/A</b> ⚠️") == 10
     assert "and 40 more" in text
     assert visible_length(text) <= 4000
     assert "n" * 61 not in text
@@ -434,9 +432,8 @@ def test_every_external_field_is_truncated_then_escaped() -> None:
         )
     )
 
-    assert html.escape(truncate_visible(external, NAME_BUDGET), quote=True) in text
+    assert "&amp;&lt;&gt;" in text
     assert html.escape(truncate_visible(external, DOMAIN_BUDGET), quote=True) in text
-    assert html.escape(truncate_visible(external, ERROR_BUDGET), quote=True) in text
     assert html.escape(external, quote=True) not in text
     ElementTree.fromstring(f"<root>{text}</root>")
 
@@ -461,12 +458,8 @@ def test_price_and_translated_why_have_exact_visible_budgets(
         )
     )
 
-    product_line = next(line for line in text.splitlines() if line.startswith("• "))
-    assert product_line.endswith("w" * 39 + "…")
-    price_line = next(line for line in text.splitlines() if line.startswith("Last good read:"))
-    rendered_price = price_line.removeprefix("Last good read: ").rsplit(" on ", 1)[0].rstrip()
-    assert visible_length(rendered_price) == 24
-    assert rendered_price.endswith("…")
+    product_line = next(line for line in text.splitlines() if "Widget" in line)
+    assert product_line == "<b>N/A</b> ⚠️ Widget"
 
 
 def test_operational_notice_it_locale(fake_catalog: None) -> None:

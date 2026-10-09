@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 from unittest.mock import patch
 
@@ -477,3 +479,17 @@ def test_the_real_repository_is_in_sync() -> None:
     assert result.returncode == 0, result.stderr
     assert result.stderr == ""
     assert result.stdout.startswith("CHECKED: ")
+
+
+def test_running_and_project_versions_have_release_notes() -> None:
+    from price_tracker import __version__
+    from price_tracker.release_notes import RELEASE_NOTES
+
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    assert project["project"]["version"] == __version__
+    assert project["project"]["version"] in RELEASE_NOTES, "Write user-facing release notes"
+    historical = set(
+        re.findall(r"^## \[(1\.\d+\.\d+)\]", (ROOT / "CHANGELOG.md").read_text(), re.M)
+    )
+    assert historical <= RELEASE_NOTES.keys()
+    assert all(len(bullets) <= 4 for bullets in RELEASE_NOTES.values())

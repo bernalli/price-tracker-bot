@@ -10,7 +10,7 @@
    |
    | 1 prodotti hanno fallito 1/2 controlli di fila. Se continua, verranno sospesi automaticamente.
    |
-   | • <b>Used Offer</b> — prezzo non leggibile
+   | <b>40,00 €</b> ⚠️ Used Offer
    |
    | Dettagli con /errori.
    markup: {}
