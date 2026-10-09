@@ -7,12 +7,14 @@
    param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
-   | 📦 <b>I tuoi prodotti</b> · attivi (2) · pagina 1/1
+   | 📦 <b>I tuoi prodotti</b>
+   | attivi (2)
+   | pagina 1/1
    |
-   | ⚠️ <b>#1</b> Kettle · 80,00 €
-   | <b>#2</b> Fan · —
+   | <b>80,00 €</b> ▼20% ⚠️ Kettle
+   | <b>N/D</b> Fan
    keyboard:
-   | [#1 → l:a:1:1] [#2 → l:a:1:2]
+   | [#1 Kettle → l:a:1:1] [#2 Fan → l:a:1:2]
    | [✅ Attivi ✓ → l:a:1] [⏸ In pausa → l:p:1]
    | [⚠️ Errori → l:e:1] [🚫 Esaurito → l:o:1]
    | [🗑 Elimina tutti → l:rmall] [➕ Aggiungi → ad]

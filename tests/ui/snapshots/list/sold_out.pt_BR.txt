@@ -3,11 +3,17 @@
 # locale: pt_BR
 # now: 2026-03-01T12:00:00Z
 text:
-   | [📦 <b>Your products</b> · [sold out sold out sold out] (1) · page 1/1 📦 <b>Your products</b> · [sold out sold out sold out] (1) · page 1/1 📦 <b>Your products</b> · [sold out sold out sold out] (1) · page 1/1]
+   | [📦 <b>Your products</b>
+   | [sold out sold out sold out] (1)
+   | page 1/1 📦 <b>Your products</b>
+   | [sold out sold out sold out] (1)
+   | page 1/1 📦 <b>Your products</b>
+   | [sold out sold out sold out] (1)
+   | page 1/1]
    | 
-   | [🚫 <b>#11</b> Toaster · € 19,99 🚫 <b>#11</b> Toaster · € 19,99 🚫 <b>#11</b> Toaster · € 19,99]
+   | <b>€ 19,99</b> 🚫 Toaster
 keyboard:
-   [#11](cb:l:o:1:11)
+   [#11 Toaster](cb:l:o:1:11)
    [[✅ Active ✅ Active ✅ Active]](cb:l:a:1)
    [[⏸ Paused ⏸ Paused ⏸ Paused]](cb:l:p:1)
    [[⚠️ Errors ⚠️ Errors ⚠️ Errors]](cb:l:e:1)

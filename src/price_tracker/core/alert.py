@@ -11,6 +11,7 @@ from typing import Literal
 
 from price_tracker.bot.callbacks import Action, encode
 from price_tracker.bot.messages import _
+from price_tracker.bot.ui.product_rows import product_row
 from price_tracker.core.notices import (
     MAX_LISTED_PRODUCTS,
     NoticeGroup,
@@ -18,9 +19,6 @@ from price_tracker.core.notices import (
 )
 from price_tracker.core.textlimits import (
     DOMAIN_BUDGET,
-    ERROR_BUDGET,
-    NAME_BUDGET,
-    WHY_BUDGET,
     truncate_visible,
 )
 
@@ -143,30 +141,15 @@ def _display_timestamp(value: str | None) -> str | None:
 
 
 def _product_lines(event: OperationalEvent) -> list[str]:
-    """Render one product using per-field budgets before HTML escaping."""
-    name = truncate_visible(event.product_name or event.url, NAME_BUDGET)
-    why = truncate_visible(_why(event.reason, event.detail), WHY_BUDGET)
-    lines = [f"• <b>{_escape_html(name)}</b> — {_escape_html(why)}"]
-    timestamp = _display_timestamp(event.last_checked_at)
-    if event.last_price is not None and timestamp is not None:
-        price = truncate_visible(
-            f"{event.last_price} {_currency_symbol(event.currency or '')}".strip(), 24
+    """Keep each affected product on one narrow row; the heading explains its state."""
+    return [
+        product_row(
+            event.product_name or event.url,
+            event.last_price,
+            currency=event.currency or "EUR",
+            mark="⚠️",
         )
-        amount, separator, symbol = price.rpartition(" ")
-        if not separator:
-            amount, symbol = price, ""
-        lines.append(
-            _("Last good read: {price} {sym} on {date}").format(
-                price=_escape_html(amount),
-                sym=_escape_html(symbol),
-                date=timestamp,
-            )
-        )
-    else:
-        lines.append(_("No successful read yet"))
-    error = truncate_visible(event.last_error or _("unknown"), ERROR_BUDGET)
-    lines.append(_("Error: <code>{error}</code>").format(error=_escape_html(error)))
-    return lines
+    ]
 
 
 def format_operational_notice(group: NoticeGroup) -> str:
@@ -211,9 +194,7 @@ def format_warning_notice(group: NoticeGroup) -> str:
         "",
     ]
     for event in group.events[:MAX_LISTED_PRODUCTS]:
-        name = truncate_visible(event.product_name or event.url, NAME_BUDGET)
-        why = truncate_visible(_why(event.reason, event.detail), WHY_BUDGET)
-        lines.append(f"• <b>{_escape_html(name)}</b> — {_escape_html(why)}")
+        lines.extend(_product_lines(event))
     remaining = len(group.events) - MAX_LISTED_PRODUCTS
     if remaining > 0:
         lines.append(_("… and {k} more").format(k=remaining))

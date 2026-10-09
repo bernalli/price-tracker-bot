@@ -28,7 +28,7 @@
    | Tocca un prodotto per controllarlo.
    keyboard:
    | [🔄 Controlla tutti i prezzi → ca]
-   | [🔄 #1 Kettle → p:1:ck]
+   | [80,00 € ▼20% Kettle → p:1:ck]
    | [📈 Storico prezzo → hi]
    | [◀️ Menu → h]
 ## db after step 2
@@ -41,9 +41,10 @@
 -> editMessageText chat=10 message_id=1000
    param parse_mode="HTML"
    text:
-   | ✅ <b>Completato</b> — 1 prodotti
+   | ✅ <b>Completato</b>
+   | 1 prodotti
    |
-   |   #1 Kettle — €80.00 <i>(-20.0%)</i>
+   | <b>80,00 €</b> ▼20% Kettle
    keyboard:
    | [◀️ Menu → h]
 ## db after step 3
@@ -77,9 +78,9 @@
    | Tocca un prodotto per controllarlo.
    keyboard:
    | [🔄 Controlla tutti i prezzi → ca]
-   | [🔄 #1 Kettle → p:1:ck]
-   | [🔄 #2 Cheap → p:2:ck]
-   | [🔄 #3 Near → p:3:ck]
+   | [80,00 € ▼20% Kettle → p:1:ck]
+   | [0,64 € ▼20% Cheap → p:2:ck]
+   | [99,50 € ▼0,5% Near → p:3:ck]
    | [📈 Storico prezzo → hi]
    | [◀️ Menu → h]
 ## db after step 5
@@ -92,11 +93,12 @@
 -> editMessageText chat=10 message_id=1001
    param parse_mode="HTML"
    text:
-   | ✅ <b>Completato</b> — 3 prodotti
+   | ✅ <b>Completato</b>
+   | 3 prodotti
    |
-   |   #1 Kettle — €80.00 <i>(-20.0%)</i>
-   |   #2 Cheap — €0.64 <i>(-20.0%)</i>
-   |   #3 Near — €99.50 <i>(-0.5%)</i>
+   | <b>80,00 €</b> ▼20% Kettle
+   | <b>0,64 €</b> ▼20% Cheap
+   | <b>99,50 €</b> ▼0,5% Near
    keyboard:
    | [◀️ Menu → h]
 ## db after step 6

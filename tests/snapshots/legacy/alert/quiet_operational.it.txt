@@ -13,7 +13,7 @@
 ## step 4: job run_check_all
 (no calls)
 ## db after step 4
-+ digest_queue id=1 {user_id=10, product_id=NULL, alert_payload_json="{\"kind\": \"operational\", \"event\": \"warning\", \"event_id\": \"ops:warning:10:example.com:2026-03-01T12:00:00+00:00\", \"user_id\": 10, \"domain\": \"example.com\", \"product_ids\": [1], \"products\": [{\"id\": 1, \"name\": \"Kettle\", \"why\": \"prezzo non leggibile\"}], \"reason\": \"parse_error\", \"count\": 1, \"error_count\": 2, \"max_errors\": 4, \"buttons\": [], \"text\": \"\\u23f3 <b>Controlli in errore su example.com</b> (1)\\n\\n1 prodotti hanno fallito 2/4 controlli di fila. Se continua, verranno sospesi automaticamente.\\n\\n\\u2022 <b>Kettle</b> \\u2014 prezzo non leggibile\\n\\nDettagli con /errori.\"}", enqueued_at=<now:9999-99-99 99:99:99>, flushed_at=NULL}
++ digest_queue id=1 {user_id=10, product_id=NULL, alert_payload_json="{\"kind\": \"operational\", \"event\": \"warning\", \"event_id\": \"ops:warning:10:example.com:2026-03-01T12:00:00+00:00\", \"user_id\": 10, \"domain\": \"example.com\", \"product_ids\": [1], \"products\": [{\"id\": 1, \"name\": \"Kettle\", \"why\": \"prezzo non leggibile\"}], \"reason\": \"parse_error\", \"count\": 1, \"error_count\": 2, \"max_errors\": 4, \"buttons\": [], \"text\": \"\\u23f3 <b>Controlli in errore su example.com</b> (1)\\n\\n1 prodotti hanno fallito 2/4 controlli di fila. Se continua, verranno sospesi automaticamente.\\n\\n<b>80,00\\u00a0\\u20ac</b> \\u26a0\\ufe0f Kettle\\n\\nDettagli con /errori.\"}", enqueued_at=<now:9999-99-99 99:99:99>, flushed_at=NULL}
 ~ products id=1 consecutive_errors: 1 -> 2
 ## step 5: command "/digest_now" user=10
 -> sendMessage chat=10

@@ -26,10 +26,12 @@ from price_tracker.bot.decorators import (
     restricted,
     with_locale,
 )
-from price_tracker.bot.handlers._helpers import _escape_html, _format_relative_time
+from price_tracker.bot.handlers._helpers import _escape_html
 from price_tracker.bot.messages import _
+from price_tracker.bot.ui.product_rows import product_row
 from price_tracker.bot.ui.width import truncate_to_width
 from price_tracker.core.http_client import build_client, public_request
+from price_tracker.core.textlimits import split_message
 
 if TYPE_CHECKING:
     from telegram import Update
@@ -473,7 +475,8 @@ async def cmd_errori(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     if text is None:
         await update.message.reply_text(no_errors_text())
         return
-    await update.message.reply_html(text)
+    for chunk in split_message(text):
+        await update.message.reply_html(chunk)
 
 
 def no_errors_text() -> str:
@@ -494,26 +497,17 @@ async def errors_text(db: Any, health_mgr: Any, user_id: int) -> str | None:
 
     lines: list[str] = [_("⚠️ <b>Recent errors ({n})</b>").format(n=len(errored)), ""]
     for row in errored:
-        name = _escape_html(truncate_to_width(row.name or _("Unknown"), 50))
-        lines.append(f"<b>#{row.id}</b> {name}")
-
-        state_label = ""
-        if health_mgr is not None and row.domain:
-            state = health_mgr.state(row.domain)
-            if state != QuarantineState.CLOSED:
-                until = _format_remaining(health_mgr.locked_until(row.domain))
-                resumes = _("🔒 {tier} (resumes in {until})").format(
-                    tier=_tier_label(state.value), until=until
-                )
-                state_label = f" — {resumes}"
-        lines.append(f"  🌐 {_escape_html(row.domain or '?')}{state_label}")
-        failed = _("❌ {n} failed reads").format(n=row.consecutive_errors)
-        lines.append(f"  {failed}")
-        if row.last_error:
-            when = _format_relative_time(row.last_error_at)
-            when_str = f" — {when}" if when else ""
-            lines.append(f"  🐞 {_escape_html(row.last_error[:140])}{when_str}")
-        lines.append("")
+        mark = "⚠️"
+        if (
+            health_mgr is not None
+            and row.domain
+            and health_mgr.state(row.domain) != QuarantineState.CLOSED
+        ):
+            mark = "🔒"
+        lines.append(
+            product_row(row.name or _("Unknown"), None, mark=f"{mark}{row.consecutive_errors}")
+        )
+    lines.append("")
 
     lines.append(
         _(

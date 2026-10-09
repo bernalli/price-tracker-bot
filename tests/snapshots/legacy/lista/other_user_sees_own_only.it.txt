@@ -7,11 +7,13 @@
    param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
-   | 📦 <b>I tuoi prodotti</b> · attivi (1) · pagina 1/1
+   | 📦 <b>I tuoi prodotti</b>
+   | attivi (1)
+   | pagina 1/1
    |
-   | <b>#2</b> Lamp · 30,00 €
+   | <b>30,00 €</b> Lamp
    keyboard:
-   | [#2 → l:a:1:2]
+   | [#2 Lamp → l:a:1:2]
    | [✅ Attivi ✓ → l:a:1] [⏸ In pausa → l:p:1]
    | [⚠️ Errori → l:e:1] [🚫 Esaurito → l:o:1]
    | [➕ Aggiungi → ad] [🏠 Home → h]

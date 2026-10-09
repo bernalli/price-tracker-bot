@@ -23,9 +23,9 @@
    |
    | 3 prodotti hanno fallito 1/2 controlli di fila. Se continua, verranno sospesi automaticamente.
    |
-   | • <b>Amazon 1</b> — bloccato
-   | • <b>Amazon 2</b> — bloccato
-   | • <b>Amazon 3</b> — bloccato
+   | <b>25,00 €</b> ⚠️ Amazon 1
+   | <b>25,00 €</b> ⚠️ Amazon 2
+   | <b>25,00 €</b> ⚠️ Amazon 3
    |
    | Dettagli con /errori.
    markup: {}
@@ -36,23 +36,24 @@
    |
    | 3 prodotti hanno fallito 1/2 controlli di fila. Se continua, verranno sospesi automaticamente.
    |
-   | • <b>Gone</b> — pagina non trovata (HTTP 410)
-   | • <b>Offline</b> — sito irraggiungibile
-   | • <b>Broken</b> — sito irraggiungibile
+   | <b>40,00 €</b> ⚠️ Gone
+   | <b>40,00 €</b> ⚠️ Offline
+   | <b>40,00 €</b> ⚠️ Broken
    |
    | Dettagli con /errori.
    markup: {}
 -> editMessageText chat=10 message_id=1000
    param parse_mode="HTML"
    text:
-   | ✅ <b>Controllo completato</b> — 6 prodotti
+   | ✅ <b>Controllo completato</b>
+   | 6 prodotti
    |
-   |   #1 Amazon 1 — €25.00 ⚠️
-   |   #2 Amazon 2 — €25.00 ⚠️
-   |   #3 Amazon 3 — €25.00 ⚠️
-   |   #4 Gone — €40.00 ⚠️
-   |   #5 Offline — €40.00 ⚠️
-   |   #6 Broken — €40.00 ⚠️
+   | <b>25,00 €</b> ⚠️ Amazon 1
+   | <b>25,00 €</b> ⚠️ Amazon 2
+   | <b>25,00 €</b> ⚠️ Amazon 3
+   | <b>40,00 €</b> ⚠️ Gone
+   | <b>40,00 €</b> ⚠️ Offline
+   | <b>40,00 €</b> ⚠️ Broken
 ## db after step 1
 ~ products id=1 consecutive_errors: 0 -> 1
 ~ products id=1 last_error: NULL -> "block: HTTP 403 block on https://www.amazon.com/dp/B0FIXTURE1"

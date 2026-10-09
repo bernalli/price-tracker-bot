@@ -16,8 +16,9 @@ from html import escape
 from typing import TYPE_CHECKING, Any
 
 from price_tracker.bot.messages import _, ngettext, reset_locale, set_locale, user_locale
+from price_tracker.bot.ui.product_rows import amount, product_row
 from price_tracker.core.alert import _why
-from price_tracker.core.textlimits import DOMAIN_BUDGET, NAME_BUDGET, paginate, truncate_visible
+from price_tracker.core.textlimits import DOMAIN_BUDGET, paginate, truncate_visible
 from price_tracker.notifier.preferences import EffectivePrefs, is_quiet_now
 
 if TYPE_CHECKING:
@@ -63,22 +64,12 @@ def _price_block(entry: DigestEntry, payload: dict[str, Any]) -> str:
         if entry.product_id is not None
         else _("Operational notice")
     )
-    name = _safe_text(payload.get("product_name"), fallback=fallback_name, budget=NAME_BUDGET)
-    old = _safe_text(payload.get("old_price"), fallback="?")
-    new = _safe_text(payload.get("new_price"), fallback="?")
-    currency = _safe_text(payload.get("currency"), fallback="")
-    domain = _safe_text(payload.get("domain"), fallback="", budget=DOMAIN_BUDGET)
-    old_value = payload.get("old_price")
-    new_value = payload.get("new_price")
-    try:
-        if not isinstance(old_value, (int, float, str)) or not isinstance(
-            new_value, (int, float, str)
-        ):
-            raise ValueError
-        arrow = "🔻" if float(new_value) < float(old_value) else "🔺"
-    except (TypeError, ValueError):
-        arrow = "•"
-    return f"{arrow} {name} — {currency}{old} → {currency}{new} — {domain}"
+    return product_row(
+        str(payload.get("product_name") or fallback_name),
+        amount(payload.get("new_price")),
+        initial=amount(payload.get("old_price")),
+        currency=str(payload.get("currency") or "EUR"),
+    )
 
 
 def _operational_block(payload: dict[str, Any], *, include_heading: bool) -> str:

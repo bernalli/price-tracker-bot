@@ -27,9 +27,9 @@
    |
    | Tocca un prodotto per cambiare soglia o target.
    keyboard:
-   | [#1 Kettle [-10%] 🎯€70 → p:1:ed]
-   | [#2 Fan [-€5.00] → p:2:ed]
-   | [#3 Speaker [🔔 Ogni ribasso] → p:3:ed]
+   | [80,00 € ▼20% Kettle → p:1:ed]
+   | [N/D Fan → p:2:ed]
+   | [20,00 € Speaker → p:3:ed]
    | [◀️ Menu → h]
 ## db after step 2
 (no changes)

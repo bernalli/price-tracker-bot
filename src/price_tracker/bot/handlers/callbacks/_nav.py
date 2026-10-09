@@ -191,7 +191,10 @@ async def _errors(
 ) -> None:
     text = await errors_text(db, context.bot_data.get("health_manager"), user_id)
     back = button(_("◀️ Status & info"), callback=encode(Action("stats")))
-    await _edit(query, _report_screen(text or no_errors_text(), back))
+    chunks = split_message(text or no_errors_text())
+    await _edit(query, _report_screen(chunks[0], back))
+    for chunk in chunks[1:]:
+        await query.message.reply_text(chunk, parse_mode=ParseMode.HTML)
 
 
 async def _set_digest(

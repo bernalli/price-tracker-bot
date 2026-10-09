@@ -27,7 +27,7 @@
    |
    | Tocca un prodotto per modificarlo.
    keyboard:
-   | [#1 Long NNNNNNNNNNNNNNNNNNNNNN… €80.00 → p:1:ed]
+   | [80,00 € ▼20% Long NNNNNNNNNNNNN… → p:1:ed]
    | [⏸ 1 in pausa → riattiva → pz]
    | [◀️ Menu → h]
 ## db after step 2
@@ -41,7 +41,7 @@
    |
    | Tocca per riattivare.
    keyboard:
-   | [▶️ #2 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNN… → p:2:ra]
+   | [45,00 € ⏸ Long NNNNNNNNNNNNNNN… → p:2:ra]
    | [◀️ Menu → h]
 ## db after step 3
 (no changes)
@@ -71,7 +71,7 @@
    | Tocca un prodotto per controllarlo.
    keyboard:
    | [🔄 Controlla tutti i prezzi → ca]
-   | [🔄 #1 Long NNNNNNNNNNNNNNNNNNNNNNNN… → p:1:ck]
+   | [80,00 € ▼20% Long NNNNNNNNNNNNN… → p:1:ck]
    | [📈 Storico prezzo → hi]
    | [◀️ Menu → h]
 ## db after step 5
@@ -84,9 +84,10 @@
 -> editMessageText chat=10 message_id=1001
    param parse_mode="HTML"
    text:
-   | ✅ <b>Completato</b> — 1 prodotti
+   | ✅ <b>Completato</b>
+   | 1 prodotti
    |
-   |   #1 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNN… — €80.00 <i>(-20.0%)</i>
+   | <b>80,00 €</b> ▼20% Long NNNNNNNNNNNNN…
    keyboard:
    | [◀️ Menu → h]
 ## db after step 6
@@ -119,7 +120,7 @@
    |
    | Tocca un prodotto per il grafico.
    keyboard:
-   | [📈 #1 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNN… → p:1:ch:all]
+   | [80,00 € ▼20% Long NNNNNNNNNNNNN… → p:1:ch:all]
    | [◀️ Menu → h]
 ## db after step 8
 (no changes)
@@ -148,7 +149,7 @@
    |
    | Tocca un prodotto per cambiare soglia o target.
    keyboard:
-   | [#1 Long NNNNNNNNNNNNNNNN… [-10%] → p:1:ed]
+   | [80,00 € ▼20% Long NNNNNNNNNNNNN… → p:1:ed]
    | [◀️ Menu → h]
 ## db after step 10
 (no changes)

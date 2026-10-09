@@ -137,7 +137,7 @@ def test_pseudo_catalog_contains_exactly_the_29_card_msgids() -> None:
     # (already in the catalog, shared with notifier/digest.py): it is a real
     # _() call site under bot/ui/, so extraction finds it, but it is not one
     # of the 29 msgids the card adds.
-    singular_ids -= {"Product #{product_id}", *PANEL_SINGULAR}
+    singular_ids -= {"Product #{product_id}", "N/A", "Unknown", *PANEL_SINGULAR}
     assert singular_ids == set(CARD_SINGULAR)
     assert plural_ids == {CARD_PLURAL, PANEL_PLURAL}
 

@@ -969,12 +969,12 @@ async def set_error(repo: Repository, pid: int, error: str) -> None:
     await repo._conn.commit()
 
 
-async def test_the_error_report_escapes_names_and_errors(repo: Repository) -> None:
+async def test_the_error_report_escapes_names_and_shows_error_counts(repo: Repository) -> None:
     pid = await add_product(repo, USER, "<b>&Kettle")
     await set_error(repo, pid, "<i>&broken")
     text = edited_text(await press(repo, "er"))
     assert "&lt;b&gt;&amp;Kettle" in text
-    assert "&lt;i&gt;&amp;broken" in text
+    assert "⚠️3" in text
     assert "<b>&" not in text
 
 

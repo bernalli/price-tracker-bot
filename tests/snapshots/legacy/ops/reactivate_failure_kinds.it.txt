@@ -13,10 +13,10 @@
    param parse_mode="HTML"
    text:
    | ▶️ <b>Ricontrollati 4 prodotti su example.com</b>
-   | ❌ Kettle — bloccato
-   | ❌ Speaker — pagina non trovata (HTTP 404)
-   | ❌ Mixer — sito irraggiungibile
-   | ❌ Heater — sito irraggiungibile
+   | <b>80,00 €</b> ▼20% ❌ bloccato Kettle
+   | <b>40,00 €</b> ❌ pagina non trov… Spe…
+   | <b>60,00 €</b> ❌ sito irraggiung… Mix…
+   | <b>40,00 €</b> ❌ sito irraggiung… Hea…
 ## db after step 3
 ~ products id=1 is_active: 0 -> 1
 ~ products id=1 consecutive_errors: 2 -> 1

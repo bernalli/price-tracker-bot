@@ -246,10 +246,10 @@ async def test_ops_react_reply_is_chunked(repo: Repository) -> None:
             name=f"{index}-" + "x" * 200,
             url=f"https://a.example.com/{index}",
         )
-        for index in range(60)
+        for index in range(160)
     ]
     scheduler = AsyncMock()
-    scheduler.check_products_for_user.return_value = [SimpleNamespace(reason=None)] * 60
+    scheduler.check_products_for_user.return_value = [SimpleNamespace(reason=None)] * 160
     query = _query()
     query.answer = AsyncMock()
 
