@@ -157,14 +157,23 @@ def test_coordinator_modules_have_the_expected_importers() -> None:
     ]
     assert _importers("price_tracker.bot.callbacks") == [
         "price_tracker.bot.flows",
-        "price_tracker.bot.handlers.callbacks.__init__",
+        "price_tracker.bot.handlers.__init__",
+        "price_tracker.bot.handlers._cards",
         "price_tracker.bot.handlers.callbacks._actions",
         "price_tracker.bot.handlers.callbacks._admin",
+        "price_tracker.bot.handlers.callbacks._legacy",
         "price_tracker.bot.handlers.callbacks._menu",
         "price_tracker.bot.handlers.callbacks._nav",
+        "price_tracker.bot.handlers.callbacks._ops",
         "price_tracker.bot.handlers.callbacks._product",
+        "price_tracker.bot.handlers.history",
+        "price_tracker.bot.handlers.monitoring",
+        "price_tracker.bot.handlers.product",
+        "price_tracker.bot.keyboards",
         "price_tracker.bot.ui.cards",
         "price_tracker.bot.ui.panels",
+        "price_tracker.core.alert",
+        "price_tracker.notifier.telegram",
     ]
     assert _importers("price_tracker.app.inputs") == [
         "price_tracker.bot.flow_services",

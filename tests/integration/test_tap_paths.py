@@ -35,27 +35,27 @@ End = Literal["visible", "panel", "prompt", "prefs"]
 
 PROMPT_CANCEL: Final = re.compile(r"^p:[0-9a-f]{32}:x$")
 CARD: Final = ("l:a:1", "l:a:1:{P}")
-RULE: Final = (*CARD, "edit_{P}")
+RULE: Final = (*CARD, "p:{P}:ed")
 NOTIFICATIONS: Final = (*RULE, "p:{P}:pr")
 
 # Commands reached without a button: /start and /menu open the menu itself.
 NO_PATH: Final = frozenset({"start", "menu"})
 
 PATHS: Final[dict[str, tuple[int, tuple[str, ...], End]]] = {
-    "help": (OWNER, ("menu_info", "hp"), "panel"),
-    "cancel": (OWNER, (*RULE, "track_threshold_{P}", "@cancel"), "visible"),
+    "help": (OWNER, ("st", "hp"), "panel"),
+    "cancel": (OWNER, (*RULE, "p:{P}:th", "@cancel"), "visible"),
     "add": (OWNER, ("l:a:1", "ad"), "panel"),
     "list": (OWNER, ("l:a:1",), "panel"),
-    "check": (OWNER, (*CARD, "check_{P}"), "visible"),
-    "checkall": (OWNER, ("menu_prezzi", "menu_checkall"), "visible"),
-    "refresh": (OWNER, (*CARD, "setrefresh_{P}"), "visible"),
-    "pause": (OWNER, (*CARD, "pause_{P}"), "visible"),
-    "reactivate": (OWNER, ("l:a:1", "l:p:1", "l:p:1:{Q}", "reactivate_{Q}"), "visible"),
-    "delete": (OWNER, (*CARD, "remove_{P}"), "visible"),
-    "history": (OWNER, (*CARD, "chart_{P}"), "visible"),
-    "reset": (OWNER, (*RULE, "reset_{P}"), "visible"),
-    "target": (OWNER, (*RULE, "track_target_{P}"), "prompt"),
-    "threshold": (OWNER, (*RULE, "track_threshold_{P}"), "prompt"),
+    "check": (OWNER, (*CARD, "p:{P}:ck"), "visible"),
+    "checkall": (OWNER, ("pc", "ca"), "visible"),
+    "refresh": (OWNER, (*CARD, "p:{P}:iv"), "visible"),
+    "pause": (OWNER, (*CARD, "p:{P}:pa"), "visible"),
+    "reactivate": (OWNER, ("l:a:1", "l:p:1", "l:p:1:{Q}", "p:{Q}:ra"), "visible"),
+    "delete": (OWNER, (*CARD, "p:{P}:rm"), "visible"),
+    "history": (OWNER, (*CARD, "p:{P}:ch:all"), "visible"),
+    "reset": (OWNER, (*RULE, "p:{P}:rs"), "visible"),
+    "target": (OWNER, (*RULE, "p:{P}:tg"), "prompt"),
+    "threshold": (OWNER, (*RULE, "p:{P}:th"), "prompt"),
     "mute": (OWNER, ("s", "s:mu", "s:mu:24"), "prefs"),
     "unmute": (OWNER, ("s", "s:mu", "s:mu:off"), "prefs"),
     "digest_mode": (OWNER, ("s", "s:dg", "s:dg:on"), "prefs"),
@@ -64,17 +64,17 @@ PATHS: Final[dict[str, tuple[int, tuple[str, ...], End]]] = {
     "throttle": (OWNER, ("s", "s:th", "s:ask:th"), "prompt"),
     "prefs": (OWNER, ("s",), "panel"),
     "digest_now": (OWNER, ("s", "s:dg", "s:dn"), "visible"),
-    "export": (OWNER, ("menu_dati", "menu_esporta"), "visible"),
-    "import": (OWNER, ("menu_dati", "menu_importa_info"), "panel"),
-    "status": (OWNER, ("menu_info",), "panel"),
-    "errors": (OWNER, ("menu_info", "er"), "panel"),
-    "adduser": (ADMIN, ("menu_admin", "menu_admin_adduser"), "visible"),
-    "removeuser": (ADMIN, ("menu_admin", "menu_admin_removeuser"), "visible"),
-    "users": (ADMIN, ("menu_admin", "menu_admin_users"), "visible"),
-    "nick": (ADMIN, ("menu_admin", "menu_admin_nick"), "visible"),
-    "setinterval": (ADMIN, ("menu_admin", "menu_admin_interval"), "visible"),
-    "debug": (ADMIN, ("menu_admin", "menu_admin_debug"), "prompt"),
-    "health": (ADMIN, ("menu_admin", "a:hl"), "panel"),
+    "export": (OWNER, ("d", "d:x"), "visible"),
+    "import": (OWNER, ("d", "d:i"), "panel"),
+    "status": (OWNER, ("st",), "panel"),
+    "errors": (OWNER, ("st", "er"), "panel"),
+    "adduser": (ADMIN, ("a", "a:add"), "visible"),
+    "removeuser": (ADMIN, ("a", "a:rm"), "visible"),
+    "users": (ADMIN, ("a", "a:u"), "visible"),
+    "nick": (ADMIN, ("a", "a:nk"), "visible"),
+    "setinterval": (ADMIN, ("a", "a:iv"), "visible"),
+    "debug": (ADMIN, ("a", "a:dbg"), "prompt"),
+    "health": (ADMIN, ("a", "a:hl"), "panel"),
 }
 
 # The values a command takes as an argument, reached by tapping too.
@@ -94,8 +94,8 @@ NEW_NODES: Final = {
     "s:th": "s",
     "s:dn": "s",
     "p:{P}:pr": "p:{P}:c",
-    "er": "menu_info",
-    "a:hl": "menu_admin",
+    "er": "st",
+    "a:hl": "a",
     "ad": "l:a:1",
 }
 

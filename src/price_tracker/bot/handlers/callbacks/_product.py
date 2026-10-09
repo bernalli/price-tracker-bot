@@ -26,10 +26,11 @@ from price_tracker.bot.handlers._helpers import (
     _parse_id,
     out_of_stock_line,
 )
+from price_tracker.bot.handlers.callbacks._legacy import resolve_callback
 from price_tracker.bot.handlers.callbacks._nav import show_card, show_list
 from price_tracker.bot.handlers.history import _generate_chart
 from price_tracker.bot.keyboards import build_threshold_keyboard
-from price_tracker.bot.messages import _, current_locale, ngettext
+from price_tracker.bot.messages import N_, _, current_locale, ngettext
 from price_tracker.bot.ui.width import truncate_to_width
 from price_tracker.core.alert import _why
 from price_tracker.i18n.format import money
@@ -43,15 +44,19 @@ logger = logging.getLogger(__name__)
 
 
 async def handle_delete_flow(
-    query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, data: str
+    query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, data: object
 ) -> bool:
     """Handle the delete confirmation flow (`confirm_delete_*`, `cancel_delete`,
     `delete_all`, `confirmdeleteall`).
     """
-    if data.startswith("confirm_delete_"):
-        product_id = _parse_id(data.replace("confirm_delete_", ""))
+    action = resolve_callback(data)
+    if action is None:
+        return False
+    if action.name == "product.remove_ok":
+        raw = action.args[0]
+        product_id = raw if isinstance(raw, int) else _parse_id(raw)
         if product_id is None:
-            await query.edit_message_text("❌ ID non valido.")
+            await query.edit_message_text(_("❌ Invalid ID."))
             return True
         product = await _get_user_product(context, product_id, user_id)
         # An admin may delete any product (as with every other product action),
@@ -64,41 +69,43 @@ async def handle_delete_flow(
         await show_list(query, context, db, user_id, notice=notice)
         return True
 
-    if data == "cancel_delete":
-        await query.edit_message_text("👍 Operazione annullata.")
+    if action.name == "delete.cancel":
+        await query.edit_message_text(_("👍 Operation cancelled."))
         return True
 
-    if data == "delete_all":
+    if action.name == "list.remove_all":
         products = await db.get_active_products(user_id)
         count = len(products)
         if count == 0:
-            await query.edit_message_text("📭 Nessun prodotto da eliminare.")
+            await query.edit_message_text(_("📭 No products to delete."))
             return True
 
         keyboard = InlineKeyboardMarkup(
             [
                 [
                     InlineKeyboardButton(
-                        f"⚠️ Sì, elimina tutti ({count})",
-                        callback_data="confirmdeleteall",
+                        _("⚠️ Yes, delete all ({count})").format(count=count),
+                        callback_data=encode(Action("list.remove_all_ok")),
                     ),
                     InlineKeyboardButton(
-                        "❌ Annulla", callback_data=encode(Action("list.page", ("a", 1)))
+                        _("❌ Cancel"), callback_data=encode(Action("list.page", ("a", 1)))
                     ),
                 ]
             ]
         )
         await query.edit_message_text(
-            f"🚨 <b>Attenzione!</b>\n\n"
-            f"Stai per eliminare <b>definitivamente {count} prodotti</b> "
-            f"e tutto il loro storico prezzi.\n\n"
-            f"Questa azione <b>non è reversibile</b>.",
+            _(
+                "🚨 <b>Warning!</b>\n\n"
+                "You are about to <b>permanently delete {count} products</b> "
+                "and their entire price history.\n\n"
+                "This action <b>cannot be undone</b>."
+            ).format(count=count),
             parse_mode=ParseMode.HTML,
             reply_markup=keyboard,
         )
         return True
 
-    if data == "confirmdeleteall":
+    if action.name == "list.remove_all_ok":
         products = await db.get_active_products(user_id)
         count = 0
         for p in products:
@@ -124,15 +131,16 @@ def _price_or_dash(amount: Decimal, currency: str, loc: str) -> str:
 
 
 async def handle_check_button(
-    query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, data: str
+    query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, data: object
 ) -> bool:
     """Handle the per-product 'Check now' button (`check_<id>`): the card shows the outcome."""
-    if not data.startswith("check_"):
+    action = resolve_callback(data)
+    if action is None or action.name != "product.check":
         return False
-
-    product_id = _parse_id(data.replace("check_", ""))
+    raw = action.args[0]
+    product_id = raw if isinstance(raw, int) else _parse_id(raw)
     if product_id is None:
-        await query.edit_message_text("❌ ID non valido.")
+        await query.edit_message_text(_("❌ Invalid ID."))
         return True
     product = await _get_user_product(context, product_id, user_id)
     if not product:
@@ -183,24 +191,25 @@ async def handle_check_button(
 
 
 async def handle_chart_button(
-    query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, data: str
+    query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, data: object
 ) -> bool:
-    """Handle the per-product 'Storico prezzo' button (`chart_<id>`)."""
-    if not data.startswith("chart_"):
+    """Handle the per-product 'Price history' button (`chart_<id>`)."""
+    action = resolve_callback(data)
+    if action is None or action.name != "product.chart":
         return False
-
-    product_id = _parse_id(data.replace("chart_", ""))
+    raw = action.args[0]
+    product_id = raw if isinstance(raw, int) else _parse_id(raw)
     if product_id is None:
-        await query.edit_message_text("❌ ID non valido.")
+        await query.edit_message_text(_("❌ Invalid ID."))
         return True
     product = await _get_user_product(context, product_id, user_id)
     if not product:
-        await query.edit_message_text("❌ Prodotto non trovato.")
+        await query.edit_message_text(_("❌ Product not found."))
         return True
 
     chart = await _generate_chart(db, product_id, product)
     if chart:
-        name = truncate_to_width(product.get("name") or "Prodotto", 50)
+        name = truncate_to_width(product.get("name") or _("Product"), 50)
         await query.message.reply_photo(
             photo=InputFile(chart, filename=f"chart_{product_id}.png"),
             caption=f"📈 <b>#{product_id}</b> {_escape_html(name)}",
@@ -208,86 +217,101 @@ async def handle_chart_button(
         )
     else:
         await query.message.reply_text(
-            "📭 Dati insufficienti per generare il grafico (servono almeno 2 punti)."
+            _("📭 Not enough data to generate the chart (at least 2 points are needed).")
         )
     return True
 
 
 _PREF_PROMPTS: dict[str, tuple[str | None, str | None, str]] = {
-    "pref_new_": ("new", None, "🆕 Preferenza: <b>Solo Nuovo</b>"),
-    "pref_used_": ("used", None, "♻️ Preferenza: <b>Solo Usato</b>"),
-    "pref_amazon_": (None, "amazon", "📦 Preferenza: <b>Solo venduto da Amazon</b>"),
-    "pref_anyseller_": (None, "any", "🏪 Preferenza: <b>Qualsiasi venditore</b>"),
-    "pref_default_": (None, None, "👍 Preferenza: <b>Nessun filtro</b>"),
+    "n": ("new", None, N_("🆕 Preference: <b>New only</b>")),
+    "u": ("used", None, N_("♻️ Preference: <b>Used only</b>")),
+    "s1": (None, "amazon", N_("📦 Preference: <b>Sold by Amazon only</b>")),
+    "s0": (None, "any", N_("🏪 Preference: <b>Any seller</b>")),
+    "0": (None, None, N_("👍 Preference: <b>No filter</b>")),
 }
 
 
 async def handle_amazon_pref(
-    query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, data: str
+    query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, data: object
 ) -> bool:
     """Handle Amazon condition/seller preference buttons (`pref_*`)."""
-    for prefix, (condition, seller, label) in _PREF_PROMPTS.items():
-        if data.startswith(prefix):
-            product_id = _parse_id(data.replace(prefix, ""))
-            if product_id is None:
-                await query.edit_message_text("❌ ID non valido.")
-                return True
-            product = await _get_user_product(context, product_id, user_id)
-            if not product:
-                await query.edit_message_text("❌ Prodotto non trovato.")
-                return True
-            await db.set_product_preferences(product_id, condition=condition, seller=seller)
-            name = truncate_to_width(product.get("name") or "Sconosciuto", 60)
-            await query.edit_message_text(
-                f"{label} per #{product_id}\n"
-                f"📦 {_escape_html(name)}\n\n"
-                f"<b>Come vuoi essere avvisato?</b>",
-                parse_mode=ParseMode.HTML,
-                reply_markup=build_threshold_keyboard(product_id),
-            )
-            return True
-    return False
+    action = resolve_callback(data)
+    if action is None or action.name != "product.offer_filter":
+        return False
+    raw, choice = action.args
+    product_id = raw if isinstance(raw, int) else _parse_id(raw)
+    if product_id is None:
+        await query.edit_message_text(_("❌ Invalid ID."))
+        return True
+    condition, seller, label = _PREF_PROMPTS[str(choice)]
+    product = await _get_user_product(context, product_id, user_id)
+    if not product:
+        await query.edit_message_text(_("❌ Product not found."))
+        return True
+    await db.set_product_preferences(product_id, condition=condition, seller=seller)
+    name = truncate_to_width(product.get("name") or _("Unknown"), 60)
+    await query.edit_message_text(
+        _(
+            "{preference} for #{product_id}\n📦 {name}\n\n<b>How do you want to be notified?</b>"
+        ).format(
+            preference=_(label),
+            product_id=product_id,
+            name=_escape_html(name),
+        ),
+        parse_mode=ParseMode.HTML,
+        reply_markup=build_threshold_keyboard(product_id),
+    )
+    return True
 
 
 async def handle_track_choice(
-    query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, data: str
+    query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, data: object
 ) -> bool:
     """Handle tracking-mode choice buttons (`track_*`)."""
-    if data.startswith("track_any_"):
-        product_id = _parse_id(data.replace("track_any_", ""))
+    action = resolve_callback(data)
+    if action is None:
+        return False
+    if action.name == "product.threshold_any":
+        raw = action.args[0]
+        product_id = raw if isinstance(raw, int) else _parse_id(raw)
         if product_id is None:
-            await query.edit_message_text("❌ ID non valido.")
+            await query.edit_message_text(_("❌ Invalid ID."))
             return True
         product = await _get_user_product(context, product_id, user_id)
         if not product:
-            await query.edit_message_text("❌ Prodotto non trovato.")
+            await query.edit_message_text(_("❌ Product not found."))
             return True
         await db.set_threshold(product_id, "any_drop", "0")
-        name = truncate_to_width(product.get("name") or "Sconosciuto", 60)
+        name = truncate_to_width(product.get("name") or _("Unknown"), 60)
         await query.edit_message_text(
-            f"🔔 <b>Ogni ribasso</b> attivato per #{product_id}\n"
-            f"📦 {_escape_html(name)}\n\n"
-            f"Riceverai una notifica ad ogni calo di prezzo.",
+            _(
+                "🔔 <b>Any drop</b> enabled for #{product_id}\n"
+                "📦 {name}\n\n"
+                "You will be notified whenever the price drops."
+            ).format(product_id=product_id, name=_escape_html(name)),
             parse_mode=ParseMode.HTML,
         )
         return True
 
-    if data.startswith("track_default_"):
-        product_id = _parse_id(data.replace("track_default_", ""))
+    if action.name == "product.threshold_default":
+        raw = action.args[0]
+        product_id = raw if isinstance(raw, int) else _parse_id(raw)
         if product_id is None:
-            await query.edit_message_text("❌ ID non valido.")
+            await query.edit_message_text(_("❌ Invalid ID."))
             return True
         product = await _get_user_product(context, product_id, user_id)
         if not product:
-            await query.edit_message_text("❌ Prodotto non trovato.")
+            await query.edit_message_text(_("❌ Product not found."))
             return True
         await db.set_threshold(product_id, "percentage", "10")
-        name = truncate_to_width(product.get("name") or "Sconosciuto", 60)
+        name = truncate_to_width(product.get("name") or _("Unknown"), 60)
         await query.edit_message_text(
-            f"👍 <b>Soglia default -10%</b> per #{product_id}\n"
-            f"📦 {_escape_html(name)}\n\n"
-            f"Riceverai una notifica quando il prezzo scende del 10% "
-            f"dal prezzo iniziale.",
+            _(
+                "👍 <b>Default threshold -10%</b> for #{product_id}\n"
+                "📦 {name}\n\n"
+                "You will be notified when the price drops by ten percent "
+                "from the initial price."
+            ).format(product_id=product_id, name=_escape_html(name)),
             parse_mode=ParseMode.HTML,
         )
         return True

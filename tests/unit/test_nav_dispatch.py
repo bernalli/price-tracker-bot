@@ -155,15 +155,26 @@ async def press(repo: Repository, data: str | None) -> MagicMock:
 # --- T3-9 the hook only forwards registered navigation actions ---------------
 
 
-@pytest.mark.parametrize("data", ["menu_main", "check_1", "delete_all"])
-async def test_legacy_payloads_never_reach_the_navigation_handlers(
-    repo: Repository, monkeypatch: pytest.MonkeyPatch, data: str
+@pytest.mark.parametrize(
+    ("data", "expected"),
+    [
+        ("menu_main", Action("home")),
+        ("check_1", Action("product.check", (1,))),
+        ("delete_all", Action("list.remove_all")),
+    ],
+)
+async def test_legacy_payloads_are_normalized_before_dispatch(
+    repo: Repository, monkeypatch: pytest.MonkeyPatch, data: str, expected: Action
 ) -> None:
-    async def fail(*args: object, **kwargs: object) -> bool:
-        raise AssertionError("a legacy payload reached _nav.handle_action")
+    seen: list[Action] = []
 
-    monkeypatch.setattr(_nav, "handle_action", fail)
+    async def capture(*args: object, **kwargs: object) -> bool:
+        seen.append(args[-1])  # type: ignore[arg-type]
+        return True
+
+    monkeypatch.setattr(_nav, "handle_action", capture)
     await press(repo, data)
+    assert seen == [expected]
 
 
 @pytest.mark.parametrize("data", ["l:a:0", "garbage", "s:zz"])
@@ -702,7 +713,7 @@ async def test_the_admin_button_is_only_for_admins_on_every_path(
     await repo.ensure_user(ADMIN, is_admin=True)
     for _text, markup in await home_of(repo, user_id):
         wires = {b.callback_data for row in markup.inline_keyboard for b in row}
-        assert ("menu_admin" in wires) is admin
+        assert ("a" in wires) is admin
 
 
 # --- the language section: the choice is stored and the section redrawn in it ---
@@ -940,7 +951,7 @@ async def test_an_admin_sees_the_health_report(repo: Repository) -> None:
     text, markup = shown(query)
     assert "Scraper Health Report" in text
     wires = [b.callback_data for row in markup.inline_keyboard for b in row]
-    assert wires == ["menu_admin", "h"]
+    assert wires == ["a", "h"]
 
 
 async def test_the_error_report_without_errors(repo: Repository) -> None:
@@ -948,7 +959,7 @@ async def test_the_error_report_without_errors(repo: Repository) -> None:
     text, markup = shown(await press(repo, "er"))
     assert text == "✅ No recent errors on your products."
     wires = [b.callback_data for row in markup.inline_keyboard for b in row]
-    assert wires == ["menu_info", "h"]
+    assert wires == ["st", "h"]
 
 
 async def set_error(repo: Repository, pid: int, error: str) -> None:

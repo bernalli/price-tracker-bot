@@ -45,7 +45,7 @@ MIGRATIONS_DIR = Path(price_tracker.__file__).resolve().parent / "db" / "migrati
 USER = 10
 OTHER = 12
 ADMIN = 13
-BAD_ID = "❌ ID non valido."
+BAD_ID = "❌ Invalid ID."
 NOT_FOUND = "Product not found."
 
 
@@ -214,7 +214,7 @@ async def test_pause_redraws_the_card_with_a_notice(repo: Repository) -> None:
     assert record.is_active is False
     expected = with_notice(await card_screen(repo, pid, back="l:p:1"), "⏸ Tracking paused.")
     assert_shows(query, expected)
-    assert f"reactivate_{pid}" in wires(shown(query)[1])
+    assert f"p:{pid}:ra" in wires(shown(query)[1])
     assert_no_old_text(query)
 
 
@@ -227,7 +227,7 @@ async def test_reactivate_redraws_the_card_with_a_notice(repo: Repository) -> No
     assert record.is_active is True
     expected = with_notice(await card_screen(repo, pid, back="l:a:1"), "▶️ Tracking resumed.")
     assert_shows(query, expected)
-    assert f"pause_{pid}" in wires(shown(query)[1])
+    assert f"p:{pid}:pa" in wires(shown(query)[1])
     assert_no_old_text(query)
 
 
@@ -256,7 +256,7 @@ async def test_an_admin_pausing_a_foreign_product_sees_its_card(repo: Repository
     text, markup = shown(query)
     assert "Secret Fan" in text
     assert text.startswith("⏸ Tracking paused.\n\n")
-    assert f"reactivate_{foreign}" in wires(markup)
+    assert f"p:{foreign}:ra" in wires(markup)
 
 
 # --- the delete prompt and its Cancel ----------------------------------------
@@ -265,7 +265,7 @@ async def test_an_admin_pausing_a_foreign_product_sees_its_card(repo: Repository
 async def test_the_delete_prompt_cancels_back_to_the_card(repo: Repository) -> None:
     pid = await add_product(repo, "Kettle")
     prompt = await press(repo, f"remove_{pid}")
-    assert wires(shown(prompt)[1]) == [f"confirm_delete_{pid}", f"pause_{pid}", f"p:{pid}:c"]
+    assert wires(shown(prompt)[1]) == [f"p:{pid}:rmok", f"p:{pid}:pa", f"p:{pid}:c"]
     query = await press(repo, f"p:{pid}:c")
     assert_shows(query, await card_screen(repo, pid, back="l:a:1"))
     assert await repo.get_product(pid) is not None
@@ -315,7 +315,7 @@ async def test_the_delete_all_prompt_cancels_back_to_the_list(repo: Repository) 
     await add_product(repo, "Kettle")
     await add_product(repo, "Lamp")
     prompt = await press(repo, "delete_all")
-    assert wires(shown(prompt)[1]) == ["confirmdeleteall", "l:a:1"]
+    assert wires(shown(prompt)[1]) == ["l:rmallok", "l:a:1"]
     query = await press(repo, "l:a:1")
     assert_shows(query, await list_screen(repo))
     assert len(await rows(repo)) == 2
@@ -360,7 +360,7 @@ async def test_check_without_change_redraws_the_card(repo: Repository) -> None:
     assert scheduler.calls == [(pid, USER)]
     assert edited_texts(query)[0] == "🔄 Checking..."
     assert_shows(query, with_notice(card, "✅ Checked: no significant change."))
-    assert f"check_{pid}" in wires(shown(query)[1])
+    assert f"p:{pid}:ck" in wires(shown(query)[1])
 
 
 async def test_check_with_a_drop_shows_it_and_the_fresh_card(repo: Repository) -> None:

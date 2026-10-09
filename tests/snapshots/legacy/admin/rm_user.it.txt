@@ -11,9 +11,9 @@
    |
    | Tocca per rimuovere:
    keyboard:
-   | [🚫 10 → admin_rm_10]
-   | [🚫 11 → admin_rm_11]
-   | [◀️ Impostazioni → menu_admin]
+   | [🚫 10 → a:rm:10]
+   | [🚫 11 → a:rm:11]
+   | [◀️ Impostazioni → a]
 ## db after step 1
 (no changes)
 ## step 2: press "admin_rm_11" user=1 on=1
@@ -23,7 +23,7 @@
    text:
    | ✅ Utente <code>11</code> rimosso.
    keyboard:
-   | [◀️ Impostazioni → menu_admin]
+   | [◀️ Impostazioni → a]
 ## db after step 2
 ~ users user_id=11 is_active: 1 -> 0
 ## step 3: press "admin_rm_x" user=1 on=1 synthetic

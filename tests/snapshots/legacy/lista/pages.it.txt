@@ -21,7 +21,7 @@
    | [1/2 → noop] [▶️ → l:a:2]
    | [✅ Attivi ✓ → l:a:1] [⏸ In pausa → l:p:1]
    | [⚠️ Errori → l:e:1] [🚫 Esaurito → l:o:1]
-   | [🗑 Elimina tutti → delete_all] [➕ Aggiungi → ad]
+   | [🗑 Elimina tutti → l:rmall] [➕ Aggiungi → ad]
    | [🏠 Home → h]
 ## db after step 1
 ~ users user_id=10 display_name: NULL -> "U10"
@@ -40,7 +40,7 @@
    | [◀️ → l:a:1] [2/2 → noop]
    | [✅ Attivi ✓ → l:a:1] [⏸ In pausa → l:p:1]
    | [⚠️ Errori → l:e:1] [🚫 Esaurito → l:o:1]
-   | [🗑 Elimina tutti → delete_all] [➕ Aggiungi → ad]
+   | [🗑 Elimina tutti → l:rmall] [➕ Aggiungi → ad]
    | [🏠 Home → h]
 ## db after step 2
 (no changes)
@@ -76,9 +76,9 @@
    | ⏱ Controlli: ogni 6 h · mai
    | ⚠️ 2 letture fallite · /errors
    keyboard:
-   | [🔄 Controlla ora → check_5] [📈 Storico → chart_5]
-   | [⏸ Pausa → pause_5] [🗑 Elimina → remove_5]
-   | [🔔 Regola avviso → edit_5] [⏱ Intervallo → setrefresh_5]
+   | [🔄 Controlla ora → p:5:ck] [📈 Storico → p:5:ch:all]
+   | [⏸ Pausa → p:5:pa] [🗑 Elimina → p:5:rm]
+   | [🔔 Regola avviso → p:5:ed] [⏱ Intervallo → p:5:iv]
    | [🔗 Apri → url:https://shop.example.com/item/84]
    | [◀️ Lista → l:e:1]
 ## db after step 4

@@ -13,9 +13,9 @@
    |
    | Incolla il link di un prodotto per iniziare a seguirlo.
    keyboard:
-   | [📦 Prodotti → l:a:1] [💶 Prezzi → menu_prezzi]
-   | [🔔 Notifiche → menu_notifiche] [💾 Dati → menu_dati]
-   | [ℹ️ Stato e info → menu_info] [⚙️ Impostazioni → s]
+   | [📦 Prodotti → l:a:1] [💶 Prezzi → pc]
+   | [🔔 Notifiche → nt] [💾 Dati → d]
+   | [ℹ️ Stato e info → st] [⚙️ Impostazioni → s]
 ## db after step 1
 ~ users user_id=10 display_name: NULL -> "U10"
 ## step 2: press "menu_prodotti" user=10 on=1000
@@ -27,9 +27,9 @@
    |
    | Tocca un prodotto per modificarlo.
    keyboard:
-   | [#1 Long NNNNNNNNNNNNNNNNNNNNNN… €80.00 → edit_1]
-   | [⏸ 1 in pausa → riattiva → menu_paused]
-   | [◀️ Menu → menu_main]
+   | [#1 Long NNNNNNNNNNNNNNNNNNNNNN… €80.00 → p:1:ed]
+   | [⏸ 1 in pausa → riattiva → pz]
+   | [◀️ Menu → h]
 ## db after step 2
 (no changes)
 ## step 3: press "menu_paused" user=10 on=1000
@@ -41,8 +41,8 @@
    |
    | Tocca per riattivare.
    keyboard:
-   | [▶️ #2 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNN… → reactivate_2]
-   | [◀️ Menu → menu_main]
+   | [▶️ #2 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNN… → p:2:ra]
+   | [◀️ Menu → h]
 ## db after step 3
 (no changes)
 ## step 4: command "/menu" user=10
@@ -56,9 +56,9 @@
    |
    | Incolla il link di un prodotto per iniziare a seguirlo.
    keyboard:
-   | [📦 Prodotti → l:a:1] [💶 Prezzi → menu_prezzi]
-   | [🔔 Notifiche → menu_notifiche] [💾 Dati → menu_dati]
-   | [ℹ️ Stato e info → menu_info] [⚙️ Impostazioni → s]
+   | [📦 Prodotti → l:a:1] [💶 Prezzi → pc]
+   | [🔔 Notifiche → nt] [💾 Dati → d]
+   | [ℹ️ Stato e info → st] [⚙️ Impostazioni → s]
 ## db after step 4
 (no changes)
 ## step 5: press "menu_prezzi" user=10 on=1001
@@ -70,10 +70,10 @@
    |
    | Tocca un prodotto per controllarlo.
    keyboard:
-   | [🔄 Controlla tutti i prezzi → menu_checkall]
-   | [🔄 #1 Long NNNNNNNNNNNNNNNNNNNNNNNN… → check_1]
-   | [📈 Storico prezzo → menu_storia]
-   | [◀️ Menu → menu_main]
+   | [🔄 Controlla tutti i prezzi → ca]
+   | [🔄 #1 Long NNNNNNNNNNNNNNNNNNNNNNNN… → p:1:ck]
+   | [📈 Storico prezzo → hi]
+   | [◀️ Menu → h]
 ## db after step 5
 (no changes)
 ## step 6: press "menu_checkall" user=10 on=1001
@@ -88,7 +88,7 @@
    |
    |   #1 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNN… — €80.00 <i>(-20.0%)</i>
    keyboard:
-   | [◀️ Menu → menu_main]
+   | [◀️ Menu → h]
 ## db after step 6
 + price_history id=6 {product_id=1, price="80.00", checked_at=<now:9999-99-99 99:99:99>}
 ~ products id=1 last_checked_at: "2026-03-01 10:00:00" -> <now:9999-99-99 99:99:99>
@@ -105,9 +105,9 @@
    |
    | Incolla il link di un prodotto per iniziare a seguirlo.
    keyboard:
-   | [📦 Prodotti → l:a:1] [💶 Prezzi → menu_prezzi]
-   | [🔔 Notifiche → menu_notifiche] [💾 Dati → menu_dati]
-   | [ℹ️ Stato e info → menu_info] [⚙️ Impostazioni → s]
+   | [📦 Prodotti → l:a:1] [💶 Prezzi → pc]
+   | [🔔 Notifiche → nt] [💾 Dati → d]
+   | [ℹ️ Stato e info → st] [⚙️ Impostazioni → s]
 ## db after step 7
 (no changes)
 ## step 8: press "menu_storia" user=10 on=1002
@@ -119,8 +119,8 @@
    |
    | Tocca un prodotto per il grafico.
    keyboard:
-   | [📈 #1 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNN… → chart_1]
-   | [◀️ Menu → menu_main]
+   | [📈 #1 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNN… → p:1:ch:all]
+   | [◀️ Menu → h]
 ## db after step 8
 (no changes)
 ## step 9: command "/menu" user=10
@@ -134,9 +134,9 @@
    |
    | Incolla il link di un prodotto per iniziare a seguirlo.
    keyboard:
-   | [📦 Prodotti → l:a:1] [💶 Prezzi → menu_prezzi]
-   | [🔔 Notifiche → menu_notifiche] [💾 Dati → menu_dati]
-   | [ℹ️ Stato e info → menu_info] [⚙️ Impostazioni → s]
+   | [📦 Prodotti → l:a:1] [💶 Prezzi → pc]
+   | [🔔 Notifiche → nt] [💾 Dati → d]
+   | [ℹ️ Stato e info → st] [⚙️ Impostazioni → s]
 ## db after step 9
 (no changes)
 ## step 10: press "menu_notifiche" user=10 on=1003
@@ -148,7 +148,7 @@
    |
    | Tocca un prodotto per cambiare soglia o target.
    keyboard:
-   | [#1 Long NNNNNNNNNNNNNNNN… [-10%] → edit_1]
-   | [◀️ Menu → menu_main]
+   | [#1 Long NNNNNNNNNNNNNNNN… [-10%] → p:1:ed]
+   | [◀️ Menu → h]
 ## db after step 10
 (no changes)

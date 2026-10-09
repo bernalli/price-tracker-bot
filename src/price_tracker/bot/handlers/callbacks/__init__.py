@@ -12,9 +12,9 @@ from typing import TYPE_CHECKING
 
 from telegram.ext import Application, CallbackQueryHandler
 
-from price_tracker.bot.callbacks import Action, decode
 from price_tracker.bot.decorators import _db, with_locale
 from price_tracker.bot.handlers.callbacks import _actions, _admin, _menu, _nav, _ops, _product
+from price_tracker.bot.handlers.callbacks._legacy import resolve_callback
 
 if TYPE_CHECKING:
     from telegram import Update
@@ -34,43 +34,44 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     if not await db.is_user_allowed(user_id):
         return
 
-    data = query.data
+    action = resolve_callback(query.data)
+    if action is None:
+        logger.info("Unhandled callback data: %s", query.data)
+        return
 
-    # Registered navigation actions first; legacy strings never decode.
-    action = decode(data)
-    if isinstance(action, Action) and await _nav.handle_action(query, context, db, user_id, action):
+    if await _nav.handle_action(query, context, db, user_id, action):
         return
 
     # Order matters — earlier handlers have higher specificity. Each helper
     # returns True when it handled the callback; on False we fall through.
-    if await _ops.handle_ops_buttons(query, context, db, user_id, data):
+    if await _ops.handle_ops_buttons(query, context, db, user_id, action):
         return
-    if await _product.handle_delete_flow(query, context, db, user_id, data):
+    if await _product.handle_delete_flow(query, context, db, user_id, action):
         return
-    if await _product.handle_check_button(query, context, db, user_id, data):
+    if await _product.handle_check_button(query, context, db, user_id, action):
         return
-    if await _product.handle_chart_button(query, context, db, user_id, data):
+    if await _product.handle_chart_button(query, context, db, user_id, action):
         return
-    if await _product.handle_amazon_pref(query, context, db, user_id, data):
+    if await _product.handle_amazon_pref(query, context, db, user_id, action):
         return
-    if await _product.handle_track_choice(query, context, db, user_id, data):
+    if await _product.handle_track_choice(query, context, db, user_id, action):
         return
-    if await _actions.handle_edit_button(query, context, db, user_id, data):
+    if await _actions.handle_edit_button(query, context, db, user_id, action):
         return
-    if await _actions.handle_pause_button(query, context, db, user_id, data):
+    if await _actions.handle_pause_button(query, context, db, user_id, action):
         return
-    if await _actions.handle_remove_button(query, context, db, user_id, data):
+    if await _actions.handle_remove_button(query, context, db, user_id, action):
         return
-    if await _actions.handle_reset_button(query, context, db, user_id, data):
+    if await _actions.handle_reset_button(query, context, db, user_id, action):
         return
-    if await _actions.handle_reactivate_button(query, context, db, user_id, data):
+    if await _actions.handle_reactivate_button(query, context, db, user_id, action):
         return
-    if await _menu.handle_menu_navigation(query, context, db, user_id, data):
+    if await _menu.handle_menu_navigation(query, context, db, user_id, action):
         return
-    if await _admin.handle_admin_menu(query, context, db, user_id, data):
+    if await _admin.handle_admin_menu(query, context, db, user_id, action):
         return
 
-    logger.info("Unhandled callback data: %s", data)
+    logger.info("Unhandled callback action: %s", action.name)
 
 
 def register(app: Application) -> None:

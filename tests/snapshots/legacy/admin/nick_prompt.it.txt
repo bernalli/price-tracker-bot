@@ -11,10 +11,10 @@
    |
    | Scegli utente:
    keyboard:
-   | [✏️ 1 → admin_nick_1]
-   | [✏️ 10 → admin_nick_10]
-   | [✏️ 11 → admin_nick_11]
-   | [◀️ Impostazioni → menu_admin]
+   | [✏️ 1 → a:nk:1]
+   | [✏️ 10 → a:nk:10]
+   | [✏️ 11 → a:nk:11]
+   | [◀️ Impostazioni → a]
 ## db after step 1
 (no changes)
 ## step 2: press "admin_nick_10" user=1 on=1
@@ -27,7 +27,7 @@
    |
    | Scrivi il nuovo nickname:
    keyboard:
-   | [Annulla → menu_admin]
+   | [Annulla → a]
 ## db after step 2
 (no changes)
 ## step 3: text "Bob" user=1
@@ -55,7 +55,7 @@
    |
    | Scrivi il nuovo nickname:
    keyboard:
-   | [Annulla → menu_admin]
+   | [Annulla → a]
 ## db after step 5
 (no changes)
 ## step 6: text "   " user=1

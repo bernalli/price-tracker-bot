@@ -30,8 +30,8 @@ async def test_add_product_rejects_loopback_url_before_scrape() -> None:
     update.message.reply_text.assert_awaited()
 
 
-PRIVATE_MESSAGE = "❌ URL non consentito: punta a un indirizzo privato o interno."
-SCHEME_MESSAGE = "❌ URL non consentito: sono supportati solo link http:// e https://."
+PRIVATE_MESSAGE = "❌ URL not allowed: it points to a private or internal address."
+SCHEME_MESSAGE = "❌ URL not allowed: only http:// and https:// links are supported."
 
 
 def _wired() -> tuple[AsyncMock, MagicMock, MagicMock, MagicMock]:

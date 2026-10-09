@@ -11,7 +11,7 @@
    |
    | Scrivi i minuti (es. <code>60</code>, <code>360</code>):
    keyboard:
-   | [Annulla → menu_admin]
+   | [Annulla → a]
 ## db after step 1
 (no changes)
 ## step 2: text "abc" user=1
@@ -48,7 +48,7 @@
    |
    | Scrivi i minuti (es. <code>60</code>, <code>360</code>):
    keyboard:
-   | [Annulla → menu_admin]
+   | [Annulla → a]
 ## db after step 6
 (no changes)
 ## step 7: text "30" user=1
@@ -67,7 +67,7 @@
    |
    | Scrivi i minuti (es. <code>60</code>, <code>360</code>):
    keyboard:
-   | [Annulla → menu_admin]
+   | [Annulla → a]
 ## db after step 8
 (no changes)
 ## step 9: text "10081" user=1
@@ -92,7 +92,7 @@
    |
    | Scrivi i minuti (es. <code>60</code>, <code>360</code>):
    keyboard:
-   | [Annulla → menu_admin]
+   | [Annulla → a]
 ## db after step 11
 (no changes)
 ## step 12: text "60" user=1
@@ -113,10 +113,10 @@
    |
    | Incolla il link di un prodotto per iniziare a seguirlo.
    keyboard:
-   | [📦 Prodotti → l:a:1] [💶 Prezzi → menu_prezzi]
-   | [🔔 Notifiche → menu_notifiche] [💾 Dati → menu_dati]
-   | [ℹ️ Stato e info → menu_info] [⚙️ Impostazioni → s]
-   | [👑 Admin → menu_admin]
+   | [📦 Prodotti → l:a:1] [💶 Prezzi → pc]
+   | [🔔 Notifiche → nt] [💾 Dati → d]
+   | [ℹ️ Stato e info → st] [⚙️ Impostazioni → s]
+   | [👑 Admin → a]
 ## db after step 13
 (no changes)
 ## step 14: press "menu_info" user=1 on=1008
@@ -137,6 +137,6 @@
    | 🔄 Check globali: 0
    keyboard:
    | [❓ Aiuto → hp] [⚠️ Errori → er]
-   | [◀️ Menu → menu_main]
+   | [◀️ Menu → h]
 ## db after step 14
 (no changes)

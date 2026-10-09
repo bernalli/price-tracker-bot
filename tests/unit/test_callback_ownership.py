@@ -123,4 +123,4 @@ async def test_track_default_foreign_product_writes_nothing() -> None:
 
     assert handled is True
     db.set_threshold.assert_not_awaited()
-    query.edit_message_text.assert_awaited_once_with("❌ Prodotto non trovato.")
+    query.edit_message_text.assert_awaited_once_with("❌ Product not found.")

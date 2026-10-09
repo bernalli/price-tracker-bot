@@ -14,13 +14,13 @@ from price_tracker.bot.handlers.debug import cmd_debug
 from price_tracker.bot.ui.width import display_width
 
 _PAGE = "<html><body><p>nothing here</p></body></html>"
-_NAME_LINE = re.compile(r"^   Nome: (.*)$", re.MULTILINE)
+_NAME_LINE = re.compile(r"^   Name: (.*)$", re.MULTILINE)
 
 
-async def _debug_report(name: str | None) -> str:
+async def _debug_report(name: str | None, price: object = None) -> str:
     """Run ``/debug`` against a scraper that returns ``name`` and return the final report."""
     scraper = SimpleNamespace(
-        scrape=AsyncMock(return_value=SimpleNamespace(name=name, price=None, error="e"))
+        scrape=AsyncMock(return_value=SimpleNamespace(name=name, price=price, error="e"))
     )
     registry = SimpleNamespace(resolve=lambda _url: scraper)
     db = MagicMock()
@@ -43,6 +43,7 @@ async def _debug_report(name: str | None) -> str:
 
 
 def _shown_name(report: str) -> str:
+    assert "   Price: ❌ (e)" in report
     match = _NAME_LINE.search(report)
     assert match is not None, report
     return html.unescape(match.group(1))
@@ -76,3 +77,12 @@ async def test_hostile_name_never_breaks_the_markup() -> None:
     assert "<b>" not in name_line.group(1)
     assert "&amp;" in name_line.group(1) or "&lt;" in name_line.group(1)
     assert not re.search(r"&(?!amp;|lt;|gt;)", name_line.group(1))
+
+
+@pytest.mark.asyncio
+async def test_zero_price_with_an_error_shows_the_error() -> None:
+    from decimal import Decimal
+
+    report = await _debug_report("Kettle", price=Decimal("0"))
+    assert "   Price: ❌ (e)" in report
+    assert "€0" not in report

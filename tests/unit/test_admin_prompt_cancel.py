@@ -59,7 +59,7 @@ async def test_each_admin_prompt_has_only_a_cancel_button_to_the_admin_menu(data
     assert user_data["pending_action"] == OPENINGS[data]
     markup = query.edit_message_text.await_args.kwargs["reply_markup"]
     buttons = [(b.text, b.callback_data) for row in markup.inline_keyboard for b in row]
-    assert buttons == [("Cancel", "menu_admin")]
+    assert buttons == [("Cancel", "a")]
 
 
 @pytest.mark.parametrize("data", sorted(OPENINGS))

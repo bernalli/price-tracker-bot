@@ -8,9 +8,9 @@
    text:
    | 📦 <b>Scegli prodotto da eliminare:</b>
    keyboard:
-   | [#1 Kettle €80.00 → remove_1]
-   | [#2 Fan → remove_2]
-   | [🗑 Elimina tutti i prodotti → delete_all]
+   | [#1 Kettle €80.00 → p:1:rm]
+   | [#2 Fan → p:2:rm]
+   | [🗑 Elimina tutti i prodotti → l:rmall]
 ## db after step 1
 ~ users user_id=10 display_name: NULL -> "U10"
 ## step 2: command "/elimina 1" user=10
@@ -23,7 +23,7 @@
    |
    | Verrà cancellato anche tutto lo storico prezzi.
    keyboard:
-   | [🗑 Sì, elimina → confirm_delete_1] [❌ Annulla → cancel_delete]
+   | [🗑 Sì, elimina → p:1:rmok] [❌ Annulla → l:x]
 ## db after step 2
 (no changes)
 ## step 3: command "/elimina abc" user=10
@@ -48,7 +48,7 @@
    |
    | Verrà cancellato anche tutto lo storico prezzi.
    keyboard:
-   | [🗑 Sì, elimina → confirm_delete_2] [❌ Annulla → cancel_delete]
+   | [🗑 Sì, elimina → p:2:rmok] [❌ Annulla → l:x]
 ## db after step 5
 (no changes)
 ## step 6: command "/elimina" user=10
@@ -57,10 +57,10 @@
    text:
    | 📦 <b>Scegli prodotto da eliminare:</b>
    keyboard:
-   | [#1 Kettle €80.00 → remove_1]
-   | [#2 Fan → remove_2]
-   | [#3 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNN… €80.00 → remove_3]
-   | [🗑 Elimina tutti i prodotti → delete_all]
+   | [#1 Kettle €80.00 → p:1:rm]
+   | [#2 Fan → p:2:rm]
+   | [#3 Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNN… €80.00 → p:3:rm]
+   | [🗑 Elimina tutti i prodotti → l:rmall]
 ## db after step 6
 (no changes)
 ## step 7: command "/elimina 3" user=10
@@ -73,6 +73,6 @@
    |
    | Verrà cancellato anche tutto lo storico prezzi.
    keyboard:
-   | [🗑 Sì, elimina → confirm_delete_3] [❌ Annulla → cancel_delete]
+   | [🗑 Sì, elimina → p:3:rmok] [❌ Annulla → l:x]
 ## db after step 7
 (no changes)
