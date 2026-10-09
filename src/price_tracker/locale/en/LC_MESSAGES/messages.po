@@ -1641,3 +1641,128 @@ msgstr "✏️ Other hours"
 #: src/price_tracker/bot/ui/panels.py
 msgid "✏️ Change"
 msgstr "✏️ Change"
+
+#: src/price_tracker/release_notes.py:12
+msgid "Keep your tracked products and familiar commands through 1.x updates."
+msgstr "Keep your tracked products and familiar commands through 1.x updates."
+
+#: src/price_tracker/release_notes.py:13
+msgid "Blocked sites pause automatically, avoiding repeated failed checks."
+msgstr "Blocked sites pause automatically, avoiding repeated failed checks."
+
+#: src/price_tracker/release_notes.py:16
+msgid "See 90 days of price history in your charts."
+msgstr "See 90 days of price history in your charts."
+
+#: src/price_tracker/release_notes.py:17
+msgid "Get grouped warnings when a site has trouble, with quick recovery buttons."
+msgstr "Get grouped warnings when a site has trouble, with quick recovery buttons."
+
+#: src/price_tracker/release_notes.py:18
+msgid "Digests wait until your quiet hours end."
+msgstr "Digests wait until your quiet hours end."
+
+#: src/price_tracker/release_notes.py:21
+msgid "Cancel a pending question with /cancel; unanswered questions expire."
+msgstr "Cancel a pending question with /cancel; unanswered questions expire."
+
+#: src/price_tracker/release_notes.py:22
+msgid "Set price rules and check intervals with clearer prompts in your language."
+msgstr "Set price rules and check intervals with clearer prompts in your language."
+
+#: src/price_tracker/release_notes.py:25
+msgid "Choose how often each product is checked."
+msgstr "Choose how often each product is checked."
+
+#: src/price_tracker/release_notes.py:26
+msgid "Manage products from cards with check, history and pause buttons."
+msgstr "Manage products from cards with check, history and pause buttons."
+
+#: src/price_tracker/release_notes.py:27
+msgid "Import product lists with clearer feedback on invalid rows."
+msgstr "Import product lists with clearer feedback on invalid rows."
+
+#: src/price_tracker/release_notes.py:30
+msgid "Choose your language in Settings, including for price alerts."
+msgstr "Choose your language in Settings, including for price alerts."
+
+#: src/price_tracker/release_notes.py:31
+msgid "Browse products by page and filter active, paused or failing items."
+msgstr "Browse products by page and filter active, paused or failing items."
+
+#: src/price_tracker/release_notes.py:32
+msgid "Sold-out listings no longer trigger misleading price alerts."
+msgstr "Sold-out listings no longer trigger misleading price alerts."
+
+#: src/price_tracker/release_notes.py:35
+msgid "Find Prices and Notifications again in the grouped main menu."
+msgstr "Find Prices and Notifications again in the grouped main menu."
+
+#: src/price_tracker/release_notes.py:36
+msgid "Menu icons now match their actions."
+msgstr "Menu icons now match their actions."
+
+#: src/price_tracker/release_notes.py:39
+msgid "Digests show the actual number of failed checks."
+msgstr "Digests show the actual number of failed checks."
+
+#: src/price_tracker/release_notes.py:40
+msgid "Unsupported product links get a clearer explanation."
+msgstr "Unsupported product links get a clearer explanation."
+
+#: src/price_tracker/release_notes.py:43
+msgid "Filter sold-out products and see availability on each card."
+msgstr "Filter sold-out products and see availability on each card."
+
+#: src/price_tracker/release_notes.py:44
+msgid "Product cards stay in place after actions, with a short confirmation."
+msgstr "Product cards stay in place after actions, with a short confirmation."
+
+#: src/price_tracker/release_notes.py:47
+msgid "Reach everyday actions from a simpler Telegram command menu."
+msgstr "Reach everyday actions from a simpler Telegram command menu."
+
+#: src/price_tracker/release_notes.py:48
+msgid "Open the main menu with /start and find Help under Status & info."
+msgstr "Open the main menu with /start and find Help under Status & info."
+
+#: src/price_tracker/release_notes.py:49
+msgid "Automatic suspension notices no longer repeat during overlapping checks."
+msgstr "Automatic suspension notices no longer repeat during overlapping checks."
+
+#: src/price_tracker/release_notes.py:52
+msgid "Reach every command through buttons in the main menu."
+msgstr "Reach every command through buttons in the main menu."
+
+#: src/price_tracker/release_notes.py:53
+msgid "Set quiet hours, time zone and notification limits with guided prompts."
+msgstr "Set quiet hours, time zone and notification limits with guided prompts."
+
+#: src/price_tracker/release_notes.py:54
+msgid "Manage one product's notifications without changing your other settings."
+msgstr "Manage one product's notifications without changing your other settings."
+
+#: src/price_tracker/release_notes.py:57
+msgid "Get just one back-in-stock alert when a sold-out product returns."
+msgstr "Get just one back-in-stock alert when a sold-out product returns."
+
+#: src/price_tracker/release_notes.py:58
+msgid "English replies now stay in English throughout the bot."
+msgstr "English replies now stay in English throughout the bot."
+
+#: src/price_tracker/release_notes.py:59
+msgid "Buttons in older messages keep working after updates."
+msgstr "Buttons in older messages keep working after updates."
+
+#: src/price_tracker/release_notes.py:88
+#, python-brace-format
+msgid "Updated to version {version}"
+msgstr "Updated to version {version}"
+
+#: src/price_tracker/release_notes.py:98
+msgid "Also since your last update:"
+msgstr "Also since your last update:"
+
+#: src/price_tracker/release_notes.py:99
+msgid "…and earlier improvements."
+msgstr "…and earlier improvements."

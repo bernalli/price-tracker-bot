@@ -13,6 +13,7 @@ from telegram.ext import Application, ContextTypes
 
 from price_tracker.bot.command_menus import sync_command_menus
 from price_tracker.bot.handlers import register_handlers
+from price_tracker.bot.release_updates import announce_release
 from price_tracker.config import Config, parse_bind
 from price_tracker.core.health import HealthManager
 from price_tracker.core.http_client import build_client
@@ -92,6 +93,7 @@ async def post_init(application: Application[Any, Any, Any, Any, Any, Any]) -> N
     )
 
     await sync_command_menus(application.bot, repo)
+    await announce_release(application.bot, repo, config.lang)
 
 
 async def _setup_scheduler(application: Application[Any, Any, Any, Any, Any, Any]) -> None:
