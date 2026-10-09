@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 from collections import Counter
+from html import unescape
+from pathlib import Path
 from unittest.mock import AsyncMock, Mock
 
 import aiosqlite
@@ -14,9 +16,53 @@ import price_tracker
 from price_tracker import release_notes
 from price_tracker.bot import release_updates
 from price_tracker.bot.messages import current_locale, get_translation, reset_locale, set_locale
+from price_tracker.bot.ui.width import display_width
 from price_tracker.db.migrator import apply_migrations
 from price_tracker.db.repository import Repository
 from price_tracker.main import MIGRATIONS_DIR
+
+CATALOG_LOCALES = sorted(
+    path.parent.parent.name
+    for path in (Path(release_notes.__file__).parent / "locale").glob("*/LC_MESSAGES/messages.po")
+)
+
+
+def assert_short_release_notes(locale: str) -> None:
+    translation = get_translation(locale)
+    for version, bullets in release_notes.RELEASE_NOTES.items():
+        for bullet in bullets:
+            for text in (bullet, translation.gettext(bullet)):
+                assert len(text.splitlines()) == 1, (version, locale, text)
+                assert display_width(f"• {text}") <= 32, (version, locale, text)
+
+
+@pytest.mark.parametrize("locale", CATALOG_LOCALES)
+def test_release_notes_are_short_phrases(locale):
+    assert_short_release_notes(locale)
+
+
+@pytest.mark.parametrize("bullet", ["x" * 31, "🔔" * 16, "First\nSecond"])
+def test_release_notes_guard_rejects_long_or_multiline_notes(monkeypatch, bullet):
+    monkeypatch.setattr(release_notes, "RELEASE_NOTES", {"1.8.0": (bullet,)})
+    with pytest.raises(AssertionError):
+        assert_short_release_notes("en")
+
+
+@pytest.mark.parametrize("locale", CATALOG_LOCALES)
+@pytest.mark.parametrize("version", release_notes.RELEASE_NOTES)
+@pytest.mark.parametrize("catch_up", [False, True])
+def test_every_release_message_line_fits_small_phones(locale, version, catch_up):
+    # Exhaust the finite version/locale/mode domain, including empty releases.
+    token = set_locale(locale)
+    try:
+        assert current_locale() == locale
+        previous = "1.0.0" if catch_up else version
+        text = release_notes.render_release_notes(previous, version)
+        assert len(text) <= release_notes.MESSAGE_LIMIT
+        for line in unescape(text).splitlines():
+            assert display_width(line) <= 32, (version, locale, line)
+    finally:
+        reset_locale(token)
 
 
 @pytest.fixture
@@ -45,9 +91,9 @@ async def test_first_start_catches_up_each_active_user_and_persists(repo, no_del
     assert [call.kwargs["chat_id"] for call in calls] == [123456789, 900000001]
     for call in calls:
         assert call.kwargs["parse_mode"] == "HTML"
-        assert "Updated to version 1.8.0" in call.kwargs["text"]
-        assert "Also since your last update:" in call.kwargs["text"]
-        assert "1.7.0:" in call.kwargs["text"]
+        assert f"Updated to version {price_tracker.__version__}" in call.kwargs["text"]
+        assert "Earlier:" in call.kwargs["text"]
+        assert "• Every command has a button" in call.kwargs["text"]
         assert "1.0.0:" not in call.kwargs["text"]
     assert await repo.get_config("last_announced_version") == price_tracker.__version__
     assert no_delay.await_count == 1
@@ -59,7 +105,8 @@ async def test_first_start_catches_up_each_active_user_and_persists(repo, no_del
 
 
 @pytest.mark.parametrize("stored", ["1.8.0", "1.8.1", "1.10.0"])
-async def test_equal_or_older_running_version_does_nothing(repo, stored):
+async def test_equal_or_older_running_version_does_nothing(repo, monkeypatch, stored):
+    monkeypatch.setattr(price_tracker, "__version__", "1.8.0")
     await repo.ensure_user(123456789)
     await repo.set_config("last_announced_version", stored)
     bot = Mock(send_message=AsyncMock())
@@ -87,8 +134,8 @@ async def test_upgrade_only_includes_unseen_releases(repo, monkeypatch, skipped)
     assert "Newest detail" in text
     assert "Already seen" not in text
     assert "Future improvement" not in text
-    assert ("1.7.2: Intermediate improvement" in text) == skipped
-    assert ("Also since your last update:" in text) == skipped
+    assert ("• Intermediate improvement" in text) == skipped
+    assert ("Earlier:" in text) == skipped
     assert "Intermediate detail" not in text
     assert await repo.get_config("last_announced_version") == "1.8.0"
 
@@ -109,7 +156,7 @@ async def test_empty_skipped_release_is_omitted_from_catch_up(repo, monkeypatch)
     await release_updates.announce_release(bot, repo, "en")
 
     text = bot.send_message.await_args.kwargs["text"]
-    assert "1.7.3: Intermediate improvement" in text
+    assert "• Intermediate improvement" in text
     assert "1.7.2:" not in text
 
 
@@ -128,17 +175,19 @@ async def test_empty_newest_and_skipped_releases_are_recorded_without_message(re
 
 
 def test_cap_drops_oldest_lines_and_escapes_html(monkeypatch):
-    notes = {
-        f"1.{minor}.0": (f"Improvement {minor} " + "x" * 180, "Detail") for minor in range(1, 12)
-    }
-    notes["1.12.0"] = ("Prices < 10 & > 5", "Keep <b>literal</b> text")
+    notes = {f"1.{minor}.0": (f"Improvement {minor}", "Detail") for minor in range(1, 100)}
+    notes["1.100.0"] = ("Prices < 10 & > 5", "Keep <b>literal</b> text")
     monkeypatch.setattr(release_notes, "RELEASE_NOTES", notes)
-    text = release_notes.render_release_notes("1.0.0", "1.12.0")
+    text = release_notes.render_release_notes("1.0.0", "1.100.0")
     assert len(text) <= 1200
     assert "Prices &lt; 10 &amp; &gt; 5" in text
     assert "&lt;b&gt;literal&lt;/b&gt;" in text
-    assert text.index("1.11.0:") < text.index("1.10.0:") < text.index("1.9.0:")
-    assert "1.1.0:" not in text
+    assert (
+        text.index("• Improvement 99")
+        < text.index("• Improvement 98")
+        < text.index("• Improvement 97")
+    )
+    assert "• Improvement 1" not in text.splitlines()
     assert text.endswith("…and earlier improvements.")
 
 
@@ -154,9 +203,9 @@ async def test_recipient_language_and_locale_restoration(repo):
     texts = {
         call.kwargs["chat_id"]: call.kwargs["text"] for call in bot.send_message.await_args_list
     }
-    assert "Aggiornato alla versione 1.8.0" in texts[123456789]
-    assert "Inoltre, dal tuo ultimo aggiornamento:" in texts[123456789]
-    assert "Updated to version 1.8.0" in texts[900000001]
+    assert f"Aggiornato alla versione {price_tracker.__version__}" in texts[123456789]
+    assert "In precedenza:" in texts[123456789]
+    assert f"Updated to version {price_tracker.__version__}" in texts[900000001]
     assert texts[900000002] == texts[123456789]
     assert current_locale() == "en"
 
@@ -204,6 +253,7 @@ def test_latest_bullets_also_fit_without_broken_html(monkeypatch):
     text = release_notes.render_release_notes("1.0.0", "1.2.0")
     assert len(text) <= 1200
     assert text.count("• ") >= 4
+    assert all(display_width(line) <= 32 for line in unescape(text).splitlines())
     # Every ampersand belongs to a complete entity, even in shortened bullets.
     assert "&" not in text.replace("&lt;", "").replace("&gt;", "").replace("&amp;", "")
 
@@ -357,10 +407,11 @@ async def test_announce_skips_current_claims_and_cleans_only_older_versions(repo
 
 
 def test_release_notes_omit_all_older_notes_when_none_fit(monkeypatch):
+    monkeypatch.setattr(release_notes, "MESSAGE_LIMIT", 75)
     monkeypatch.setattr(
         release_notes,
         "RELEASE_NOTES",
-        {"1.1.0": ("Older detail " * 120,), "1.2.0": ("Newest improvement",)},
+        {"1.1.0": ("Older improvement fills space",), "1.2.0": ("Newest improvement",)},
     )
     text = release_notes.render_release_notes("1.0.0", "1.2.0")
     assert text == ("Updated to version 1.2.0\n• Newest improvement\n…and earlier improvements.")

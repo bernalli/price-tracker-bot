@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-09 11:51+0200\n"
+"POT-Creation-Date: 2026-10-09 12:32+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: it_IT\n"
@@ -16,132 +16,112 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.17.0\n"
+"Generated-By: Babel 2.18.0\n"
 
-#: src/price_tracker/release_notes.py:14
-msgid "See 90 days of price history in your charts."
-msgstr "Consulta 90 giorni di storico prezzi nei grafici."
+#: src/price_tracker/release_notes.py:17
+msgid "90 days of price charts"
+msgstr "Grafici prezzi di 90 giorni"
 
-#: src/price_tracker/release_notes.py:15
-msgid "Get grouped warnings when a site has trouble, with quick recovery buttons."
-msgstr ""
-"Ricevi avvisi raggruppati sui problemi di un sito, con pulsanti per "
-"riprendere i controlli."
-
-#: src/price_tracker/release_notes.py:16
-msgid "Digests wait until your quiet hours end."
-msgstr "I riepiloghi attendono la fine delle ore di silenzio."
+#: src/price_tracker/release_notes.py:18
+msgid "Grouped site warnings"
+msgstr "Avvisi sito raggruppati"
 
 #: src/price_tracker/release_notes.py:19
-msgid "Cancel a pending question with /cancel; unanswered questions expire."
-msgstr "Annulla una domanda con /cancel; quelle senza risposta scadono."
+msgid "Digests after quiet hours"
+msgstr "Riepiloghi dopo ore silenziose"
 
-#: src/price_tracker/release_notes.py:20
-msgid "Set price rules and check intervals with clearer prompts."
-msgstr "Imposta regole di prezzo e intervalli con domande più chiare."
+#: src/price_tracker/release_notes.py:22
+msgid "Cancel prompts with /cancel"
+msgstr "Annulla richieste con /cancel"
 
-#: src/price_tracker/release_notes.py:23
-msgid "Choose how often each product is checked."
-msgstr "Scegli ogni quanto controllare ciascun prodotto."
+#: src/price_tracker/release_notes.py:26
+msgid "Check each product your way"
+msgstr "Controlli per ogni prodotto"
 
-#: src/price_tracker/release_notes.py:24
-msgid "Manage products from cards with check, history and pause buttons."
-msgstr ""
-"Gestisci i prodotti dalle schede con i pulsanti di controllo, storico e "
-"pausa."
-
-#: src/price_tracker/release_notes.py:25
-msgid "Import product lists with clearer feedback on invalid rows."
-msgstr ""
-"Importa liste di prodotti con indicazioni più chiare sulle righe non "
-"valide."
+#: src/price_tracker/release_notes.py:27
+msgid "Product actions on each card"
+msgstr "Azioni su ogni scheda"
 
 #: src/price_tracker/release_notes.py:28
-msgid "Browse products by page and filter active, paused or failing items."
-msgstr ""
-"Sfoglia i prodotti per pagina e filtra quelli attivi, in pausa o con "
-"errori."
-
-#: src/price_tracker/release_notes.py:29
-msgid "Sold-out listings no longer trigger misleading price alerts."
-msgstr "I prodotti esauriti non generano più avvisi di prezzo fuorvianti."
+msgid "Clearer list import feedback"
+msgstr "Import liste più chiaro"
 
 #: src/price_tracker/release_notes.py:31
-msgid "Find Prices and Notifications again in the grouped main menu."
-msgstr "Ritrova Prezzi e Notifiche nel menu principale organizzato per categorie."
+msgid "Product pages and filters"
+msgstr "Prodotti per pagina e filtri"
 
-#: src/price_tracker/release_notes.py:33
-msgid "Digests show the actual number of failed checks."
-msgstr "I riepiloghi mostrano il numero effettivo di controlli falliti."
+#: src/price_tracker/release_notes.py:32
+msgid "No price alerts for sold-outs"
+msgstr "Esauriti senza avvisi prezzo"
 
 #: src/price_tracker/release_notes.py:34
-msgid "Unsupported product links get a clearer explanation."
-msgstr "I link non supportati ricevono una spiegazione più chiara."
+msgid "Main menu grouped by category"
+msgstr "Menu diviso per categorie"
+
+#: src/price_tracker/release_notes.py:36
+msgid "Digests count failed checks"
+msgstr "Errori contati nei riepiloghi"
 
 #: src/price_tracker/release_notes.py:37
-msgid "Filter sold-out products and see availability on each card."
-msgstr "Filtra i prodotti esauriti e vedi la disponibilità su ogni scheda."
+msgid "Clearer unsupported-link help"
+msgstr "Link non supportati: più aiuto"
 
-#: src/price_tracker/release_notes.py:38
-msgid "Product cards stay in place after actions, with a short confirmation."
-msgstr "Le schede restano al loro posto dopo le azioni, con una breve conferma."
+#: src/price_tracker/release_notes.py:40
+msgid "Filter sold-out products"
+msgstr "Filtra i prodotti esauriti"
 
 #: src/price_tracker/release_notes.py:41
-msgid "Reach everyday actions from a simpler Telegram command menu."
-msgstr "Accedi alle azioni quotidiane da un menu comandi Telegram più semplice."
+msgid "Product cards stay in place"
+msgstr "Schede prodotto ferme"
 
-#: src/price_tracker/release_notes.py:42
-msgid "Open the main menu with /start and find Help under Status & info."
-msgstr "Apri il menu principale con /start e trova Aiuto in Stato e info."
+#: src/price_tracker/release_notes.py:44
+msgid "Simpler command menu"
+msgstr "Menu comandi semplificato"
 
-#: src/price_tracker/release_notes.py:43
-msgid "Automatic suspension notices no longer repeat during overlapping checks."
-msgstr ""
-"Gli avvisi di sospensione automatica non si ripetono con controlli "
-"simultanei."
+#: src/price_tracker/release_notes.py:45
+msgid "Main menu via /start"
+msgstr "Menu principale con /start"
 
 #: src/price_tracker/release_notes.py:46
-msgid "Reach every command through buttons in the main menu."
-msgstr "Accedi a tutti i comandi dai pulsanti del menu principale."
+msgid "No repeated suspension notices"
+msgstr "Avvisi sospensione senza bis"
 
-#: src/price_tracker/release_notes.py:47
-msgid "Set quiet hours, time zone and notification limits with guided prompts."
-msgstr ""
-"Imposta ore di silenzio, fuso orario e limiti delle notifiche con domande"
-" guidate."
-
-#: src/price_tracker/release_notes.py:48
-msgid "Manage one product's notifications without changing your other settings."
-msgstr ""
-"Gestisci le notifiche di un prodotto senza modificare le altre "
-"impostazioni."
+#: src/price_tracker/release_notes.py:49
+msgid "Every command has a button"
+msgstr "Un pulsante per ogni comando"
 
 #: src/price_tracker/release_notes.py:50
-msgid "Get just one back-in-stock alert when a sold-out product returns."
-msgstr "Ricevi un solo avviso quando un prodotto esaurito torna disponibile."
+msgid "Guided notification settings"
+msgstr "Impostazioni avvisi guidate"
 
-#: src/price_tracker/release_notes.py:52
-msgid "Product lists fit on one line per product, even on small phones."
-msgstr ""
-"Gli elenchi mostrano ogni prodotto su una sola riga, anche sui telefoni "
-"più piccoli."
+#: src/price_tracker/release_notes.py:51
+msgid "Alerts for each product"
+msgstr "Avvisi per ogni prodotto"
 
 #: src/price_tracker/release_notes.py:53
-msgid "After each update you get a short message with what's new."
-msgstr "Dopo ogni aggiornamento ricevi un breve messaggio con le novità."
+msgid "One alert when back in stock"
+msgstr "Un solo avviso al rientro"
 
-#: src/price_tracker/release_notes.py:82
+#: src/price_tracker/release_notes.py:55
+msgid "Lists fit on one line"
+msgstr "Liste su una riga"
+
+#: src/price_tracker/release_notes.py:56
+msgid "What’s new after each update"
+msgstr "Novità dopo ogni aggiornamento"
+
+#: src/price_tracker/release_notes.py:86
 #, python-brace-format
 msgid "Updated to version {version}"
 msgstr "Aggiornato alla versione {version}"
 
-#: src/price_tracker/release_notes.py:99
-msgid "Also since your last update:"
-msgstr "Inoltre, dal tuo ultimo aggiornamento:"
+#: src/price_tracker/release_notes.py:103
+msgid "Earlier:"
+msgstr "In precedenza:"
 
-#: src/price_tracker/release_notes.py:100
+#: src/price_tracker/release_notes.py:104
 msgid "…and earlier improvements."
-msgstr "…e altri miglioramenti precedenti."
+msgstr "…e altre novità precedenti."
 
 #: src/price_tracker/bot/commands.py:19 src/price_tracker/bot/ui/panels.py:285
 msgid "📦 Products"
@@ -2634,27 +2614,34 @@ msgstr "Usa /lista per lo stato completo."
 msgid "Use /reactivate or /errori for details."
 msgstr "Usa /reactivate o /errori per i dettagli."
 
+#, python-brace-format
 msgid "🔒 {tier} (resumes in {until})"
 msgstr "🔒 {tier} (riprende tra {until})"
 
+#, python-brace-format
 msgid "❌ {n} failed reads"
 msgstr "❌ {n} letture fallite"
 
+#, python-brace-format
 msgid "✅ {name} — {price}"
 msgstr "✅ {name} — {price}"
 
+#, python-brace-format
 msgid "❌ {name} — {why}"
 msgstr "❌ {name} — {why}"
 
+#, python-brace-format
 msgid "Last good read: {price} {sym} on {date}"
 msgstr "Ultima lettura buona: {price} {sym} il {date}"
 
 msgid "No successful read yet"
 msgstr "Nessuna lettura riuscita finora"
 
+#, python-brace-format
 msgid "Error: <code>{error}</code>"
 msgstr "Errore: <code>{error}</code>"
 
+#, python-brace-format
 msgid "{mark}<b>#{id}</b> {name} · {price}"
 msgstr "{mark}<b>#{id}</b> {name} · {price}"
 
@@ -2676,15 +2663,19 @@ msgstr "📭 Dati insufficienti per generare il grafico (servono almeno 2 punti)
 msgid "❌ Impossibile aggiornare il prezzo iniziale."
 msgstr "❌ Impossibile aggiornare il prezzo iniziale."
 
+#, python-brace-format
 msgid "{n} hour"
 msgstr "{n} ora"
 
+#, python-brace-format
 msgid "{n} minutes"
 msgstr "{n} minuti"
 
+#, python-brace-format
 msgid "⏸ Tracking paused: <b>{name}</b>"
 msgstr "⏸ Tracking in pausa: <b>{name}</b>"
 
+#, python-brace-format
 msgid "Use /reactivate {pid} to resume tracking."
 msgstr "Usa /riattiva {pid} per riprendere."
 
@@ -2718,6 +2709,7 @@ msgstr "👍 Ok, nessuna modifica."
 msgid "❌ Prezzo non valido. Riprova."
 msgstr "❌ Prezzo non valido. Riprova."
 
+#, python-format
 msgid "❌ Valore non valido. Riprova (es. 20% o 50)."
 msgstr "❌ Valore non valido. Riprova (es. 20% o 50)."
 
@@ -2739,6 +2731,7 @@ msgstr "❌ Minimo 5 minuti."
 msgid "❌ Numero non valido. Riprova."
 msgstr "❌ Numero non valido. Riprova."
 
+#, python-brace-format
 msgid "Listings removed on {domain}"
 msgstr "Prodotti rimossi da {domain}"
 
@@ -2746,38 +2739,38 @@ msgid "These pages answer HTTP 404/410: the store took them off the catalog."
 msgstr "Le pagine rispondono HTTP 404/410: lo store li ha tolti dal catalogo."
 
 msgid ""
-"Deleting keeps your list clean. "
-"Reactivate only if the store restores"
-" them."
+"Deleting keeps your list clean. Reactivate only if the store restores "
+"them."
 msgstr ""
-"Eliminarli tiene pulita la lista. "
-"Riattivali solo se lo store li "
-"rimette in vendita."
+"Eliminarli tiene pulita la lista. Riattivali solo se lo store li rimette "
+"in vendita."
 
+#, python-brace-format
 msgid "Price unreadable on {domain}"
 msgstr "Prezzo illeggibile su {domain}"
 
 msgid ""
-"The pages load, but the price "
-"could not be read anymore (layout "
-"change or a different offer)."
+"The pages load, but the price could not be read anymore (layout change or"
+" a different offer)."
 msgstr ""
-"Le pagine si aprono, ma il prezzo"
-" non si legge più (layout cambiato"
-" o offerta diversa)."
+"Le pagine si aprono, ma il prezzo non si legge più (layout cambiato o "
+"offerta diversa)."
 
 msgid "Reactivate to run a fresh check right now."
 msgstr "Riattiva per fare subito un nuovo controllo."
 
+#, python-brace-format
 msgid "Site unreachable: {domain}"
 msgstr "Sito irraggiungibile: {domain}"
 
+#, python-brace-format
 msgid "The site did not answer {max} checks in a row."
 msgstr "Il sito non ha risposto a {max} controlli di fila."
 
 msgid "Try again later. Reactivate once the site is back."
 msgstr "Riprova più tardi. Riattiva quando il sito torna raggiungibile."
 
+#, python-brace-format
 msgid "Blocked by {domain}"
 msgstr "Bloccato da {domain}"
 
@@ -2786,10 +2779,10 @@ msgstr "Il sito rifiuta i controlli automatici (anti-bot)."
 
 msgid "Domain quarantine already paces retries. Reactivate once it clears."
 msgstr ""
-"La quarantena del dominio gestisce già"
-" i tentativi. Riattiva quando si "
+"La quarantena del dominio gestisce già i tentativi. Riattiva quando si "
 "sblocca."
 
+#, python-brace-format
 msgid "Tracking suspended on {domain}"
 msgstr "Tracking sospeso su {domain}"
 
@@ -2798,3 +2791,7 @@ msgstr "I controlli continuano a fallire."
 
 msgid "Reactivate to retry."
 msgstr "Riattiva per riprovare."
+
+#: src/price_tracker/release_notes.py:23
+msgid "Guided prices and checks"
+msgstr "Prezzi e controlli guidati"
