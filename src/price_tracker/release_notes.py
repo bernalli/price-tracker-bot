@@ -55,6 +55,7 @@ RELEASE_NOTES: dict[str, tuple[str, ...]] = {
         N_("Lists fit on one line"),
         N_("What’s new after each update"),
     ),
+    "1.8.1": (),
 }
 
 MESSAGE_LIMIT = 1200
