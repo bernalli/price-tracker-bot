@@ -77,7 +77,11 @@ def decode_legacy(data: object) -> Action | None:
     """Normalize any known legacy payload; malformed legacy ids remain routable."""
     if not isinstance(data, str) or not data:
         return None
-    if len(data.encode("utf-8")) > MAX_CALLBACK_BYTES:
+    try:
+        byte_count = len(data.encode("utf-8"))
+    except UnicodeEncodeError:
+        return None
+    if byte_count > MAX_CALLBACK_BYTES:
         return None
     exact = _EXACT.get(data)
     if exact is not None:
