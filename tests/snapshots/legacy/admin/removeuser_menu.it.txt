@@ -30,12 +30,12 @@
    | ⏱ Intervallo globale: 360 min
    keyboard:
    | [👥 Lista utenti → a:u]
-   | [➕ Aggiungi utente → a:add] [🚫 Rimuovi utente → a:rm]
+   | [➕ Aggiungi utente → a:add] [🗑 Rimuovi utente → a:rm]
    | [✏️ Nickname utente → a:nk]
    | [⏱ Intervallo globale: 360 min → a:iv]
    | [🔧 Debug scraper → a:dbg]
    | [🏥 Salute scraper → a:hl]
-   | [◀️ Menu → h]
+   | [⬅️ Menu → h]
 ## db after step 2
 (no changes)
 ## step 3: press "menu_admin_removeuser" user=1 on=1000
@@ -43,12 +43,12 @@
 -> editMessageText chat=1 message_id=1000
    param parse_mode="HTML"
    text:
-   | 🚫 <b>Rimuovi utente</b>
+   | 🗑 <b>Rimuovi utente</b>
    |
    | Tocca per rimuovere:
    keyboard:
-   | [🚫 10 → a:rm:10]
-   | [🚫 11 → a:rm:11]
-   | [◀️ Impostazioni → a]
+   | [🗑 10 → a:rm:10]
+   | [🗑 11 → a:rm:11]
+   | [⬅️ Impostazioni → a]
 ## db after step 3
 (no changes)

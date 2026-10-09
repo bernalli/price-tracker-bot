@@ -30,11 +30,11 @@
    | ⏱ Intervallo globale: 90 min
    keyboard:
    | [👥 Lista utenti → a:u]
-   | [➕ Aggiungi utente → a:add] [🚫 Rimuovi utente → a:rm]
+   | [➕ Aggiungi utente → a:add] [🗑 Rimuovi utente → a:rm]
    | [✏️ Nickname utente → a:nk]
    | [⏱ Intervallo globale: 90 min → a:iv]
    | [🔧 Debug scraper → a:dbg]
    | [🏥 Salute scraper → a:hl]
-   | [◀️ Menu → h]
+   | [⬅️ Menu → h]
 ## db after step 2
 (no changes)

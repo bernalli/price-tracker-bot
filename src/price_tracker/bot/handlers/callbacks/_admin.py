@@ -31,13 +31,13 @@ logger = logging.getLogger(__name__)
 def _cancel_prompt() -> InlineKeyboardMarkup:
     """The Cancel button of a prompt waiting for typed text: back to the admin menu."""
     return InlineKeyboardMarkup(
-        [[InlineKeyboardButton(_("Cancel"), callback_data=encode(Action("admin")))]]
+        [[InlineKeyboardButton(_("❌ Cancel"), callback_data=encode(Action("admin")))]]
     )
 
 
 def _back_to_admin() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
-        [[InlineKeyboardButton(_("◀️ Settings"), callback_data=encode(Action("admin")))]]
+        [[InlineKeyboardButton(_("⬅️ Settings"), callback_data=encode(Action("admin")))]]
     )
 
 
@@ -64,7 +64,7 @@ async def handle_admin_menu(
                     _("➕ Add user"), callback_data=encode(Action("admin.add_user"))
                 ),
                 InlineKeyboardButton(
-                    _("🚫 Remove user"), callback_data=encode(Action("admin.remove_user"))
+                    _("🗑 Remove user"), callback_data=encode(Action("admin.remove_user"))
                 ),
             ],
             [
@@ -151,14 +151,14 @@ async def handle_admin_menu(
             rows.append(
                 [
                     InlineKeyboardButton(
-                        f"🚫 {nm}",
+                        f"🗑 {nm}",
                         callback_data=encode(Action("admin.remove_user_id", (u["user_id"],))),
                     )
                 ]
             )
-        rows.append([InlineKeyboardButton(_("◀️ Settings"), callback_data=encode(Action("admin")))])
+        rows.append([InlineKeyboardButton(_("⬅️ Settings"), callback_data=encode(Action("admin")))])
         await query.edit_message_text(
-            _("🚫 <b>Remove user</b>\n\nTap a user to remove them:"),
+            _("🗑 <b>Remove user</b>\n\nTap a user to remove them:"),
             parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup(rows),
         )
@@ -208,7 +208,7 @@ async def handle_admin_menu(
                     )
                 ]
             )
-        rows.append([InlineKeyboardButton(_("◀️ Settings"), callback_data=encode(Action("admin")))])
+        rows.append([InlineKeyboardButton(_("⬅️ Settings"), callback_data=encode(Action("admin")))])
         await query.edit_message_text(
             _("✏️ <b>Nickname</b>\n\nChoose a user:"),
             parse_mode=ParseMode.HTML,

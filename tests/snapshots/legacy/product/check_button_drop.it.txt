@@ -38,7 +38,7 @@
    | [⏸ Pausa → p:1:pa] [🗑 Elimina → p:1:rm]
    | [🔔 Regola avviso → p:1:ed] [⏱ Intervallo → p:1:iv]
    | [🔗 Apri → url:https://shop.example.com/item/1]
-   | [◀️ Lista → l:a:1]
+   | [⬅️ Lista → l:a:1]
 ## db after step 2
 (no changes)
 ## step 3: press "check_1" user=10 on=1000
@@ -65,7 +65,7 @@
    | [⏸ Pausa → p:1:pa] [🗑 Elimina → p:1:rm]
    | [🔔 Regola avviso → p:1:ed] [⏱ Intervallo → p:1:iv]
    | [🔗 Apri → url:https://shop.example.com/item/1]
-   | [◀️ Lista → l:a:1]
+   | [⬅️ Lista → l:a:1]
 ## db after step 3
 + price_history id=6 {product_id=1, price="64.00", checked_at=<now:9999-99-99 99:99:99>}
 ~ products id=1 current_price: "80.00" -> "64.00"

@@ -28,7 +28,7 @@
    | Tocca un prodotto per controllarlo.
    keyboard:
    | [🔄 Controlla tutti i prezzi → ca]
-   | [◀️ Menu → h]
+   | [⬅️ Menu → h]
 ## db after step 2
 (no changes)
 ## step 3: press "menu_checkall" user=10 on=1000
@@ -37,6 +37,6 @@
    text:
    | 📭 Nessun prodotto.
    keyboard:
-   | [◀️ Menu → h]
+   | [⬅️ Menu → h]
 ## db after step 3
 (no changes)

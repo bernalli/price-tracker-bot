@@ -186,8 +186,8 @@ ITALIAN: dict[str, str] = {
     "admin_menu": ("👑 <b>Impostazioni</b>\n\n👥 Utenti attivi: 2\n⏱ Intervallo globale: 360 min"),
     "edit": (
         "✏️ <b>Modifica #1</b> Kettle\n\n"
-        "🎯 Soglia attuale: <b>🔔 Ogni ribasso</b>\n"
-        "🏁 Target attuale: <b>non impostato</b>\n"
+        "📉 Soglia attuale: <b>🔔 Ogni ribasso</b>\n"
+        "🎯 Target attuale: <b>non impostato</b>\n"
         "📌 Prezzo base: <b>€100.00</b>\n\n"
         "<b>Cosa vuoi modificare?</b>"
     ),
@@ -196,11 +196,11 @@ ITALIAN: dict[str, str] = {
     "notifications": "🔔 <b>Notifiche</b>\n\nTocca un prodotto per cambiare soglia o target.",
     "info_user": (
         "ℹ️ <b>Statistiche</b>\n\n"
-        "📦 Prodotti attivi: 1\n📁 Totali: 2\n🔄 Check: 5\n⏱ Intervallo: ogni 6h"
+        "📦 Prodotti attivi: 1\n📦 Totali: 2\n🔄 Check: 5\n⏱ Intervallo: ogni 6h"
     ),
     "info_admin": (
         "ℹ️ <b>Statistiche</b>\n\n"
-        "📦 Prodotti attivi: 1\n📁 Totali: 2\n🔄 Check: 5\n⏱ Intervallo: ogni 6h\n\n"
+        "📦 Prodotti attivi: 1\n📦 Totali: 2\n🔄 Check: 5\n⏱ Intervallo: ogni 6h\n\n"
         "👑 <b>Admin</b>\n👥 Utenti attivi: 2\n📦 Prodotti globali: 1\n🔄 Check globali: 5"
     ),
     "errors": (
@@ -217,22 +217,22 @@ ITALIAN_LABELS: dict[str, list[str]] = {
     "admin_menu": [
         "👥 Lista utenti",
         "➕ Aggiungi utente",
-        "🚫 Rimuovi utente",
+        "🗑 Rimuovi utente",
         "✏️ Nickname utente",
         "⏱ Intervallo globale: 360 min",
         "🔧 Debug scraper",
         "🏥 Salute scraper",
-        "◀️ Menu",
+        "⬅️ Menu",
     ],
     "edit": [
         "🔔 Ogni ribasso",
         "📉 Soglia % o €",
-        "💰 Prezzo target",
-        "🔄 Azzera prezzo base",
+        "🎯 Prezzo target",
+        "📌 Azzera prezzo base",
         "🔔 Notifiche",
     ],
-    "notifications": ["80,00\xa0€ ▼20% Kettle", "◀️ Menu"],
-    "back_buttons": ["◀️ Menu", "◀️ Menu"],
+    "notifications": ["80,00\xa0€ ▼20% Kettle", "⬅️ Menu"],
+    "back_buttons": ["⬅️ Menu", "⬅️ Menu"],
 }
 
 

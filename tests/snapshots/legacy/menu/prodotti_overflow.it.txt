@@ -38,7 +38,7 @@
    | [18,00 € Item 09 → p:9:ed]
    | [19,00 € Item 10 → p:10:ed]
    | [... altri 2 → /lista → pdc]
-   | [◀️ Menu → h]
+   | [⬅️ Menu → h]
 ## db after step 2
 (no changes)
 ## step 3: command "/menu" user=10
@@ -77,7 +77,7 @@
    | [17,00 € Item 08 → p:8:ck]
    | [… altri 4 → Prodotti → l:a:1]
    | [📈 Storico prezzo → hi]
-   | [◀️ Menu → h]
+   | [⬅️ Menu → h]
 ## db after step 4
 (no changes)
 ## step 5: command "/menu" user=10
@@ -115,7 +115,7 @@
    | [17,00 € Item 08 → p:8:ch:all]
    | [18,00 € Item 09 → p:9:ch:all]
    | [19,00 € Item 10 → p:10:ch:all]
-   | [◀️ Menu → h]
+   | [⬅️ Menu → h]
 ## db after step 6
 (no changes)
 ## step 7: command "/menu" user=10
@@ -153,7 +153,7 @@
    | [17,00 € Item 08 → p:8:ed]
    | [18,00 € Item 09 → p:9:ed]
    | [19,00 € Item 10 → p:10:ed]
-   | [◀️ Menu → h]
+   | [⬅️ Menu → h]
 ## db after step 8
 (no changes)
 ## step 9: seed "\"/pausa 12\""
@@ -194,6 +194,6 @@
    | [19,00 € Item 10 → p:10:ed]
    | [... altri 1 → /lista → pdc]
    | [⏸ 1 in pausa → riattiva → pz]
-   | [◀️ Menu → h]
+   | [⬅️ Menu → h]
 ## db after step 11
 (no changes)

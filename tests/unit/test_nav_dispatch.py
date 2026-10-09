@@ -528,7 +528,7 @@ async def test_a_card_opened_from_the_list_returns_to_the_same_page_and_filter(
         await repo.increment_errors(pid)
     query = await press(repo, f"l:e:2:{twelve[1]}")
     _, markup = shown(query)
-    back = [b for row in markup.inline_keyboard for b in row if b.text == "◀️ List"]
+    back = [b for row in markup.inline_keyboard for b in row if b.text == "⬅️ List"]
     assert [decode(b.callback_data) for b in back] == [Action("list.page", ("e", 2))]
     returned = await press(repo, back[0].callback_data)
     assert_shows(returned, await render_list(repo, "e", 2))

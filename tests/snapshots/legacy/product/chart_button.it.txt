@@ -38,7 +38,7 @@
    | [⏸ Pausa → p:1:pa] [🗑 Elimina → p:1:rm]
    | [🔔 Regola avviso → p:1:ed] [⏱ Intervallo → p:1:iv]
    | [🔗 Apri → url:https://shop.example.com/item/1]
-   | [◀️ Lista → l:a:1]
+   | [⬅️ Lista → l:a:1]
 ## db after step 2
 (no changes)
 ## step 3: press "chart_1" user=10 on=1000

@@ -7,4 +7,4 @@ text:
    | 
    | Incolla qui il link della pagina di un prodotto per iniziare a seguirlo.
 keyboard:
-   [◀️ Lista](cb:l:a:1)  [🏠 Home](cb:h)
+   [⬅️ Lista](cb:l:a:1)  [🏠 Home](cb:h)

@@ -38,7 +38,7 @@
    | [⏸ Pausa → p:1:pa] [🗑 Elimina → p:1:rm]
    | [🔔 Regola avviso → p:1:ed] [⏱ Intervallo → p:1:iv]
    | [🔗 Apri → url:https://shop.example.com/item/1]
-   | [◀️ Lista → l:a:1]
+   | [⬅️ Lista → l:a:1]
 ## db after step 2
 (no changes)
 ## step 3: press "edit_1" user=10 on=1000
@@ -48,16 +48,16 @@
    text:
    | ✏️ <b>Modifica #1</b> Kettle
    |
-   | 🎯 Soglia attuale: <b>-10%</b>
-   | 🏁 Target attuale: <b>non impostato</b>
+   | 📉 Soglia attuale: <b>-10%</b>
+   | 🎯 Target attuale: <b>non impostato</b>
    | 📌 Prezzo base: <b>€100.00</b>
    |
    | <b>Cosa vuoi modificare?</b>
    keyboard:
    | [🔔 Ogni ribasso → p:1:th:any]
    | [📉 Soglia % o € → p:1:th]
-   | [💰 Prezzo target → p:1:tg]
-   | [🔄 Azzera prezzo base → p:1:rs]
+   | [🎯 Prezzo target → p:1:tg]
+   | [📌 Azzera prezzo base → p:1:rs]
    | [🔔 Notifiche → p:1:pr]
 ## db after step 3
 (no changes)

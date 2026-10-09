@@ -17,4 +17,4 @@ keyboard:
    [⏸ Pause](cb:p:51:pa)  [🗑 Delete](cb:p:51:rm)
    [🔔 Alert rule](cb:p:51:th)  [⏱ Interval](cb:p:51:iv)
    [🔗 Open](url:https://shop.example.com/item/51)
-   [◀️ List](cb:l:a:1)
+   [⬅️ List](cb:l:a:1)

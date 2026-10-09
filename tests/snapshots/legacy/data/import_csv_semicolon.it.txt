@@ -11,7 +11,7 @@
 -> editMessageText chat=10 message_id=1000
    param parse_mode="HTML"
    text:
-   | 📁 <b>Importazione completata</b>
+   | 📥 <b>Importazione completata</b>
    | ✅ Importati: 1
 ## db after step 1
 + products id=1 {url="https://shop.example.com/item/21", name="X", initial_price="3.00", current_price="3.00", is_active=1, consecutive_errors=0, last_checked_at=NULL, last_notified_at=NULL, created_at=<now:9999-99-99 99:99:99>, updated_at=<now:9999-99-99 99:99:99>, threshold_type="percentage", threshold_value="10", target_price=NULL, domain="example.com", lowest_price="3.00", highest_price="3.00", user_id=10, currency="EUR", is_available=1, pending_alert_price=NULL, pending_alert_at=NULL, preferred_condition=NULL, preferred_seller=NULL, check_interval_minutes=NULL, last_error=NULL, last_error_at=NULL, pending_read_price=NULL, pending_read_count=0, pending_read_streak=0, gone_streak=0, suspension_kind=NULL, suspension_reason=NULL}

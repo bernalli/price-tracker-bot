@@ -6,7 +6,7 @@
 -> sendMessage chat=10
    param parse_mode="HTML"
    text:
-   | 📁 <b>Importa prodotti da CSV</b>
+   | 📥 <b>Importa prodotti da CSV</b>
    |
    | Invia un file CSV (esportato con /esporta) come allegato.
    | I prodotti duplicati (stesso URL) verranno saltati.
@@ -16,7 +16,7 @@
 -> sendMessage chat=10
    param parse_mode="HTML"
    text:
-   | 📁 <b>Importa prodotti da CSV</b>
+   | 📥 <b>Importa prodotti da CSV</b>
    |
    | Invia un file CSV (esportato con /esporta) come allegato.
    | I prodotti duplicati (stesso URL) verranno saltati.

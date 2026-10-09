@@ -29,13 +29,13 @@ def build_threshold_keyboard(product_id: int) -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton(
-                    "\U0001f4b0 Prezzo target",
+                    "🎯 Prezzo target",
                     callback_data=encode(Action("product.target", (product_id,))),
                 ),
             ],
             [
                 InlineKeyboardButton(
-                    "\U0001f44d Va bene -10% (default)",
+                    "👍 Va bene -10% (default)",
                     callback_data=encode(Action("product.threshold_default", (product_id,))),
                 ),
             ],
@@ -45,4 +45,4 @@ def build_threshold_keyboard(product_id: int) -> InlineKeyboardMarkup:
 
 def menu_back_button() -> list[InlineKeyboardButton]:
     """Single-row 'back to main menu' button."""
-    return [InlineKeyboardButton(_("◀️ Menu"), callback_data=encode(Action("home")))]
+    return [InlineKeyboardButton(_("⬅️ Menu"), callback_data=encode(Action("home")))]

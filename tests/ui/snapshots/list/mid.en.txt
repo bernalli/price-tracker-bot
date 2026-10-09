@@ -16,7 +16,7 @@ keyboard:
    [#6 Kettle](cb:l:a:2:6)  [#7 Fan](cb:l:a:2:7)
    [#8 Lamp](cb:l:a:2:8)  [#9 Heater](cb:l:a:2:9)
    [#10 Wireless Hea…](cb:l:a:2:10)
-   [◀️](cb:l:a:1)  [2/3](cb:noop)  [▶️](cb:l:a:3)
+   [⬅️](cb:l:a:1)  [2/3](cb:noop)  [▶️](cb:l:a:3)
    [✅ Active ✓](cb:l:a:1)  [⏸ Paused](cb:l:p:1)
    [⚠️ Errors](cb:l:e:1)  [🚫 Sold out](cb:l:o:1)
    [🗑 Delete all](cb:l:rmall)  [➕ Add](cb:ad)
