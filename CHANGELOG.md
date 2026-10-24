@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.2] - 2026-10-24
+
+### Security
+
+- Dependencies with known vulnerabilities are updated: Pillow 13.0.0, aiohttp 3.14.5,
+  Brotli 1.2.1, certifi 2026.10.23, filelock 4.2.4 and virtualenv 21.14.13.
+- The minimum aiohttp and Brotli versions exclude the vulnerable releases.
+
 ## [1.8.1] - 2026-10-09
 
 ### Fixed
