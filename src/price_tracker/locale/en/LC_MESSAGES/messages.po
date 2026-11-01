@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-09 13:02+0200\n"
+"POT-Creation-Date: 2026-11-01 07:42+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: en\n"
@@ -114,16 +114,16 @@ msgstr "Lists fit on one line"
 msgid "What’s new after each update"
 msgstr "What’s new after each update"
 
-#: src/price_tracker/release_notes.py:87
+#: src/price_tracker/release_notes.py:90
 #, python-brace-format
 msgid "Updated to version {version}"
 msgstr "Updated to version {version}"
 
-#: src/price_tracker/release_notes.py:104
+#: src/price_tracker/release_notes.py:107
 msgid "Earlier:"
 msgstr "Earlier:"
 
-#: src/price_tracker/release_notes.py:105
+#: src/price_tracker/release_notes.py:108
 msgid "…and earlier improvements."
 msgstr "…and earlier improvements."
 
@@ -894,7 +894,7 @@ msgstr ""
 #: src/price_tracker/bot/handlers/callbacks/_product.py:212
 #: src/price_tracker/bot/handlers/history.py:150
 #: src/price_tracker/bot/handlers/history.py:199
-#: src/price_tracker/bot/handlers/product.py:439
+#: src/price_tracker/bot/handlers/product.py:455
 msgid "Product"
 msgstr "Product"
 
@@ -1224,17 +1224,24 @@ msgid ""
 "💡 Check that the link is correct or report the unsupported site."
 msgstr ""
 
-#: src/price_tracker/bot/handlers/product.py:409
+#: src/price_tracker/bot/handlers/product.py:419
 msgid ""
 "🛡 The site is currently blocking automated requests.\n"
 "Please try again in a few minutes."
 msgstr ""
 
-#: src/price_tracker/bot/handlers/product.py:416
+#: src/price_tracker/bot/handlers/product.py:424
+msgid ""
+"🛡 This site blocks automated requests (bot protection), so I can't read "
+"the price.\n"
+"The block is usually permanent: this product can't be tracked for now."
+msgstr ""
+
+#: src/price_tracker/bot/handlers/product.py:432
 msgid "Price not found"
 msgstr "Price not found"
 
-#: src/price_tracker/bot/handlers/product.py:419
+#: src/price_tracker/bot/handlers/product.py:435
 #, python-brace-format
 msgid ""
 "❌ I could not find the price.\n"
@@ -1243,48 +1250,48 @@ msgid ""
 "💡 Check that the link is correct and the product is available."
 msgstr ""
 
-#: src/price_tracker/bot/handlers/product.py:443
+#: src/price_tracker/bot/handlers/product.py:459
 #, python-brace-format
 msgid "✅ <b>Product added!</b> (#{product_id})"
 msgstr "✅ <b>Product added!</b> (#{product_id})"
 
-#: src/price_tracker/bot/handlers/product.py:446
+#: src/price_tracker/bot/handlers/product.py:462
 #, python-brace-format
 msgid "💰 Price: <b>{price}</b>"
 msgstr ""
 
-#: src/price_tracker/bot/handlers/product.py:447
+#: src/price_tracker/bot/handlers/product.py:463
 #, python-brace-format
 msgid "🌐 Site: {domain}"
 msgstr "🌐 Site: {domain}"
 
-#: src/price_tracker/bot/handlers/product.py:452
+#: src/price_tracker/bot/handlers/product.py:468
 msgid ""
 "\n"
 "📋 <b>Amazon preferences:</b>"
 msgstr ""
 
-#: src/price_tracker/bot/handlers/product.py:457
+#: src/price_tracker/bot/handlers/product.py:473
 msgid "🆕 New only"
 msgstr ""
 
-#: src/price_tracker/bot/handlers/product.py:461
+#: src/price_tracker/bot/handlers/product.py:477
 msgid "♻️ Used only"
 msgstr ""
 
-#: src/price_tracker/bot/handlers/product.py:467
+#: src/price_tracker/bot/handlers/product.py:483
 msgid "📦 Amazon only"
 msgstr ""
 
-#: src/price_tracker/bot/handlers/product.py:471
+#: src/price_tracker/bot/handlers/product.py:487
 msgid "🏪 Any seller"
 msgstr ""
 
-#: src/price_tracker/bot/handlers/product.py:477
+#: src/price_tracker/bot/handlers/product.py:493
 msgid "👍 Anything is fine (default)"
 msgstr ""
 
-#: src/price_tracker/bot/handlers/product.py:485
+#: src/price_tracker/bot/handlers/product.py:501
 msgid ""
 "\n"
 "<b>How do you want to be notified?</b>"
@@ -2539,3 +2546,4 @@ msgstr "Use /lista for full state."
 #: src/price_tracker/notifier/digest.py:141
 msgid "Use /reactivate or /errori for details."
 msgstr "Use /reactivate or /errori for details."
+
