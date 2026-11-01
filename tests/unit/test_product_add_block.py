@@ -72,7 +72,8 @@ async def _add_with_block(exc: Exception) -> str:
     }
     await _add_product(update, context, "http://93.184.216.34/p/1")
     db.add_product.assert_not_awaited()
-    return msg.edit_text.await_args.args[0]
+    text: str = msg.edit_text.await_args.args[0]
+    return text
 
 
 @pytest.mark.parametrize(
