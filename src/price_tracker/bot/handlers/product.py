@@ -398,18 +398,34 @@ async def _add_product(
             )
         )
         return
-    from price_tracker.core.exceptions import BlockEvent  # noqa: PLC0415
+    from price_tracker.core.exceptions import (  # noqa: PLC0415
+        BlockEvent,
+        CaptchaDetected,
+        HTTPBlockStatus,
+    )
 
     try:
         result = await scraper_for_url.scrape(url, client)
-    except BlockEvent:
-        logger.info("Add blocked by site protection for %s", url[:60])
-        await msg.edit_text(
-            _(
+    except BlockEvent as exc:
+        logger.info("Add blocked by site protection for %s: %s", url[:60], exc)
+        # A rate limit (429) or a CAPTCHA wears off: retrying later can work.
+        # A 403 or a WAF/bot-protection page usually means the site refuses
+        # every automated client, so "try again in a few minutes" would mislead.
+        transient = isinstance(exc, CaptchaDetected) or (
+            isinstance(exc, HTTPBlockStatus) and exc.status == 429
+        )
+        if transient:
+            text = _(
                 "🛡 The site is currently blocking automated requests.\n"
                 "Please try again in a few minutes."
             )
-        )
+        else:
+            text = _(
+                "🛡 This site blocks automated requests (bot protection), "
+                "so I can't read the price.\n"
+                "The block is usually permanent: this product can't be tracked for now."
+            )
+        await msg.edit_text(text)
         return
 
     if result.price is None:

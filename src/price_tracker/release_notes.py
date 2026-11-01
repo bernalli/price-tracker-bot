@@ -57,6 +57,7 @@ RELEASE_NOTES: dict[str, tuple[str, ...]] = {
     ),
     "1.8.1": (),
     "1.8.2": (),
+    "1.8.3": (),
 }
 
 MESSAGE_LIMIT = 1200

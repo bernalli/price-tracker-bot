@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.3] - 2026-11-01
+
+### Fixed
+
+- Amazon products that are sold out or no longer sold by Amazon are recognised as out of
+  stock instead of failing every check and being suspended: the `#outOfStock` notice,
+  "currently unavailable" texts in every supported Amazon locale, and pages with only other
+  sellers' offers.
+- Amazon's "page not found" page served with a success status counts as a removed listing,
+  so the product is suspended after the usual confirmations with a clear reason.
+- When adding a product, a site with permanent bot protection (HTTP 403 or a WAF page) no
+  longer suggests trying again in a few minutes; a rate limit or CAPTCHA still does.
+
 ## [1.8.2] - 2026-10-24
 
 ### Security
