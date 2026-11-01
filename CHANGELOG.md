@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.3] - 2026-11-01
+
 ### Fixed
 
 - Amazon products that are sold out or no longer sold by Amazon are recognised as out of
