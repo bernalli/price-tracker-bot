@@ -81,6 +81,63 @@ def _owned_by(element: Tag, target_asin: str | None) -> bool:
     return True
 
 
+# Lower-case phrases Amazon prints when a listing is sold out, per locale.
+_UNAVAILABLE_PHRASES: tuple[str, ...] = (
+    "non disponibile",  # it
+    "currently unavailable",  # com, co.uk, ca, com.au
+    "temporarily out of stock",
+    "nicht verfügbar",  # de
+    "indisponible",  # fr
+    "no disponible",  # es
+    "niet beschikbaar",  # nl
+    "niet leverbaar",
+    "niedostępny",  # pl
+    "inte tillgänglig",  # se
+    "在庫切れ",  # co.jp
+    "現在お取り扱いできません",
+)
+
+# Containers whose text states the listing's own availability.
+_AVAILABILITY_SELECTORS: tuple[str, ...] = (
+    "#availability",
+    "#outOfStock",
+    "#availability_feature_div",
+)
+
+
+def _is_unavailable(soup: BeautifulSoup) -> bool:
+    """Whether the page states the product itself is sold out / unavailable."""
+    for selector in _AVAILABILITY_SELECTORS:
+        for el in soup.select(selector):
+            text = el.get_text(" ", strip=True).lower()
+            if any(phrase in text for phrase in _UNAVAILABLE_PHRASES):
+                return True
+    return False
+
+
+def _has_no_buybox_offer(soup: BeautifulSoup) -> bool:
+    """Whether the page has no buy box, only a link to other sellers' offers."""
+    return (
+        soup.select_one("#buybox-see-all-buying-choices, #buybox-see-all-buying-choices-announce")
+        is not None
+        and soup.select_one("#add-to-cart-button, #buy-now-button") is None
+    )
+
+
+# Ref tags on the links of Amazon's not-found ("dogs") page; identical in every
+# locale, unlike the page's title and copy.
+_NOT_FOUND_REF_RE = re.compile(r"ref=cs_404_", re.IGNORECASE)
+
+
+def _is_not_found_page(soup: BeautifulSoup) -> bool:
+    """Whether the page is Amazon's not-found page rather than a product page."""
+    if soup.select_one("#productTitle, #title, #dp, #dp-container") is not None:
+        return False
+    return any(
+        _NOT_FOUND_REF_RE.search(str(a.get("href") or "")) for a in soup.find_all("a", href=True)
+    )
+
+
 @with_retry(RetryConfig(max_attempts=3, base_wait=2.0, max_wait=10.0))
 async def _fetch_amazon_html(
     url: str, client: httpx.AsyncClient, extra_headers: dict[str, str] | None = None
@@ -258,9 +315,13 @@ class AmazonScraper(AbstractScraper):
         if soup.find("form", action=re.compile(r"validateCaptcha")):
             raise CaptchaDetected(marker="amazon-validateCaptcha", url=url)
 
-        # Check for "currently unavailable"
-        unavail = soup.find(id="availability")
-        if unavail and "non disponibile" in unavail.get_text().lower():
+        # A removed ASIN can come back as Amazon's "dogs" not-found page with a
+        # 2xx status: that is a gone listing, not a page we failed to read.
+        if _is_not_found_page(soup):
+            raise ListingGone(status=404, url=url)
+
+        # Sold-out / "currently unavailable" listing, in any supported locale.
+        if _is_unavailable(soup):
             info.available = False
 
         # Extract price — CSS selectors first (buybox = real price for Amazon).
@@ -319,6 +380,11 @@ class AmazonScraper(AbstractScraper):
                 info.seller = None
 
         if info.price is None:
+            # No buy box at all, only "see all buying choices" from other sellers:
+            # Amazon itself is not selling the product, which is a sold-out state
+            # to wait out (restock alert), not a page we failed to read.
+            if _has_no_buybox_offer(soup):
+                info.available = False
             info.error = "Prezzo non trovato (prodotto non disponibile?)"
 
         return info
