@@ -19,7 +19,7 @@ from bs4 import BeautifulSoup
 from price_tracker.core.exceptions import BlockEvent, ListingGone
 from price_tracker.core.http_client import public_request
 from price_tracker.core.identity import RequestedIdentity
-from price_tracker.core.money import Money, normalize_currency_code
+from price_tracker.core.money import MAX_AMOUNT, Money, normalize_currency_code
 from price_tracker.core.pricegrammar import Unreadable, select_offer
 from price_tracker.core.retry_policy import RetryConfig, with_retry
 from price_tracker.core.scraper_base import (
@@ -118,6 +118,28 @@ def _without_variant_param(url: str) -> str:
     parsed = urlparse(url)
     kept = [(k, v) for k, v in parse_qsl(parsed.query, keep_blank_values=True) if k != "variant"]
     return parsed._replace(query=urlencode(kept)).geturl()
+
+
+def _embedded_variant_price(value: object) -> Decimal | None:
+    """Price of one variant of the theme-embedded product JSON, or ``None``.
+
+    Liquid's ``json`` filter renders a variant price as integer cents
+    (``19900`` is 199.00), unlike the ``.json`` API's decimal strings; a theme
+    that formats the price itself writes a decimal string, read as it is.
+    Anything else is not read: a bool, a float (cents or units is a guess), zero,
+    a negative or out-of-range number, a container. No price is recoverable; a
+    wrong one is pushed to the user.
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        if value <= 0:
+            return None
+        amount = Decimal(value).scaleb(-2)
+        return amount if amount <= MAX_AMOUNT else None
+    if isinstance(value, str):
+        return parse_price(value)
+    return None
 
 
 def _variant_offer_id(variant: Mapping[str, object]) -> str | None:
@@ -556,11 +578,9 @@ class ShopifyScraper(AbstractScraper):
                     if "variants" in product:
                         info.name = product.get("title")
                         for v in product["variants"]:
-                            price = v.get("price")
-                            if price:
-                                info.price = parse_price(str(price))
-                                if info.price:
-                                    return info
+                            info.price = _embedded_variant_price(v.get("price"))
+                            if info.price:
+                                return info
                 except (json.JSONDecodeError, TypeError, AttributeError):
                     continue
         # A product JSON whose title was read but no price parsed still hands the
