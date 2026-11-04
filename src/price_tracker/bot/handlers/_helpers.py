@@ -76,6 +76,19 @@ def _parse_id(text: str) -> int | None:
     return value if 1 <= value <= ID_MAX else None
 
 
+def _record_manual_start(ctx: Any, url: str) -> None:
+    """Tell the scheduler a manual check on ``url``'s store starts now.
+
+    The manual check itself never waits for the store's gap; the next scheduled
+    check on that store keeps its distance from it.
+    """
+    bot_data = getattr(ctx, "bot_data", None)
+    scheduler = bot_data.get("scheduler") if isinstance(bot_data, dict) else None
+    record = getattr(scheduler, "record_manual_start", None)
+    if callable(record):
+        record(url)
+
+
 def _safe_dec(value: object) -> Decimal | None:
     """Best-effort Decimal conversion; returns None on failure."""
     if value is None:

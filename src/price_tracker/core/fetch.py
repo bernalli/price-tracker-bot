@@ -31,6 +31,7 @@ from price_tracker.core.scraper_base import (
     detect_block_event,
     detect_listing_gone,
     get_headers,
+    retry_after_header,
 )
 from price_tracker.core.url_utils import UnsafeURLError, validate_public_url
 
@@ -337,7 +338,12 @@ async def _fetch_primary(
 
         # Only a response that will not be followed reaches block detection and
         # status handling: the body of a followed redirect is never inspected.
-        detect_block_event(status_code=response.status_code, body=text, url=current)
+        detect_block_event(
+            status_code=response.status_code,
+            body=text,
+            url=current,
+            retry_after=retry_after_header(response),
+        )
         if decode_error is not None:
             raise decode_error
         response.raise_for_status()

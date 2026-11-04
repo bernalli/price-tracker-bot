@@ -30,6 +30,7 @@ from price_tracker.core.scraper_base import (
     detect_listing_gone,
     get_headers,
     parse_price,
+    retry_after_header,
     select_jsonld_offer,
 )
 
@@ -148,7 +149,12 @@ async def _fetch_amazon_html(
     # Surface 403/429/WAF/CAPTCHA as a BlockEvent and 404/410 as ListingGone
     # BEFORE raise_for_status — same schema as shopify.py (#16), so neither
     # collapses into a generic httpx.HTTPStatusError further down the chain.
-    detect_block_event(status_code=response.status_code, body=response.text, url=url)
+    detect_block_event(
+        status_code=response.status_code,
+        body=response.text,
+        url=url,
+        retry_after=retry_after_header(response),
+    )
     detect_listing_gone(status_code=response.status_code, url=url)
     response.raise_for_status()
     return response.text
@@ -167,7 +173,12 @@ async def _fetch_with_fresh_client(url: str) -> str | None:
             response = await public_request(fresh, "GET", url, headers=headers)
             # Same schema as the primary fetch: block/gone detection precedes
             # raise_for_status on this path too (#16).
-            detect_block_event(status_code=response.status_code, body=response.text, url=url)
+            detect_block_event(
+                status_code=response.status_code,
+                body=response.text,
+                url=url,
+                retry_after=retry_after_header(response),
+            )
             detect_listing_gone(status_code=response.status_code, url=url)
             response.raise_for_status()
             return response.text

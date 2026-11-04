@@ -30,6 +30,7 @@ from price_tracker.core.scraper_base import (
     detect_listing_gone,
     get_headers,
     parse_price,
+    retry_after_header,
     unwrap_jsonld_graph,
 )
 from price_tracker.core.structured_data import StructureError, decode_json_strict
@@ -48,7 +49,12 @@ async def _fetch_shopify_response(url: str, client: httpx.AsyncClient) -> httpx.
     # Surface 403/429 (and WAF/CAPTCHA bodies) as a BlockEvent BEFORE
     # raise_for_status, so the scheduler quarantines the domain instead of
     # recording a generic failure (#16). with_retry never retries BlockEvents.
-    detect_block_event(status_code=response.status_code, body=response.text, url=url)
+    detect_block_event(
+        status_code=response.status_code,
+        body=response.text,
+        url=url,
+        retry_after=retry_after_header(response),
+    )
     detect_listing_gone(status_code=response.status_code, url=url)
     response.raise_for_status()
     return response
@@ -372,7 +378,12 @@ class ShopifyScraper(AbstractScraper):
             logger.debug("Shopify HTML fetch failed for %s: %s", url[:60], e)
             return None
         # Surface WAF/CAPTCHA challenge bodies as a BlockEvent → domain quarantine (#7).
-        detect_block_event(status_code=response.status_code, body=response.text, url=url)
+        detect_block_event(
+            status_code=response.status_code,
+            body=response.text,
+            url=url,
+            retry_after=retry_after_header(response),
+        )
         if not _is_product_path(response.url):
             # A removed product does not always answer 404 straight away: measured
             # against a real store, the first request on a cookieless session is
@@ -437,7 +448,10 @@ class ShopifyScraper(AbstractScraper):
                 data = await self._fetch_json_via_curl_cffi(json_url)
                 if data is None:
                     detect_block_event(
-                        status_code=response.status_code, body=response.text, url=json_url
+                        status_code=response.status_code,
+                        body=response.text,
+                        url=json_url,
+                        retry_after=retry_after_header(response),
                     )
                     return None  # pragma: no cover - detect_block_event always raises here
             elif response.status_code == 404:
@@ -449,12 +463,18 @@ class ShopifyScraper(AbstractScraper):
                 # on a 200) must surface as a BlockEvent when it is one, never as a
                 # swallowed None (#16, JSON branch never checked this before).
                 detect_block_event(
-                    status_code=response.status_code, body=response.text, url=json_url
+                    status_code=response.status_code,
+                    body=response.text,
+                    url=json_url,
+                    retry_after=retry_after_header(response),
                 )
                 return None
             else:
                 detect_block_event(
-                    status_code=response.status_code, body=response.text, url=json_url
+                    status_code=response.status_code,
+                    body=response.text,
+                    url=json_url,
+                    retry_after=retry_after_header(response),
                 )
                 data = response.json()
 

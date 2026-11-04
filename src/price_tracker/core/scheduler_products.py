@@ -77,6 +77,17 @@ class ProductChecksMixin:
 
         def _recipient_locale(self, user_id: int) -> Any: ...
 
+        def _defer_on_retry_after(self, domain: str, exc: BaseException) -> None: ...
+
+    def record_manual_start(self, url: str) -> None:
+        """Note a manual check on ``url``'s store, so the next scheduled one keeps its gap.
+
+        A manual check never waits for the gap itself.
+        """
+        domain = extract_etld_plus_one(url)
+        if domain:
+            self.deps.domain_spacing.record_start(domain)
+
     async def _check_product_core(
         self,
         product_id: int,
@@ -508,6 +519,9 @@ class ProductChecksMixin:
                         half_open_seen.add(domain)
                 scraper = self.deps.registry.resolve(product.url)
                 scraper_name = scraper.name if scraper is not None else "unknown"
+                # A manual check does not wait for the store's gap, but the next
+                # scheduled check on that store keeps its distance from this one.
+                self.record_manual_start(product.url)
                 try:
                     outcome = await self._check_product_core(
                         product.id,
@@ -517,6 +531,7 @@ class ProductChecksMixin:
                     )
                 except BlockEvent as exc:
                     logger.warning("Block detected for product %d: %s", product.id, exc)
+                    self._defer_on_retry_after(domain, exc)
                     if self.deps.metrics is not None:
                         self.deps.metrics.price_check_total.labels(
                             scraper=scraper_name, domain=domain, status="block"
@@ -567,6 +582,7 @@ class ProductChecksMixin:
                         CheckResult(product.id, user_id, disabled=disabled, reason="parse_error")
                     )
                 except (httpx.HTTPError, ValueError, KeyError) as exc:
+                    self._defer_on_retry_after(domain, exc)
                     reason, detail = _failure_reason(exc)
                     disabled = await self._record_failure_and_maybe_disable(
                         product,
