@@ -2705,3 +2705,31 @@ msgstr "Usa /lista per lo stato completo."
 msgid "Use /reactivate or /errori for details."
 msgstr "Usa /reactivate o /errori per i dettagli."
 
+
+#: src/price_tracker/bot/ui/panels.py
+#, python-brace-format
+msgid "{percent} and {amount}"
+msgstr "{percent} e {amount}"
+
+#: src/price_tracker/bot/ui/panels.py
+#, python-brace-format
+msgid "{value} (default)"
+msgstr "{value} (predefinito)"
+
+#: src/price_tracker/bot/ui/panels.py
+#, python-brace-format
+msgid "📉 Minimum drop: {value}"
+msgstr "📉 Calo minimo: {value}"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "📉 Minimum drop"
+msgstr "📉 Calo minimo"
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "📉 <b>Minimum drop</b>"
+msgstr "📉 <b>Calo minimo</b>"
+
+#: src/price_tracker/bot/ui/panels.py
+#, python-brace-format
+msgid "A price drop is announced only when it is at least this share of the old price and at least {amount} in the product's currency."
+msgstr "Un calo di prezzo viene segnalato solo se vale almeno questa quota del prezzo precedente e almeno {amount} nella valuta del prodotto."

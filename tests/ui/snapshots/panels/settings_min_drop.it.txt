@@ -1,0 +1,14 @@
+# ui snapshot v1
+# screen: panels.settings_min_drop
+# locale: it
+# now: 2026-03-01T12:00:00Z
+text:
+   | 📉 <b>Calo minimo</b>
+   | 
+   | Un calo di prezzo viene segnalato solo se vale almeno questa quota del prezzo precedente e almeno 1 nella valuta del prodotto.
+   | 
+   | Attuale: 5% e 1
+keyboard:
+   [Disattivo](cb:s:md:off)  [1%](cb:s:md:1)
+   [2%](cb:s:md:2)  [5% ✓](cb:s:md:5)
+   [⬅️ Impostazioni](cb:s)  [🏠 Home](cb:h)

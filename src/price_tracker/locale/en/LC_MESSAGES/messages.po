@@ -2547,3 +2547,31 @@ msgstr "Use /lista for full state."
 msgid "Use /reactivate or /errori for details."
 msgstr "Use /reactivate or /errori for details."
 
+
+#: src/price_tracker/bot/ui/panels.py
+#, python-brace-format
+msgid "{percent} and {amount}"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+#, python-brace-format
+msgid "{value} (default)"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+#, python-brace-format
+msgid "📉 Minimum drop: {value}"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "📉 Minimum drop"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+msgid "📉 <b>Minimum drop</b>"
+msgstr ""
+
+#: src/price_tracker/bot/ui/panels.py
+#, python-brace-format
+msgid "A price drop is announced only when it is at least this share of the old price and at least {amount} in the product's currency."
+msgstr ""

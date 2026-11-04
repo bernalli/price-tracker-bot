@@ -17,6 +17,12 @@ from zoneinfo import ZoneInfo
 
 from babel.numbers import list_currencies
 
+from price_tracker.core.drop_floor import (
+    DEFAULT_DROP_FLOOR,
+    MIN_DROP_CHOICES,
+    DropFloor,
+    floor_for_choice,
+)
 from price_tracker.i18n.format import _check_amount
 
 if TYPE_CHECKING:
@@ -192,3 +198,35 @@ class HomeView:
         _check_int("active", self.active, minimum=0)
         _check_int("paused", self.paused, minimum=0)
         _check_bool("is_admin", self.is_admin)
+
+
+@dataclass(frozen=True, slots=True)
+class MinDropView:
+    """The minimum drop before a price alert, as Settings shows it.
+
+    ``choice`` is the stored choice (``None``: the server default); ``floor`` the
+    minimum drop in effect for it, ``default_absolute`` the server's absolute part.
+    """
+
+    choice: str | None
+    floor: DropFloor
+    default_absolute: Decimal
+
+    def __post_init__(self) -> None:
+        if self.choice is not None and self.choice not in MIN_DROP_CHOICES:
+            raise ValueError(
+                f"choice: must be one of {MIN_DROP_CHOICES} or None, got {self.choice!r}"
+            )
+        if not isinstance(self.floor, DropFloor):
+            raise ValueError(f"floor: must be a DropFloor, got {self.floor!r}")
+
+    @property
+    def is_default(self) -> bool:
+        """Whether the user never chose, so the server default applies."""
+        return self.choice is None
+
+
+def min_drop_view(choice: object, default: DropFloor = DEFAULT_DROP_FLOOR) -> MinDropView:
+    """The view of a stored minimum-drop choice; an unknown stored value is the default."""
+    stored = choice if isinstance(choice, str) and choice in MIN_DROP_CHOICES else None
+    return MinDropView(stored, floor_for_choice(stored, default), default.absolute)

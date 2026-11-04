@@ -6,12 +6,21 @@ import logging
 import math
 import os
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from dotenv import load_dotenv
 
 from price_tracker.app.inputs import InputError, parse_user_id
 from price_tracker.core.domain_spacing import DEFAULT_MIN_GAP_SECONDS
+from price_tracker.core.drop_floor import (
+    DEFAULT_MIN_DROP_ABSOLUTE,
+    DEFAULT_MIN_DROP_PERCENT,
+    parse_floor_value,
+)
 from price_tracker.core.outlier import REQUIRED_CONFIRMATIONS
+
+if TYPE_CHECKING:
+    from decimal import Decimal
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -74,6 +83,8 @@ class Config:
     metrics_enabled: bool = True
     read_confirmations: int = REQUIRED_CONFIRMATIONS
     domain_min_gap_seconds: float = DEFAULT_MIN_GAP_SECONDS
+    min_drop_percent: Decimal = DEFAULT_MIN_DROP_PERCENT
+    min_drop_absolute: Decimal = DEFAULT_MIN_DROP_ABSOLUTE
 
     @classmethod
     def from_env(cls) -> Config:
@@ -106,6 +117,16 @@ class Config:
             read_confirmations=int(os.getenv("READ_CONFIRMATIONS", str(REQUIRED_CONFIRMATIONS))),
             metrics_enabled=metrics_enabled,
             domain_min_gap_seconds=_parse_min_gap(os.getenv("DOMAIN_MIN_GAP_SECONDS")),
+            min_drop_percent=parse_floor_value(
+                os.getenv("MIN_DROP_PERCENT"),
+                name="MIN_DROP_PERCENT",
+                default=DEFAULT_MIN_DROP_PERCENT,
+            ),
+            min_drop_absolute=parse_floor_value(
+                os.getenv("MIN_DROP_ABSOLUTE"),
+                name="MIN_DROP_ABSOLUTE",
+                default=DEFAULT_MIN_DROP_ABSOLUTE,
+            ),
         )
 
 

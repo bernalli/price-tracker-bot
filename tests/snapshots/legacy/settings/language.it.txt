@@ -46,10 +46,12 @@
    | 🚦 Throttle: unlimited
    | 🌍 Timezone: Europe/Rome
    | 🗣 Language: English
+   | 📉 Minimum drop: off (default)
    keyboard:
    | [🔕 Mute → s:mu] [📬 Digest → s:dg]
    | [🌙 Quiet hours → s:qh] [🚦 Throttle → s:th]
    | [🌍 Timezone → s:tz] [🗣 Language → s:lang]
+   | [📉 Minimum drop → s:md]
    | [🏠 Home → h]
 ## db after step 3
 (no changes)
@@ -97,10 +99,12 @@
    | 🚦 Limite: illimitato
    | 🌍 Fuso orario: Europe/Rome
    | 🗣 Lingua: Automatica (Italiano)
+   | 📉 Calo minimo: off (predefinito)
    keyboard:
    | [🔕 Silenzia → s:mu] [📬 Digest → s:dg]
    | [🌙 Ore silenziose → s:qh] [🚦 Limite → s:th]
    | [🌍 Fuso orario → s:tz] [🗣 Lingua → s:lang]
+   | [📉 Calo minimo → s:md]
    | [🏠 Home → h]
 ## db after step 6
 (no changes)

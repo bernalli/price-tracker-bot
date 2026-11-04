@@ -66,6 +66,8 @@ All configuration is via environment variables, loaded from `.env` (or the host 
 | `REQUEST_TIMEOUT`             | `30`                    | HTTP timeout in seconds for scraper requests                                                                           |
 | `DOMAIN_MIN_GAP_SECONDS`      | `30`                    | Minimum seconds between the starts of two scheduled checks on the same store (eTLD+1); `0` disables. Spacing is per check (a check's redirects and follow-up page are part of it): while one store waits, the sweep checks other stores. A 429/503 with `Retry-After` leaves that store's remaining products for a later sweep (capped at 3600 s). Manual checks never wait, but the next scheduled check keeps its distance from them |
 | `NOTIFICATION_COOLDOWN_HOURS` | `24`                    | Per-product alert cooldown                                                                                             |
+| `MIN_DROP_PERCENT`            | `2`                     | A price-drop alert needs a drop of at least this percentage of the old price, whatever the product's rule (any drop, percentage, absolute, target); `0` disables this part. Users override it in Settings → Minimum drop (off, 1 %, 2 %, 5 %) |
+| `MIN_DROP_ABSOLUTE`           | `1`                     | ...and at least this amount in the product's currency; `0` disables this part. A user preset keeps it; the user's "off" turns off both parts |
 | `METRICS_ENABLED`             | `true`                  | Prometheus exporter is on by default. Set `0` or `false` to disable.                                                  |
 
 For the full set including outlier detection thresholds and currency tuning, see `src/price_tracker/config.py`.

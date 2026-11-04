@@ -51,7 +51,7 @@ def _actions(screen: Screen) -> list[Action]:
     return [item for item in decoded if isinstance(item, Action)]
 
 
-def test_main_panel_offers_the_six_sections_and_home() -> None:
+def test_main_panel_offers_the_seven_sections_and_home() -> None:
     assert _actions(settings_screen(BUSY, now=NOW)) == [
         Action("settings.section", ("mu",)),
         Action("settings.section", ("dg",)),
@@ -59,6 +59,7 @@ def test_main_panel_offers_the_six_sections_and_home() -> None:
         Action("settings.section", ("th",)),
         Action("settings.section", ("tz",)),
         Action("settings.section", ("lang",)),
+        Action("settings.section", ("md",)),
         Action("home"),
     ]
 
@@ -77,6 +78,7 @@ def test_main_panel_offers_the_six_sections_and_home() -> None:
         ("lang", ["auto", "en", "it"], "settings.language", []),
         ("tz", [], "", [Action("settings.ask", ("tz",))]),
         ("th", [], "", [Action("settings.ask", ("th",))]),
+        ("md", ["off", "1", "2", "5"], "settings.min_drop", []),
     ],
 )
 def test_section_offers_its_presets_a_way_back_and_home(
@@ -88,7 +90,7 @@ def test_section_offers_its_presets_a_way_back_and_home(
 
 
 @pytest.mark.parametrize("locale", LOCALES)
-@pytest.mark.parametrize("section", ["mu", "dg", "qh", "lang", "tz", "th"])
+@pytest.mark.parametrize("section", ["mu", "dg", "qh", "lang", "tz", "th", "md"])
 def test_every_section_ends_with_back_and_home(section: str, locale: str, ui_locales: Path) -> None:
     set_locale(locale)
     rows = settings_section_screen(section, BUSY, now=NOW).rows

@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any, Final
 from telegram.constants import ParseMode
 from telegram.error import BadRequest, RetryAfter
 
-from price_tracker.app.views import PrefsView
+from price_tracker.app.views import MinDropView, PrefsView, min_drop_view
 from price_tracker.bot.callbacks import Action, encode
 from price_tracker.bot.handlers._cards import (
     card_actions,
@@ -41,6 +41,7 @@ from price_tracker.bot.ui.panels import (
     settings_section_screen,
 )
 from price_tracker.bot.ui.screens import Button, Screen
+from price_tracker.core.drop_floor import DEFAULT_DROP_FLOOR, DropFloor
 from price_tracker.core.textlimits import split_message
 from price_tracker.i18n.locales import AVAILABLE_LANGUAGES
 from price_tracker.notifier.preferences import PreferencesManager, clear_mute, update_prefs
@@ -91,25 +92,65 @@ async def _stored_language(db: Any, user_id: int) -> str | None:
     return None if user is None else user.language
 
 
+def _default_floor(context: ContextTypes.DEFAULT_TYPE) -> DropFloor:
+    """The server's minimum drop, as the running scheduler applies it."""
+    deps = getattr(context.bot_data.get("scheduler"), "deps", None)
+    floor = getattr(deps, "drop_floor", None)
+    return floor if isinstance(floor, DropFloor) else DEFAULT_DROP_FLOOR
+
+
+async def _min_drop(db: Any, user_id: int, default: DropFloor) -> MinDropView:
+    return min_drop_view(await db.get_user_min_drop(user_id), default)
+
+
 async def _settings(
     query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, action: Action
 ) -> None:
     view = await _prefs_view(db, user_id)
     language = await _stored_language(db, user_id)
-    await _edit(query, settings_screen(view, now=datetime.now(UTC), language=language))
+    screen = settings_screen(
+        view,
+        now=datetime.now(UTC),
+        language=language,
+        min_drop=await _min_drop(db, user_id, _default_floor(context)),
+    )
+    await _edit(query, screen)
 
 
-async def _show_section(query: Any, db: Any, user_id: int, section: str, notice: str = "") -> None:
+async def _show_section(
+    query: Any,
+    db: Any,
+    user_id: int,
+    section: str,
+    notice: str = "",
+    *,
+    default_floor: DropFloor = DEFAULT_DROP_FLOOR,
+) -> None:
     view = await _prefs_view(db, user_id)
     language = await _stored_language(db, user_id)
-    screen = settings_section_screen(section, view, now=datetime.now(UTC), language=language)
+    screen = settings_section_screen(
+        section,
+        view,
+        now=datetime.now(UTC),
+        language=language,
+        min_drop=await _min_drop(db, user_id, default_floor),
+    )
     await _edit(query, _with_notice(screen, notice))
 
 
 async def _settings_section(
     query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, action: Action
 ) -> None:
-    await _show_section(query, db, user_id, str(action.args[0]))
+    await _show_section(
+        query, db, user_id, str(action.args[0]), default_floor=_default_floor(context)
+    )
+
+
+async def _set_min_drop(
+    query: Any, context: ContextTypes.DEFAULT_TYPE, db: Any, user_id: int, action: Action
+) -> None:
+    await db.set_user_min_drop(user_id, str(action.args[0]))
+    await _show_section(query, db, user_id, "md", default_floor=_default_floor(context))
 
 
 def _mute_changes(value: str) -> dict[str, Any]:
@@ -347,6 +388,7 @@ _HANDLERS: Final[dict[str, Callable[..., Awaitable[None]]]] = {
     "settings.digest": _set_digest,
     "settings.quiet": _set_quiet,
     "settings.language": _set_language,
+    "settings.min_drop": _set_min_drop,
     "list.page": _list_page,
     "list.open": _list_open,
     "product.card": _product_card,

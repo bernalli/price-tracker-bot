@@ -1,15 +1,18 @@
 """The Home screen and the settings panels: pure screens built from a view.
 
-The values with presets (mute, digest, quiet hours and language) get a button per
-preset; every section shows its current value and leads back to Settings and Home.
+The values with presets (mute, digest, quiet hours, minimum drop and language) get a
+button per preset; every section shows its current value and leads back to Settings
+and Home.
 """
 
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING, Final
 
-from price_tracker.bot.callbacks import MUTE_PRESETS, Action, encode
+from price_tracker.app.views import MinDropView, min_drop_view
+from price_tracker.bot.callbacks import MUTE_PRESETS, SETTINGS_MIN_DROP, Action, encode
 from price_tracker.bot.commands import COMMANDS, GROUP_TITLES, GROUPS, HELP_HEADER
 from price_tracker.bot.messages import _, current_locale, ngettext
 from price_tracker.bot.ui.escape import escape_html
@@ -73,6 +76,39 @@ def _throttle_value(view: PrefsView) -> str:
     return _("{n} per hour").format(n=view.throttle_per_hour)
 
 
+def _number(value: Decimal) -> str:
+    """``2`` rather than ``2.00`` or ``2E+0``."""
+    return format(value.normalize(), "f")
+
+
+def _min_drop_value(view: MinDropView) -> str:
+    floor = view.floor
+    if floor.is_off:
+        value = _("off")
+    else:
+        value = _("{percent} and {amount}").format(
+            percent=f"{_number(floor.percent)}%", amount=_number(floor.absolute)
+        )
+    if view.is_default:
+        return _("{value} (default)").format(value=value)
+    return value
+
+
+def _min_drop_presets(view: MinDropView) -> list[Button]:
+    floor = view.floor
+    presets = [_preset(_("Off"), Action("settings.min_drop", ("off",)), current=floor.is_off)]
+    presets += [
+        _preset(
+            f"{value}%",
+            Action("settings.min_drop", (value,)),
+            current=not floor.is_off and floor.percent == Decimal(value),
+        )
+        for value in SETTINGS_MIN_DROP
+        if value != "off"
+    ]
+    return presets
+
+
 def _language_value(language: str | None) -> str:
     if language is not None and language in AVAILABLE_LANGUAGES:
         return endonym(language)
@@ -120,10 +156,17 @@ def _value_lines(view: PrefsView, now: datetime, loc: str) -> list[str]:
     ]
 
 
-def settings_screen(view: PrefsView, *, now: datetime, language: str | None = None) -> Screen:
-    """The settings overview. Pure: the caller supplies the clock and the stored language.
+def settings_screen(
+    view: PrefsView,
+    *,
+    now: datetime,
+    language: str | None = None,
+    min_drop: MinDropView | None = None,
+) -> Screen:
+    """The settings overview. Pure: the caller supplies the clock and the stored choices.
 
     ``language`` is the stored choice; ``None`` (or a code without a catalogue) is Automatic.
+    ``min_drop`` is the minimum drop in effect; ``None`` shows the documented default.
     """
     _check_now(now)
     loc = current_locale()
@@ -132,6 +175,9 @@ def settings_screen(view: PrefsView, *, now: datetime, language: str | None = No
         "",
         *_value_lines(view, now, loc),
         _("🗣 Language: {language}").format(language=_language_value(language)),
+        _("📉 Minimum drop: {value}").format(
+            value=_min_drop_value(min_drop or min_drop_view(None))
+        ),
     ]
     sections = [
         button(_("🔕 Mute"), callback=encode(Action("settings.section", ("mu",)))),
@@ -140,6 +186,7 @@ def settings_screen(view: PrefsView, *, now: datetime, language: str | None = No
         button(_("🚦 Throttle"), callback=encode(Action("settings.section", ("th",)))),
         button(_("🌍 Timezone"), callback=encode(Action("settings.section", ("tz",)))),
         button(_("🗣 Language"), callback=encode(Action("settings.section", ("lang",)))),
+        button(_("📉 Minimum drop"), callback=encode(Action("settings.section", ("md",)))),
     ]
     return Screen(text="\n".join(lines), rows=layout_rows(sections, [home_button()]))
 
@@ -196,17 +243,23 @@ def _language_presets(language: str | None) -> list[Button]:
 
 
 def settings_section_screen(
-    section: str, view: PrefsView, *, now: datetime, language: str | None = None
+    section: str,
+    view: PrefsView,
+    *,
+    now: datetime,
+    language: str | None = None,
+    min_drop: MinDropView | None = None,
 ) -> Screen:
     """One preference's presets, the current one marked.
 
-    ``section``: ``mu``, ``dg``, ``qh``, ``lang``, ``tz`` or ``th``; ``language`` is the
-    stored choice.
+    ``section``: ``mu``, ``dg``, ``qh``, ``lang``, ``tz``, ``th`` or ``md``; ``language``
+    is the stored choice, ``min_drop`` the minimum drop in effect (``None``: the default).
     """
     _check_now(now)
     loc = current_locale()
     extra: list[Button] = []
     presets: list[Button] = []
+    intro = ""
     if section == "mu":
         title, value = _("🔕 <b>Mute</b>"), _mute_value(view, now, loc)
         presets = _mute_presets(view, now, loc, _settings_mute)
@@ -231,12 +284,21 @@ def settings_section_screen(
     elif section == "th":
         title, value = _("🚦 <b>Throttle</b>"), _throttle_value(view)
         extra = [_ask(_("✏️ Change"), "th")]
+    elif section == "md":
+        drop = min_drop or min_drop_view(None)
+        title, value = _("📉 <b>Minimum drop</b>"), _min_drop_value(drop)
+        presets = _min_drop_presets(drop)
+        intro = _(
+            "A price drop is announced only when it is at least this share of the old "
+            "price and at least {amount} in the product's currency."
+        ).format(amount=_number(drop.default_absolute))
     else:
-        raise ValueError(f"section: must be one of mu, dg, qh, lang, tz, th, got {section!r}")
+        raise ValueError(f"section: must be one of mu, dg, qh, lang, tz, th, md, got {section!r}")
     back = button(_("⬅️ Settings"), callback=encode(Action("settings")))
     current = _("Current: {value}").format(value=value)
+    body = f"{intro}\n\n{current}" if intro else current
     return Screen(
-        text=f"{title}\n\n{current}", rows=layout_rows(presets, extra, [back, home_button()])
+        text=f"{title}\n\n{body}", rows=layout_rows(presets, extra, [back, home_button()])
     )
 
 

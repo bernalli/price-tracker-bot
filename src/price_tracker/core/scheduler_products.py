@@ -12,10 +12,11 @@ import httpx
 from price_tracker.core.alert import (
     PriceAlert,
     ThresholdType,
-    crosses_threshold,
     format_alert,
     format_back_in_stock,
+    should_alert,
 )
+from price_tracker.core.drop_floor import NO_DROP_FLOOR, DropFloor, floor_for_choice
 from price_tracker.core.exceptions import BlockEvent, ListingGone, ParseError
 from price_tracker.core.health import QuarantineState
 from price_tracker.core.notices import NoticeCollector
@@ -337,17 +338,33 @@ class ProductChecksMixin:
         if old_price is None:
             return (p.user_id, None, False, None)
         threshold_type = cast("ThresholdType", p.threshold_type)
-        threshold_hit = crosses_threshold(
+        rule_hit = should_alert(
             old=old_price,
             new=info.price,
             threshold_type=threshold_type,
             threshold_value=p.threshold_value,
+            target_price=p.target_price,
+            floor=NO_DROP_FLOOR,
         )
-        # A target is a crossing, not a state: alert when the price moves from
-        # above it to at-or-below it, so a product parked under its target does
-        # not re-announce itself every cooldown window.
-        target_hit = p.target_price is not None and info.price <= p.target_price < old_price
-        if not (threshold_hit or target_hit):
+        if not rule_hit:
+            return (p.user_id, None, False, None)
+        floor = await self._drop_floor(p.user_id)
+        if not should_alert(
+            old=old_price,
+            new=info.price,
+            threshold_type=threshold_type,
+            threshold_value=p.threshold_value,
+            target_price=p.target_price,
+            floor=floor,
+        ):
+            logger.info(
+                "Product %d: drop %s -> %s is below the minimum drop (%s%%, %s); no alert",
+                p.id,
+                old_price,
+                info.price,
+                floor.percent,
+                floor.absolute,
+            )
             return (p.user_id, None, False, None)
         alert = PriceAlert(
             product_id=p.id,
@@ -360,6 +377,11 @@ class ProductChecksMixin:
             threshold_value=p.threshold_value,
         )
         return (p.user_id, alert, False, None)
+
+    async def _drop_floor(self, user_id: int) -> DropFloor:
+        """The minimum drop in effect for ``user_id``: their choice, else the default."""
+        choice = await self.deps.repo.get_user_min_drop(user_id)
+        return floor_for_choice(choice if isinstance(choice, str) else None, self.deps.drop_floor)
 
     @staticmethod
     def _condition_matches(product: ProductRecord, scraped_condition: str | None) -> bool:

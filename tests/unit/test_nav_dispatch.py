@@ -73,6 +73,7 @@ HANDLED = frozenset(
         "settings.digest",
         "settings.quiet",
         "settings.language",
+        "settings.min_drop",
         "list.page",
         "list.open",
         "product.card",

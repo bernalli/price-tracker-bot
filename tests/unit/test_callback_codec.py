@@ -102,12 +102,13 @@ MODEL: dict[str, tuple[Any, ...]] = {
     "flow.scope": ("p", TOK, "sc", _enum("store", *LEVELS)),
     "flow.cancel": ("p", TOK, "x"),
     "settings": ("s",),
-    "settings.section": ("s", _enum("mu", "dg", "qh", "lang", "tz", "th")),
+    "settings.section": ("s", _enum("mu", "dg", "qh", "lang", "tz", "th", "md")),
     "settings.ask": ("s", "ask", _enum("mu", "dg", "qh", "tz", "th")),
     "settings.digest_now": ("s", "dn"),
     "settings.mute": ("s", "mu", _enum("1", "8", "24", "0", "off")),
     "settings.digest": ("s", "dg", _enum("on", "off")),
     "settings.quiet": ("s", "qh", _enum("2208", "off")),
+    "settings.min_drop": ("s", "md", _enum("off", "1", "2", "5")),
     "settings.chart_theme": ("s", "ct", _enum("light", "dark")),
     "settings.language": ("s", "lang", _enum(*LOCALES, "auto")),
     "data": ("d",),
@@ -303,7 +304,7 @@ def test_list_open_and_settings_round_trip_with_every_value() -> None:
         assert decode(f"s:dg:{value}") == Action("settings.digest", (value,))
     for value in ("2208", "off"):
         assert decode(f"s:qh:{value}") == Action("settings.quiet", (value,))
-    for section in ("mu", "dg", "qh", "lang", "tz", "th"):
+    for section in ("mu", "dg", "qh", "lang", "tz", "th", "md"):
         assert decode(f"s:{section}") == Action("settings.section", (section,))
         assert encode(Action("settings.section", (section,))) == f"s:{section}"
 
@@ -651,6 +652,7 @@ def test_no_new_wire_starts_with_a_legacy_entry() -> None:
         "settings.mute",
         "settings.digest",
         "settings.quiet",
+        "settings.min_drop",
         "settings.ask",
         "settings.digest_now",
         "product.prefs",
