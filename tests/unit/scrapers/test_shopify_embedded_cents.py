@@ -48,7 +48,7 @@ def _meta_page(price: object, *, title: str | None = "Widget") -> str:
 
 
 def _read(html: str) -> Decimal | None:
-    info = ShopifyScraper()._try_embedded_product_json(html)
+    info = ShopifyScraper()._read_product_page(html, "https://store.com/products/widget")
     return None if info is None else info.price
 
 
@@ -80,6 +80,7 @@ def test_decimal_string_price_stays_as_it_is() -> None:
         True,
         False,
         199.0,
+        199.99,
         19900.0,
         10**15,
         None,
@@ -92,6 +93,7 @@ def test_decimal_string_price_stays_as_it_is() -> None:
         "true",
         "false",
         "float",
+        "fractional-float",
         "float-cents",
         "huge",
         "null",

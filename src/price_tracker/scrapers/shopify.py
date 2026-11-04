@@ -628,8 +628,8 @@ class ShopifyScraper(AbstractScraper):
         """Last-resort Shopify-style price in cents anywhere in the page (2999 = 29.99)."""
         info = ProductInfo()
         cents_patterns = [
-            r'"price"\s*:\s*(\d{3,7})\b',
-            r'"price_min"\s*:\s*(\d{3,7})\b',
+            r'"price"\s*:\s*(\d{3,7})(?=\s*[,}\]])',
+            r'"price_min"\s*:\s*(\d{3,7})(?=\s*[,}\]])',
         ]
         for pattern in cents_patterns:
             matches = re.findall(pattern, html)
