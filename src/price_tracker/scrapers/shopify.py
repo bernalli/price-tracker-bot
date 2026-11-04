@@ -348,16 +348,18 @@ class ShopifyScraper(AbstractScraper):
 
             embedded = self._try_embedded_product_json(html, url)
             if embedded is not None:
+                embedded.currency = normalize_currency_code(self._detect_currency_from_html(html))
                 return embedded
 
             result = self._try_cents_price(html)
             if result is not None:
-                result.currency = detect_currency("")
+                result.currency = normalize_currency_code(self._detect_currency_from_html(html))
                 return result
 
             soup = BeautifulSoup(html, "lxml")
             css_result = self._try_shopify_selectors(soup)
             if css_result:
+                css_result.currency = normalize_currency_code(self._detect_currency_from_html(html))
                 return css_result
 
         return None
