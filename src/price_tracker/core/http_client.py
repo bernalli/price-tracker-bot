@@ -11,9 +11,12 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Iterable
 
+    from price_tracker.core.pacer import DomainPacer
+
 import httpcore
 import httpx
 
+from price_tracker.core.pacer import domain_key, get_domain_pacer
 from price_tracker.core.url_utils import UnsafeURLError, _is_blocked_ip
 
 
@@ -215,7 +218,27 @@ class PublicAsyncClient(httpx.AsyncClient):
         auth: Any = httpx.USE_CLIENT_DEFAULT,
         follow_redirects: Any = httpx.USE_CLIENT_DEFAULT,
     ) -> httpx.Response:
-        """Send through validated connections; bound the complete redirect chain."""
+        """Send through validated connections; bound the complete redirect chain.
+
+        Every request waits its store's turn first (``core.pacer``), before the
+        deadline starts: the wait is politeness towards the store, not network
+        time. The hops of a followed redirect chain share that one turn.
+        """
+        pacer = get_domain_pacer()
+        async with pacer.turn(request.url):
+            return await self._send_chain(
+                request, pacer, stream=stream, auth=auth, follow_redirects=follow_redirects
+            )
+
+    async def _send_chain(
+        self,
+        request: httpx.Request,
+        pacer: DomainPacer,
+        *,
+        stream: bool,
+        auth: Any,
+        follow_redirects: Any,
+    ) -> httpx.Response:
         follow = follow_redirects is True
         deadline = asyncio.get_running_loop().time() + self._deadline_seconds
         history: list[httpx.Response] = []
@@ -226,6 +249,11 @@ class PublicAsyncClient(httpx.AsyncClient):
                         request, stream=True, auth=auth, follow_redirects=False
                     )
                     try:
+                        key = domain_key(request.url)
+                        if key is not None:
+                            await pacer.note_response(
+                                key, response.status_code, response.headers.get("Retry-After")
+                            )
                         assert isinstance(response.stream, httpx.AsyncByteStream)
                         response.stream = _DeadlineStream(response.stream, deadline, request)
                         response.history = list(history)

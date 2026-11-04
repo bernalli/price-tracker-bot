@@ -12,7 +12,7 @@ import pytest_asyncio
 import respx
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+    from collections.abc import AsyncIterator, Iterator
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
@@ -79,3 +79,16 @@ def public_dns(monkeypatch: pytest.MonkeyPatch) -> None:
         return [(family, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", (address, port))]
 
     monkeypatch.setattr(socket, "getaddrinfo", resolve)
+
+
+@pytest.fixture(autouse=True)
+def unpaced_requests() -> Iterator[None]:
+    """No test waits between requests to one store; pacer tests install their own."""
+    from price_tracker.core.pacer import DomainPacer, configure_domain_pacer, get_domain_pacer
+
+    previous = get_domain_pacer()
+    configure_domain_pacer(DomainPacer(min_gap=0, max_retry_after=0))
+    try:
+        yield
+    finally:
+        configure_domain_pacer(previous)

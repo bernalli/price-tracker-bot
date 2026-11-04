@@ -64,6 +64,7 @@ All configuration is via environment variables, loaded from `.env` (or the host 
 | `MAX_CONSECUTIVE_ERRORS`      | `10`                    | Failed checks before a product is auto-suspended (domain-wide quarantine uses the fixed tiers in `core/health.py`, not this variable) |
 | `LISTING_GONE_CONFIRMATIONS`  | `3`                     | Consecutive HTTP 404/410 answers before a removed listing is suspended                                                 |
 | `REQUEST_TIMEOUT`             | `30`                    | HTTP timeout in seconds for scraper requests                                                                           |
+| `DOMAIN_MIN_GAP_SECONDS`      | `30`                    | Minimum seconds between two requests to the same store (eTLD+1), for sweeps and manual checks alike; `0` disables. A 429/503 `Retry-After` also delays the next request to that store (capped at 300 s) |
 | `NOTIFICATION_COOLDOWN_HOURS` | `24`                    | Per-product alert cooldown                                                                                             |
 | `METRICS_ENABLED`             | `true`                  | Prometheus exporter is on by default. Set `0` or `false` to disable.                                                  |
 

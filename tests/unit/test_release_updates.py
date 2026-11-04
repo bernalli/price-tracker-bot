@@ -292,7 +292,12 @@ async def test_post_init_leaves_release_announcement_for_background_task(memory_
     application = Mock(
         bot=bot,
         bot_data={
-            "config": Mock(admin_users=(123456789,), request_timeout=30, lang="en"),
+            "config": Mock(
+                admin_users=(123456789,),
+                request_timeout=30,
+                lang="en",
+                domain_min_gap_seconds=0.0,
+            ),
             "db_conn": memory_db,
             "registry": Mock(),
         },
