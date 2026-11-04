@@ -11,7 +11,7 @@ import re
 from collections.abc import Iterator, Mapping
 from decimal import Decimal
 from typing import ClassVar
-from urllib.parse import parse_qsl, urlencode, urlparse
+from urllib.parse import parse_qsl, unquote, urlencode, urlparse
 
 import httpx
 from bs4 import BeautifulSoup
@@ -153,8 +153,8 @@ def _embedded_documents(html: str) -> Iterator[str]:
             continue
         assignments = list(marker.finditer(raw))
         if not assignments:
-            if re.search(r'"(?:product|variants)"\s*:', raw):
-                yield raw
+            # Analytics, pixel and app scripts mention "product" too: only a
+            # recognised theme-payload assignment is read, anything else is skipped.
             continue
         for match in assignments:
             start = match.end()
@@ -648,7 +648,10 @@ class ShopifyScraper(AbstractScraper):
             requested = RequestedIdentity.from_url(_without_variant_param(url))
         except ValueError:
             return rejected
-        handles = re.findall(r"/products/([a-z0-9\-_]+)(?:/|$)", urlparse(url).path, re.I)
+        handles = [
+            unquote(h).casefold()
+            for h in re.findall(r"/products/([^/]+)(?:/|$)", urlparse(url).path)
+        ]
         selectors = [
             v for k, v in parse_qsl(urlparse(url).query, keep_blank_values=True) if k == "variant"
         ]
@@ -673,7 +676,12 @@ class ShopifyScraper(AbstractScraper):
             # A numeric product ID alone cannot establish ownership of a slug URL.
             ownership: list[bool] = []
             if "handle" in product:
-                ownership.append(bool(handles) and product["handle"] == handles[0])
+                handle = product["handle"]
+                ownership.append(
+                    bool(handles)
+                    and isinstance(handle, str)
+                    and unquote(handle).casefold() == handles[0]
+                )
             if "url" in product:
                 ownership.append(_url_matches_requested(product["url"], requested))
             if not ownership or (any(ownership) and not all(ownership)):

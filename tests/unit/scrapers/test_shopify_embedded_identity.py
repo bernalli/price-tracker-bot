@@ -140,3 +140,24 @@ def test_embedded_price_cannot_override_product_group_ambiguity() -> None:
         + f'<script type="application/ld+json">{json.dumps([group, other])}</script>'
     )
     assert _price(html, f"{_URL}?variant=2") is None
+
+
+def test_unrelated_script_mentioning_product_cannot_reject_the_page() -> None:
+    pixel = (
+        "<script>window.webPixelsManager.init({"
+        '"event": "product_viewed", "product": {"id": 99, "price": 5}});</script>'
+    )
+    html = pixel + _page(_PRODUCT)
+    assert _price(html, f"{_URL}?variant=2") == Decimal(20)
+
+
+@pytest.mark.parametrize(
+    ("url", "handle"),
+    [
+        ("https://store.com/products/caf%C3%A9", "café"),
+        ("https://store.com/products/Widget", "widget"),
+    ],
+)
+def test_encoded_or_cased_handle_still_owns_the_page(url: str, handle: str) -> None:
+    html = _page({**_PRODUCT, "handle": handle})
+    assert _price(html, f"{url}?variant=2") == Decimal(20)
