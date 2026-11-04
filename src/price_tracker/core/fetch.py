@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
 from price_tracker.core.exceptions import BlockEvent, ListingGone
 from price_tracker.core.http_client import public_client
-from price_tracker.core.pacer import get_domain_pacer
+from price_tracker.core.pacer import excluded_from_deadline
 from price_tracker.core.scraper_base import (
     detect_block_event,
     detect_listing_gone,
@@ -443,19 +443,22 @@ async def fetch_page(
     Fallbacks are trusted local code, like installed scraper plugins, and must
     perform any network I/O through ``public_request`` or ``build_client``.
 
-    The store's turn (``core.pacer``) is taken before the deadline starts and held
-    for every redirect hop of this fetch, so the wait never eats the deadline.
+    Every hop waits its store's turn (``core.pacer``) in the transport; those waits
+    push this deadline back, so it bounds network time only.
     """
-    async with get_domain_pacer().turn(url):
-        try:
-            async with asyncio.timeout(deadline), public_client(client) as protected:
-                return await _fetch_page(
-                    url,
-                    protected,
-                    headers=headers,
-                    fallbacks=fallbacks,
-                    max_redirects=max_redirects,
-                    max_bytes=max_bytes,
-                )
-        except TimeoutError as exc:
-            raise httpx.ReadTimeout("overall fetch deadline exceeded") from exc
+    try:
+        async with (
+            asyncio.timeout(deadline) as budget,
+            excluded_from_deadline(budget),
+            public_client(client) as protected,
+        ):
+            return await _fetch_page(
+                url,
+                protected,
+                headers=headers,
+                fallbacks=fallbacks,
+                max_redirects=max_redirects,
+                max_bytes=max_bytes,
+            )
+    except TimeoutError as exc:
+        raise httpx.ReadTimeout("overall fetch deadline exceeded") from exc

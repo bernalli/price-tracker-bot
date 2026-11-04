@@ -2,11 +2,13 @@
 
 Some stores rate-limit per address burst: three products of the same store
 checked within a few seconds answer 429 and push the domain into quarantine.
-Every outgoing request therefore waits its turn per registrable domain (eTLD+1):
-at least ``min_gap`` seconds after the previous request to that store started,
-and at least as long as the store last asked for with ``Retry-After`` on a 429
-or 503. The wait happens before the request; no lock is held while it is in
-flight, so a slow response never delays requests to other stores.
+Every physical request therefore waits its turn per registrable domain
+(eTLD+1), each hop of a redirect chain included, for the domain that hop
+contacts: at least ``min_gap`` seconds after the previous request to that store
+started, and at least as long as the store last asked for with ``Retry-After``
+on a 429 or 503. The wait happens right before the request and is not counted
+against the request deadline; no lock is held while the request is in flight,
+so a slow response never delays requests to other stores.
 
 The pacer is process-wide because every client in the process shares the same
 outbound address: the store sees all of them as one visitor.
@@ -34,10 +36,26 @@ DEFAULT_MIN_GAP_SECONDS: Final = 30.0
 MAX_RETRY_AFTER_SECONDS: Final = 300.0
 _RETRY_AFTER_STATUSES: Final = frozenset({429, 503})
 
-# Domains whose turn the current task already holds: the hops of one redirect
-# chain, and the request a caller paced ahead of its own deadline, must not
-# queue behind themselves.
-_HELD_TURNS: ContextVar[frozenset[str]] = ContextVar("held_domain_turns", default=frozenset())
+# Deadlines the current task is inside of. A turn's wait is politeness towards
+# the store, not network time: every wait pushes each of them back.
+_DEADLINES: ContextVar[tuple[asyncio.Timeout, ...]] = ContextVar("pacing_deadlines", default=())
+
+
+@asynccontextmanager
+async def excluded_from_deadline(deadline: asyncio.Timeout) -> AsyncIterator[None]:
+    """Push ``deadline`` back by every pacing wait taken inside this block."""
+    token = _DEADLINES.set((*_DEADLINES.get(), deadline))
+    try:
+        yield
+    finally:
+        _DEADLINES.reset(token)
+
+
+def _extend_deadlines(seconds: float) -> None:
+    for deadline in _DEADLINES.get():
+        when = deadline.when()
+        if when is not None:
+            deadline.reschedule(when + seconds)
 
 
 def domain_key(url: httpx.URL | str) -> str | None:
@@ -130,6 +148,9 @@ class DomainPacer:
                 if start <= now:
                     self._next_start[key] = now + self._min_gap
                     return
+            # Extend before sleeping: a deadline due during the sleep would
+            # otherwise fire before it could be moved.
+            _extend_deadlines(start - now)
             await self._sleep(start - now)
 
     async def note_response(self, key: str, status_code: int, retry_after: str | None) -> None:
@@ -144,20 +165,23 @@ class DomainPacer:
             if until > self._hold_until.get(key, -math.inf):
                 self._hold_until[key] = until
 
-    @asynccontextmanager
-    async def turn(self, url: httpx.URL | str) -> AsyncIterator[None]:
-        """Wait for the store's turn unless this task already holds it."""
+    async def before_request(self, url: httpx.URL | str) -> None:
+        """Book the turn of the store ``url`` contacts; call right before sending.
+
+        There is no exemption for a request that follows another one: every hop
+        of a redirect chain is a request the store sees, and books its own turn.
+        """
         key = domain_key(url)
-        held = _HELD_TURNS.get()
-        if key is None or key in held:
-            yield
-            return
-        await self.wait_turn(key)
-        token = _HELD_TURNS.set(held | {key})
-        try:
-            yield
-        finally:
-            _HELD_TURNS.reset(token)
+        if key is not None:
+            await self.wait_turn(key)
+
+    async def after_response(
+        self, url: httpx.URL | str, status_code: int, retry_after: str | None
+    ) -> None:
+        """Record what the store ``url`` contacts answered (``Retry-After`` holds)."""
+        key = domain_key(url)
+        if key is not None:
+            await self.note_response(key, status_code, retry_after)
 
 
 _pacer = DomainPacer()

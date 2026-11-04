@@ -24,6 +24,7 @@ from price_tracker.core.pacer import (
     DomainPacer,
     configure_domain_pacer,
     domain_key,
+    excluded_from_deadline,
     get_domain_pacer,
     parse_retry_after,
 )
@@ -137,9 +138,9 @@ async def test_no_lock_is_held_while_a_request_is_in_flight(clock: _VirtualClock
     release = asyncio.Event()
 
     async def slow_request() -> None:
-        async with pacer.turn("https://store.com/products/a"):
-            in_flight.set()
-            await release.wait()
+        await pacer.before_request("https://store.com/products/a")
+        in_flight.set()  # booked and sent; the response has not arrived yet
+        await release.wait()
 
     slow = asyncio.create_task(slow_request())
     await in_flight.wait()
@@ -153,13 +154,13 @@ async def test_no_lock_is_held_while_a_request_is_in_flight(clock: _VirtualClock
     await slow
 
 
-async def test_a_held_turn_is_not_waited_again(clock: _VirtualClock) -> None:
-    """The hops of one redirect chain share the turn of the request that started it."""
+async def test_a_request_that_follows_another_is_not_exempt(clock: _VirtualClock) -> None:
+    """A redirect hop is a new request to the store: it books its own turn."""
     pacer = _pacer(clock)
-    async with pacer.turn("https://store.com/a"), pacer.turn("https://www.store.com/b"):
-        pass
+    await pacer.before_request("https://store.com/a")
+    await pacer.before_request("https://www.store.com/b")
 
-    assert clock.sleeps == []
+    assert clock.sleeps == [pytest.approx(30.0)]
 
 
 # ── Retry-After ──
@@ -302,7 +303,7 @@ async def test_public_request_honours_retry_after(
     assert clock.sleeps == [pytest.approx(60.0)]
 
 
-async def test_redirect_hops_do_not_wait_behind_their_own_request(
+async def test_each_redirect_hop_waits_its_own_turn(
     installed: DomainPacer, clock: _VirtualClock
 ) -> None:
     with respx.mock(assert_all_called=False) as router:
@@ -316,7 +317,9 @@ async def test_redirect_hops_do_not_wait_behind_their_own_request(
             page = await fetch_page("https://store.com/old", client)
 
     assert page.url_final == "https://store.com/new"
-    assert clock.sleeps == []
+    # One wait per hop: /new after /old in each chain. The second chain starts
+    # 60 s later, past the gap, so its first request does not wait.
+    assert clock.sleeps == [pytest.approx(30.0), pytest.approx(30.0)]
 
 
 async def test_fetch_page_waits_its_turn(installed: DomainPacer, clock: _VirtualClock) -> None:
@@ -327,3 +330,145 @@ async def test_fetch_page_waits_its_turn(installed: DomainPacer, clock: _Virtual
             await fetch_page("https://store.com/a", client)
 
     assert clock.sleeps == [pytest.approx(30.0)]
+
+
+# ── every physical request books its own turn, redirect hops included ──
+
+
+class _BookingPacer(DomainPacer):
+    """Records the virtual time of every turn it hands out, per store."""
+
+    def __init__(self, clock: _VirtualClock) -> None:
+        super().__init__(min_gap=30.0, clock=clock, wall_clock=lambda: _WALL, sleep=clock.sleep)
+        self._now = clock
+        self.bookings: dict[str, list[float]] = {}
+
+    async def wait_turn(self, key: str) -> None:
+        await super().wait_turn(key)
+        self.bookings.setdefault(key, []).append(self._now())
+
+    def assert_spaced(self, gap: float) -> None:
+        for key, starts in self.bookings.items():
+            ordered = sorted(starts)
+            for earlier, later in zip(ordered, ordered[1:], strict=False):
+                assert later - earlier >= gap - 1e-9, (key, ordered)
+
+
+@pytest.fixture
+def booking(clock: _VirtualClock) -> Iterator[_BookingPacer]:
+    previous = get_domain_pacer()
+    pacer = _BookingPacer(clock)
+    configure_domain_pacer(pacer)
+    try:
+        yield pacer
+    finally:
+        configure_domain_pacer(previous)
+
+
+def _calls(router: respx.Router, host: str) -> int:
+    return sum(1 for call in router.calls if call.request.url.host == host)
+
+
+async def test_a_redirect_into_a_store_and_a_direct_request_are_spaced(
+    booking: _BookingPacer,
+) -> None:
+    with respx.mock(assert_all_called=False) as router:
+        router.get("https://a-store.com/p").respond(
+            302, headers={"Location": "https://b-store.com/p"}
+        )
+        router.get("https://b-store.com/p").respond(200, text="ok")
+        async with httpx.AsyncClient() as client:
+            await asyncio.gather(
+                public_request(client, "GET", "https://a-store.com/p"),
+                public_request(client, "GET", "https://b-store.com/p"),
+            )
+        assert _calls(router, "b-store.com") == 2
+
+    assert len(booking.bookings["b-store.com"]) == 2
+    booking.assert_spaced(30.0)
+
+
+async def test_a_redirect_within_one_store_is_spaced(
+    booking: _BookingPacer, clock: _VirtualClock
+) -> None:
+    with respx.mock(assert_all_called=False) as router:
+        router.get("https://store.com/old").respond(
+            302, headers={"Location": "https://store.com/new"}
+        )
+        router.get("https://store.com/new").respond(200, text="<html>ok</html>")
+        async with httpx.AsyncClient() as client:
+            await public_request(client, "GET", "https://store.com/old")
+            clock.now += 60
+            page = await fetch_page("https://store.com/old", client)
+        assert _calls(router, "store.com") == 4
+
+    assert page.url_final == "https://store.com/new"
+    assert len(booking.bookings["store.com"]) == 4
+    booking.assert_spaced(30.0)
+
+
+async def test_two_chains_converging_on_one_store_are_spaced(booking: _BookingPacer) -> None:
+    with respx.mock(assert_all_called=False) as router:
+        router.get("https://x-store.com/p").respond(
+            302, headers={"Location": "https://b-store.com/p"}
+        )
+        router.get("https://y-store.com/p").respond(
+            302, headers={"Location": "https://b-store.com/p"}
+        )
+        router.get("https://b-store.com/p").respond(200, text="<html>ok</html>")
+        async with httpx.AsyncClient() as client:
+            await asyncio.gather(
+                public_request(client, "GET", "https://x-store.com/p"),
+                fetch_page("https://y-store.com/p", client),
+            )
+        assert _calls(router, "b-store.com") == 2
+
+    assert len(booking.bookings["b-store.com"]) == 2
+    booking.assert_spaced(30.0)
+
+
+async def test_retry_after_of_a_store_reached_by_redirect_is_honoured(
+    booking: _BookingPacer,
+) -> None:
+    with respx.mock(assert_all_called=False) as router:
+        router.get("https://a-store.com/p").respond(
+            302, headers={"Location": "https://b-store.com/p"}
+        )
+        router.get("https://b-store.com/p").respond(429, headers={"Retry-After": "90"})
+        router.get("https://b-store.com/q").respond(200, text="ok")
+        async with httpx.AsyncClient() as client:
+            await public_request(client, "GET", "https://a-store.com/p")
+            await public_request(client, "GET", "https://b-store.com/q")
+
+    first, second = booking.bookings["b-store.com"]
+    assert second - first >= 90.0
+
+
+async def test_a_pacing_wait_does_not_consume_the_request_deadline(clock: _VirtualClock) -> None:
+    """A wait inside a deadline pushes that deadline back by the time waited."""
+    pacer = _pacer(clock)
+    await pacer.wait_turn("store.com")
+    loop = asyncio.get_running_loop()
+    async with asyncio.timeout_at(loop.time() + 5) as budget:
+        before = budget.when()
+        assert before is not None
+        async with excluded_from_deadline(budget):
+            await pacer.wait_turn("store.com")
+        after = budget.when()
+
+    assert clock.sleeps == [pytest.approx(30.0)]
+    assert after == pytest.approx(before + 30.0)
+
+
+async def test_a_wait_after_the_deadline_scope_moves_nothing(clock: _VirtualClock) -> None:
+    pacer = _pacer(clock)
+    await pacer.wait_turn("store.com")
+    loop = asyncio.get_running_loop()
+    async with asyncio.timeout_at(loop.time() + 5) as budget:
+        before = budget.when()
+        async with excluded_from_deadline(budget):
+            pass
+        await pacer.wait_turn("store.com")
+
+    assert clock.sleeps == [pytest.approx(30.0)]
+    assert budget.when() == before
