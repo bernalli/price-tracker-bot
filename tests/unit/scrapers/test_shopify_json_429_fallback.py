@@ -37,7 +37,8 @@ _JSON_URL = f"{_URL}.json"
 # The theme's embedded product JSON, as a real Shopify product page renders it:
 # prices in integer cents.
 _PAGE = (
-    '<html><head><script>var meta = {"product":{"id":1,"vendor":"Shop","variants":['
+    '<html><head><script>var meta = {"product":{"id":1,"vendor":"Shop",'
+    '"handle":"haywood-white-wood-ash","variants":['
     '{"id":11,"price":19900,"name":"HAYWOOD - 36","sku":"A1"}]},'
     '"page":{"pageType":"product"}};</script></head><body></body></html>'
 )

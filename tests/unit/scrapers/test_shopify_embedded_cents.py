@@ -41,29 +41,29 @@ _REAL_SHAPE_META = (
 
 
 def _meta_page(price: object, *, title: str | None = "Widget") -> str:
-    product: dict[str, object] = {"variants": [{"id": 1, "price": price}]}
+    product: dict[str, object] = {"handle": "widget", "variants": [{"id": 1, "price": price}]}
     if title is not None:
         product["title"] = title
     return f"<script>var meta = {json.dumps({'product': product})};</script>"
 
 
-def _read(html: str) -> Decimal | None:
-    info = ShopifyScraper()._read_product_page(html, "https://store.com/products/widget")
+def _read(html: str, handle: str = "widget") -> Decimal | None:
+    info = ShopifyScraper()._read_product_page(html, f"https://store.com/products/{handle}")
     return None if info is None else info.price
 
 
 def test_real_shape_meta_block_reads_cents() -> None:
-    assert _read(_REAL_SHAPE_META) == Decimal("199.00")
+    assert _read(_REAL_SHAPE_META, "haywood-white-wood-ash") == Decimal("199.00")
 
 
 def test_product_json_script_reads_cents() -> None:
-    payload = {"title": "Widget", "variants": [{"id": 1, "price": 2999}]}
+    payload = {"handle": "widget", "title": "Widget", "variants": [{"id": 1, "price": 2999}]}
     html = f'<script type="application/json" id="ProductJson-main">{json.dumps(payload)}</script>'
     assert _read(html) == Decimal("29.99")
 
 
 def test_analytics_meta_assignment_reads_cents() -> None:
-    payload = {"product": {"variants": [{"id": 1, "price": 1234}]}}
+    payload = {"product": {"handle": "widget", "variants": [{"id": 1, "price": 1234}]}}
     html = f"<script>window.ShopifyAnalytics.meta = {json.dumps(payload)};</script>"
     assert _read(html) == Decimal("12.34")
 
@@ -106,12 +106,20 @@ def test_unusable_price_yields_no_price(price: object) -> None:
 
 
 def test_missing_price_yields_no_price() -> None:
-    html = '<script>var meta = {"product":{"title":"Widget","variants":[{"id":1}]}};</script>'
+    html = (
+        '<script>var meta = {"product":{"handle":"widget","title":"Widget",'
+        '"variants":[{"id":1}]}};</script>'
+    )
     assert _read(html) is None
 
 
 def test_unusable_first_variant_falls_through_to_a_cents_one() -> None:
-    payload = {"product": {"variants": [{"price": True}, {"price": 4500}]}}
+    payload = {
+        "product": {
+            "handle": "widget",
+            "variants": [{"id": 1, "price": True}, {"id": 2, "price": 4500}],
+        }
+    }
     assert _read(f"<script>var meta = {json.dumps(payload)};</script>") == Decimal("45.00")
 
 

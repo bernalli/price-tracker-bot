@@ -857,12 +857,13 @@ async def test_shopify_headless_other_query_params_keep_identity() -> None:
 
 
 @pytest.mark.asyncio
-async def test_shopify_embedded_title_survives_cents_fallback() -> None:
-    """Embedded product JSON with an unreadable price keeps its title on the cents read."""
+async def test_shopify_unreadable_embedded_price_stops_cents_fallback() -> None:
+    """A rejected product source cannot recover an unrelated page-wide price."""
     html = (
-        '<script>var meta = {"product":{"title":"Widget","variants":[{"price":"n/a"}]}};'
+        '<script>var meta = {"product":{"handle":"widget","title":"Widget",'
+        '"variants":[{"id":1,"price":"n/a"}]}};'
         '</script><script>{"price_min": 2999}</script>'
     )
     info = await _scrape_headless("https://shop.example.com/products/widget", html)
-    assert info.price == Decimal("29.99")
-    assert info.name == "Widget"
+    assert info.price is None
+    assert info.error is not None

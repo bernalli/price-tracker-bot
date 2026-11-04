@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 import logging
 import re
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from decimal import Decimal
 from typing import ClassVar
 from urllib.parse import parse_qsl, urlencode, urlparse
@@ -139,6 +139,58 @@ def _embedded_variant_price(value: object) -> Decimal | None:
         return amount if amount <= MAX_AMOUNT else None
     if isinstance(value, str):
         return parse_price(value)
+    return None
+
+
+def _embedded_documents(html: str) -> Iterator[str]:
+    """Yield whole theme documents, retaining malformed or truncated sources for rejection."""
+    marker = re.compile(r"\b(?:var\s+meta|(?:window\.)?ShopifyAnalytics\.meta)\s*=\s*(?=\{)")
+    soup = BeautifulSoup(html, "lxml")
+    for script in soup.find_all("script"):
+        raw = script.string or script.get_text()
+        if str(script.get("id", "")).lower().startswith("productjson"):
+            yield raw
+            continue
+        assignments = list(marker.finditer(raw))
+        if not assignments:
+            if re.search(r'"(?:product|variants)"\s*:', raw):
+                yield raw
+            continue
+        for match in assignments:
+            start = match.end()
+            depth = 0
+            in_string = False
+            escaped = False
+            end = len(raw)
+            for pos in range(start, len(raw)):
+                char = raw[pos]
+                if in_string:
+                    if escaped:
+                        escaped = False
+                    elif char == "\\":
+                        escaped = True
+                    elif char == '"':
+                        in_string = False
+                elif char == '"':
+                    in_string = True
+                elif char in "[{":
+                    depth += 1
+                elif char in "]}":
+                    depth -= 1
+                    if depth == 0:
+                        tail = raw[pos + 1 :].lstrip()
+                        if not tail or tail.startswith(";"):
+                            end = pos + 1
+                        break
+            yield raw[start:end]
+
+
+def _embedded_id(value: object) -> str | None:
+    """Canonical positive Shopify identifier, excluding booleans and empty IDs."""
+    if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+        return str(value)
+    if isinstance(value, str) and value.isascii() and value.isdigit():
+        return value.lstrip("0") or None
     return None
 
 
@@ -282,11 +334,6 @@ class ShopifyScraper(AbstractScraper):
     def _read_product_page(self, html: str, url: str) -> ProductInfo | None:
         """Price from a product page's HTML, or ``None`` when nothing was found."""
         if html:
-            embedded = self._try_embedded_product_json(html)
-            if embedded is not None and embedded.price is not None:
-                embedded.currency = detect_currency("")
-                return embedded
-
             # A headless (Next.js/Hydrogen) storefront has no legacy embedded Shopify
             # JSON at all: its JSON-LD carries a ProductGroup/hasVariant instead. Once
             # a matching ProductGroup is found, it is authoritative for this page — it
@@ -299,10 +346,12 @@ class ShopifyScraper(AbstractScraper):
             if group_result is not None:
                 return group_result
 
+            embedded = self._try_embedded_product_json(html, url)
+            if embedded is not None:
+                return embedded
+
             result = self._try_cents_price(html)
             if result is not None:
-                if embedded is not None:
-                    result.name = embedded.name
                 result.currency = detect_currency("")
                 return result
 
@@ -590,38 +639,75 @@ class ShopifyScraper(AbstractScraper):
         chosen = readable[0]
         return ProductInfo(name=name, price=chosen.amount, currency=chosen.currency)
 
-    def _try_embedded_product_json(self, html: str) -> ProductInfo | None:
-        """Extract product data from the theme's embedded Shopify product JSON."""
-        info = ProductInfo()
-
-        patterns = [
-            # var meta = {"product": {...}}
-            r"var\s+meta\s*=\s*(\{.+?\});",
-            # <script.*id="ProductJson.*">
-            r'<script[^>]*id=["\']ProductJson[^"\']*["\'][^>]*>(\{.+?\})</script>',
-            # window.ShopifyAnalytics.meta
-            r"ShopifyAnalytics\.meta\s*=\s*(\{.+?\});",
-            # product: { ... } in script tags
-            r'"product"\s*:\s*(\{[^}]*"variants"[^}]*\})',
+    def _try_embedded_product_json(self, html: str, url: str) -> ProductInfo | None:
+        """Select one complete, identity-bound product; rejection is terminal."""
+        rejected = ProductInfo(error="Unreadable or ambiguous embedded Shopify product")
+        try:
+            requested = RequestedIdentity.from_url(_without_variant_param(url))
+        except ValueError:
+            return rejected
+        handles = re.findall(r"/products/([a-z0-9\-_]+)(?:/|$)", urlparse(url).path, re.I)
+        selectors = [
+            v for k, v in parse_qsl(urlparse(url).query, keep_blank_values=True) if k == "variant"
         ]
-
-        for pattern in patterns:
-            matches = re.findall(pattern, html, re.DOTALL)
-            for match in matches:
-                try:
-                    data = json.loads(match)
-                    product = data.get("product", data)
-                    if "variants" in product:
-                        info.name = product.get("title")
-                        for v in product["variants"]:
-                            info.price = _embedded_variant_price(v.get("price"))
-                            if info.price:
-                                return info
-                except (json.JSONDecodeError, TypeError, AttributeError):
-                    continue
-        # A product JSON whose title was read but no price parsed still hands the
-        # title on to the cents scan, as the single-method version did.
-        return info if info.name is not None else None
+        if selectors and (len(selectors) != 1 or _embedded_id(selectors[0]) is None):
+            return rejected
+        selected_id = _embedded_id(selectors[0]) if selectors else None
+        products: list[Mapping[str, object]] = []
+        saw_product = False
+        for raw in _embedded_documents(html):
+            try:
+                data = decode_json_strict(raw)
+            except StructureError:
+                return rejected
+            if not isinstance(data, Mapping):
+                return rejected
+            if "product" not in data and "variants" not in data:
+                continue
+            saw_product = True
+            product = data.get("product", data)
+            if not isinstance(product, Mapping):
+                return rejected
+            # A numeric product ID alone cannot establish ownership of a slug URL.
+            ownership: list[bool] = []
+            if "handle" in product:
+                ownership.append(bool(handles) and product["handle"] == handles[0])
+            if "url" in product:
+                ownership.append(_url_matches_requested(product["url"], requested))
+            if not ownership or (any(ownership) and not all(ownership)):
+                return rejected
+            if all(ownership):
+                products.append(product)
+        if not saw_product:
+            return None
+        if len(products) != 1:
+            return rejected
+        product = products[0]
+        variants = product.get("variants")
+        if not isinstance(variants, list) or not variants:
+            return rejected
+        by_id: dict[str, Mapping[str, object]] = {}
+        for variant in variants:
+            if not isinstance(variant, Mapping):
+                return rejected
+            identity = _embedded_id(variant.get("id"))
+            if identity is None or identity in by_id:
+                return rejected
+            by_id[identity] = variant
+        if selected_id is not None:
+            if selected_id not in by_id:
+                return rejected
+            price = _embedded_variant_price(by_id[selected_id].get("price"))
+        else:
+            prices = {_embedded_variant_price(v.get("price")) for v in by_id.values()}
+            prices.discard(None)
+            if len(prices) != 1:
+                return rejected
+            price = prices.pop()
+        if price is None:
+            return rejected
+        name = product.get("title")
+        return ProductInfo(name=name if isinstance(name, str) else None, price=price)
 
     @staticmethod
     def _try_cents_price(html: str) -> ProductInfo | None:
