@@ -16,7 +16,7 @@ from urllib.parse import parse_qsl, urlencode, urlparse
 import httpx
 from bs4 import BeautifulSoup
 
-from price_tracker.core.exceptions import BlockEvent, ListingGone
+from price_tracker.core.exceptions import BlockEvent, HTTPBlockStatus, ListingGone
 from price_tracker.core.http_client import public_request
 from price_tracker.core.identity import RequestedIdentity
 from price_tracker.core.money import MAX_AMOUNT, Money, normalize_currency_code
@@ -219,7 +219,12 @@ class ShopifyScraper(AbstractScraper):
         # Try JSON API first (most reliable)
         json_url = self._build_json_url(url)
         if json_url:
-            result = await self._try_json_api(json_url, client)
+            try:
+                result = await self._try_json_api(json_url, client)
+            except HTTPBlockStatus as json_block:
+                if json_block.status != 429:
+                    raise
+                return await self._scrape_page_after_json_429(url, client, json_block)
             if result and result.price is not None:
                 if result.currency:
                     # The variant carried its own currency: the price and its
@@ -245,6 +250,37 @@ class ShopifyScraper(AbstractScraper):
 
         # Fallback: fetch HTML and parse embedded Shopify product data
         html = await self._fetch_html(url, client)
+        if html:
+            page_result = self._read_product_page(html, url)
+            if page_result is not None:
+                return page_result
+
+        return ProductInfo(error="Prezzo non trovato (Shopify)")
+
+    async def _scrape_page_after_json_429(
+        self, url: str, client: httpx.AsyncClient, json_block: HTTPBlockStatus
+    ) -> ProductInfo:
+        """Read the product page after the ``.json`` endpoint answered 429.
+
+        Some stores rate-limit the ``.json`` API per address and path while the
+        product page of the same product still answers. The page goes through the
+        same validated client and the same HTML chain as the 404 fallback. A
+        page that is refused too (403/429, WAF, CAPTCHA) raises its own block,
+        naming the page URL: that is the request that was refused last. A page
+        that cannot be fetched at all leaves nothing that contradicts the JSON
+        block, so that block is raised as it happened.
+        """
+        logger.info("Shopify JSON answered 429 for %s; reading the product page", url[:80])
+        html = await self._fetch_html(url, client)
+        if html is None:
+            raise json_block
+        page_result = self._read_product_page(html, url)
+        if page_result is not None:
+            return page_result
+        return ProductInfo(error="Prezzo non trovato (Shopify)")
+
+    def _read_product_page(self, html: str, url: str) -> ProductInfo | None:
+        """Price from a product page's HTML, or ``None`` when nothing was found."""
         if html:
             embedded = self._try_embedded_product_json(html)
             if embedded is not None and embedded.price is not None:
@@ -275,7 +311,7 @@ class ShopifyScraper(AbstractScraper):
             if css_result:
                 return css_result
 
-        return ProductInfo(error="Prezzo non trovato (Shopify)")
+        return None
 
     @staticmethod
     async def _fetch_html(url: str, client: httpx.AsyncClient) -> str | None:
