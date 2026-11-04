@@ -19,7 +19,7 @@ from bs4 import BeautifulSoup
 from price_tracker.core.exceptions import BlockEvent, ListingGone
 from price_tracker.core.http_client import public_request
 from price_tracker.core.identity import RequestedIdentity
-from price_tracker.core.money import Money
+from price_tracker.core.money import Money, normalize_currency_code
 from price_tracker.core.pricegrammar import Unreadable, select_offer
 from price_tracker.core.retry_policy import RetryConfig, with_retry
 from price_tracker.core.scraper_base import (
@@ -199,6 +199,11 @@ class ShopifyScraper(AbstractScraper):
         if json_url:
             result = await self._try_json_api(json_url, client)
             if result and result.price is not None:
+                if result.currency:
+                    # The variant carried its own currency: the price and its
+                    # currency come from the same payload, and the store sees
+                    # one request instead of two.
+                    return result
                 # Detect currency from HTML page (JSON-LD, OG tags). This fetch is
                 # enrichment ONLY: the price is already in hand. A challenge/block
                 # marker in the HTML must NOT discard a valid scrape (it falsely
@@ -372,6 +377,7 @@ class ShopifyScraper(AbstractScraper):
             logger.debug("Shopify JSON API: %s, %d variants", name, len(variants))
             declares_availability = any(isinstance(v, dict) and "available" in v for v in variants)
             price: Decimal | None = None
+            currency: str | None = None
             available = True
             # Prefer variants the shop declares purchasable: sold-out products
             # often keep a placeholder price on the first variant (#33).
@@ -385,6 +391,7 @@ class ShopifyScraper(AbstractScraper):
                     logger.debug("Shopify variant price: %s -> %s", variant_price, parsed)
                     if parsed:
                         price = parsed
+                        currency = normalize_currency_code(variant.get("price_currency"))
                         break
 
             if price is None and declares_availability:
@@ -396,6 +403,7 @@ class ShopifyScraper(AbstractScraper):
                         parsed = parse_price(str(variant_price))
                         if parsed:
                             price = parsed
+                            currency = normalize_currency_code(variant.get("price_currency"))
                             available = False
                             break
 
@@ -405,7 +413,9 @@ class ShopifyScraper(AbstractScraper):
             return ProductInfo(
                 name=name,
                 price=price,
-                currency=None,  # Unknown from JSON API; detected from HTML downstream
+                # The chosen variant's own currency. None when the payload has no
+                # usable ``price_currency``: the caller then reads it from the HTML.
+                currency=currency,
                 available=available,
             )
 
