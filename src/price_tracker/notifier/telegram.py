@@ -82,7 +82,12 @@ class TelegramNotifier:
         if self._prefs is not None and (product_id is not None or kind == "operational"):
             alert: dict[str, Any] = {**(payload or {}), "text": text}
             return await self.notify_alert(user_id=user_id, product_id=product_id, alert=alert)
-        return await self._send_direct(user_id, text, reply_markup=_markup(payload))
+        return await self._send_direct(
+            user_id,
+            text,
+            reply_markup=_markup(payload),
+            disable_preview=kind == "operational",
+        )
 
     async def _send_direct(
         self,
@@ -90,6 +95,7 @@ class TelegramNotifier:
         text: str,
         *,
         reply_markup: InlineKeyboardMarkup | None = None,
+        disable_preview: bool = False,
     ) -> bool:
         chunks = split_message(text)
         for index, chunk in enumerate(chunks, start=1):
@@ -98,7 +104,7 @@ class TelegramNotifier:
                     chat_id=user_id,
                     text=chunk,
                     parse_mode=ParseMode.HTML,
-                    disable_web_page_preview=False,
+                    disable_web_page_preview=disable_preview,
                     reply_markup=reply_markup if index == len(chunks) else None,
                 )
             except Exception as e:  # noqa: BLE001 — Telegram errors are non-deterministic
@@ -123,14 +129,21 @@ class TelegramNotifier:
         chat_id: int,
         text: str,
         reply_markup: InlineKeyboardMarkup | None = None,
+        disable_preview: bool = False,
     ) -> None:
-        """Send an HTML alert message and emit the immediate-sent metric."""
+        """Send an HTML alert message and emit the immediate-sent metric.
+
+        ``disable_preview`` is for operational notices: the store domain they
+        name would otherwise expand into a preview card of that store.
+        """
         chunks = split_message(text)
         for index, chunk in enumerate(chunks, start=1):
             await self._bot.send_message(
                 chat_id=chat_id,
                 text=chunk,
                 parse_mode=ParseMode.HTML,
+                # None leaves the request as it was: price alerts keep their preview.
+                disable_web_page_preview=True if disable_preview else None,
                 reply_markup=reply_markup if index == len(chunks) else None,
             )
         if not chunks:
@@ -229,7 +242,12 @@ class TelegramNotifier:
         # price-drop body) keeps its text; the dict-only fallback is for callers
         # that hand over structured data alone.
         text = alert.get("text") or _format_alert_message(alert)
-        await self.send_alert(chat_id=user_id, text=text, reply_markup=_markup(alert))
+        await self.send_alert(
+            chat_id=user_id,
+            text=text,
+            reply_markup=_markup(alert),
+            disable_preview=operational,
+        )
         self._mark_delivered(event_id)
         return True
 

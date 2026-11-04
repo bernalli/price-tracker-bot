@@ -15,6 +15,7 @@
    text:
    | 🔄 Controllo di 3 prodotti in corso...
 -> sendMessage chat=10
+   param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
    | ⏳ <b>Controlli in errore su amazon.com</b> (1)
