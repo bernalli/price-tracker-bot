@@ -27,7 +27,6 @@ if TYPE_CHECKING:
 
 from price_tracker.core.exceptions import BlockEvent, ListingGone
 from price_tracker.core.http_client import public_client
-from price_tracker.core.pacer import excluded_from_deadline
 from price_tracker.core.scraper_base import (
     detect_block_event,
     detect_listing_gone,
@@ -442,16 +441,9 @@ async def fetch_page(
 
     Fallbacks are trusted local code, like installed scraper plugins, and must
     perform any network I/O through ``public_request`` or ``build_client``.
-
-    Every hop waits its store's turn (``core.pacer``) in the transport; those waits
-    push this deadline back, so it bounds network time only.
     """
     try:
-        async with (
-            asyncio.timeout(deadline) as budget,
-            excluded_from_deadline(budget),
-            public_client(client) as protected,
-        ):
+        async with asyncio.timeout(deadline), public_client(client) as protected:
             return await _fetch_page(
                 url,
                 protected,

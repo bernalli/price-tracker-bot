@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import math
 import os
 from dataclasses import dataclass
 
@@ -11,7 +10,6 @@ from dotenv import load_dotenv
 
 from price_tracker.app.inputs import InputError, parse_user_id
 from price_tracker.core.outlier import REQUIRED_CONFIRMATIONS
-from price_tracker.core.pacer import DEFAULT_MIN_GAP_SECONDS
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -42,19 +40,6 @@ def _parse_allowed_users(raw: str) -> tuple[int, ...]:
     return tuple(users)
 
 
-def _parse_min_gap(raw: str | None) -> float:
-    """Parse ``DOMAIN_MIN_GAP_SECONDS``: a finite number of seconds, 0 disables."""
-    if raw is None or not raw.strip():
-        return DEFAULT_MIN_GAP_SECONDS
-    try:
-        value = float(raw)
-    except ValueError:
-        raise ValueError("DOMAIN_MIN_GAP_SECONDS must be a number of seconds") from None
-    if not math.isfinite(value) or value < 0:
-        raise ValueError("DOMAIN_MIN_GAP_SECONDS must be a finite number >= 0")
-    return value
-
-
 @dataclass(frozen=True)
 class Config:
     telegram_bot_token: str
@@ -73,7 +58,6 @@ class Config:
     prometheus_bind: str = "127.0.0.1:9090"
     metrics_enabled: bool = True
     read_confirmations: int = REQUIRED_CONFIRMATIONS
-    domain_min_gap_seconds: float = DEFAULT_MIN_GAP_SECONDS
 
     @classmethod
     def from_env(cls) -> Config:
@@ -105,7 +89,6 @@ class Config:
             prometheus_bind=os.getenv("PROMETHEUS_BIND", "127.0.0.1:9090"),
             read_confirmations=int(os.getenv("READ_CONFIRMATIONS", str(REQUIRED_CONFIRMATIONS))),
             metrics_enabled=metrics_enabled,
-            domain_min_gap_seconds=_parse_min_gap(os.getenv("DOMAIN_MIN_GAP_SECONDS")),
         )
 
 

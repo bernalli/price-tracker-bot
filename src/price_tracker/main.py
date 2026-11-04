@@ -17,7 +17,6 @@ from price_tracker.bot.release_updates import announce_release
 from price_tracker.config import Config, parse_bind
 from price_tracker.core.health import HealthManager
 from price_tracker.core.http_client import build_client
-from price_tracker.core.pacer import DomainPacer, configure_domain_pacer
 from price_tracker.core.registry import (
     ScraperRegistry,
     discover_builtin_scrapers,
@@ -81,9 +80,6 @@ async def post_init(application: Application[Any, Any, Any, Any, Any, Any]) -> N
 
     await reconcile_admins(repo, config.admin_users)
 
-    # One pacer for the whole process: every client shares the outbound address,
-    # so a store sees the scheduler and manual checks as the same visitor.
-    configure_domain_pacer(DomainPacer(min_gap=config.domain_min_gap_seconds))
     application.bot_data["http_client"] = build_client(timeout=float(config.request_timeout))
 
     # Wire DigestService so /digest_now and other digest-driven flows can

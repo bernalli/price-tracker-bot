@@ -14,7 +14,6 @@ if TYPE_CHECKING:
 import httpcore
 import httpx
 
-from price_tracker.core.pacer import excluded_from_deadline, get_domain_pacer
 from price_tracker.core.url_utils import UnsafeURLError, _is_blocked_ip
 
 
@@ -136,11 +135,6 @@ class _PublicTransport(httpx.AsyncBaseTransport):
         self._active: set[_OwnedStream] = set()
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
-        # Every physical request passes here, each redirect hop included: it books
-        # the turn of the store it contacts before it resolves, takes a slot or
-        # connects, so neither a slot nor a lock is held while it waits.
-        pacer = get_domain_pacer()
-        await pacer.before_request(request.url)
         addresses = await _resolve_public(request.url)
         # Neither an arbitrary Host nor a caller's SNI override may separate
         # the HTTP/TLS identity from the URL whose address was validated.
@@ -158,15 +152,6 @@ class _PublicTransport(httpx.AsyncBaseTransport):
         owned = _OwnedStream(response.stream, transport, self._slots, self._active)
         self._active.add(owned)
         response.stream = owned
-        try:
-            await pacer.after_response(
-                request.url, response.status_code, response.headers.get("Retry-After")
-            )
-        except BaseException:
-            # Cancelled while recording: nobody will read this response, so
-            # release its connection and slot here.
-            await owned.aclose()
-            raise
         return response
 
     async def aclose(self) -> None:
@@ -230,25 +215,19 @@ class PublicAsyncClient(httpx.AsyncClient):
         auth: Any = httpx.USE_CLIENT_DEFAULT,
         follow_redirects: Any = httpx.USE_CLIENT_DEFAULT,
     ) -> httpx.Response:
-        """Send through validated connections; bound the complete redirect chain.
-
-        The transport makes every hop wait its store's turn (``core.pacer``); those
-        waits push the deadline back, so the deadline bounds network time only.
-        """
+        """Send through validated connections; bound the complete redirect chain."""
         follow = follow_redirects is True
         deadline = asyncio.get_running_loop().time() + self._deadline_seconds
         history: list[httpx.Response] = []
         try:
-            async with asyncio.timeout_at(deadline) as budget, excluded_from_deadline(budget):
+            async with asyncio.timeout_at(deadline):
                 while True:
                     response = await super().send(
                         request, stream=True, auth=auth, follow_redirects=False
                     )
                     try:
                         assert isinstance(response.stream, httpx.AsyncByteStream)
-                        response.stream = _DeadlineStream(
-                            response.stream, budget.when() or deadline, request
-                        )
+                        response.stream = _DeadlineStream(response.stream, deadline, request)
                         response.history = list(history)
                         if not follow or response.next_request is None:
                             if not stream:
