@@ -150,3 +150,25 @@ class TestObservabilityConfig:
         for falsy in ("0", "false", "no", "FALSE", "False", "off"):
             monkeypatch.setenv("METRICS_ENABLED", falsy)
             assert load_config().metrics_enabled is False
+
+
+@pytest.mark.parametrize("raw", [None, "", "1", "true", "0", "false"])
+def test_product_image_configuration_defaults_and_switch(monkeypatch, raw):
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "test-token")
+    monkeypatch.delenv("IMAGE_CACHE_DIR", raising=False)
+    if raw is None:
+        monkeypatch.delenv("LIST_IMAGES", raising=False)
+    else:
+        monkeypatch.setenv("LIST_IMAGES", raw)
+    config = Config.from_env()
+    assert config.list_images is (raw not in ("0", "false"))
+    assert config.image_cache_dir == ""
+
+
+def test_product_image_cache_directory_is_preserved(monkeypatch):
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "test-token")
+    monkeypatch.setenv("IMAGE_CACHE_DIR", "custom/thumbs")
+    monkeypatch.setenv("DATABASE_PATH", "data/prices.db")
+    config = Config.from_env()
+    assert config.image_cache_dir == "custom/thumbs"
+    assert config.database_path == "data/prices.db"

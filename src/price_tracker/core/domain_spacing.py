@@ -158,6 +158,13 @@ class DomainSpacing:
         until = self._deferred_until.get(domain)
         return until is not None and until > self._clock()
 
+    def deferred_for(self, domain: str) -> float:
+        """Seconds until the active deferral ends, without changing stored state."""
+        until = self._deferred_until.get(domain)
+        if until is None:
+            return 0.0
+        return max(0.0, until - self._clock())
+
     def defer(self, domain: str, retry_after: str | None) -> None:
         """Defer ``domain`` for as long as a 429/503 ``Retry-After`` asks, capped.
 

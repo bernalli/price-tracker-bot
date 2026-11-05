@@ -185,17 +185,19 @@ def _filter_word(list_filter: str) -> str:
     return _("paused") if list_filter == "p" else _("errors")
 
 
-def _list_row(view: ProductView) -> str:
+def list_mark(view: ProductView) -> str:
     if view.status != "active":
-        mark = "⏸ "
-    elif view.consecutive_errors > 0:
-        mark = "⚠️ "
-    elif view.out_of_stock:
-        mark = "🚫 "
-    else:
-        mark = ""
+        return "⏸"
+    if view.consecutive_errors > 0:
+        return "⚠️"
+    if view.out_of_stock:
+        return "🚫"
+    return ""
+
+
+def _list_row(view: ProductView) -> str:
     return product_row(
-        view.name, view.current, initial=view.initial, currency=view.currency, mark=mark.strip()
+        view.name, view.current, initial=view.initial, currency=view.currency, mark=list_mark(view)
     )
 
 
@@ -243,12 +245,14 @@ def _list_keyboard(page: ListPage) -> tuple[tuple[Button, ...], ...]:
     return (*rows, *layout_rows(footer))
 
 
-def list_page(page: ListPage) -> Screen:
-    """Render one page of the product list. Pure: the locale is the current one."""
+def list_header(page: ListPage) -> str:
     header = _("📦 <b>Your products</b> · {filter} ({total}) · page {page}/{pages}").format(
         filter=_filter_word(page.filter), total=page.total, page=page.page, pages=page.pages
     )
+    return header.replace(" · ", "\n")
+
+
+def list_page(page: ListPage) -> Screen:
+    """Render one page of the product list. Pure: the locale is the current one."""
     body = [_list_row(item) for item in page.items] or [_("Nothing here.")]
-    return Screen(
-        text="\n".join([header.replace(" · ", "\n"), "", *body]), rows=_list_keyboard(page)
-    )
+    return Screen(text="\n".join([list_header(page), "", *body]), rows=_list_keyboard(page))

@@ -13,14 +13,21 @@ sends, and ``make_application`` builds a real ``Application`` around the fake.
 
 from __future__ import annotations
 
+import asyncio
+import hashlib
 import itertools
 import json
+import warnings
+from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from decimal import Decimal
+from io import BytesIO
 from typing import TYPE_CHECKING, Any
 
+from PIL import Image, UnidentifiedImageError
 from telegram import Update
+from telegram.error import TimedOut
 from telegram.ext import Application, ApplicationBuilder
 from telegram.request import BaseRequest
 
@@ -56,6 +63,18 @@ class Call:
     failed: bool = False
     message_id: int | None = None
 
+    started: int = 0
+    finished: int | None = None
+
+    def link_preview(self) -> dict[str, Any] | None:
+        """The explicit link preview options, if any."""
+        return _json_dict(self.params.get("link_preview_options"))
+
+    def has_keyboard(self) -> bool:
+        """Whether an inline keyboard has at least one row."""
+        markup = _json_dict(self.params.get("reply_markup"))
+        return bool(markup and markup.get("inline_keyboard"))
+
     @property
     def chat_id(self) -> int | None:
         value = self.params.get("chat_id")
@@ -76,6 +95,51 @@ class Call:
         ]
 
 
+@dataclass
+class RemoteMessage:
+    """Visible remote state, independent of the request history."""
+
+    kind: str
+    text: str | None = None
+    caption: str | None = None
+    reply_markup: dict[str, Any] | None = None
+    link_preview: dict[str, Any] | None = None
+    photo_size: tuple[int, int] | None = None
+    photo_sha256: str | None = None
+
+
+@dataclass(frozen=True)
+class Reject:
+    status: int
+    description: str
+    retry_after: int | None = None
+
+
+@dataclass(frozen=True)
+class LoseResponse:
+    """Apply the operation, then lose its response."""
+
+
+@dataclass(frozen=True)
+class TimeoutBeforeApply:
+    """Lose the request before it can change remote state."""
+
+
+def _json_dict(value: Any) -> dict[str, Any] | None:
+    if isinstance(value, str):
+        value = json.loads(value)
+    return value if isinstance(value, dict) else None
+
+
+def overlapping(calls: list[Call]) -> bool:
+    """Whether any two recorded request intervals intersect."""
+    ordered = sorted(calls, key=lambda call: call.started)
+    return any(
+        left.finished is None or left.finished > right.started
+        for left, right in zip(ordered, ordered[1:], strict=False)
+    )
+
+
 class FakeRequest(BaseRequest):
     """Records Bot API calls and answers them like Telegram would."""
 
@@ -84,6 +148,34 @@ class FakeRequest(BaseRequest):
         self.violations: list[str] = []
         self._fail_next: set[int] = set()
         self._message_ids = itertools.count(1000)
+        self.remote: dict[tuple[int, int], RemoteMessage] = {}
+        self._deleted: set[tuple[int, int]] = set()
+        self.simulate_not_modified = False
+        self._scripts: dict[str, deque[Reject | LoseResponse | TimeoutBeforeApply]] = defaultdict(
+            deque
+        )
+        self._holds: dict[str, deque[asyncio.Event]] = defaultdict(deque)
+        self._sequence = itertools.count(1)
+        self._checked_photo_size: tuple[int, int] = (1, 1)
+
+    def remote_of(self, chat_id: int, message_id: int) -> RemoteMessage | None:
+        return self.remote.get((chat_id, message_id))
+
+    def delete_remote(self, chat_id: int, message_id: int) -> None:
+        key = (chat_id, message_id)
+        self.remote.pop(key, None)
+        self._deleted.add(key)
+
+    def script(self, method: str, behaviour: Reject | LoseResponse | TimeoutBeforeApply) -> None:
+        self._scripts[method].append(behaviour)
+
+    def attempts(self, method: str) -> list[Call]:
+        return [call for call in self.calls if call.method == method]
+
+    def hold_next(self, method: str) -> asyncio.Event:
+        event = asyncio.Event()
+        self._holds[method].append(event)
+        return event
 
     @property
     def read_timeout(self) -> float | None:
@@ -105,16 +197,76 @@ class FakeRequest(BaseRequest):
     def calls_of(self, method: str) -> list[Call]:
         return [call for call in self.calls if call.method == method and not call.failed]
 
-    def _check_limits(self, method: str, params: dict[str, Any]) -> None:
+    def _check_limits(
+        self, method: str, params: dict[str, Any], request_data: RequestData | None = None
+    ) -> None:
         text = params.get("text")
         is_text_call = method in {"sendMessage", "editMessageText"} and isinstance(text, str)
         if is_text_call and not 1 <= len(str(text)) <= MAX_TEXT:
             self.violations.append(f"{method}: text length {len(str(text))}")
         if method == "answerCallbackQuery" and isinstance(text, str) and len(text) > MAX_TOAST:
             self.violations.append(f"toast length {len(text)}")
-        for data in Call(method, params).callback_data():
-            if not 1 <= len(data.encode("utf-8")) <= MAX_CALLBACK_BYTES:
-                self.violations.append(f"callback_data {data!r} out of 1..64 bytes")
+        for callback in Call(method, params).callback_data():
+            if not 1 <= len(callback.encode("utf-8")) <= MAX_CALLBACK_BYTES:
+                self.violations.append(f"callback_data {callback!r} out of 1..64 bytes")
+
+        media = _json_dict(params.get("media"))
+        self._checked_photo_size = (1, 1)
+        if method == "sendPhoto" or (
+            method == "editMessageMedia" and media is not None and media.get("type") == "photo"
+        ):
+            data = self._photo_bytes(params, request_data)
+            if len(data) > 10_000_000:
+                self.violations.append(f"{method}: photo size {len(data)}")
+            previous_pixel_cap = Image.MAX_IMAGE_PIXELS
+            try:
+                Image.MAX_IMAGE_PIXELS = None
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", Image.DecompressionBombWarning)
+                    with Image.open(BytesIO(data), formats=("JPEG", "PNG")) as image:
+                        image.load()
+                        width, height = image.size
+                self._checked_photo_size = (width, height)
+                if width + height > 10000:
+                    self.violations.append(f"{method}: photo dimensions {width}x{height}")
+                if max(width, height) / min(width, height) > 20:
+                    self.violations.append(f"{method}: photo ratio {width}x{height}")
+            except (OSError, ValueError, UnidentifiedImageError):
+                self.violations.append(f"{method}: photo decode failed")
+            finally:
+                Image.MAX_IMAGE_PIXELS = previous_pixel_cap
+
+    @staticmethod
+    def _photo_bytes(params: dict[str, Any], request_data: RequestData | None) -> bytes:
+        if request_data is None:
+            return b""
+        media = _json_dict(params.get("media"))
+        reference = media.get("media") if media is not None else params.get("photo")
+        uploads = request_data.multipart_data
+        part_name = "photo"
+        if isinstance(reference, str) and reference.startswith("attach://"):
+            part_name = reference.removeprefix("attach://")
+        part = uploads.get(part_name)
+        if part is None:
+            return b""
+        content = part[1]
+        if isinstance(content, bytes):
+            return content
+        position = content.tell()
+        try:
+            return bytes(content.read())
+        finally:
+            content.seek(position)
+
+    @staticmethod
+    def _error(
+        call: Call, status: int, description: str, retry_after: int | None = None
+    ) -> tuple[int, bytes]:
+        call.failed = True
+        body: dict[str, Any] = {"ok": False, "error_code": status, "description": description}
+        if retry_after is not None:
+            body["parameters"] = {"retry_after": retry_after}
+        return status, json.dumps(body).encode()
 
     async def do_request(
         self,
@@ -128,26 +280,68 @@ class FakeRequest(BaseRequest):
     ) -> tuple[int, bytes]:
         del method, read_timeout, write_timeout, connect_timeout, pool_timeout
         api_method = url.rsplit("/", 1)[-1]
-        params = dict(request_data.parameters) if request_data is not None else {}
-        call = Call(api_method, params)
+        params: dict[str, Any] = dict(request_data.parameters) if request_data is not None else {}
+        call = Call(api_method, params, started=next(self._sequence))
         self.calls.append(call)
-        self._check_limits(api_method, params)
-        chat_id = call.chat_id
-        if chat_id is not None and chat_id in self._fail_next:
-            self._fail_next.discard(chat_id)
-            call.failed = True
-            body = {
-                "ok": False,
-                "error_code": 403,
-                "description": "Forbidden: bot was blocked by the user",
-            }
-            return 403, json.dumps(body).encode()
-        result = self._result(api_method, params)
-        if isinstance(result, dict) and "message_id" in result:
-            call.message_id = int(result["message_id"])
-        return 200, json.dumps({"ok": True, "result": result}).encode()
+        behaviour = self._scripts[api_method].popleft() if self._scripts[api_method] else None
+        hold = self._holds[api_method].popleft() if self._holds[api_method] else None
+        try:
+            if hold is not None:
+                await hold.wait()
+            self._check_limits(api_method, params, request_data)
+            chat_id = call.chat_id
+            if chat_id is not None and chat_id in self._fail_next:
+                self._fail_next.discard(chat_id)
+                return self._error(call, 403, "Forbidden: bot was blocked by the user")
+            if isinstance(behaviour, Reject):
+                return self._error(
+                    call, behaviour.status, behaviour.description, behaviour.retry_after
+                )
+            if isinstance(behaviour, TimeoutBeforeApply):
+                call.failed = True
+                raise TimedOut("Timed out")
+            key = (int(params.get("chat_id", 0)), int(params.get("message_id", 0)))
+            previous = self.remote.get(key)
+            if api_method in {"editMessageText", "editMessageMedia"} and key in self._deleted:
+                return self._error(call, 400, "Bad Request: message to edit not found")
+            if api_method == "editMessageText" and previous is not None:
+                if previous.kind == "photo":
+                    return self._error(
+                        call, 400, "Bad Request: there is no text in the message to edit"
+                    )
+                if (
+                    self.simulate_not_modified
+                    and previous.text == params.get("text")
+                    and previous.reply_markup == _json_dict(params.get("reply_markup"))
+                    and previous.link_preview == call.link_preview()
+                ):
+                    return self._error(
+                        call,
+                        400,
+                        "Bad Request: message is not modified: specified new message content and "
+                        "reply markup are exactly the same as a current content and reply markup "
+                        "of the message",
+                    )
+            result = (
+                self._message_result(api_method, params, request_data)
+                if api_method in {"sendPhoto", "editMessageMedia"}
+                else self._result(api_method, params)
+            )
+            if isinstance(result, dict) and "message_id" in result:
+                call.message_id = int(result["message_id"])
+            if isinstance(behaviour, LoseResponse):
+                call.failed = True
+                raise TimedOut("Timed out")
+            return 200, json.dumps({"ok": True, "result": result}).encode()
+        finally:
+            call.finished = next(self._sequence)
 
     def _result(self, api_method: str, params: dict[str, Any]) -> Any:
+        return self._message_result(api_method, params)
+
+    def _message_result(
+        self, api_method: str, params: dict[str, Any], request_data: RequestData | None = None
+    ) -> Any:
         if api_method == "getMe":
             return {
                 "id": BOT_ID,
@@ -158,7 +352,7 @@ class FakeRequest(BaseRequest):
                 "can_read_all_group_messages": False,
                 "supports_inline_queries": False,
             }
-        if api_method in {"sendMessage", "editMessageText"}:
+        if api_method in {"sendMessage", "editMessageText", "sendPhoto", "editMessageMedia"}:
             message_id = params.get("message_id")
             if message_id is None:
                 message_id = next(self._message_ids)
@@ -172,6 +366,37 @@ class FakeRequest(BaseRequest):
             markup = params.get("reply_markup")
             if markup is not None:
                 message["reply_markup"] = json.loads(markup) if isinstance(markup, str) else markup
+            if api_method in {"sendPhoto", "editMessageMedia"}:
+                data = self._photo_bytes(params, request_data)
+                size = self._checked_photo_size
+                media = _json_dict(params.get("media")) or params
+                caption = media.get("caption")
+                message.pop("text", None)
+                message["photo"] = [
+                    {
+                        "file_id": f"f{message_id}",
+                        "file_unique_id": f"u{message_id}",
+                        "width": size[0],
+                        "height": size[1],
+                    }
+                ]
+                if caption is not None:
+                    message["caption"] = caption
+                remote = RemoteMessage(
+                    "photo",
+                    caption=caption,
+                    reply_markup=_json_dict(markup),
+                    photo_size=size,
+                    photo_sha256=hashlib.sha256(data).hexdigest(),
+                )
+            else:
+                remote = RemoteMessage(
+                    "text",
+                    text=params.get("text", ""),
+                    reply_markup=_json_dict(markup),
+                    link_preview=_json_dict(params.get("link_preview_options")),
+                )
+            self.remote[(int(params["chat_id"]), int(message_id))] = remote
             return message
         return True
 

@@ -30,6 +30,7 @@ from price_tracker.app.inputs import (
     Percentage,
     parse_threshold,
 )
+from price_tracker.bot import list_media
 from price_tracker.bot.callbacks import Action, encode
 from price_tracker.bot.decorators import (
     _client,
@@ -51,6 +52,7 @@ from price_tracker.bot.keyboards import build_threshold_keyboard
 from price_tracker.bot.messages import _
 from price_tracker.bot.ui.product_rows import record_row
 from price_tracker.bot.ui.width import truncate_to_width
+from price_tracker.core.image_url import normalize_image_url
 from price_tracker.core.textlimits import truncate_visible
 
 logger = logging.getLogger(__name__)
@@ -443,6 +445,7 @@ async def _add_product(
 
     currency = result.currency or detect_currency(url) or "EUR"
 
+    image_url = normalize_image_url(result.image_url, base_url=url)
     product_id = await db.add_product(
         user_id=user_id,
         url=url,
@@ -452,7 +455,11 @@ async def _add_product(
         threshold_type="percentage",
         threshold_value=Decimal("10"),
         currency=currency,
+        image_url=image_url,
     )
+    mode = list_media.two_message_mode(context)
+    if mode is not None:
+        mode.thumbnails.request(image_url)
 
     name = result.name or _("Product")
     name_short = truncate_to_width(name, 80)

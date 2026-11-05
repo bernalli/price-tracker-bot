@@ -11,6 +11,7 @@ import json
 import logging
 import random
 import re
+from contextlib import suppress
 from decimal import Decimal
 from typing import ClassVar
 from urllib.parse import urlparse
@@ -20,6 +21,14 @@ from bs4 import BeautifulSoup, Tag
 
 from price_tracker.core.exceptions import BlockEvent, CaptchaDetected, ListingGone
 from price_tracker.core.http_client import build_client, public_request
+from price_tracker.core.identity import normalize_url
+from price_tracker.core.image_url import normalize_image_url
+from price_tracker.core.page_image import (
+    ImageDocument,
+    ImagePageHTML,
+    PriceImageBinding,
+    extract_page_image,
+)
 from price_tracker.core.retry_policy import RetryConfig, with_retry
 from price_tracker.core.scraper_base import (
     USER_AGENTS,
@@ -157,7 +166,7 @@ async def _fetch_amazon_html(
     )
     detect_listing_gone(status_code=response.status_code, url=url)
     response.raise_for_status()
-    return response.text
+    return ImagePageHTML(response.text, str(response.url))
 
 
 async def _fetch_with_fresh_client(url: str) -> str | None:
@@ -181,7 +190,7 @@ async def _fetch_with_fresh_client(url: str) -> str | None:
             )
             detect_listing_gone(status_code=response.status_code, url=url)
             response.raise_for_status()
-            return response.text
+            return ImagePageHTML(response.text, str(response.url))
     except (httpx.HTTPError, ValueError) as e:
         logger.debug("Fresh client retry failed: %s", e)
         return None
@@ -339,8 +348,14 @@ class AmazonScraper(AbstractScraper):
         # Prices are accepted only if they belong to this product's ASIN, so a
         # recommendation card can never stand in for a missing buy-box price.
         target_asin = _extract_asin(url) or _page_asin(soup)
-        css_price = self._extract_price(soup, target_asin=target_asin)
-        ld_price = self._try_json_ld_price(soup)
+        document = ImageDocument.parse(soup)
+        css_sources: list[Tag] = []
+        json_sources: list[str] = []
+        css_price = self._extract_price(soup, target_asin=target_asin, image_sources=css_sources)
+        ld_price = self._try_json_ld_price(
+            soup, image_document=document, image_sources=json_sources
+        )
+        json_selected = css_price is None
 
         # Prefer CSS, but cross-check with JSON-LD: when CSS differs >2x from
         # Product.offers.price, CSS is likely an installment/rata-mensile value.
@@ -356,6 +371,7 @@ class AmazonScraper(AbstractScraper):
                     url[:60],
                 )
                 info.price = ld_price
+                json_selected = True
             else:
                 info.price = css_price
         else:
@@ -378,7 +394,10 @@ class AmazonScraper(AbstractScraper):
 
         # If buybox shows used/renewed, try to find the new price and override
         if info.condition != "new":
-            new_price = self._extract_new_price(soup, target_asin=target_asin)
+            new_sources: list[Tag] = []
+            new_price = self._extract_new_price(
+                soup, target_asin=target_asin, image_sources=new_sources
+            )
             if new_price:
                 logger.info(
                     "Buybox is %s at %s, new price available at %s — using new price",
@@ -389,6 +408,8 @@ class AmazonScraper(AbstractScraper):
                 info.price = new_price
                 info.condition = "new"
                 info.seller = None
+                json_selected = False
+                css_sources = new_sources
 
         if info.price is None:
             # No buy box at all, only "see all buying choices" from other sellers:
@@ -398,10 +419,115 @@ class AmazonScraper(AbstractScraper):
                 info.available = False
             info.error = "Prezzo non trovato (prodotto non disponibile?)"
 
+        if info.price is not None:
+            info.image_url = self._image_for_price(
+                soup,
+                url,
+                getattr(html, "final_url", url),
+                document,
+                json_sources if json_selected else None,
+                css_sources,
+            )
         return info
 
+    @staticmethod
+    def _image_for_price(
+        soup: BeautifulSoup,
+        url: str,
+        final_url: str,
+        document: ImageDocument,
+        json_sources: list[str] | None,
+        css_sources: list[Tag],
+    ) -> str | None:
+        asin = _extract_asin(url)
+        if asin is None or _extract_asin(final_url) != asin:
+            return None
+        echoes = [
+            _extract_asin(str(tag.get("href") or tag.get("content") or ""))
+            for tag in soup.select('link[rel="canonical"], meta[property="og:url"]')
+        ]
+        echoes.extend(
+            str(tag.get("value") or "").upper()
+            for tag in soup.select('input#ASIN, input[name="ASIN"]')
+        )
+        if not echoes or any(echo != asin for echo in echoes):
+            return None
+
+        def owned(element: Tag) -> bool:
+            for node in (element, *element.parents):
+                owner = node.get("data-asin")
+                if owner is not None and str(owner).strip().upper() != asin:
+                    return False
+                context = " ".join(
+                    (
+                        str(node.get("id") or ""),
+                        " ".join(node.get("class") or []),
+                        str(node.get("data-feature-name") or ""),
+                    )
+                ).lower()
+                if any(
+                    marker in context
+                    for marker in (
+                        "recommend",
+                        "carousel",
+                        "sims",
+                        "similar",
+                        "sponsored",
+                        "sp_detail",
+                        "bundle",
+                    )
+                ):
+                    return False
+            return True
+
+        if json_sources is not None:
+            if not json_sources:
+                return None
+            return extract_page_image(
+                soup,
+                page_url=final_url,
+                price_binding=PriceImageBinding(
+                    document,
+                    url,
+                    tuple(json_sources),
+                    normalize_url(url),
+                    True,
+                ),
+            )
+        if not css_sources or not all(owned(node) for node in css_sources):
+            return None
+        images = set()
+        for node in soup.select("#landingImage"):
+            if owned(node):
+                for attribute in ("data-old-hires", "src"):
+                    image = normalize_image_url(node.get(attribute), base_url=final_url)
+                    if image is not None:
+                        images.add(image)
+                        break
+        if len(images) > 1:
+            return None
+        if images:
+            return images.pop()
+        return extract_page_image(
+            soup,
+            page_url=final_url,
+            price_binding=PriceImageBinding(
+                document,
+                url,
+                (),
+                normalize_url(url),
+                True,
+                price_source="trusted",
+                page_scope="product",
+            ),
+        )
+
     def _extract_price(
-        self, soup: BeautifulSoup, *, target_asin: str | None = None
+        self,
+        soup: BeautifulSoup,
+        *,
+        target_asin: str | None = None,
+        image_sources: list[Tag] | None = None,
     ) -> Decimal | None:
         # Strategy 1: Target the main buy box directly (most reliable)
         buybox_containers = [
@@ -474,6 +600,8 @@ class AmazonScraper(AbstractScraper):
                     parsed = parse_price(el.get_text(strip=True))
                     if parsed:
                         logger.debug("Amazon price from %s > %s: %s", container_sel, sel, parsed)
+                        if image_sources is not None:
+                            image_sources.append(el)
                         return parsed
 
         # Strategy 2: Broad selectors (fallback)
@@ -558,6 +686,8 @@ class AmazonScraper(AbstractScraper):
 
                 parsed = parse_price(text)
                 if parsed:
+                    if image_sources is not None:
+                        image_sources.append(el)
                     return parsed
 
         return None
@@ -679,7 +809,11 @@ class AmazonScraper(AbstractScraper):
         return "new"
 
     def _extract_new_price(
-        self, soup: BeautifulSoup, *, target_asin: str | None = None
+        self,
+        soup: BeautifulSoup,
+        *,
+        target_asin: str | None = None,
+        image_sources: list[Tag] | None = None,
     ) -> Decimal | None:
         """Extract the "new" price when the buybox shows a used/renewed item."""
         for sel in ["[id*=newAccordionRow]", "#newAccordionRow", "#buyBoxAccordion"]:
@@ -688,28 +822,49 @@ class AmazonScraper(AbstractScraper):
                 if price_el and _owned_by(price_el, target_asin):
                     parsed = parse_price(price_el.get_text(strip=True))
                     if parsed:
+                        if image_sources is not None:
+                            image_sources.append(price_el)
                         return parsed
 
         nbp = soup.select_one("#newBuyBoxPrice")
         if nbp and _owned_by(nbp, target_asin):
             parsed = parse_price(nbp.get_text(strip=True))
             if parsed:
+                if image_sources is not None:
+                    image_sources.append(nbp)
                 return parsed
 
         new_link = soup.select_one('a[href*="condition=new"]')
         if new_link and _owned_by(new_link, target_asin):
             parsed = parse_price(new_link.get_text(strip=True))
             if parsed:
+                if image_sources is not None:
+                    image_sources.append(new_link)
                 return parsed
 
         return None
 
-    def _try_json_ld_price(self, soup: BeautifulSoup) -> Decimal | None:
+    def _try_json_ld_price(
+        self,
+        soup: BeautifulSoup,
+        *,
+        image_document: ImageDocument | None = None,
+        image_sources: list[str] | None = None,
+    ) -> Decimal | None:
         scripts = soup.find_all("script", type="application/ld+json")
         for script in scripts:
             if not script.string:
                 continue
             try:
+                ref = None
+                if image_document is not None and image_document.valid:
+                    with suppress(ValueError):
+                        ref = f"jsonld:{image_document.payloads.index(script.string)}"
+                bound = (
+                    image_document.nodes.get(ref) if image_document is not None and ref else None
+                )
+                # The price keeps its historical parse; the strict document only
+                # supplies the provenance reference used for the image.
                 data = json.loads(script.string)
                 if isinstance(data, dict) and data.get("@type") == "Product":
                     # Shared offer selection: skips financing entries and
@@ -717,6 +872,8 @@ class AmazonScraper(AbstractScraper):
                     # concrete price — never offers[0] blindly (#54).
                     selected = select_jsonld_offer(data.get("offers", {}))
                     if selected is not None:
+                        if image_sources is not None and bound is not None and ref is not None:
+                            image_sources.append(ref)
                         return selected[0]
             except (json.JSONDecodeError, TypeError, AttributeError):
                 continue

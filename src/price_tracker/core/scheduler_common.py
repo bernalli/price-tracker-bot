@@ -24,6 +24,12 @@ CHECK_TICK_MINUTES = 5
 MAX_INTERVAL_MINUTES = 7 * 24 * 60
 
 
+class ThumbnailRequester(Protocol):
+    """Anything that can be asked, without waiting, to fetch a product image later."""
+
+    def request(self, url: str | None) -> bool: ...
+
+
 class NotifierFn(Protocol):
     """Delivers one formatted message to one user."""
 
@@ -123,6 +129,7 @@ class SchedulerDeps:
     """Per-store spacing of scheduled checks; startup passes DOMAIN_MIN_GAP_SECONDS."""
     drop_floor: DropFloor = NO_DROP_FLOOR
     """Server-default minimum drop for an alert; startup passes MIN_DROP_PERCENT/ABSOLUTE."""
+    thumbnails: ThumbnailRequester | None = None
 
 
 @dataclass(frozen=True)

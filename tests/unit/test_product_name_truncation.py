@@ -231,7 +231,7 @@ async def _drive_add_product(name: str) -> Surfaces:
     db.add_product.return_value = PRODUCT_ID
     scraper = AsyncMock()
     scraper.scrape.return_value = SimpleNamespace(
-        price=Decimal("10.00"), name=name, currency="EUR", error=None
+        price=Decimal("10.00"), name=name, currency="EUR", error=None, image_url=None
     )
     context.bot_data["scraper"] = MagicMock()
     context.bot_data["scraper"].resolve.return_value = scraper

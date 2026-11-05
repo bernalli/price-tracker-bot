@@ -62,6 +62,10 @@ RELEASE_NOTES: dict[str, tuple[str, ...]] = {
         N_("Skip tiny price drops"),
         N_("Fewer store pause notices"),
     ),
+    "1.10.0": (
+        N_("Product photos in the list"),
+        N_("Six products per page"),
+    ),
 }
 
 MESSAGE_LIMIT = 1200

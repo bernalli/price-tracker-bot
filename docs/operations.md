@@ -16,6 +16,10 @@ never started, so page scripts, subresources, service workers and WebSockets can
 open separate connections. Products requiring browser rendering or impersonation may
 no longer yield prices; ordinary HTTP extraction remains available.
 
+Product images use the same validated transport, HTTPS only, with an 8 MiB body cap and accepted image content types. Downloads run in the background after an accepted price check or product addition, never when opening `/list`. The product card uses Telegram's link preview: Telegram's servers fetch the image URL from the store, rather than the bot.
+
+`DOMAIN_MIN_GAP_SECONDS` spaces the starts of background jobs, including image downloads, by eTLD+1 (default 30 seconds; `0` disables the gap). Manual checks never wait, but their images are still queued for background download. A redirect chain is one job. The HTTP transport does no pacing.
+
 Telegram uses its fixed API endpoints. Locally installed Python plugins and fetch
 fallbacks are trusted code and must use the supplied client or `public_request` for
 network access; they are not sandboxed.
@@ -56,6 +60,8 @@ All configuration is via environment variables, loaded from `.env` (or the host 
 | ----------------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | `TELEGRAM_BOT_TOKEN`          | (required)              | Telegram bot API token                                                                                                 |
 | `ALLOWED_USERS`               | (required)              | Comma-separated Telegram user IDs authorized to use the bot (first listed becomes admin)                               |
+| `LIST_IMAGES`                 | `1`                     | Enable the grid photo and numbered text list; `0` or `false` keeps the text list |
+| `IMAGE_CACHE_DIR`             | (derived)               | Thumbnail directory; empty uses `thumbs` beside `DATABASE_PATH`. Images are disabled with `:memory:` |
 | `DATABASE_PATH`               | `/data/pricetracker.db` | SQLite database path                                                                                                   |
 | `LOCALE`                      | `en`                    | Default locale fallback when Telegram `language_code` missing (`en`, `it`)                                             |
 | `LOG_LEVEL`                   | `INFO`                  | structlog log level (`DEBUG`, `INFO`, `WARNING`, `ERROR`)                                                              |
@@ -72,11 +78,17 @@ All configuration is via environment variables, loaded from `.env` (or the host 
 
 For the full set including outlier detection thresholds and currency tuning, see `src/price_tracker/config.py`.
 
+## Product lists
+
+`/list` sends a grid photo first, then a text message with the prices and navigation. The two sends are independent: a failure can leave an isolated photo or no new message. There is no automatic retry. Send a new `/list` to restore navigation when Telegram accepts the text. During a grid cooldown the command attempts only the text.
+
+After a restart, grid photos in earlier lists stop updating; `/list` sends a new pair. The text in earlier lists remains navigable and is the source of current prices.
+
 ## Backup & restore
 
 ### What to back up
 
-All runtime state lives in **one file**: the SQLite database at `DATABASE_PATH` (default `/data/pricetracker.db`). It contains users, products, price history, scraper health, notification preferences, the digest queue, and the cached currency rates. There are no separate JSON state files.
+All runtime state lives in **one file**: the SQLite database at `DATABASE_PATH` (default `/data/pricetracker.db`). It contains users, products, price history, scraper health, notification preferences, the digest queue, and the cached currency rates. There are no separate JSON state files. The `thumbs` directory is a disposable cache, bounded to 64 MiB and 2000 files, and does not need a backup.
 
 ```bash
 # Stop the bot to ensure a consistent snapshot

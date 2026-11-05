@@ -17,6 +17,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 
 from price_tracker.app.views import (
+    LIST_FILTER_ORDER,
     PAGE_SIZE,
     HomeView,
     ListFilter,
@@ -29,6 +30,7 @@ from price_tracker.bot.callbacks import Action, encode
 from price_tracker.bot.decorators import _config, _db, _get_conversion_rate
 from price_tracker.bot.messages import _
 from price_tracker.bot.ui.cards import CardActions
+from price_tracker.core.image_url import normalize_image_url
 from price_tracker.core.url_utils import extract_etld_plus_one
 
 if TYPE_CHECKING:
@@ -113,6 +115,9 @@ def product_view(record: _Record, *, default_interval_minutes: int) -> ProductVi
         if rate is not None:
             estimate = _amount((current * rate).quantize(Decimal("0.01")))
     interval = record.get("check_interval_minutes")
+    image_url = record.get("image_url")
+    if not isinstance(image_url, str) or normalize_image_url(image_url, base_url="") != image_url:
+        image_url = None
     return ProductView(
         id=int(record["id"]),
         name=str(record.get("name") or ""),
@@ -133,6 +138,7 @@ def product_view(record: _Record, *, default_interval_minutes: int) -> ProductVi
         reference_estimate=estimate,
         reference_currency=REFERENCE_CURRENCY,
         out_of_stock=_out_of_stock(record),
+        image_url=image_url,
     )
 
 
@@ -183,7 +189,8 @@ def list_view(
     page = min(page, pages)
     shown = matching[(page - 1) * PAGE_SIZE : page * PAGE_SIZE]
     items = tuple(product_view(r, default_interval_minutes=default_interval_minutes) for r in shown)
-    return ListPage(list_filter, page, pages, len(matching), items)
+    counts = tuple(sum(bool(_FILTERS[key](r)) for r in records) for key in LIST_FILTER_ORDER)
+    return ListPage(list_filter, page, pages, len(matching), items, counts=counts)
 
 
 async def home_view(db: Any, user_id: int) -> HomeView:

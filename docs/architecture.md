@@ -23,6 +23,8 @@ plugins/             # extension point for custom scrapers (gitignored except RE
 
 Each top-level package has one responsibility and exposes a clear interface to the next layer. Cross-layer calls always flow downward (`bot/` → `core/` → `db/` / `scrapers/` / `notifier/`); `core/` is the orchestrator.
 
+The `media/` package downloads product images after accepted price readings, decodes them under fixed resource limits, and stores bounded JPEG thumbnails. Its background worker shares the scheduler's `DomainSpacing` instance: spacing applies to job starts by eTLD+1, and a redirect chain stays one job. The core scheduler depends only on a request-only protocol. `/list` reads cached thumbnails to render a grid photo followed by numbered text with navigation. Callbacks edit the text first and then a known grid photo; cards use Telegram link previews. An in-memory bounded registry associates each text with its grid. Restarting loses those associations; disabling `LIST_IMAGES` retains the text list.
+
 ## Data flow — scheduler tick to notification
 
 ```

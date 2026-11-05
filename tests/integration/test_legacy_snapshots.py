@@ -24,6 +24,7 @@ import re
 import shutil
 import time
 import warnings
+import zlib
 from collections import Counter
 from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal
@@ -37,6 +38,7 @@ from _pytest.outcomes import Failed
 from freezegun import freeze_time
 from hypothesis import example, given, settings
 from hypothesis import strategies as st
+from PIL import Image
 from telegram import (
     File,
     InlineKeyboardButton,
@@ -222,6 +224,24 @@ PRESS_LINE_RE: Final = re.compile(r'^## step \d+: press "([^"]*)"', re.MULTILINE
 COMMAND_LINE_RE: Final = re.compile(r'^## step \d+: command "/([^\s"]+)', re.MULTILINE)
 GENERATED_WITH: Final = "_generated_with.txt"
 PNG_MAGIC: Final = b"\x89PNG\r\n\x1a\n"
+
+
+def _padded_png(size: int) -> bytes:
+    """A decodable 1x1 PNG padded to an exact byte length."""
+    output = BytesIO()
+    Image.new("RGB", (1, 1), "white").save(output, format="PNG")
+    source = output.getvalue()
+    padding = b"\0" * (size - len(source) - 12)
+    chunk = b"npAD" + padding
+    return (
+        source[:-12]
+        + len(padding).to_bytes(4, "big")
+        + chunk
+        + (zlib.crc32(chunk) & 0xFFFFFFFF).to_bytes(4, "big")
+        + source[-12:]
+    )
+
+
 KETTLE_URL: Final = "https://shop.example.com/item/1"
 
 # Hosts whose name (not a literal IP) the scenario resolves through the URL guard.
@@ -539,7 +559,7 @@ async def test_h5_photo_and_document_uploads_and_downloads(frozen_world: LegacyW
     """Uploads render by filename and content; downloads serve registered bytes only."""
     w = frozen_world
     bot = w.app.bot
-    photo = PNG_MAGIC + b"\0" * (2048 - len(PNG_MAGIC))
+    photo = _padded_png(2048)
 
     async def uploads() -> None:
         await bot.send_photo(chat_id=OWNER, photo=BytesIO(photo))
@@ -669,7 +689,7 @@ async def test_h9_wall_clock_guards(frozen_world: LegacyWorld) -> None:
     assert f"   | at {over_a_day}" in lines
     assert "   | 🕐 5min fa" in lines
 
-    photo = PNG_MAGIC + b"\0" * (2048 - len(PNG_MAGIC))
+    photo = _padded_png(2048)
     csv = f"created_at\r\n{stamp}:00\r\n".encode()
     offending: list[tuple[str, Callable[[], Awaitable[object]]]] = [
         (stamp, lambda: bot.send_message(chat_id=OWNER, text=f"at {stamp}")),
@@ -912,7 +932,7 @@ async def test_h5_photo_size_out_of_bounds_is_a_violation(frozen_world: LegacyWo
     bot = w.app.bot
 
     def png(size: int) -> BytesIO:
-        return BytesIO(PNG_MAGIC + b"\0" * (size - len(PNG_MAGIC)))
+        return BytesIO(_padded_png(size))
 
     async def photos() -> None:
         for size in (1023, 1024, 2 * 1024 * 1024, 2 * 1024 * 1024 + 1):
