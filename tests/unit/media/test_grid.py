@@ -78,6 +78,7 @@ def test_tiles_are_row_major_with_a_dark_number_badge() -> None:
         jpeg_bytes(640, 640),
         jpeg_bytes(320, 320)[:30],
     ],
+    ids=["none", "bad", "bare-soi", "png", "jpeg-100", "jpeg-640", "truncated-jpeg"],
 )
 def test_missing_corrupt_wrong_format_and_wrong_size_thumbnails_are_neutral(
     thumb: bytes | None,

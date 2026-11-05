@@ -84,6 +84,7 @@ def test_ensure_dir_propagates_errors(tmp_path: Path) -> None:
         "jpeg",
         bytearray(JPEG),
     ],
+    ids=["empty", "not-jpeg", "two-byte-soi", "over-cap", "none", "str", "bytearray"],
 )
 def test_invalid_bytes_are_refused_before_creating_files(tmp_path: Path, data: Any) -> None:
     root = tmp_path / "absent"
@@ -144,7 +145,11 @@ def test_failed_overwrite_preserves_the_previous_file(
     assert list(tmp_path.iterdir()) == [cache.path_for("url")]
 
 
-@pytest.mark.parametrize("data", [b"bad", b"", b"\xff\xd8\xff" + b"x" * MAX_THUMB_BYTES])
+@pytest.mark.parametrize(
+    "data",
+    [b"bad", b"", b"\xff\xd8\xff" + b"x" * MAX_THUMB_BYTES],
+    ids=["bad", "empty", "over-cap"],
+)
 def test_corrupt_or_oversized_files_are_removed(tmp_path: Path, data: bytes) -> None:
     cache = ThumbnailCache(tmp_path)
     path = cache.path_for("url")

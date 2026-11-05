@@ -79,3 +79,21 @@ def public_dns(monkeypatch: pytest.MonkeyPatch) -> None:
         return [(family, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", (address, port))]
 
     monkeypatch.setattr(socket, "getaddrinfo", resolve)
+
+
+# A verbose run prints each id on one log line; ids this long have stalled CI runners.
+MAX_TEST_ID_LENGTH = 16_384
+
+
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    """Refuse parametrize ids that would flood the verbose test log.
+
+    pytest builds ids from parameter values, so a large bytes payload becomes a
+    multi-megabyte log line that CI runners cannot stream. Pass ``ids=`` instead.
+    """
+    long_ids = [item.nodeid[:120] for item in items if len(item.nodeid) > MAX_TEST_ID_LENGTH]
+    if long_ids:
+        raise pytest.UsageError(
+            f"test ids longer than {MAX_TEST_ID_LENGTH} characters (pass ids= to parametrize): "
+            + "; ".join(long_ids)
+        )

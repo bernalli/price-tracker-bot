@@ -75,7 +75,11 @@ def test_cmyk_and_sixteen_bit_modes_are_safe() -> None:
         assert_thumbnail(result)
 
 
-@pytest.mark.parametrize("data", [b"", b"x" * (8 * 1024 * 1024 + 1), None, bytearray(b"x"), "bad"])
+@pytest.mark.parametrize(
+    "data",
+    [b"", b"x" * (8 * 1024 * 1024 + 1), None, bytearray(b"x"), "bad"],
+    ids=["empty", "over-8MiB", "none", "bytearray", "str"],
+)
 def test_invalid_input_sizes_and_types_are_refused(data: Any) -> None:
     with pytest.raises(ImageRejected, match="size"):
         make_thumbnail(data)
