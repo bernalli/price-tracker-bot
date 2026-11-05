@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
-from PIL import Image
+from PIL import Image, ImageFont
 
 from price_tracker.media import grid
 from price_tracker.media.grid import Tile, render_grid
@@ -154,9 +154,11 @@ def test_hostile_text_and_long_prices_are_bounded(price: str) -> None:
 
 def test_prices_shrink_from_30_to_16_px_then_truncate_within_the_image_width() -> None:
     label, font = grid._price_label("$12.00")
+    assert isinstance(font, ImageFont.FreeTypeFont)
     assert (label, font.size) == ("$12.00", 30)
     long_price = "£1234567890" * 30
     label, font = grid._price_label(long_price)
+    assert isinstance(font, ImageFont.FreeTypeFont)
     assert font.size == 16
     assert label.endswith("…")
     assert long_price.startswith(label[:-1])
