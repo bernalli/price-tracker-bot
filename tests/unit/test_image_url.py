@@ -46,6 +46,10 @@ from price_tracker.core.image_url import MAX_IMAGE_URL_LENGTH, normalize_image_u
         ("https://cdn.example:8443/x.jpg", "", None),
         ("https://cdn.example:443/x.jpg", "", "https://cdn.example/x.jpg"),
         ("https://10.0.0.5/x.jpg", "", None),
+        ("https://127.1/x.jpg", "", None),
+        ("https://0x7f.0.0.1/x.jpg", "", None),
+        ("https://1.2.3.4.5/x.jpg", "", None),
+        ("https://cdn.0x1f/x.jpg", "", None),
         ("https://[::1]/x.jpg", "", None),
         ("https://localhost/x.jpg", "", None),
         ("https://cdn.example./x.jpg", "", None),
@@ -104,6 +108,7 @@ def test_arbitrary_inputs_are_safe_and_normalization_is_idempotent(raw, base):
     assert url.port in (None, 443)
     assert "." in url.host
     assert not url.host.endswith(".")
+    assert not url.host.rsplit(".", 1)[1].isdigit()
     with pytest.raises(ValueError, match=r"."):
         ipaddress.ip_address(url.host)
     assert normalize_image_url(result, base_url="") == result

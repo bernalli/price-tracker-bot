@@ -33,6 +33,13 @@ def normalize_image_url(raw: object, *, base_url: str) -> str | None:
         host = url.host
         if not host or "." not in host or host.endswith("."):
             return None
+        last_label = host.rsplit(".", 1)[1]
+        if last_label.isdigit() or (
+            last_label.startswith("0x") and all(c in "0123456789abcdef" for c in last_label[2:])
+        ):
+            # A numeric final label makes resolvers read the host as a
+            # non-canonical IPv4 literal (127.1, 0x7f.0.0.1).
+            return None
         try:
             ipaddress.ip_address(host)
         except ValueError:

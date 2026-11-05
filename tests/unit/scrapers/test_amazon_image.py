@@ -110,3 +110,27 @@ async def test_a_new_price_override_replaces_the_jsonld_image_binding() -> None:
     result = await html_scrape("amazon", page, url=AMAZON_URL)
     assert str(result.price) == "25.00"
     assert result.image_url == OTHER
+
+
+@pytest.mark.parametrize("with_document", [False, True])
+def test_the_jsonld_price_keeps_its_historical_parse_beside_the_image_document(
+    with_document: bool,
+) -> None:
+    from decimal import Decimal
+
+    from bs4 import BeautifulSoup
+
+    from price_tracker.core.page_image import ImageDocument
+    from price_tracker.scrapers.amazon import AmazonScraper
+
+    soup = BeautifulSoup(
+        '<script type="application/ld+json">'
+        '{"@type":"Product","offers":{"price":1e2,"priceCurrency":"EUR"}}</script>',
+        "lxml",
+    )
+    document = ImageDocument.parse(soup) if with_document else None
+    sources: list[str] = []
+    price = AmazonScraper()._try_json_ld_price(soup, image_document=document, image_sources=sources)
+    assert price == Decimal("100.0")
+    assert str(price) == "100.0"
+    assert sources == (["jsonld:0"] if with_document else [])

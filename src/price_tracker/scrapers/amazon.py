@@ -863,7 +863,9 @@ class AmazonScraper(AbstractScraper):
                 bound = (
                     image_document.nodes.get(ref) if image_document is not None and ref else None
                 )
-                data = bound if bound is not None else json.loads(script.string)
+                # The price keeps its historical parse; the strict document only
+                # supplies the provenance reference used for the image.
+                data = json.loads(script.string)
                 if isinstance(data, dict) and data.get("@type") == "Product":
                     # Shared offer selection: skips financing entries and
                     # AggregateOffer.lowPrice, returns the representative

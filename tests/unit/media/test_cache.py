@@ -299,7 +299,7 @@ def test_writes_and_prune_share_one_lock(tmp_path: Path, monkeypatch: pytest.Mon
     writer.start()
     assert entered.wait(5)
     cleaner.start()
-    assert not pruned.is_set()
+    assert not pruned.wait(0.2)
     release.set()
     writer.join(5)
     cleaner.join(5)
@@ -308,3 +308,15 @@ def test_writes_and_prune_share_one_lock(tmp_path: Path, monkeypatch: pytest.Mon
     assert not errors
     assert pruned.is_set()
     assert cache.read("url") == JPEG
+
+
+def test_has_never_waits_for_the_cache_lock(tmp_path: Path) -> None:
+    cache = ThumbnailCache(tmp_path)
+    cache.write("url", JPEG)
+    result: list[bool] = []
+    with cache._lock:
+        worker = threading.Thread(target=lambda: result.append(cache.has("url")))
+        worker.start()
+        worker.join(2)
+    worker.join(5)
+    assert result == [True]

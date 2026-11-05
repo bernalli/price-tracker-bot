@@ -63,8 +63,9 @@ class ThumbnailCache:
         return info if stat.S_ISREG(info.st_mode) else None
 
     def has(self, url: str) -> bool:
-        with self._lock:
-            return self._regular(self.path_for(url)) is not None
+        # One lstat needs no lock; callers run on the event loop and must not
+        # wait for a write's fsync or a prune held by a worker thread.
+        return self._regular(self.path_for(url)) is not None
 
     @classmethod
     def _remove(cls, path: Path, expected: os.stat_result | None = None) -> bool:
