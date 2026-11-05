@@ -33,6 +33,7 @@ def product_row(
     currency: str = "EUR",
     mark: str = "",
     html: bool = True,
+    width: int = ROW_WIDTH,
 ) -> str:
     """Put price/change first; allocate only the remaining display cells to the name.
 
@@ -40,6 +41,8 @@ def product_row(
     list pages. Compact scientific numbers keep extreme amounts/changes
     readable without truncating a monetary value.
     """
+    if not isinstance(width, int) or isinstance(width, bool) or width < 16:
+        raise ValueError("width must be an integer >= 16")
     current, initial = amount(current), amount(initial)
     loc = current_locale()
     try:
@@ -54,15 +57,17 @@ def product_row(
     delta = delta.replace("▼ ", "▼").replace("▲ ", "▲")
     status = f" {sanitize_label(mark)}" if mark else ""
     extra = f" {delta}" if delta else ""
-    if display_width(price + extra) > ROW_WIDTH - 8:
+    if display_width(price + extra) > width - 8:
         if current is not None:
             price = f"{current:.2E} {currency}".rstrip()
         if delta and initial and current is not None:
             delta = _compact_change(initial, current)
             extra = f" {delta}"
-    status = truncate_to_width(status, max(0, ROW_WIDTH - display_width(price + extra) - 5))
+    if display_width(price + extra) > width:
+        extra = ""
+    status = truncate_to_width(status, max(0, width - display_width(price + extra) - 5))
     prefix = price + extra + status
-    budget = max(0, ROW_WIDTH - display_width(prefix) - 1)
+    budget = max(0, width - display_width(prefix) - 1)
     shown = truncate_to_width(sanitize_label(name) or _("Unknown"), budget)
     if html:
         prefix = f"<b>{escape(price)}</b>{escape(extra + status)}"

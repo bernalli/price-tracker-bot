@@ -29,7 +29,11 @@ TRANSITIONAL_IMPORTS: Final = frozenset({"price_tracker.bot.messages"})
 # The callback codec is plain data (stdlib and Babel only); screens encode their own buttons.
 CODEC_MODULE: Final = "price_tracker.bot.callbacks"
 CODEC_IMPORTERS: Final = frozenset(
-    {"src/price_tracker/bot/ui/panels.py", "src/price_tracker/bot/ui/cards.py"}
+    {
+        "src/price_tracker/bot/ui/panels.py",
+        "src/price_tracker/bot/ui/cards.py",
+        "src/price_tracker/bot/ui/list_text.py",
+    }
 )
 
 # The command registry is plain data; only the help screen renders it.
