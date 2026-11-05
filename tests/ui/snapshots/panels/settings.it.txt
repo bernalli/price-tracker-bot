@@ -11,8 +11,10 @@ text:
    | 🚦 Limite: 5 all'ora
    | 🌍 Fuso orario: Europe/Berlin
    | 🗣 Lingua: Automatica (Italiano)
+   | 📉 Calo minimo: 2% e 1 (predefinito)
 keyboard:
    [🔕 Silenzia](cb:s:mu)  [📬 Digest](cb:s:dg)
    [🌙 Ore silenziose](cb:s:qh)  [🚦 Limite](cb:s:th)
    [🌍 Fuso orario](cb:s:tz)  [🗣 Lingua](cb:s:lang)
+   [📉 Calo minimo](cb:s:md)
    [🏠 Home](cb:h)

@@ -11,6 +11,7 @@ text:
    | [🚦 Throttle: [5 per hour 5 per hour 5 per hour] 🚦 Throttle: [5 per hour 5 per hour 5 per hour] 🚦 Throttle: [5 per hour 5 per hour 5 per hour]]
    | [🌍 Timezone: Europe/Berlin 🌍 Timezone: Europe/Berlin 🌍 Timezone: Europe/Berlin]
    | [🗣 Language: [Automatic (Français) Automatic (Français) Automatic (Français)] 🗣 Language: [Automatic (Français) Automatic (Français) Automatic (Français)] 🗣 Language: [Automatic (Français) Automatic (Français) Automatic (Français)]]
+   | [📉 Minimum drop: [[2% and 1 2% and 1 2% and 1] (default) [2% and 1 2% and 1 2% and 1] (default) [2% and 1 2% and 1 2% and 1] (default)] 📉 Minimum drop: [[2% and 1 2% and 1 2% and 1] (default) [2% and 1 2% and 1 2% and 1] (default) [2% and 1 2% and 1 2% and 1] (default)] 📉 Minimum drop: [[2% and 1 2% and 1 2% and 1] (default) [2% and 1 2% and 1 2% and 1] (default) [2% and 1 2% and 1 2% and 1] (default)]]
 keyboard:
    [[🔕 Mute 🔕 Mute 🔕 Mute]](cb:s:mu)
    [[📬 Digest 📬 Digest 📬 Digest]](cb:s:dg)
@@ -18,4 +19,5 @@ keyboard:
    [[🚦 Throttle 🚦 Throttle 🚦 Throt…](cb:s:th)
    [[🌍 Timezone 🌍 Timezone 🌍 Timez…](cb:s:tz)
    [[🗣 Language 🗣 Language 🗣 Langu…](cb:s:lang)
+   [[📉 Minimum drop 📉 Minimum drop …](cb:s:md)
    [[🏠 Home 🏠 Home 🏠 Home]](cb:h)

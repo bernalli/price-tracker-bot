@@ -15,6 +15,8 @@ from price_tracker.bot.command_menus import sync_command_menus
 from price_tracker.bot.handlers import register_handlers
 from price_tracker.bot.release_updates import announce_release
 from price_tracker.config import Config, parse_bind
+from price_tracker.core.domain_spacing import DomainSpacing
+from price_tracker.core.drop_floor import DropFloor
 from price_tracker.core.health import HealthManager
 from price_tracker.core.http_client import build_client
 from price_tracker.core.registry import (
@@ -129,6 +131,10 @@ async def _setup_scheduler(application: Application[Any, Any, Any, Any, Any, Any
             lang=config.lang,
             health_mgr=health_mgr,
             metrics=metrics,
+            # Checks on one store start at least this far apart; every client
+            # shares the outbound address, so the store sees them as one visitor.
+            domain_spacing=DomainSpacing(min_gap=config.domain_min_gap_seconds),
+            drop_floor=DropFloor(config.min_drop_percent, config.min_drop_absolute),
         )
     )
 

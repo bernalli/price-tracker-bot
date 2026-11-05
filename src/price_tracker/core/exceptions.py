@@ -46,10 +46,15 @@ class BlockEvent(ScrapeError):
 
 
 class HTTPBlockStatus(BlockEvent):
-    """HTTP 429 (Too Many Requests) or 403 (Forbidden) status response."""
+    """HTTP 429 (Too Many Requests) or 403 (Forbidden) status response.
 
-    def __init__(self, *, status: int, url: str = "") -> None:
+    ``retry_after`` keeps the response's ``Retry-After`` header, when it carried a
+    textual one, so the scheduler can defer the store for as long as it asked.
+    """
+
+    def __init__(self, *, status: int, url: str = "", retry_after: str | None = None) -> None:
         self.status = status
+        self.retry_after = retry_after if isinstance(retry_after, str) else None
         super().__init__(f"HTTP {status} block on {url}", url=url)
 
 

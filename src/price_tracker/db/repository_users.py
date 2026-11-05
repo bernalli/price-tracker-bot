@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from price_tracker.core.drop_floor import MIN_DROP_CHOICES
 from price_tracker.db.models import NotificationPrefs, UserRecord
 from price_tracker.db.repository_common import (
     _TELEGRAM_TAG_RE,
@@ -87,6 +88,29 @@ class UserRepositoryMixin(_RepositoryBase):
         )
         await self._conn.commit()
         return int(cursor.rowcount) > 0
+
+    async def set_user_min_drop(self, user_id: int, choice: str | None) -> bool:
+        """Store the minimum drop before a price alert (``None`` = server default).
+
+        ``choice`` is ``"off"`` or a percentage preset; anything else raises
+        ``ValueError``. Returns False when the user does not exist.
+        """
+        if choice is not None and choice not in MIN_DROP_CHOICES:
+            raise ValueError(f"unsupported min_drop choice: {choice!r}")
+        cursor = await self._conn.execute(
+            "UPDATE users SET min_drop = ? WHERE user_id = ?", (choice, user_id)
+        )
+        await self._conn.commit()
+        return int(cursor.rowcount) > 0
+
+    async def get_user_min_drop(self, user_id: int) -> str | None:
+        """The stored minimum-drop choice, ``None`` for the default or an unknown user."""
+        cursor = await self._conn.execute(
+            "SELECT min_drop FROM users WHERE user_id = ?", (user_id,)
+        )
+        row = await cursor.fetchone()
+        value = row[0] if row else None
+        return value if value in MIN_DROP_CHOICES else None
 
     async def set_user_telegram_tag(self, user_id: int, tag: object) -> bool:
         """Record the IETF tag Telegram last reported for the user, verbatim.

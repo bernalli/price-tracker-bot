@@ -26,6 +26,7 @@ from price_tracker.core.scraper_base import (
     get_headers,
     jsonld_offer_availability,
     parse_price,
+    retry_after_header,
 )
 
 if TYPE_CHECKING:
@@ -80,12 +81,22 @@ class AliexpressScraper(AbstractScraper):
     async def scrape(self, url: str, client: httpx.AsyncClient) -> ProductInfo:
         try:
             response = await _fetch_aliexpress_html(url, client)
-            detect_block_event(status_code=response.status_code, body=response.text, url=url)
+            detect_block_event(
+                status_code=response.status_code,
+                body=response.text,
+                url=url,
+                retry_after=retry_after_header(response),
+            )
         except httpx.HTTPStatusError as e:
             # raise_for_status() lives inside the retry scope now, so hard
             # blocks (403/429) surface here — re-check them for BlockEvent
             # before degrading, so quarantine still engages (#55).
-            detect_block_event(status_code=e.response.status_code, body=e.response.text, url=url)
+            detect_block_event(
+                status_code=e.response.status_code,
+                body=e.response.text,
+                url=url,
+                retry_after=retry_after_header(e.response),
+            )
             logger.debug("AliExpress fetch failed for %s: %s", url[:80], e)
             return ProductInfo(error=f"HTTP error: {e}")
         except (httpx.HTTPError, ValueError) as e:

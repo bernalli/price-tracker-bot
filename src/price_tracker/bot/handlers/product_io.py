@@ -26,6 +26,7 @@ from telegram.ext import (
 
 from price_tracker.app.inputs import Absolute, Percentage, parse_threshold
 from price_tracker.bot.decorators import _client, _db, _scraper, restricted, with_locale
+from price_tracker.bot.handlers._helpers import _record_manual_start
 from price_tracker.bot.messages import _
 
 logger = logging.getLogger(__name__)
@@ -207,6 +208,7 @@ async def cmd_import(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             if scraper_for_url is None:
                 errors += 1
                 continue
+            _record_manual_start(context, url)
             result = await scraper_for_url.scrape(url, client)
             price = result.price
             name = result.name or row.get("Nome", _("Imported"))

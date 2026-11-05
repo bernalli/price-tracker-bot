@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-11-05
+
+### Added
+
+- A minimum drop before a price alert: by default a drop must be at least 2% and at least 1 in the
+  product's currency, for every alert rule including "any drop". Change it in Settings → Minimum drop
+  (off, 1%, 2% or 5%).
+
+### Fixed
+
+- Shopify stores that rate-limit the product JSON (HTTP 429) are read from the product page instead of
+  pausing the whole store.
+- Shopify prices: the currency comes from the product JSON, so each check makes one request instead of two;
+  prices in the theme's embedded JSON (in cents) are no longer read 100 times too high; the requested variant
+  is honoured on the page fallback, and the page currency is kept.
+- Checks on the same store start at least 30 seconds apart (`DOMAIN_MIN_GAP_SECONDS`), and a `Retry-After`
+  from a store postpones its next checks.
+- A store that pauses again within a day no longer sends another notice, and operational notices are sent
+  without link previews.
+
+### Changed
+
+- The Docker image no longer installs Chromium.
+
 ## [1.8.3] - 2026-11-01
 
 ### Fixed

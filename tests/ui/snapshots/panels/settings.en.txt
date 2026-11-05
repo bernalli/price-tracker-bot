@@ -11,8 +11,10 @@ text:
    | 🚦 Throttle: 5 per hour
    | 🌍 Timezone: Europe/Berlin
    | 🗣 Language: Automatic (English)
+   | 📉 Minimum drop: 2% and 1 (default)
 keyboard:
    [🔕 Mute](cb:s:mu)  [📬 Digest](cb:s:dg)
    [🌙 Quiet hours](cb:s:qh)  [🚦 Throttle](cb:s:th)
    [🌍 Timezone](cb:s:tz)  [🗣 Language](cb:s:lang)
+   [📉 Minimum drop](cb:s:md)
    [🏠 Home](cb:h)

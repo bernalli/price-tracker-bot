@@ -102,7 +102,10 @@ def _row_to_product(row: tuple[Any, ...]) -> ProductRecord:
 
 
 _TELEGRAM_TAG_RE = re.compile(r"[A-Za-z0-9_-]{1,35}")
-_USER_COLS = "user_id, is_admin, is_active, display_name, username, language, telegram_language_tag"
+_USER_COLS = (
+    "user_id, is_admin, is_active, display_name, username, language, telegram_language_tag, "
+    "min_drop"
+)
 
 
 def _row_to_user(row: Any) -> UserRecord:
@@ -114,6 +117,7 @@ def _row_to_user(row: Any) -> UserRecord:
         username=row[4],
         language=row[5],
         telegram_language_tag=row[6],
+        min_drop=row[7],
     )
 
 

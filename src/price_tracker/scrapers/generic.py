@@ -36,6 +36,7 @@ from price_tracker.core.scraper_base import (
     detect_listing_gone,
     get_headers,
     parse_price,
+    retry_after_header,
     select_jsonld_offer,
 )
 
@@ -82,7 +83,12 @@ async def _fetch_generic_html(url: str, client: httpx.AsyncClient) -> str:
     # Surface 403/429 (and WAF/CAPTCHA bodies) as a BlockEvent BEFORE
     # raise_for_status, so the scheduler quarantines the domain instead of
     # recording a generic failure (#16). with_retry never retries BlockEvents.
-    detect_block_event(status_code=response.status_code, body=response.text, url=url)
+    detect_block_event(
+        status_code=response.status_code,
+        body=response.text,
+        url=url,
+        retry_after=retry_after_header(response),
+    )
     detect_listing_gone(status_code=response.status_code, url=url)
     response.raise_for_status()
     return response.text

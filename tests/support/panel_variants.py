@@ -6,7 +6,7 @@ import dataclasses
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
-from price_tracker.app.views import HomeView, PrefsView
+from price_tracker.app.views import HomeView, PrefsView, min_drop_view
 from price_tracker.bot.ui.panels import (
     add_screen,
     home_screen,
@@ -57,6 +57,9 @@ SCREENS: dict[str, Callable[[], Screen]] = {
     "settings_language": lambda: settings_section_screen("lang", BUSY, now=NOW, language="it"),
     "settings_timezone": lambda: settings_section_screen("tz", BUSY, now=NOW),
     "settings_throttle": lambda: settings_section_screen("th", BUSY, now=NOW),
+    "settings_min_drop": lambda: settings_section_screen(
+        "md", BUSY, now=NOW, min_drop=min_drop_view("5")
+    ),
     "product_prefs": lambda: product_prefs_screen("Kettle", 7, BUSY, now=NOW),
     "add": add_screen,
     "home_user": lambda: home_screen(HomeView(active=3, paused=1, is_admin=False)),

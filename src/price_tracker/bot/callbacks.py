@@ -50,13 +50,15 @@ PERIODS: Final = ("7d", "30d", "90d", "1y", "all")
 THEMES: Final = ("light", "dark")
 MUTE_PRESETS: Final = ("1", "8", "24", "0")
 LIST_FILTERS: Final = ("a", "p", "e", "o")
-SETTINGS_SECTIONS: Final = ("mu", "dg", "qh", "lang", "tz", "th")
+SETTINGS_SECTIONS: Final = ("mu", "dg", "qh", "lang", "tz", "th", "md")
 # The settings that take a typed value: mute hours, digest minutes, quiet hours,
 # time zone and notifications per hour.
 ASK_SETTINGS: Final = ("mu", "dg", "qh", "tz", "th")
 SETTINGS_MUTE: Final = (*MUTE_PRESETS, "off")
 SETTINGS_DIGEST: Final = ("on", "off")
 SETTINGS_QUIET: Final = ("2208", "off")
+# The minimum-drop presets: off, or a percentage of the old price.
+SETTINGS_MIN_DROP: Final = ("off", "1", "2", "5")
 OFFER_FILTERS: Final = ("n", "u", "s1", "s0", "0")
 HELP_SECTIONS: Final = ("tracking", "alerts", "prefs", "data", "admin")
 CURRENCY_CHOICE_LITERALS: Final = ("type", "cancel")
@@ -435,6 +437,9 @@ def build_registry() -> ActionRegistry:
         ActionSpec("settings.mute", (_lit("s"), _lit("mu"), Choice("hours", SETTINGS_MUTE))),
         ActionSpec("settings.digest", (_lit("s"), _lit("dg"), Choice("mode", SETTINGS_DIGEST))),
         ActionSpec("settings.quiet", (_lit("s"), _lit("qh"), Choice("window", SETTINGS_QUIET))),
+        ActionSpec(
+            "settings.min_drop", (_lit("s"), _lit("md"), Choice("floor", SETTINGS_MIN_DROP))
+        ),
         ActionSpec("settings.chart_theme", (_lit("s"), _lit("ct"), Choice("theme", THEMES))),
         ActionSpec(
             "settings.language", (_lit("s"), _lit("lang"), Choice("locale", LANGUAGE_CHOICES))

@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 import httpx
 
+from price_tracker.core.domain_spacing import DomainSpacing
+from price_tracker.core.drop_floor import NO_DROP_FLOOR, DropFloor
 from price_tracker.core.exceptions import LISTING_GONE_STATUSES, ListingGone, ParseError
 from price_tracker.core.health import HealthManager
 from price_tracker.core.outlier import REQUIRED_CONFIRMATIONS
@@ -117,6 +119,10 @@ class SchedulerDeps:
     read_confirmations: int = REQUIRED_CONFIRMATIONS
     lang: str | None = None
     """Agreeing reads needed before an implausible price is trusted."""
+    domain_spacing: DomainSpacing = field(default_factory=lambda: DomainSpacing(min_gap=0))
+    """Per-store spacing of scheduled checks; startup passes DOMAIN_MIN_GAP_SECONDS."""
+    drop_floor: DropFloor = NO_DROP_FLOOR
+    """Server-default minimum drop for an alert; startup passes MIN_DROP_PERCENT/ABSOLUTE."""
 
 
 @dataclass(frozen=True)

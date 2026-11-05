@@ -1,0 +1,15 @@
+# ui snapshot v1
+# screen: panels.settings_min_drop
+# locale: fr
+# now: 2026-03-01T12:00:00Z
+text:
+   | [📉 <b>Minimum drop</b> 📉 <b>Minimum drop</b> 📉 <b>Minimum drop</b>]
+   | 
+   | [A price drop is announced only when it is at least this share of the old price and at least 1 in the product's currency. A price drop is announced only when it is at least this share of the old price and at least 1 in the product's currency. A price drop is announced only when it is at least this share of the old price and at least 1 in the product's currency.]
+   | 
+   | [Current: [5% and 1 5% and 1 5% and 1] Current: [5% and 1 5% and 1 5% and 1] Current: [5% and 1 5% and 1 5% and 1]]
+keyboard:
+   [[Off Off Off]](cb:s:md:off)  [1%](cb:s:md:1)
+   [2%](cb:s:md:2)  [5% ✓](cb:s:md:5)
+   [[⬅️ Settings ⬅️ Settings ⬅️ Setti…](cb:s)
+   [[🏠 Home 🏠 Home 🏠 Home]](cb:h)

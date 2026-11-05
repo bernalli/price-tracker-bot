@@ -5,8 +5,10 @@ from __future__ import annotations
 import asyncio
 import logging
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any, cast
+
+import aiosqlite
 
 from price_tracker.bot.messages import reset_locale, set_locale, user_locale
 from price_tracker.core.alert import (
@@ -27,6 +29,34 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger("price_tracker.core.scheduler")
 
+# A store that keeps rate-limiting re-enters quarantine every few hours (the
+# breaker closes after a good probe, the next blocks lock it again). The user
+# hears about it once a day; /errors shows the quarantine all along.
+QUARANTINE_NOTICE_INTERVAL = timedelta(hours=24)
+_QUARANTINE_NOTICE_KEY_PREFIX = "quarantine_notice:"
+
+
+def quarantine_notice_key(user_id: int, domain: str) -> str:
+    """``bot_config`` key holding when ``user_id`` was last told ``domain`` paused."""
+    return f"{_QUARANTINE_NOTICE_KEY_PREFIX}{user_id}:{domain}"
+
+
+def _stored_notice_time(value: object, *, now: datetime) -> datetime | None:
+    """The stored notice time, or ``None`` when it is missing, unreadable or ahead of ``now``.
+
+    A time ahead of ``now`` (the clock moved back) is ignored rather than trusted:
+    it would otherwise silence the notice until the clock caught up.
+    """
+    if not isinstance(value, str):
+        return None
+    try:
+        when = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    if when.tzinfo is None or when > now:
+        return None
+    return when
+
 
 class NoticeDeliveryMixin:
     """Operational notices and notifier delivery responsibility."""
@@ -38,9 +68,30 @@ class NoticeDeliveryMixin:
     ) -> None:
         """Push a one-shot alert when ``domain`` first enters quarantine.
 
-        Called only on the CLOSED → LOCKED transition. The notifier runs under a
-        broad try/except so a flaky transport never aborts the scheduler tick.
+        Called only on the CLOSED → LOCKED transition, and pushed at most once per
+        :data:`QUARANTINE_NOTICE_INTERVAL` for the same user and domain. The time
+        of the last delivered notice lives in ``bot_config``, so the interval
+        holds across a restart. The notifier runs under a broad try/except so a
+        flaky transport never aborts the scheduler tick.
         """
+        key = quarantine_notice_key(product.user_id, domain)
+        now = datetime.now(UTC)
+        try:
+            stored = await self.deps.repo.get_config(key)
+        except aiosqlite.Error:
+            # Better a second notice than a lost one.
+            logger.warning("Could not read the last quarantine notice time for %s", domain)
+            stored = None
+        last = _stored_notice_time(stored, now=now)
+        if last is not None and now - last < QUARANTINE_NOTICE_INTERVAL:
+            logger.info(
+                "Quarantine of %s re-entered within %s of the last notice to user %d; "
+                "not pushed again",
+                domain,
+                QUARANTINE_NOTICE_INTERVAL,
+                product.user_id,
+            )
+            return
         async with self._recipient_locale(product.user_id):
             message = format_quarantine_notification(
                 domain=domain,
@@ -48,7 +99,7 @@ class NoticeDeliveryMixin:
                 locked_until=self.deps.health_mgr.locked_until(domain),
             )
         product_name = truncate_visible(product.name or product.url, NAME_BUDGET)
-        await self._notify(
+        delivered = await self._notify(
             product.user_id,
             message,
             product_id=None,
@@ -64,6 +115,12 @@ class NoticeDeliveryMixin:
                 ),
             },
         )
+        if not delivered:
+            return
+        try:
+            await self.deps.repo.set_config(key, now.isoformat())
+        except aiosqlite.Error:
+            logger.warning("Could not record the quarantine notice time for %s", domain)
 
     async def _record_failure_and_maybe_disable(
         self,

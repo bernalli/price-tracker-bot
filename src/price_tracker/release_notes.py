@@ -58,6 +58,10 @@ RELEASE_NOTES: dict[str, tuple[str, ...]] = {
     "1.8.1": (),
     "1.8.2": (),
     "1.8.3": (),
+    "1.9.0": (
+        N_("Skip tiny price drops"),
+        N_("Fewer store pause notices"),
+    ),
 }
 
 MESSAGE_LIMIT = 1200

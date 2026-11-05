@@ -33,6 +33,7 @@ EXPECTED = {
     "import": "📥",
     "interval": "⏱",
     "language": "🗣",
+    "min_drop": "📉",
     "mute": "🔕",
     "notifications": "🔔",
     "pause": "⏸",
@@ -82,6 +83,7 @@ ACTION_KEYS = {
 SECTION_KEYS = {
     "dg": "digest",
     "lang": "language",
+    "md": "min_drop",
     "mu": "mute",
     "qh": "quiet_hours",
     "th": "throttle",
