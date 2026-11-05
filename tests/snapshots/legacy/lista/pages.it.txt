@@ -16,10 +16,11 @@
    | <b>18,00 €</b> ▼10% Lamp
    | <b>18,00 €</b> ▼10% Heater
    | <b>18,00 €</b> ▼10% ⚠️ Mixer
+   | <b>18,00 €</b> ▼10% Toaster
    keyboard:
    | [#1 Kettle → l:a:1:1] [#2 Fan → l:a:1:2]
    | [#3 Lamp → l:a:1:3] [#4 Heater → l:a:1:4]
-   | [#5 Mixer → l:a:1:5]
+   | [#5 Mixer → l:a:1:5] [#6 Toaster → l:a:1:6]
    | [1/2 → noop] [▶️ → l:a:2]
    | [✅ Attivi ✓ → l:a:1] [⏸ In pausa → l:p:1]
    | [⚠️ Errori → l:e:1] [🚫 Esaurito → l:o:1]
@@ -37,10 +38,9 @@
    | attivi (7)
    | pagina 2/2
    |
-   | <b>18,00 €</b> ▼10% Toaster
    | <b>18,00 €</b> ▼10% Blender
    keyboard:
-   | [#6 Toaster → l:a:2:6] [#7 Blender → l:a:2:7]
+   | [#7 Blender → l:a:2:7]
    | [⬅️ → l:a:1] [2/2 → noop]
    | [✅ Attivi ✓ → l:a:1] [⏸ In pausa → l:p:1]
    | [⚠️ Errori → l:e:1] [🚫 Esaurito → l:o:1]

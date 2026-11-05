@@ -23,7 +23,7 @@ from hypothesis import strategies as st
 from telegram.error import BadRequest, RetryAfter
 
 import price_tracker
-from price_tracker.app.views import HomeView
+from price_tracker.app.views import PAGE_SIZE, HomeView
 from price_tracker.bot.callbacks import (
     ID_MAX,
     REGISTRY,
@@ -576,8 +576,9 @@ async def test_a_page_past_the_end_is_clamped_to_the_last(
     repo: Repository, twelve: list[int], asked: int
 ) -> None:
     query = await press(repo, f"l:a:{asked}")
-    assert_shows(query, await render_list(repo, "a", 3))
-    assert "page 3/3" in shown(query)[0]
+    last = (len(twelve) + PAGE_SIZE - 1) // PAGE_SIZE
+    assert_shows(query, await render_list(repo, "a", last))
+    assert f"page {last}/{last}" in shown(query)[0]
 
 
 async def test_a_filter_that_emptied_says_so(repo: Repository) -> None:

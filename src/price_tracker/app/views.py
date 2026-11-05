@@ -32,7 +32,9 @@ ProductStatus = Literal["active", "paused", "suspended"]
 ThresholdType = Literal["percentage", "absolute", "target", "any_drop"]
 ListFilter = Literal["a", "p", "e", "o"]
 
-PAGE_SIZE: Final = 5
+PAGE_SIZE: Final = 6
+LIST_FILTER_ORDER: Final[tuple[ListFilter, ...]] = ("a", "p", "e", "o")
+MAX_IMAGE_URL_LENGTH: Final = 2048
 
 _CURRENCY_CODE_RE: Final = re.compile(r"[A-Z]{3}")
 
@@ -118,6 +120,7 @@ class ProductView:
     reference_estimate: Decimal | None
     reference_currency: str
     out_of_stock: bool = False
+    image_url: str | None = None
 
     def __post_init__(self) -> None:
         _check_int("id", self.id, minimum=1)
@@ -139,6 +142,14 @@ class ProductView:
         _check_int("default_interval_minutes", self.default_interval_minutes, minimum=1)
         _check_aware_datetime("last_checked_at", self.last_checked_at)
         _check_bool("out_of_stock", self.out_of_stock)
+        if self.image_url is not None:
+            from price_tracker.core.image_url import normalize_image_url
+
+            if (
+                not isinstance(self.image_url, str)
+                or normalize_image_url(self.image_url, base_url="") != self.image_url
+            ):
+                raise ValueError("image_url: must be a canonical HTTPS image URL or None")
 
 
 @dataclass(frozen=True, slots=True)
@@ -174,6 +185,7 @@ class ListPage:
     pages: int
     total: int
     items: tuple[ProductView, ...]
+    counts: tuple[int, int, int, int] | None = None
 
     def __post_init__(self) -> None:
         _check_literal("filter", self.filter, get_args(ListFilter))
@@ -184,6 +196,13 @@ class ListPage:
         _check_int("total", self.total, minimum=0)
         if len(self.items) > PAGE_SIZE:
             raise ValueError(f"items: at most {PAGE_SIZE}, got {len(self.items)}")
+        if self.counts is not None:
+            if not isinstance(self.counts, tuple) or len(self.counts) != 4:
+                raise ValueError("counts: must be a tuple of four non-negative integers")
+            for count in self.counts:
+                _check_int("counts", count, minimum=0)
+            if self.counts[LIST_FILTER_ORDER.index(self.filter)] != self.total:
+                raise ValueError("counts: the selected filter must match total")
 
 
 @dataclass(frozen=True, slots=True)

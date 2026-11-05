@@ -14,6 +14,7 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
+from price_tracker.app.views import PAGE_SIZE
 from price_tracker.bot.callbacks import Action
 from price_tracker.bot.handlers import history, monitoring, product
 from price_tracker.bot.handlers._cards import list_view
@@ -68,7 +69,7 @@ async def test_every_list_has_one_narrow_row_per_product(
             for i in range(1, count + 1)
         ]
         rows: list[str] = []
-        for page in range(1, (count + 4) // 5 + 1):
+        for page in range(1, (count + PAGE_SIZE - 1) // PAGE_SIZE + 1):
             screen = list_page(list_view(products, "a", page, default_interval_minutes=60))
             rows.extend(screen.text.split("\n\n", 1)[1].splitlines())
         assert_rows(rows, count)
