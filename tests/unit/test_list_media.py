@@ -345,13 +345,16 @@ async def test_other_card_failures_never_retry_or_refuse_preview(rig, monkeypatc
     start = len(rig.request.calls)
     if reason in ("forbidden", "invalid"):
         original = rig.request.do_request
+        attempts: list[str] = []
 
         async def fail(**kwargs):
+            attempts.append(kwargs["url"].rsplit("/", 1)[-1])
             raise Forbidden("denied") if reason == "forbidden" else InvalidToken("denied")
 
         monkeypatch.setattr(rig.request, "do_request", fail)
         await media.edit_card(query(rig, text_id), rig.mode, SCREEN, URL)
         monkeypatch.setattr(rig.request, "do_request", original)
+        assert attempts == ["editMessageText"]
         assert len(rig.request.calls) == start
     else:
         if reason == "missing":

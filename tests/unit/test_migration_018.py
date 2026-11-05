@@ -125,6 +125,7 @@ async def test_a_failing_last_statement_rolls_back_the_whole_migration(tmp_path)
         "https://",
         "",
         "h" * 2049,
+        "https://" + "a" * 2041,
         "\0https://x.example/a",
         "https://x\0" + "a" * 3000,
         b"https://cdn.example/x.jpg",

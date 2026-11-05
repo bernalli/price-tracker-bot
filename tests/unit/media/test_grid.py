@@ -152,6 +152,18 @@ def test_hostile_text_and_long_prices_are_bounded(price: str) -> None:
         pass
 
 
+def test_prices_shrink_from_30_to_16_px_then_truncate_within_the_image_width() -> None:
+    label, font = grid._price_label("$12.00")
+    assert (label, font.size) == ("$12.00", 30)
+    long_price = "£1234567890" * 30
+    label, font = grid._price_label(long_price)
+    assert font.size == 16
+    assert label.endswith("…")
+    assert long_price.startswith(label[:-1])
+    assert font.getlength(label) <= grid.IMAGE_SIDE
+    assert font.getlength(label[:-1] + long_price[len(label) - 1] + "…") > grid.IMAGE_SIDE
+
+
 def test_missing_bundled_font_uses_the_default(
     tmp_path: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:

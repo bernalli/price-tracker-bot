@@ -44,9 +44,14 @@ async def paired(tmp_path, monkeypatch):
         mode = wire_two_messages(w, tmp_path, clock=lambda: clock[0])
         cache = ThumbnailCache(tmp_path / "thumbs")
         cache.write(URL, make_thumbnail(jpeg_bytes()))
-        rig = SimpleNamespace(w=w, mode=mode, clock=clock, callbacks=[], cache=cache)
+        rig = SimpleNamespace(w=w, mode=mode, clock=clock, callbacks=[], commands=[], cache=cache)
         yield rig
-        assert_two_message_invariants(w.request, rig.callbacks)
+        assert_two_message_invariants(
+            w.request,
+            rig.callbacks,
+            command_calls=rig.commands,
+            grids=w.app.bot_data.get("list_grids"),
+        )
         assert w.errors == []
         assert not any("An error occurred" in text for text in w.texts_to(PRIVATE))
         await w.app.bot_data["http_client"].aclose()
@@ -56,6 +61,7 @@ async def command(rig: Any) -> list[Any]:
     start = len(rig.w.request.calls)
     await rig.w.text(PRIVATE, OWNER, "/list")
     calls = list(rig.w.request.calls[start:])
+    rig.commands.append(calls)
     assert [c.method for c in calls] in (["sendPhoto", "sendMessage"], ["sendMessage"])
     return calls
 
@@ -284,6 +290,11 @@ async def test_concurrent_callbacks_do_not_overlap(paired):
     edits = [c for c in r.w.request.calls if c.method in ("editMessageText", "editMessageMedia")]
     assert [c.method for c in edits] == ["editMessageText", "editMessageMedia"] * 2
     assert not overlapping(edits)
+    last_text = edits[-2]
+    assert r.w.request.remote_of(PRIVATE, text_id).text == last_text.params["text"]
+    opened = [data.rsplit(":", 1)[1] for data in last_text.callback_data() if data.count(":") == 3]
+    entry = r.mode.grids.get((PRIVATE, text_id))
+    assert [str(tile.product_id) for tile in entry.fingerprint] == opened
 
 
 async def test_an_emptied_list_has_an_empty_grid_and_add_navigation(paired):

@@ -158,3 +158,40 @@ def test_malformed_field_types_never_form_an_outcome(field: str, value: Any) -> 
     values = {"kind": OutcomeKind.APPLIED, field: value}
     with pytest.raises(ValueError, match="outcome"):
         Outcome(**values)
+
+
+@given(
+    st.one_of(
+        st.integers(min_value=-(10**9), max_value=10**9),
+        st.floats(min_value=-1e9, max_value=1e9, allow_nan=False).map(
+            lambda seconds: timedelta(seconds=seconds)
+        ),
+    )
+)
+@settings(max_examples=200, deadline=None)
+def test_any_retry_after_value_is_a_finite_non_negative_delay(value: int | timedelta) -> None:
+    outcome = asyncio.run(attempt(fail(RetryAfter(value))))
+    expected = value.total_seconds() if isinstance(value, timedelta) else float(value)
+    assert outcome.kind is OutcomeKind.RETRY_AFTER
+    assert outcome.retry_after == max(0.0, expected)
+
+
+@given(
+    st.sampled_from(["token", "conflict", "endpoint", "migrated"]),
+    st.text(max_size=1000),
+    st.integers(min_value=-(2**63), max_value=2**63 - 1),
+)
+@settings(max_examples=200, deadline=None)
+def test_certain_refusals_are_rejected_whatever_their_text(
+    kind: str, reason: str, chat_id: int
+) -> None:
+    error = (
+        ChatMigrated(chat_id)
+        if kind == "migrated"
+        else {"token": InvalidToken, "conflict": Conflict, "endpoint": EndPointNotFound}[kind](
+            reason
+        )
+    )
+    outcome = asyncio.run(attempt(fail(error)))
+    assert outcome.kind is OutcomeKind.REJECTED
+    assert outcome.reason == f"{type(error).__name__}: {error}"

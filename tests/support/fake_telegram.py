@@ -156,6 +156,7 @@ class FakeRequest(BaseRequest):
         )
         self._holds: dict[str, deque[asyncio.Event]] = defaultdict(deque)
         self._sequence = itertools.count(1)
+        self._checked_photo_size: tuple[int, int] = (1, 1)
 
     def remote_of(self, chat_id: int, message_id: int) -> RemoteMessage | None:
         return self.remote.get((chat_id, message_id))
@@ -210,10 +211,10 @@ class FakeRequest(BaseRequest):
                 self.violations.append(f"callback_data {callback!r} out of 1..64 bytes")
 
         media = _json_dict(params.get("media"))
+        self._checked_photo_size = (1, 1)
         if method == "sendPhoto" or (
             method == "editMessageMedia" and media is not None and media.get("type") == "photo"
         ):
-            self._checked_photo_size = (1, 1)
             data = self._photo_bytes(params, request_data)
             if len(data) > 10_000_000:
                 self.violations.append(f"{method}: photo size {len(data)}")

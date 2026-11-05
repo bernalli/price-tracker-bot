@@ -12,7 +12,13 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 from PIL import Image
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, LinkPreviewOptions
+from telegram import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    InputMediaDocument,
+    InputMediaPhoto,
+    LinkPreviewOptions,
+)
 from telegram.error import BadRequest, RetryAfter, TimedOut
 
 from tests.support.fake_telegram import (
@@ -157,12 +163,35 @@ async def test_not_modified_is_simulated_only_when_enabled():
             message.message_id,
             link_preview_options=LinkPreviewOptions(is_disabled=True),
         )
-        await app.bot.edit_message_text(
-            "Original",
-            1,
-            message.message_id,
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Open", callback_data="x")]]),
+        remote = request.remote_of(1, message.message_id)
+        assert remote is not None
+        assert remote.link_preview == {"is_disabled": True}
+        markup = InlineKeyboardMarkup([[InlineKeyboardButton("Open", callback_data="x")]])
+        keyboard_only = {
+            "reply_markup": markup,
+            "link_preview_options": LinkPreviewOptions(is_disabled=True),
+        }
+        await app.bot.edit_message_text("Original", 1, message.message_id, **keyboard_only)
+        remote = request.remote_of(1, message.message_id)
+        assert remote is not None
+        assert remote.reply_markup == {
+            "inline_keyboard": [[{"text": "Open", "callback_data": "x"}]]
+        }
+        with pytest.raises(BadRequest, match="not modified"):
+            await app.bot.edit_message_text("Original", 1, message.message_id, **keyboard_only)
+
+
+async def test_a_non_photo_media_edit_records_the_neutral_size():
+    request = FakeRequest()
+    async with make_application(request) as app:
+        await app.bot.send_photo(1, photo((40, 30)))
+        message = await app.bot.send_message(1, "x")
+        await app.bot.edit_message_media(
+            InputMediaDocument(b"a,b\n", filename="a.csv"), 1, message.message_id
         )
+        remote = request.remote_of(1, message.message_id)
+        assert remote is not None
+        assert remote.photo_size == (1, 1)
 
 
 async def test_attempts_include_failed_calls():

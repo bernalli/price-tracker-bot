@@ -51,7 +51,11 @@ async def press_on(
 
 
 def assert_two_message_invariants(
-    request: FakeRequest, callback_calls: Sequence[Sequence[Call]]
+    request: FakeRequest,
+    callback_calls: Sequence[Sequence[Call]],
+    *,
+    command_calls: Sequence[Sequence[Call]] = (),
+    grids: GridRegistry | None = None,
 ) -> None:
     photo_ids = {
         (call.chat_id, call.message_id)
@@ -73,4 +77,13 @@ def assert_two_message_invariants(
             assert (call.chat_id, call.params["message_id"]) not in photo_ids
     for calls in callback_calls:
         assert all(call.method not in {"sendPhoto", "sendMessage"} for call in calls)
+    confirmed: dict[tuple[int | None, int | None], int | None] = {}
+    for calls in command_calls:
+        sends = [call for call in calls if call.method in {"sendPhoto", "sendMessage"}]
+        assert [call.method for call in sends] in (["sendMessage"], ["sendPhoto", "sendMessage"])
+        if len(sends) == 2 and not sends[0].failed and not sends[1].failed:
+            confirmed[(sends[1].chat_id, sends[1].message_id)] = sends[0].message_id
+    if grids is not None:
+        for key, entry in grids._entries.items():
+            assert confirmed.get(key) == entry.grid_message_id
     assert request.violations == []

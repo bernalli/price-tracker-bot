@@ -143,6 +143,9 @@ class ProductView:
         _check_aware_datetime("last_checked_at", self.last_checked_at)
         _check_bool("out_of_stock", self.out_of_stock)
         if self.image_url is not None:
+            # Deferred on purpose: importing this module must not load httpx
+            # (tests/ui/test_layers.py::test_ui_imports_are_effect_free), and the
+            # shared normaliser parses URLs with httpx.
             from price_tracker.core.image_url import normalize_image_url
 
             if (
