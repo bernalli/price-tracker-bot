@@ -114,16 +114,24 @@ msgstr "Liste su una riga"
 msgid "What’s new after each update"
 msgstr "Novità dopo ogni aggiornamento"
 
-#: src/price_tracker/release_notes.py:90
+#: src/price_tracker/release_notes.py:62
+msgid "Skip tiny price drops"
+msgstr "Niente avvisi per cali minimi"
+
+#: src/price_tracker/release_notes.py:63
+msgid "Fewer store pause notices"
+msgstr "Meno avvisi di negozi in pausa"
+
+#: src/price_tracker/release_notes.py:95
 #, python-brace-format
 msgid "Updated to version {version}"
 msgstr "Aggiornato alla versione {version}"
 
-#: src/price_tracker/release_notes.py:107
+#: src/price_tracker/release_notes.py:112
 msgid "Earlier:"
 msgstr "In precedenza:"
 
-#: src/price_tracker/release_notes.py:108
+#: src/price_tracker/release_notes.py:113
 msgid "…and earlier improvements."
 msgstr "…e altre novità precedenti."
 
