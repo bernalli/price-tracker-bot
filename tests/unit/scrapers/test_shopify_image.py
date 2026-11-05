@@ -1,16 +1,21 @@
 """Shopify images follow the exact priced variant and its verified associations."""
 
 import json
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
 import pytest
+import respx
 
+from price_tracker.core.http_client import build_client
+from price_tracker.scrapers import shopify
 from tests.unit.scrapers.test_image_identity import (
     IMAGE,
     OTHER,
     URL,
     api_scrape,
+    group,
     html_scrape,
     ld,
     owner,
@@ -97,9 +102,46 @@ async def test_missing_or_unsafe_images_stay_absent(image: Any) -> None:
     assert (await api_scrape(payload(image=image))).image_url is None
 
 
-async def test_attributed_html_jsonld_can_supply_an_image() -> None:
-    result = await html_scrape("shopify", ld(owner()))
+async def test_an_attributed_product_group_can_supply_an_image() -> None:
+    result = await html_scrape("shopify", ld(group()))
     assert result.image_url == IMAGE
+    assert str(result.price) == "19.00"
+
+
+JSONLD_PRODUCT = owner(name="Kettle JSON", offers={"price": "25.00", "priceCurrency": "USD"})
+
+
+@pytest.mark.parametrize("json_status", [404, 429])
+@pytest.mark.parametrize(
+    ("page", "expected"),
+    [
+        # CSS 19,00 with the page currency EUR beside a JSON-LD Product at 25.00 USD.
+        (
+            '<meta property="og:price:currency" content="EUR"><h1>Kettle CSS</h1>'
+            '<div class="product-price">19,00 \u20ac</div>' + ld(JSONLD_PRODUCT),
+            ("Kettle CSS", Decimal("19.00"), "EUR", None),
+        ),
+        # The JSON-LD Product only supplies the currency, as it always did.
+        (
+            '<h1>Kettle CSS</h1><span class="price"><span class="money">12.50</span></span>'
+            + ld(JSONLD_PRODUCT),
+            ("Kettle CSS", Decimal("12.50"), "USD", None),
+        ),
+        # A JSON-LD Product alone never decided a price on this path.
+        (ld(JSONLD_PRODUCT), (None, None, None, "Prezzo non trovato (Shopify)")),
+    ],
+)
+async def test_the_html_fallback_keeps_the_page_price_path(
+    json_status: int, page: str, expected: tuple[Any, ...]
+) -> None:
+    html = page + "<!--" + " " * 90000 + "-->"
+    with respx.mock(assert_all_called=False) as router:
+        router.get(URL + ".json").respond(json_status)
+        router.get(URL).respond(200, text=html)
+        async with build_client() as client:
+            result = await shopify.ShopifyScraper().scrape(URL, client)
+    assert (result.name, result.price, result.currency, result.error) == expected
+    assert result.image_url is None
 
 
 async def test_product_group_consensus_uses_the_group_image_and_never_the_first_variant() -> None:

@@ -423,19 +423,6 @@ class ShopifyScraper(AbstractScraper):
                 return result
 
             soup = BeautifulSoup(html, "lxml")
-            from price_tracker.scrapers.generic import GenericScraper
-
-            document = ImageDocument.parse(soup)
-            attributed = GenericScraper()._try_json_ld_bound(
-                soup, url, getattr(html, "final_url", url), document
-            )
-            if attributed is not None and "image_url" in attributed:
-                return ProductInfo(
-                    name=attributed.get("name"),
-                    price=attributed.get("price"),
-                    currency=attributed.get("currency"),
-                    image_url=attributed["image_url"],
-                )
             css_result = self._try_shopify_selectors(soup)
             if css_result:
                 css_result.currency = normalize_currency_code(self._detect_currency_from_html(html))

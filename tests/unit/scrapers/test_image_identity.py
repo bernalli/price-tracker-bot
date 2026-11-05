@@ -12,6 +12,7 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from price_tracker.core.http_client import build_client
+from price_tracker.core.page_image import MAX_NODES
 from price_tracker.scrapers import amazon, generic, shopify
 
 URL = "https://shop.example.com/products/a"
@@ -29,6 +30,36 @@ def owner(image: Any = IMAGE, **extra: Any) -> dict[str, Any]:
         "offers": {"price": "19.00", "priceCurrency": "EUR"},
         **extra,
     }
+
+
+def group(image: Any = IMAGE, **extra: Any) -> dict[str, Any]:
+    """A headless Shopify page: the requested ProductGroup decides the price and owns the image.
+
+    The Shopify HTML fallback reads a price from JSON-LD only through a ProductGroup; a bare
+    Product node never decides it there.
+    """
+    return {
+        "@type": "ProductGroup",
+        "url": URL,
+        "name": "Kettle",
+        "image": image,
+        "hasVariant": [{"@type": "Product", "offers": {"price": "19.00", "priceCurrency": "EUR"}}],
+        **extra,
+    }
+
+
+def subject(kind: str, image: Any = IMAGE, **extra: Any) -> dict[str, Any]:
+    """The node that decides the price of the requested product for ``kind``."""
+    return group(image, **extra) if kind == "shopify" else owner(image, **extra)
+
+
+def json_values(value: Any) -> int:
+    """Count every JSON value, as the document node budget does."""
+    if isinstance(value, dict):
+        return 1 + sum(json_values(child) for child in value.values())
+    if isinstance(value, list):
+        return 1 + sum(json_values(child) for child in value)
+    return 1
 
 
 def ld(nodes: Any, prefix: str = "") -> str:
@@ -83,8 +114,9 @@ async def test_public_generic_selection_is_invariant_under_graph_permutation(
 async def test_image_metadata_does_not_change_any_other_product_field(
     kind: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    html = ld(owner())
+    html = ld(subject(kind))
     result = await html_scrape(kind, html)
+    assert result.image_url == IMAGE
     module = {"generic": generic, "shopify": shopify}[kind]
     monkeypatch.setattr(module, "extract_page_image", lambda *args, **kwargs: None)
     without = await html_scrape(kind, html)
@@ -96,7 +128,9 @@ async def test_image_metadata_does_not_change_any_other_product_field(
 
 @pytest.mark.parametrize("kind", ["generic", "shopify"])
 async def test_a_redirect_to_another_product_cannot_supply_an_image(kind: str) -> None:
-    result = await html_scrape(kind, ld(owner()), redirect="https://shop.example.com/products/b")
+    result = await html_scrape(
+        kind, ld(subject(kind)), redirect="https://shop.example.com/products/b"
+    )
     assert result.image_url is None
 
 
@@ -117,7 +151,11 @@ async def test_public_conflicting_owner_images_are_terminal(reverse: bool) -> No
 async def test_public_duplicates_and_recommendations_preserve_the_attributed_image(
     kind: str, reverse: bool
 ) -> None:
-    nodes = [owner(), owner(), owner(OTHER, url="https://shop.example.com/products/b")]
+    nodes = [
+        subject(kind),
+        subject(kind),
+        subject(kind, OTHER, url="https://shop.example.com/products/b"),
+    ]
     if reverse:
         nodes.reverse()
     result = await html_scrape(kind, ld({"@graph": nodes}))
@@ -141,9 +179,11 @@ async def test_public_shopify_variant_selection_survives_reordered_variants(reve
 @pytest.mark.parametrize("kind", ["generic", "shopify"])
 async def test_a_requested_owner_without_an_image_never_borrows_a_recommendation(kind: str) -> None:
     result = await html_scrape(
-        kind, ld([owner(None), owner(OTHER, url="https://shop.example.com/products/b")])
+        kind,
+        ld([subject(kind, None), subject(kind, OTHER, url="https://shop.example.com/products/b")]),
     )
     assert result.image_url is None
+    assert str(result.price) == "19.00"
 
 
 @pytest.mark.parametrize("kind", ["generic", "shopify"])
@@ -151,7 +191,7 @@ async def test_a_requested_owner_without_an_image_never_borrows_a_recommendation
 async def test_malformed_image_metadata_isolated_from_other_product_fields(
     kind: str, type_value: Any
 ) -> None:
-    base = ld(owner(), '<h1>Kettle</h1><div class="product-price">EUR 19.00</div>')
+    base = ld(subject(kind), '<h1>Kettle</h1><div class="product-price">EUR 19.00</div>')
     added = ld({"@type": type_value, "image": OTHER})
     left = asdict(await html_scrape(kind, base))
     right = asdict(await html_scrape(kind, base + added))
@@ -167,10 +207,29 @@ async def test_public_extraction_enforces_whole_document_budgets(
     kind: str, budget: str, over: bool
 ) -> None:
     if budget == "scripts":
-        page = ld(owner()) + ld({}) * (9 + int(over))
+        page = ld(subject(kind)) + ld({}) * (9 + int(over))
     elif budget == "nodes":
-        page = ld(owner(extra=[0] * (9991 + int(over))))
+        padding = MAX_NODES - json_values(subject(kind, extra=[]))
+        page = ld(subject(kind, extra=[0] * (padding + int(over))))
     else:
-        page = ld(owner([IMAGE] * (20 + int(over))))
+        page = ld(subject(kind, [IMAGE] * (20 + int(over))))
     result = await html_scrape(kind, page)
     assert result.image_url == (None if over else IMAGE)
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+async def test_generic_jsonld_selection_is_identity_first_not_first_product(reverse: bool) -> None:
+    nodes = [
+        owner(
+            OTHER,
+            url="https://shop.example.com/products/b",
+            offers={"price": "5.00", "priceCurrency": "EUR"},
+        ),
+        owner(offers={"price": "25.00", "priceCurrency": "EUR"}),
+    ]
+    if reverse:
+        nodes.reverse()
+    result = await html_scrape("generic", ld(nodes))
+    assert str(result.price) == "25.00"
+    assert result.currency == "EUR"
+    assert result.image_url == IMAGE
