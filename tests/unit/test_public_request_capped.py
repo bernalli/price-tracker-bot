@@ -181,9 +181,11 @@ async def test_a_slow_body_hits_the_request_deadline(redirect: bool) -> None:
         async with http_client.build_client(timeout=10) as client:
             with pytest.raises(httpx.ReadTimeout):
                 await asyncio.wait_for(
-                    http_client.public_request(client, "GET", URL, max_body_bytes=10, timeout=0.05),
-                    timeout=1,
+                    http_client.public_request(client, "GET", URL, max_body_bytes=10, timeout=0.5),
+                    timeout=5,
                 )
+    # The budget must outlast resolution and redirects so the deadline fires in the body.
+    assert stream.read
     assert stream.closed
 
 
