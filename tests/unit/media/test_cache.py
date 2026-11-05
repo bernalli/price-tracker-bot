@@ -318,5 +318,6 @@ def test_has_never_waits_for_the_cache_lock(tmp_path: Path) -> None:
         worker = threading.Thread(target=lambda: result.append(cache.has("url")))
         worker.start()
         worker.join(2)
+        assert not worker.is_alive()
     worker.join(5)
     assert result == [True]
