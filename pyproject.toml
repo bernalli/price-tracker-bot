@@ -146,6 +146,7 @@ module = [
     "price_tracker.bot.callbacks",
     "price_tracker.bot.telegram_outcome",
     "price_tracker.bot.list_grid",
+    "price_tracker.bot.list_media",
     "price_tracker.bot.flow_services",
     "price_tracker.bot.flows",
     "price_tracker.bot.ui",
