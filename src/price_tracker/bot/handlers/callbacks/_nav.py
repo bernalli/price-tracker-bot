@@ -15,6 +15,7 @@ from telegram.constants import ParseMode
 from telegram.error import BadRequest, RetryAfter
 
 from price_tracker.app.views import MinDropView, PrefsView, min_drop_view
+from price_tracker.bot import list_media
 from price_tracker.bot.callbacks import Action, encode
 from price_tracker.bot.handlers._cards import (
     card_actions,
@@ -26,7 +27,6 @@ from price_tracker.bot.handlers._cards import (
     screen_markup,
 )
 from price_tracker.bot.handlers.debug import errors_text, health_text, no_errors_text
-from price_tracker.bot.list_media import edit_card, edit_list, two_message_mode
 from price_tracker.bot.messages import _, reset_locale, set_locale, user_locale
 from price_tracker.bot.ui.cards import list_page, product_card
 from price_tracker.bot.ui.labels import button, layout_rows
@@ -303,7 +303,7 @@ async def show_list(
     notice: str = "",
 ) -> None:
     """Redraw the message as a page of ``user_id``'s list, with an optional notice on top."""
-    mode = two_message_mode(context)
+    mode = list_media.two_message_mode(context)
     if mode is None:
         screen = await _list_screen(context, db, user_id, list_filter, page)
         await _edit(query, _with_notice(screen, notice))
@@ -317,7 +317,7 @@ async def show_list(
         result = list_view(records, list_filter, page, default_interval_minutes=interval)
         screen = list_text_page(result)
         items = result.items
-    await edit_list(query, mode, _with_notice(screen, notice), items)
+    await list_media.edit_list(query, mode, _with_notice(screen, notice), items)
 
 
 async def show_card(
@@ -336,11 +336,11 @@ async def show_card(
     if back is None:
         back = encode(Action("list.page", ("a" if view.status == "active" else "p", 1)))
     screen = product_card(view, card_actions(view, back=back), now=datetime.now(UTC))
-    mode = two_message_mode(context)
+    mode = list_media.two_message_mode(context)
     if mode is None:
         await _edit(query, _with_notice(screen, notice))
     else:
-        await edit_card(query, mode, _with_notice(screen, notice), view.image_url)
+        await list_media.edit_card(query, mode, _with_notice(screen, notice), view.image_url)
 
 
 async def _list_page(
