@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import ipaddress
+import math
 import socket
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any
@@ -135,6 +136,8 @@ class _PublicTransport(httpx.AsyncBaseTransport):
         self._active: set[_OwnedStream] = set()
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        if request.extensions.get("https_only") is True and request.url.scheme != "https":
+            raise UnsafeURLError("https is required")
         addresses = await _resolve_public(request.url)
         # Neither an arbitrary Host nor a caller's SNI override may separate
         # the HTTP/TLS identity from the URL whose address was validated.
@@ -217,7 +220,8 @@ class PublicAsyncClient(httpx.AsyncClient):
     ) -> httpx.Response:
         """Send through validated connections; bound the complete redirect chain."""
         follow = follow_redirects is True
-        deadline = asyncio.get_running_loop().time() + self._deadline_seconds
+        duration = request.extensions.get("public_deadline_seconds", self._deadline_seconds)
+        deadline = asyncio.get_running_loop().time() + duration
         history: list[httpx.Response] = []
         try:
             async with asyncio.timeout_at(deadline):
@@ -239,6 +243,9 @@ class PublicAsyncClient(httpx.AsyncClient):
                                 "redirect hop limit exceeded", request=request
                             )
                         next_request = response.next_request
+                        next_request.extensions["https_only"] = request.extensions.get(
+                            "https_only", False
+                        )
                         if _origin(request.url) != _origin(next_request.url):
                             next_request.headers.pop("Authorization", None)
                         history.append(response)
@@ -282,6 +289,14 @@ async def public_client(client: httpx.AsyncClient) -> AsyncIterator[PublicAsyncC
             yield protected
 
 
+class BodyLimitError(Exception):
+    """A capped response was refused before its body was trusted."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
+
+
 async def public_request(
     client: httpx.AsyncClient,
     method: str,
@@ -289,9 +304,69 @@ async def public_request(
     *,
     headers: dict[str, str] | None = None,
     timeout: float | None = None,
+    max_body_bytes: int | None = None,
+    https_only: bool = False,
 ) -> httpx.Response:
     """Fetch a product through validated connections and manually checked redirects."""
+    if https_only and max_body_bytes is None:
+        raise ValueError("https_only requires a body cap")
+    if max_body_bytes is not None:
+        if (
+            isinstance(max_body_bytes, bool)
+            or not isinstance(max_body_bytes, int)
+            or max_body_bytes < 1
+        ):
+            raise ValueError("max_body_bytes must be a positive integer")
+        if timeout is not None and (
+            isinstance(timeout, bool)
+            or not isinstance(timeout, int | float)
+            or not math.isfinite(timeout)
+            or timeout <= 0
+        ):
+            raise ValueError("timeout must be finite and positive")
     async with public_client(client) as protected:
+        if max_body_bytes is not None:
+            request = protected.build_request(
+                method,
+                url,
+                headers=headers,
+                timeout=timeout if timeout is not None else httpx.USE_CLIENT_DEFAULT,
+            )
+            request.extensions["https_only"] = https_only
+            request.extensions["public_deadline_seconds"] = (
+                min(protected._deadline_seconds, float(timeout))
+                if timeout is not None
+                else protected._deadline_seconds
+            )
+            response = await protected.send(request, stream=True, follow_redirects=True)
+            try:
+                if response.headers.get("content-encoding", "").strip().lower() not in (
+                    "",
+                    "identity",
+                ):
+                    raise BodyLimitError("encoded body")
+                length = response.headers.get("content-length")
+                if length is not None:
+                    if not length.isascii() or not length.isdigit():
+                        raise BodyLimitError("bad length")
+                    digits = length.lstrip("0") or "0"
+                    cap = str(max_body_bytes)
+                    if len(digits) > len(cap) or (len(digits) == len(cap) and digits > cap):
+                        raise BodyLimitError("too large")
+                buf = bytearray()
+                async for chunk in response.aiter_raw():
+                    if len(buf) + len(chunk) > max_body_bytes:
+                        raise BodyLimitError("too large")
+                    buf.extend(chunk)
+                return httpx.Response(
+                    response.status_code,
+                    headers=response.headers,
+                    content=bytes(buf),
+                    request=response.request,
+                    history=response.history,
+                )
+            finally:
+                await response.aclose()
         if timeout is None:
             return await protected.request(method, url, headers=headers, follow_redirects=True)
         return await protected.request(
