@@ -44,6 +44,7 @@ from price_tracker.bot.handlers._helpers import (
     _format_threshold,
     _get_user_product,
     _parse_id,
+    _record_manual_start,
     _safe_dec,
 )
 from price_tracker.bot.keyboards import build_threshold_keyboard
@@ -404,6 +405,7 @@ async def _add_product(
         HTTPBlockStatus,
     )
 
+    _record_manual_start(context, url)
     try:
         result = await scraper_for_url.scrape(url, client)
     except BlockEvent as exc:

@@ -69,7 +69,7 @@ async def test_upgrading_a_populated_schema_15_only_adds_the_two_columns() -> No
         history_before = await _rows(conn, "SELECT * FROM price_history ORDER BY id")
         columns_before = await _columns(conn, "users")
 
-        assert await apply_migrations(conn, MIGRATIONS_DIR) == 16
+        assert await apply_migrations(conn, MIGRATIONS_DIR, max_version=16) == 16
 
         assert await _columns(conn, "users") == [*columns_before, *NEW_COLUMNS]
         users_after = await _rows(conn, "SELECT * FROM users ORDER BY user_id")
@@ -85,9 +85,9 @@ async def test_upgrading_a_populated_schema_15_only_adds_the_two_columns() -> No
 async def test_applying_again_is_a_no_op() -> None:
     async with aiosqlite.connect(":memory:") as conn:
         await _seed_schema_15(conn)
-        await apply_migrations(conn, MIGRATIONS_DIR)
+        await apply_migrations(conn, MIGRATIONS_DIR, max_version=16)
         schema = await _rows(conn, "SELECT type, name, sql FROM sqlite_master ORDER BY name")
-        assert await apply_migrations(conn, MIGRATIONS_DIR) == 16
+        assert await apply_migrations(conn, MIGRATIONS_DIR, max_version=16) == 16
         assert (
             await _rows(conn, "SELECT type, name, sql FROM sqlite_master ORDER BY name") == schema
         )

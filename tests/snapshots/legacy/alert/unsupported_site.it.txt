@@ -4,6 +4,7 @@
 # frozen_now: 2026-03-01T12:00:00Z
 ## step 1: job run_check_all
 -> sendMessage chat=10
+   param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
    | ⏳ <b>Controlli in errore su 93.184.216.34</b> (1)
@@ -23,6 +24,7 @@
    text:
    | 🔄 Controllo in corso...
 -> sendMessage chat=10
+   param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
    | ⚠️ <b>Prezzo illeggibile su 93.184.216.34</b> (1)

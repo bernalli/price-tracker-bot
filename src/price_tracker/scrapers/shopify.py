@@ -8,18 +8,18 @@ from __future__ import annotations
 import json
 import logging
 import re
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from decimal import Decimal
 from typing import ClassVar
-from urllib.parse import parse_qsl, urlencode, urlparse
+from urllib.parse import parse_qsl, unquote, urlencode, urlparse
 
 import httpx
 from bs4 import BeautifulSoup
 
-from price_tracker.core.exceptions import BlockEvent, ListingGone
+from price_tracker.core.exceptions import BlockEvent, HTTPBlockStatus, ListingGone
 from price_tracker.core.http_client import public_request
 from price_tracker.core.identity import RequestedIdentity
-from price_tracker.core.money import Money
+from price_tracker.core.money import MAX_AMOUNT, Money, normalize_currency_code
 from price_tracker.core.pricegrammar import Unreadable, select_offer
 from price_tracker.core.retry_policy import RetryConfig, with_retry
 from price_tracker.core.scraper_base import (
@@ -30,6 +30,7 @@ from price_tracker.core.scraper_base import (
     detect_listing_gone,
     get_headers,
     parse_price,
+    retry_after_header,
     unwrap_jsonld_graph,
 )
 from price_tracker.core.structured_data import StructureError, decode_json_strict
@@ -48,7 +49,12 @@ async def _fetch_shopify_response(url: str, client: httpx.AsyncClient) -> httpx.
     # Surface 403/429 (and WAF/CAPTCHA bodies) as a BlockEvent BEFORE
     # raise_for_status, so the scheduler quarantines the domain instead of
     # recording a generic failure (#16). with_retry never retries BlockEvents.
-    detect_block_event(status_code=response.status_code, body=response.text, url=url)
+    detect_block_event(
+        status_code=response.status_code,
+        body=response.text,
+        url=url,
+        retry_after=retry_after_header(response),
+    )
     detect_listing_gone(status_code=response.status_code, url=url)
     response.raise_for_status()
     return response
@@ -118,6 +124,80 @@ def _without_variant_param(url: str) -> str:
     parsed = urlparse(url)
     kept = [(k, v) for k, v in parse_qsl(parsed.query, keep_blank_values=True) if k != "variant"]
     return parsed._replace(query=urlencode(kept)).geturl()
+
+
+def _embedded_variant_price(value: object) -> Decimal | None:
+    """Price of one variant of the theme-embedded product JSON, or ``None``.
+
+    Liquid's ``json`` filter renders a variant price as integer cents
+    (``19900`` is 199.00), unlike the ``.json`` API's decimal strings; a theme
+    that formats the price itself writes a decimal string, read as it is.
+    Anything else is not read: a bool, a float (cents or units is a guess), zero,
+    a negative or out-of-range number, a container. No price is recoverable; a
+    wrong one is pushed to the user.
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        if value <= 0:
+            return None
+        amount = Decimal(value).scaleb(-2)
+        return amount if amount <= MAX_AMOUNT else None
+    if isinstance(value, str):
+        return parse_price(value)
+    return None
+
+
+def _embedded_documents(html: str) -> Iterator[str]:
+    """Yield whole theme documents, retaining malformed or truncated sources for rejection."""
+    marker = re.compile(r"\b(?:var\s+meta|(?:window\.)?ShopifyAnalytics\.meta)\s*=\s*(?=\{)")
+    soup = BeautifulSoup(html, "lxml")
+    for script in soup.find_all("script"):
+        raw = script.string or script.get_text()
+        if str(script.get("id", "")).lower().startswith("productjson"):
+            yield raw
+            continue
+        assignments = list(marker.finditer(raw))
+        if not assignments:
+            # Analytics, pixel and app scripts mention "product" too: only a
+            # recognised theme-payload assignment is read, anything else is skipped.
+            continue
+        for match in assignments:
+            start = match.end()
+            depth = 0
+            in_string = False
+            escaped = False
+            end = len(raw)
+            for pos in range(start, len(raw)):
+                char = raw[pos]
+                if in_string:
+                    if escaped:
+                        escaped = False
+                    elif char == "\\":
+                        escaped = True
+                    elif char == '"':
+                        in_string = False
+                elif char == '"':
+                    in_string = True
+                elif char in "[{":
+                    depth += 1
+                elif char in "]}":
+                    depth -= 1
+                    if depth == 0:
+                        tail = raw[pos + 1 :].lstrip()
+                        if not tail or tail.startswith(";"):
+                            end = pos + 1
+                        break
+            yield raw[start:end]
+
+
+def _embedded_id(value: object) -> str | None:
+    """Canonical positive Shopify identifier, excluding booleans and empty IDs."""
+    if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+        return str(value)
+    if isinstance(value, str) and value.isascii() and value.isdigit():
+        return value.lstrip("0") or None
+    return None
 
 
 def _variant_offer_id(variant: Mapping[str, object]) -> str | None:
@@ -197,8 +277,18 @@ class ShopifyScraper(AbstractScraper):
         # Try JSON API first (most reliable)
         json_url = self._build_json_url(url)
         if json_url:
-            result = await self._try_json_api(json_url, client)
+            try:
+                result = await self._try_json_api(json_url, client)
+            except HTTPBlockStatus as json_block:
+                if json_block.status != 429:
+                    raise
+                return await self._scrape_page_after_json_429(url, client, json_block)
             if result and result.price is not None:
+                if result.currency:
+                    # The variant carried its own currency: the price and its
+                    # currency come from the same payload, and the store sees
+                    # one request instead of two.
+                    return result
                 # Detect currency from HTML page (JSON-LD, OG tags). This fetch is
                 # enrichment ONLY: the price is already in hand. A challenge/block
                 # marker in the HTML must NOT discard a valid scrape (it falsely
@@ -219,11 +309,37 @@ class ShopifyScraper(AbstractScraper):
         # Fallback: fetch HTML and parse embedded Shopify product data
         html = await self._fetch_html(url, client)
         if html:
-            embedded = self._try_embedded_product_json(html)
-            if embedded is not None and embedded.price is not None:
-                embedded.currency = detect_currency("")
-                return embedded
+            page_result = self._read_product_page(html, url)
+            if page_result is not None:
+                return page_result
 
+        return ProductInfo(error="Prezzo non trovato (Shopify)")
+
+    async def _scrape_page_after_json_429(
+        self, url: str, client: httpx.AsyncClient, json_block: HTTPBlockStatus
+    ) -> ProductInfo:
+        """Read the product page after the ``.json`` endpoint answered 429.
+
+        Some stores rate-limit the ``.json`` API per address and path while the
+        product page of the same product still answers. The page goes through the
+        same validated client and the same HTML chain as the 404 fallback. A
+        page that is refused too (403/429, WAF, CAPTCHA) raises its own block,
+        naming the page URL: that is the request that was refused last. A page
+        that cannot be fetched at all leaves nothing that contradicts the JSON
+        block, so that block is raised as it happened.
+        """
+        logger.info("Shopify JSON answered 429 for %s; reading the product page", url[:80])
+        html = await self._fetch_html(url, client)
+        if html is None:
+            raise json_block
+        page_result = self._read_product_page(html, url)
+        if page_result is not None:
+            return page_result
+        return ProductInfo(error="Prezzo non trovato (Shopify)")
+
+    def _read_product_page(self, html: str, url: str) -> ProductInfo | None:
+        """Price from a product page's HTML, or ``None`` when nothing was found."""
+        if html:
             # A headless (Next.js/Hydrogen) storefront has no legacy embedded Shopify
             # JSON at all: its JSON-LD carries a ProductGroup/hasVariant instead. Once
             # a matching ProductGroup is found, it is authoritative for this page — it
@@ -236,19 +352,23 @@ class ShopifyScraper(AbstractScraper):
             if group_result is not None:
                 return group_result
 
+            embedded = self._try_embedded_product_json(html, url)
+            if embedded is not None:
+                embedded.currency = normalize_currency_code(self._detect_currency_from_html(html))
+                return embedded
+
             result = self._try_cents_price(html)
             if result is not None:
-                if embedded is not None:
-                    result.name = embedded.name
-                result.currency = detect_currency("")
+                result.currency = normalize_currency_code(self._detect_currency_from_html(html))
                 return result
 
             soup = BeautifulSoup(html, "lxml")
             css_result = self._try_shopify_selectors(soup)
             if css_result:
+                css_result.currency = normalize_currency_code(self._detect_currency_from_html(html))
                 return css_result
 
-        return ProductInfo(error="Prezzo non trovato (Shopify)")
+        return None
 
     @staticmethod
     async def _fetch_html(url: str, client: httpx.AsyncClient) -> str | None:
@@ -258,7 +378,12 @@ class ShopifyScraper(AbstractScraper):
             logger.debug("Shopify HTML fetch failed for %s: %s", url[:60], e)
             return None
         # Surface WAF/CAPTCHA challenge bodies as a BlockEvent → domain quarantine (#7).
-        detect_block_event(status_code=response.status_code, body=response.text, url=url)
+        detect_block_event(
+            status_code=response.status_code,
+            body=response.text,
+            url=url,
+            retry_after=retry_after_header(response),
+        )
         if not _is_product_path(response.url):
             # A removed product does not always answer 404 straight away: measured
             # against a real store, the first request on a cookieless session is
@@ -323,7 +448,10 @@ class ShopifyScraper(AbstractScraper):
                 data = await self._fetch_json_via_curl_cffi(json_url)
                 if data is None:
                     detect_block_event(
-                        status_code=response.status_code, body=response.text, url=json_url
+                        status_code=response.status_code,
+                        body=response.text,
+                        url=json_url,
+                        retry_after=retry_after_header(response),
                     )
                     return None  # pragma: no cover - detect_block_event always raises here
             elif response.status_code == 404:
@@ -335,12 +463,18 @@ class ShopifyScraper(AbstractScraper):
                 # on a 200) must surface as a BlockEvent when it is one, never as a
                 # swallowed None (#16, JSON branch never checked this before).
                 detect_block_event(
-                    status_code=response.status_code, body=response.text, url=json_url
+                    status_code=response.status_code,
+                    body=response.text,
+                    url=json_url,
+                    retry_after=retry_after_header(response),
                 )
                 return None
             else:
                 detect_block_event(
-                    status_code=response.status_code, body=response.text, url=json_url
+                    status_code=response.status_code,
+                    body=response.text,
+                    url=json_url,
+                    retry_after=retry_after_header(response),
                 )
                 data = response.json()
 
@@ -372,6 +506,7 @@ class ShopifyScraper(AbstractScraper):
             logger.debug("Shopify JSON API: %s, %d variants", name, len(variants))
             declares_availability = any(isinstance(v, dict) and "available" in v for v in variants)
             price: Decimal | None = None
+            currency: str | None = None
             available = True
             # Prefer variants the shop declares purchasable: sold-out products
             # often keep a placeholder price on the first variant (#33).
@@ -385,6 +520,7 @@ class ShopifyScraper(AbstractScraper):
                     logger.debug("Shopify variant price: %s -> %s", variant_price, parsed)
                     if parsed:
                         price = parsed
+                        currency = normalize_currency_code(variant.get("price_currency"))
                         break
 
             if price is None and declares_availability:
@@ -396,6 +532,7 @@ class ShopifyScraper(AbstractScraper):
                         parsed = parse_price(str(variant_price))
                         if parsed:
                             price = parsed
+                            currency = normalize_currency_code(variant.get("price_currency"))
                             available = False
                             break
 
@@ -405,7 +542,9 @@ class ShopifyScraper(AbstractScraper):
             return ProductInfo(
                 name=name,
                 price=price,
-                currency=None,  # Unknown from JSON API; detected from HTML downstream
+                # The chosen variant's own currency. None when the payload has no
+                # usable ``price_currency``: the caller then reads it from the HTML.
+                currency=currency,
                 available=available,
             )
 
@@ -522,48 +661,91 @@ class ShopifyScraper(AbstractScraper):
         chosen = readable[0]
         return ProductInfo(name=name, price=chosen.amount, currency=chosen.currency)
 
-    def _try_embedded_product_json(self, html: str) -> ProductInfo | None:
-        """Extract product data from the theme's embedded Shopify product JSON."""
-        info = ProductInfo()
-
-        patterns = [
-            # var meta = {"product": {...}}
-            r"var\s+meta\s*=\s*(\{.+?\});",
-            # <script.*id="ProductJson.*">
-            r'<script[^>]*id=["\']ProductJson[^"\']*["\'][^>]*>(\{.+?\})</script>',
-            # window.ShopifyAnalytics.meta
-            r"ShopifyAnalytics\.meta\s*=\s*(\{.+?\});",
-            # product: { ... } in script tags
-            r'"product"\s*:\s*(\{[^}]*"variants"[^}]*\})',
+    def _try_embedded_product_json(self, html: str, url: str) -> ProductInfo | None:
+        """Select one complete, identity-bound product; rejection is terminal."""
+        rejected = ProductInfo(error="Unreadable or ambiguous embedded Shopify product")
+        try:
+            requested = RequestedIdentity.from_url(_without_variant_param(url))
+        except ValueError:
+            return rejected
+        handles = [
+            unquote(h).casefold()
+            for h in re.findall(r"/products/([^/]+)(?:/|$)", urlparse(url).path)
         ]
-
-        for pattern in patterns:
-            matches = re.findall(pattern, html, re.DOTALL)
-            for match in matches:
-                try:
-                    data = json.loads(match)
-                    product = data.get("product", data)
-                    if "variants" in product:
-                        info.name = product.get("title")
-                        for v in product["variants"]:
-                            price = v.get("price")
-                            if price:
-                                info.price = parse_price(str(price))
-                                if info.price:
-                                    return info
-                except (json.JSONDecodeError, TypeError, AttributeError):
-                    continue
-        # A product JSON whose title was read but no price parsed still hands the
-        # title on to the cents scan, as the single-method version did.
-        return info if info.name is not None else None
+        selectors = [
+            v for k, v in parse_qsl(urlparse(url).query, keep_blank_values=True) if k == "variant"
+        ]
+        if selectors and (len(selectors) != 1 or _embedded_id(selectors[0]) is None):
+            return rejected
+        selected_id = _embedded_id(selectors[0]) if selectors else None
+        products: list[Mapping[str, object]] = []
+        saw_product = False
+        for raw in _embedded_documents(html):
+            try:
+                data = decode_json_strict(raw)
+            except StructureError:
+                return rejected
+            if not isinstance(data, Mapping):
+                return rejected
+            if "product" not in data and "variants" not in data:
+                continue
+            saw_product = True
+            product = data.get("product", data)
+            if not isinstance(product, Mapping):
+                return rejected
+            # A numeric product ID alone cannot establish ownership of a slug URL.
+            ownership: list[bool] = []
+            if "handle" in product:
+                handle = product["handle"]
+                ownership.append(
+                    bool(handles)
+                    and isinstance(handle, str)
+                    and unquote(handle).casefold() == handles[0]
+                )
+            if "url" in product:
+                ownership.append(_url_matches_requested(product["url"], requested))
+            if not ownership or (any(ownership) and not all(ownership)):
+                return rejected
+            if all(ownership):
+                products.append(product)
+        if not saw_product:
+            return None
+        if len(products) != 1:
+            return rejected
+        product = products[0]
+        variants = product.get("variants")
+        if not isinstance(variants, list) or not variants:
+            return rejected
+        by_id: dict[str, Mapping[str, object]] = {}
+        for variant in variants:
+            if not isinstance(variant, Mapping):
+                return rejected
+            identity = _embedded_id(variant.get("id"))
+            if identity is None or identity in by_id:
+                return rejected
+            by_id[identity] = variant
+        if selected_id is not None:
+            if selected_id not in by_id:
+                return rejected
+            price = _embedded_variant_price(by_id[selected_id].get("price"))
+        else:
+            prices = {_embedded_variant_price(v.get("price")) for v in by_id.values()}
+            prices.discard(None)
+            if len(prices) != 1:
+                return rejected
+            price = prices.pop()
+        if price is None:
+            return rejected
+        name = product.get("title")
+        return ProductInfo(name=name if isinstance(name, str) else None, price=price)
 
     @staticmethod
     def _try_cents_price(html: str) -> ProductInfo | None:
         """Last-resort Shopify-style price in cents anywhere in the page (2999 = 29.99)."""
         info = ProductInfo()
         cents_patterns = [
-            r'"price"\s*:\s*(\d{3,7})\b',
-            r'"price_min"\s*:\s*(\d{3,7})\b',
+            r'"price"\s*:\s*(\d{3,7})(?=\s*[,}\]])',
+            r'"price_min"\s*:\s*(\d{3,7})(?=\s*[,}\]])',
         ]
         for pattern in cents_patterns:
             matches = re.findall(pattern, html)

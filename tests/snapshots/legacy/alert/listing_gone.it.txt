@@ -16,6 +16,7 @@
 ~ products id=1 gone_streak: 1 -> 2
 ## step 3: job run_check_all
 -> sendMessage chat=10
+   param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
    | ⚠️ <b>Prodotti rimossi da example.com</b> (1)

@@ -35,14 +35,11 @@ FROM python:3.12-slim AS runtime
 
 WORKDIR /app
 
-# Runtime deps only (no -dev variants); chromium libs for playwright
+# Runtime deps only (no -dev variants). No browser: rendering is disabled
+# because Chromium cannot use the validated-address transport, so neither
+# Chromium nor its system libraries and fonts are installed.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        libcurl4 \
-        libglib2.0-0 libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 \
-        libcups2 libdrm2 libdbus-1-3 libxcb1 libxkbcommon0 libx11-6 \
-        libxcomposite1 libxdamage1 libxext6 libxfixes3 libxrandr2 \
-        libgbm1 libpango-1.0-0 libcairo2 libasound2 libatspi2.0-0 \
-        fonts-liberation fonts-unifont ca-certificates \
+        libcurl4 ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # Non-root user
@@ -53,9 +50,7 @@ RUN useradd -m -r -u 1000 botuser && \
 COPY --from=builder --chown=botuser:botuser /root/.local /home/botuser/.local
 ENV PATH=/home/botuser/.local/bin:$PATH
 
-# Install playwright chromium as botuser
 USER botuser
-RUN python -m playwright install chromium 2>/dev/null || true
 
 WORKDIR /app
 COPY --chown=botuser:botuser src ./src

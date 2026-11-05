@@ -12,6 +12,7 @@
 ## step 8: seed "reload domain health"
 ## step 9: job run_check_all
 -> sendMessage chat=10
+   param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
    | ⏳ <b>Controlli in errore su amazon.com</b> (1)

@@ -430,7 +430,15 @@ _CAPTCHA_FINGERPRINTS: tuple[tuple[str, re.Pattern[str]], ...] = (
 )
 
 
-def detect_block_event(*, status_code: int, body: str, url: str) -> None:
+def retry_after_header(response: httpx.Response) -> str | None:
+    """The response's ``Retry-After`` header, when it carries a textual one."""
+    value = response.headers.get("Retry-After")
+    return value if isinstance(value, str) else None
+
+
+def detect_block_event(
+    *, status_code: int, body: str, url: str, retry_after: str | None = None
+) -> None:
     """Inspect HTTP response for block markers; raise BlockEvent subclass if blocked.
 
     Block triggers (raise BlockEvent):
@@ -444,10 +452,12 @@ def detect_block_event(*, status_code: int, body: str, url: str) -> None:
       - 5xx (server problem)
       - Network timeouts (raised by httpx, never reach here)
 
-    Caller (scraper) must invoke this AFTER httpx call and BEFORE parsing.
+    Caller (scraper) must invoke this AFTER httpx call and BEFORE parsing, and
+    pass the response's ``Retry-After`` (``retry_after_header``) so a status
+    block carries it to the scheduler.
     """
     if status_code in (403, 429):
-        raise HTTPBlockStatus(status=status_code, url=url)
+        raise HTTPBlockStatus(status=status_code, url=url, retry_after=retry_after)
 
     for provider, pattern in _WAF_FINGERPRINTS:
         if pattern.search(body):

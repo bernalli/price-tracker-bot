@@ -378,19 +378,23 @@ async def test_shopify_json_403_raises_block_event_when_curl_cffi_unavailable() 
 
 
 @pytest.mark.asyncio
-async def test_shopify_json_429_raises_block_event() -> None:
-    """429 on the .json endpoint had NO handling at all before the fix — the sharpest
-    regression case: it fell straight into `elif status != 200: return None`."""
+async def test_shopify_json_429_falls_back_to_the_product_page() -> None:
+    """A 429 on the .json endpoint is never a swallowed None (#16): the product
+    page is read instead, and only a page that is refused too raises the block
+    (``test_shopify_json_429_fallback.py``)."""
     scraper = ShopifyScraper()
     url = "https://shop.example.com/products/rate-limited"
     json_url = "https://shop.example.com/products/rate-limited.json"
 
     with respx.mock(assert_all_called=False) as router:
         router.get(json_url).respond(429, text="too many requests")
-        router.get(url).respond(200, text=_PRICED_HTML)
+        page = router.get(url).respond(200, text=_PRICED_HTML)
         async with httpx.AsyncClient() as client:
-            with pytest.raises(BlockEvent):
-                await scraper.scrape(url, client)
+            info = await scraper.scrape(url, client)
+
+    assert page.call_count == 1
+    assert info.price == Decimal("12.00")
+    assert info.error is None
 
 
 @pytest.mark.asyncio
@@ -853,12 +857,13 @@ async def test_shopify_headless_other_query_params_keep_identity() -> None:
 
 
 @pytest.mark.asyncio
-async def test_shopify_embedded_title_survives_cents_fallback() -> None:
-    """Embedded product JSON with an unreadable price keeps its title on the cents read."""
+async def test_shopify_unreadable_embedded_price_stops_cents_fallback() -> None:
+    """A rejected product source cannot recover an unrelated page-wide price."""
     html = (
-        '<script>var meta = {"product":{"title":"Widget","variants":[{"price":"n/a"}]}};'
+        '<script>var meta = {"product":{"handle":"widget","title":"Widget",'
+        '"variants":[{"id":1,"price":"n/a"}]}};'
         '</script><script>{"price_min": 2999}</script>'
     )
     info = await _scrape_headless("https://shop.example.com/products/widget", html)
-    assert info.price == Decimal("29.99")
-    assert info.name == "Widget"
+    assert info.price is None
+    assert info.error is not None

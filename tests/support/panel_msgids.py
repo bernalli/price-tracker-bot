@@ -75,6 +75,13 @@ PANEL_SINGULAR: tuple[str, ...] = (
     "✏️ Interval",
     "✏️ Other hours",
     "✏️ Change",
+    "📉 Minimum drop: {value}",
+    "📉 Minimum drop",
+    "📉 <b>Minimum drop</b>",
+    "{percent} and {amount}",
+    "{value} (default)",
+    "A price drop is announced only when it is at least this share of the old "
+    "price and at least {amount} in the product's currency.",
     "➕ <b>Add a product</b>\n\nPaste the link of a product page here to start tracking it.",
 )
 

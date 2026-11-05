@@ -246,7 +246,9 @@ async def test_the_quarantine_notice_follows_the_recipient_across_a_restart(
             for pid in products.values():
                 record = await repo.get_product(pid)
                 assert record is not None
-                await scheduler._notify_quarantine_entry(record, "example.com", reason="403")
+                # One store per round: a store's notice is pushed once a day.
+                domain = f"store{round_}.com"
+                await scheduler._notify_quarantine_entry(record, domain, reason="403")
         for uid in (A, B, C, D):
             assert _expect(uid, PAUSE_EN, PAUSE_IT) in notifier.texts(uid)[0], (round_, uid)
 
@@ -260,7 +262,8 @@ async def test_changing_the_stored_language_changes_the_next_message(repo: Repos
         scheduler = _scheduler(repo, client, notifier, {})
         await scheduler._notify_quarantine_entry(record, "example.com", reason="403")
         await repo.set_user_language(A, "en")
-        await scheduler._notify_quarantine_entry(record, "example.com", reason="403")
+        # Another store: the same one is not notified twice in a day.
+        await scheduler._notify_quarantine_entry(record, "example.org", reason="403")
     first, second = notifier.texts(A)
     assert PAUSE_IT in first
     assert PAUSE_EN in second

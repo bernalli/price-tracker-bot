@@ -64,7 +64,10 @@ All configuration is via environment variables, loaded from `.env` (or the host 
 | `MAX_CONSECUTIVE_ERRORS`      | `10`                    | Failed checks before a product is auto-suspended (domain-wide quarantine uses the fixed tiers in `core/health.py`, not this variable) |
 | `LISTING_GONE_CONFIRMATIONS`  | `3`                     | Consecutive HTTP 404/410 answers before a removed listing is suspended                                                 |
 | `REQUEST_TIMEOUT`             | `30`                    | HTTP timeout in seconds for scraper requests                                                                           |
+| `DOMAIN_MIN_GAP_SECONDS`      | `30`                    | Minimum seconds between the starts of two scheduled checks on the same store (eTLD+1); `0` disables. Spacing is per check (a check's redirects and follow-up page are part of it): while one store waits, the sweep checks other stores. A 429/503 with `Retry-After` leaves that store's remaining products for a later sweep (capped at 3600 s). Manual checks never wait, but the next scheduled check keeps its distance from them |
 | `NOTIFICATION_COOLDOWN_HOURS` | `24`                    | Per-product alert cooldown                                                                                             |
+| `MIN_DROP_PERCENT`            | `2`                     | A price-drop alert needs a drop of at least this percentage of the old price, whatever the product's rule (any drop, percentage, absolute, target); `0` disables this part. Users override it in Settings → Minimum drop (off, 1 %, 2 %, 5 %) |
+| `MIN_DROP_ABSOLUTE`           | `1`                     | ...and at least this amount in the product's currency; `0` disables this part. A user preset keeps it; the user's "off" turns off both parts |
 | `METRICS_ENABLED`             | `true`                  | Prometheus exporter is on by default. Set `0` or `false` to disable.                                                  |
 
 For the full set including outlier detection thresholds and currency tuning, see `src/price_tracker/config.py`.
@@ -127,10 +130,10 @@ services:
 ```
 
 Notes:
-- `read_only: true` makes the root filesystem immutable. Writable areas: `/tmp` (tmpfs 64m) and `/home/botuser/.cache` (tmpfs 512m for Playwright).
+- `read_only: true` makes the root filesystem immutable. Writable areas: `/tmp` (tmpfs 64m) and `/home/botuser/.cache` (tmpfs 512m for the matplotlib cache).
 - `cap_drop: [ALL]` removes every Linux capability — the bot needs none.
 - `no-new-privileges:true` blocks setuid escalation.
-- Size memory, CPU, and process limits for your workload, including browser-based scrapers.
+- Size memory, CPU, and process limits for your workload.
   Adjust the Compose defaults through a local override after measuring resource use.
 - The `/data` volume is the only writable persistent path; back up its content (see [Backup & restore](#backup--restore)).
 
@@ -173,7 +176,7 @@ Expect exactly one mount with `"type": "bind"` and the host path you intend.
 | Scraper silently stops fetching        | Domain is quarantined by HealthManager     | `/health` shows the domain in `LOCKED` state; logs `quarantine_locked` event with `block_count` and `locked_until`                                                  |
 | All scrapers slow                      | Telegram rate limit (429)                  | Built-in tenacity backoff handles automatically; check logs for `tg_429`                                                                                            |
 | Currency conversion shows stale rates  | ECB cache TTL not refreshed                | Cache TTL is 24h; force refresh by stopping the bot and removing the cache row: `sqlite3 /data/pricetracker.db "DELETE FROM bot_config WHERE key='fx_rates_eur'"` |
-| Playwright fails with cache error      | `/home/botuser/.cache` tmpfs not mounted   | Verify compose `tmpfs` block; check `docker inspect` for the mount                                                                                                  |
+| Charts warn about the matplotlib cache | `/home/botuser/.cache` tmpfs not mounted   | Verify compose `tmpfs` block; check `docker inspect` for the mount                                                                                                  |
 | `database is locked` error             | Multiple writers or interrupted WAL        | Stop the bot, run `sqlite3 /data/pricetracker.db "PRAGMA wal_checkpoint(FULL);"`, restart                                                                           |
 | Metrics endpoint returns 404           | `PROMETHEUS_BIND` unset or off-localhost   | Confirm env var; default binds to `127.0.0.1:9090` (not reachable from outside container without explicit port mapping)                                             |
 | Bot starts but `/start` is silent      | User not in `ALLOWED_USERS`                | Add Telegram user ID to `.env` and restart container                                                                                                                |

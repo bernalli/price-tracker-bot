@@ -12,6 +12,7 @@ from typing import Literal
 from price_tracker.bot.callbacks import Action, encode
 from price_tracker.bot.messages import N_, _
 from price_tracker.bot.ui.product_rows import product_row
+from price_tracker.core.drop_floor import DropFloor, clears_drop_floor
 from price_tracker.core.notices import (
     MAX_LISTED_PRODUCTS,
     NoticeGroup,
@@ -260,6 +261,33 @@ def crosses_threshold(
     if threshold_type == "target":
         return new <= threshold_value
     return False
+
+
+def should_alert(
+    *,
+    old: Decimal,
+    new: Decimal,
+    threshold_type: ThresholdType,
+    threshold_value: Decimal,
+    target_price: Decimal | None,
+    floor: DropFloor,
+) -> bool:
+    """Whether the move from ``old`` to ``new`` is announced as a price drop.
+
+    The product's rule must fire (its threshold, or a crossing of its target
+    price) AND the drop must clear the minimum-drop floor, whatever the rule:
+    a few cents off an "any drop" product are not worth a message.
+    """
+    threshold_hit = crosses_threshold(
+        old=old, new=new, threshold_type=threshold_type, threshold_value=threshold_value
+    )
+    # A target is a crossing, not a state: alert when the price moves from
+    # above it to at-or-below it, so a product parked under its target does
+    # not re-announce itself every cooldown window.
+    target_hit = target_price is not None and new <= target_price < old
+    if not (threshold_hit or target_hit):
+        return False
+    return clears_drop_floor(old=old, new=new, floor=floor)
 
 
 def format_alert(alert: PriceAlert) -> str:

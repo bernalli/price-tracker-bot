@@ -44,6 +44,7 @@ class UserRecord(_DictCompatMixin):
     username: str | None = None
     language: str | None = None
     telegram_language_tag: str | None = None
+    min_drop: str | None = None
 
 
 @dataclass(frozen=True)

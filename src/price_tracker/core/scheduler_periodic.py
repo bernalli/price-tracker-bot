@@ -1,14 +1,16 @@
-"""Periodic scheduler sweeps, pacing, quarantine filtering, and due logic."""
+"""Periodic scheduler sweeps, store spacing, quarantine filtering, and due logic."""
 
 from __future__ import annotations
 
 import asyncio
 import logging
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 import httpx
 
+from price_tracker.core.domain_spacing import retry_after_of, run_spaced
 from price_tracker.core.exceptions import BlockEvent, ListingGone, ParseError
 from price_tracker.core.health import QuarantineState
 from price_tracker.core.notices import NoticeCollector
@@ -23,9 +25,20 @@ from price_tracker.core.scraper_base import handle_block_in_pipeline
 from price_tracker.core.url_utils import extract_etld_plus_one
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from price_tracker.db.models import ProductRecord
 
 logger = logging.getLogger("price_tracker.core.scheduler")
+
+
+@dataclass(frozen=True, slots=True)
+class _SweepJob:
+    """One product check of a sweep, with the collector of its owner."""
+
+    product: ProductRecord
+    collector: NoticeCollector
+    domain: str | None
 
 
 class PeriodicRunsMixin:
@@ -81,6 +94,7 @@ class PeriodicRunsMixin:
             )
         except BlockEvent as e:
             logger.warning("Block detected for product %d: %s", product.id, e)
+            self._defer_on_retry_after(domain, e)
             if metrics is not None:
                 metrics.price_check_total.labels(
                     scraper=scraper_name, domain=domain, status="block"
@@ -131,6 +145,7 @@ class PeriodicRunsMixin:
             )
         except (httpx.HTTPError, ValueError, KeyError) as e:
             logger.warning("Check failed for product %d: %s", product.id, e)
+            self._defer_on_retry_after(domain, e)
             if metrics is not None:
                 metrics.price_check_total.labels(
                     scraper=scraper_name, domain=domain, status="error"
@@ -167,6 +182,11 @@ class PeriodicRunsMixin:
                     "Failed to record failure for product %d after unexpected error", product.id
                 )
 
+    def _defer_on_retry_after(self, domain: str, exc: BaseException) -> None:
+        """Defer ``domain`` when the failed check's 429/503 carried ``Retry-After``."""
+        if domain != "unknown":
+            self.deps.domain_spacing.defer(domain, retry_after_of(exc))
+
     async def _run_tick(
         self,
         products: list[ProductRecord],
@@ -174,73 +194,141 @@ class PeriodicRunsMixin:
         half_open_seen: set[str] | None = None,
         collector: NoticeCollector,
     ) -> None:
-        """One scheduler tick: scrape all eligible products.
+        """One scheduler tick for one collector; the caller flushes it.
 
-        Filtering rules (domain quarantine):
+        See :meth:`_run_sweep` for the filtering and spacing rules.
+        """
+        await self._run_sweep(
+            [(products, collector)],
+            half_open_seen=half_open_seen,
+            flush=False,
+        )
+
+    async def _run_sweep(
+        self,
+        batches: Sequence[tuple[Sequence[ProductRecord], NoticeCollector]],
+        *,
+        half_open_seen: set[str] | None = None,
+        flush: bool = True,
+    ) -> None:
+        """Scrape the products of every batch in one interleaved run.
+
+        Filtering rules (domain quarantine), applied right before each check:
           - skip products on LOCKED domains entirely
-          - on HALF_OPEN domains send exactly one probe (first product per domain per tick)
+          - on HALF_OPEN domains send exactly one probe (first product per domain)
+
+        Spacing (``core.domain_spacing``): two checks on the same store start at
+        least ``DOMAIN_MIN_GAP_SECONDS`` apart, across batches (users) too, and a
+        store waiting for its gap never holds back a product of another store.
+        A store deferred by ``Retry-After`` is left for a later sweep: its
+        products are not attempted, so they stay due.
 
         ``half_open_seen`` lets a caller share the probed-domain set across
-        multiple ticks: ``run_check_all`` passes one set for the whole global
-        sweep so a HALF_OPEN domain receives a single probe per sweep instead
-        of one per user (#17). When ``None`` (single-user callers) a fresh set
-        scoped to this tick is used.
+        sweeps: a HALF_OPEN domain receives a single probe per sweep instead of
+        one per user (#17). When ``None`` a fresh set scoped to this sweep is used.
 
-        Rate-limiting pacing (`delay_between_products`) is applied between scrapes
-        to be friendly to upstream servers.
+        Rate-limiting pacing (`delay_between_products`) is applied after each
+        scrape to be friendly to upstream servers.
+
+        With ``flush`` each batch's collector is flushed once all its products are
+        done or skipped (and, at the latest, when the sweep ends).
         """
         metrics = self.deps.metrics
+        jobs = [
+            _SweepJob(product, collector, extract_etld_plus_one(product.url) or None)
+            for products, collector in batches
+            for product in products
+        ]
         if metrics is not None:
-            metrics.scheduler_jobs_active.set(len(products))
+            metrics.scheduler_jobs_active.set(len(jobs))
         if half_open_seen is None:
             half_open_seen = set()
-        for product in products:
-            domain = extract_etld_plus_one(product.url)
-            if not domain:
-                # Unknown domain — best-effort scrape (Generic scraper handles it)
-                await self._scrape_one(product, collector=collector)
-                await asyncio.sleep(self.deps.delay_between_products)
-                continue
+        remaining: dict[int, int] = {}
+        for job in jobs:
+            remaining[id(job.collector)] = remaining.get(id(job.collector), 0) + 1
+        unflushed: dict[int, NoticeCollector] = {
+            id(collector): collector for _products, collector in batches
+        }
 
+        async def settle(job: _SweepJob) -> None:
+            key = id(job.collector)
+            remaining[key] -= 1
+            if flush and remaining[key] == 0 and key in unflushed:
+                await self._flush_guaranteed(unflushed.pop(key))
+
+        dropped: list[_SweepJob] = []
+
+        def admit(job: _SweepJob, domain: str) -> bool:
             if self.deps.health_mgr.is_locked(domain):
                 if metrics is not None:
                     metrics.quarantine_skip_total.labels(domain=domain).inc()
-                continue  # skip — domain is in quarantine lockout; no sleep needed
+                return False  # skip — domain is in quarantine lockout
+            # only one probe per half-open domain per sweep
+            return not (self.deps.health_mgr.is_half_open(domain) and domain in half_open_seen)
 
-            if self.deps.health_mgr.is_half_open(domain):
-                if domain in half_open_seen:
-                    continue  # only one probe per half-open domain per tick; no sleep needed
-                half_open_seen.add(domain)
-
-            await self._scrape_one(product, collector=collector)
+        async def run(job: _SweepJob) -> None:
+            for skipped in dropped:
+                await settle(skipped)
+            dropped.clear()
+            if job.domain is not None and self.deps.health_mgr.is_half_open(job.domain):
+                half_open_seen.add(job.domain)
+            await self._scrape_one(job.product, collector=job.collector)
+            await settle(job)
             await asyncio.sleep(self.deps.delay_between_products)
 
-    async def run_check_for_user(self, *, user_id: int) -> None:
-        """Check every active product owned by `user_id` sequentially."""
-        products = await self.deps.repo.list_products_for_user(user_id=user_id, only_active=True)
-        collector = NoticeCollector()
+        def drop(job: _SweepJob) -> None:
+            if job.domain is not None and self.deps.domain_spacing.is_deferred(job.domain):
+                logger.info(
+                    "Product %d: %s asked to retry later; left for a later sweep",
+                    job.product.id,
+                    job.domain,
+                )
+            dropped.append(job)
+
         try:
-            await self._run_tick(products, collector=collector)
+            if flush:
+                for key in [k for k in unflushed if remaining.get(k, 0) == 0]:
+                    await self._flush_guaranteed(unflushed.pop(key))
+            await run_spaced(
+                jobs,
+                spacing=self.deps.domain_spacing,
+                domain_of=lambda job: job.domain,
+                admit=admit,
+                run=run,
+                drop=drop,
+            )
         finally:
-            await self._flush_guaranteed(collector)
+            if flush:
+                cancelled = False
+                for collector in list(unflushed.values()):
+                    try:
+                        await self._flush_guaranteed(collector)
+                    except asyncio.CancelledError:
+                        cancelled = True
+                unflushed.clear()
+                if cancelled:
+                    raise asyncio.CancelledError
+
+    async def run_check_for_user(self, *, user_id: int) -> None:
+        """Check every active product owned by `user_id`, spaced per store."""
+        products = await self.deps.repo.list_products_for_user(user_id=user_id, only_active=True)
+        await self._run_sweep([(products, NoticeCollector())])
 
     async def run_check_all(self) -> None:
         """Check every active product across every active user.
 
-        A single ``half_open_seen`` set is shared across the per-user ticks so
-        a HALF_OPEN domain is probed at most once per global sweep (#17).
+        All users' products run in one interleaved sweep, so the per-store
+        spacing holds across users and a HALF_OPEN domain is probed at most
+        once per global sweep (#17).
         """
         users = await self.deps.repo.list_active_users()
-        half_open_seen: set[str] = set()
+        batches: list[tuple[Sequence[ProductRecord], NoticeCollector]] = []
         for u in users:
             products = await self.deps.repo.list_products_for_user(
                 user_id=u.user_id, only_active=True
             )
-            collector = NoticeCollector()
-            try:
-                await self._run_tick(products, half_open_seen=half_open_seen, collector=collector)
-            finally:
-                await self._flush_guaranteed(collector)
+            batches.append((products, NoticeCollector()))
+        await self._run_sweep(batches)
 
     def _last_attempt(self, product: ProductRecord) -> datetime | None:
         """The latest known attempt: this process's own, else the stored read or failure.
@@ -291,7 +379,7 @@ class PeriodicRunsMixin:
         """
         moment = now or datetime.now(UTC)
         users = await self.deps.repo.list_active_users()
-        half_open_seen: set[str] = set()
+        batches: list[tuple[Sequence[ProductRecord], NoticeCollector]] = []
         for u in users:
             products = await self.deps.repo.list_products_for_user(
                 user_id=u.user_id, only_active=True
@@ -301,10 +389,6 @@ class PeriodicRunsMixin:
                 for p in products
                 if self._is_due(p, global_minutes=global_interval_minutes, now=moment)
             ]
-            if not due:
-                continue
-            collector = NoticeCollector()
-            try:
-                await self._run_tick(due, half_open_seen=half_open_seen, collector=collector)
-            finally:
-                await self._flush_guaranteed(collector)
+            if due:
+                batches.append((due, NoticeCollector()))
+        await self._run_sweep(batches)

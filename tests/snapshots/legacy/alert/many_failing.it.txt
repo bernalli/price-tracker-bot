@@ -4,6 +4,7 @@
 # frozen_now: 2026-03-01T12:00:00Z
 ## step 1: job run_check_all
 -> sendMessage chat=10
+   param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
    | ⏳ <b>Controlli in errore su example.com</b> (11)
@@ -60,6 +61,7 @@
 ~ products id=11 last_error_at: NULL -> <now:9999-99-99 99:99:99>
 ## step 2: job run_check_all
 -> sendMessage chat=10
+   param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
    | ⚠️ <b>Prezzo illeggibile su example.com</b> (11)
