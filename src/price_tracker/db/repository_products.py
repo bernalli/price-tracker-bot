@@ -26,12 +26,13 @@ class ProductRepositoryMixin(_RepositoryBase):
         currency: str,
         threshold_type: str = "percentage",
         threshold_value: Decimal = Decimal("10"),
+        image_url: str | None = None,
     ) -> int:
         cursor = await self._conn.execute(
             "INSERT INTO products(user_id, url, name, domain, initial_price, "
             "current_price, lowest_price, highest_price, currency, "
-            "threshold_type, threshold_value) "
-            "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "threshold_type, threshold_value, image_url) "
+            "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 user_id,
                 url,
@@ -44,6 +45,7 @@ class ProductRepositoryMixin(_RepositoryBase):
                 currency,
                 threshold_type,
                 _dec_str(threshold_value),
+                image_url,
             ),
         )
         await self._conn.commit()
@@ -98,6 +100,36 @@ class ProductRepositoryMixin(_RepositoryBase):
             ),
         )
         await self._conn.commit()
+
+    async def update_price_and_image(
+        self, product_id: int, price: Decimal, image_url: str | None
+    ) -> None:
+        """Store an accepted price and the image URL of the same reading, in one statement."""
+        await self._conn.execute(
+            "UPDATE products SET current_price = ?, image_url = ?, "
+            "lowest_price = CASE WHEN lowest_price IS NULL OR "
+            "CAST(? AS REAL) < CAST(lowest_price AS REAL) THEN ? ELSE lowest_price END, "
+            "highest_price = CASE WHEN highest_price IS NULL OR "
+            "CAST(? AS REAL) > CAST(highest_price AS REAL) THEN ? ELSE highest_price END, "
+            "last_checked_at = datetime('now'), updated_at = datetime('now') WHERE id = ?",
+            (
+                _dec_str(price),
+                image_url,
+                _dec_str(price),
+                _dec_str(price),
+                _dec_str(price),
+                _dec_str(price),
+                product_id,
+            ),
+        )
+        await self._conn.commit()
+
+    async def list_image_urls(self) -> set[str]:
+        """Every distinct non-NULL product image URL, for every user."""
+        cursor = await self._conn.execute(
+            "SELECT DISTINCT image_url FROM products WHERE image_url IS NOT NULL"
+        )
+        return {row[0] for row in await cursor.fetchall()}
 
     async def set_threshold(
         self, product_id: int, threshold_type: str, threshold_value: Decimal
