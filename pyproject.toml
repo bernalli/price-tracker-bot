@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "price-tracker"
-version = "1.9.0"
+version = "1.10.0"
 description = "Self-hosted Telegram bot for multi-site price tracking"
 authors = [{name = "Samuele Martinalli", email = "254686239+bernalli@users.noreply.github.com"}]
 license = {text = "MIT"}
@@ -20,6 +20,8 @@ dependencies = [
     "aiosqlite>=0.20.0",
     "python-dotenv>=1.2.3",
     "matplotlib>=3.11.2",
+    # Decodes product images into thumbnails; previously only a transitive dependency of matplotlib.
+    "pillow>=13.0.0",
     "curl_cffi>=0.16.3",
     "scrapling>=0.4.15",
     "browserforge>=1.0.0",
@@ -142,6 +144,9 @@ disable_error_code = [
 [[tool.mypy.overrides]]
 module = [
     "price_tracker.bot.callbacks",
+    "price_tracker.bot.telegram_outcome",
+    "price_tracker.bot.list_grid",
+    "price_tracker.bot.list_media",
     "price_tracker.bot.flow_services",
     "price_tracker.bot.flows",
     "price_tracker.bot.ui",

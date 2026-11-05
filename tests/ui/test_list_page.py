@@ -63,8 +63,8 @@ def test_pagination_slices_and_clamps(count: int) -> None:
         assert ids(page) == expected
 
 
-def test_page_size_is_five() -> None:
-    assert PAGE_SIZE == 5
+def test_page_size_is_six() -> None:
+    assert PAGE_SIZE == 6
 
 
 # --- filters ------------------------------------------------------------------
@@ -143,7 +143,9 @@ def test_products_open_the_card_on_this_page_and_filter(ui_locales: Path) -> Non
     set_locale("en")
     screen = list_page(build(12, "e", 2))
     opens = [decode(d) for d in callbacks(screen) if d.startswith("l:e:2:")]
-    assert opens == [Action("list.open", ("e", 2, i)) for i in range(6, 11)]
+    assert opens == [
+        Action("list.open", ("e", 2, i)) for i in range(PAGE_SIZE + 1, 2 * PAGE_SIZE + 1)
+    ]
 
 
 @pytest.mark.parametrize("list_filter", ["a", "p", "e", "o"])
@@ -187,14 +189,14 @@ def test_navigation_follows_the_page(ui_locales: Path) -> None:
         row = next((r for r in screen.rows if any(b.callback == "noop" for b in r)), ())
         return [b.callback or "" for b in row]
 
-    assert nav(5, 1) == []
+    assert nav(PAGE_SIZE, 1) == []
     assert nav(0, 1) == []
     assert nav(12, 1) == ["noop", "l:a:2"]
-    assert nav(12, 2) == ["l:a:1", "noop", "l:a:3"]
-    assert nav(12, 3) == ["l:a:2", "noop"]
+    assert nav(12, 2) == ["l:a:1", "noop"]
+    assert nav(12, 3) == ["l:a:1", "noop"]
     screen = list_page(build(12, "a", 2))
     row = next(r for r in screen.rows if any(b.callback == "noop" for b in r))
-    assert row[1].label == "2/3"
+    assert row[1].label == "2/2"
 
 
 @pytest.mark.parametrize(

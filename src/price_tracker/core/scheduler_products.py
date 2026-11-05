@@ -19,6 +19,7 @@ from price_tracker.core.alert import (
 from price_tracker.core.drop_floor import NO_DROP_FLOOR, DropFloor, floor_for_choice
 from price_tracker.core.exceptions import BlockEvent, ListingGone, ParseError
 from price_tracker.core.health import QuarantineState
+from price_tracker.core.image_url import normalize_image_url
 from price_tracker.core.notices import NoticeCollector
 from price_tracker.core.outlier import MAX_HELD_READS, ReadVerdict, classify_read, reads_agree
 from price_tracker.core.scheduler_common import (
@@ -292,7 +293,10 @@ class ProductChecksMixin:
             return (p.user_id, None, False, None)
 
         old_price = p.current_price or p.initial_price
-        await self.deps.repo.update_price(p.id, info.price)
+        image_url = normalize_image_url(info.image_url, base_url=p.url)
+        await self.deps.repo.update_price_and_image(p.id, info.price, image_url)
+        if self.deps.thumbnails is not None:
+            self.deps.thumbnails.request(image_url)
         await self.deps.repo.add_price_history(p.id, info.price)
         if p.pending_read_count or p.pending_read_streak:
             await self.deps.repo.clear_pending_read(p.id)

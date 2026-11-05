@@ -80,6 +80,7 @@ class ProductRecord(_DictCompatMixin):
     gone_streak: int = 0
     suspension_kind: str | None = None
     suspension_reason: str | None = None
+    image_url: str | None = None
 
 
 @dataclass(frozen=True)

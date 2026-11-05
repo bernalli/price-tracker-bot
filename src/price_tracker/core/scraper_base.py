@@ -362,6 +362,7 @@ class ProductInfo:
     seller: str | None = None
     condition: str | None = None
     error: str | None = None
+    image_url: str | None = None
 
 
 class AbstractScraper(ABC):

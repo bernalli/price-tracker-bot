@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 
 from telegram.ext import Application, CommandHandler, ContextTypes
 
+from price_tracker.bot import list_media
 from price_tracker.bot.decorators import _db, restricted, with_locale
 from price_tracker.bot.handlers._cards import (
     default_interval,
@@ -18,6 +19,7 @@ from price_tracker.bot.handlers._cards import (
     reply_screen,
 )
 from price_tracker.bot.ui.cards import list_page
+from price_tracker.bot.ui.list_text import list_text_page
 
 if TYPE_CHECKING:
     from telegram import Update
@@ -33,7 +35,11 @@ async def cmd_list(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     interval = await default_interval(context)
     page = list_view(records, "a", 1, default_interval_minutes=interval)
-    await reply_screen(update.message, list_page(page))
+    mode = list_media.two_message_mode(context)
+    if mode is None:
+        await reply_screen(update.message, list_page(page))
+    else:
+        await list_media.send_list(update.message, mode, list_text_page(page), page.items)
 
 
 def register(app: Application) -> None:

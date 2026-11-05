@@ -122,6 +122,14 @@ msgstr "Skip tiny price drops"
 msgid "Fewer store pause notices"
 msgstr "Fewer store pause notices"
 
+#: src/price_tracker/release_notes.py:66
+msgid "Product photos in the list"
+msgstr "Product photos in the list"
+
+#: src/price_tracker/release_notes.py:67
+msgid "Six products per page"
+msgstr "Six products per page"
+
 #: src/price_tracker/release_notes.py:95
 #, python-brace-format
 msgid "Updated to version {version}"

@@ -122,6 +122,14 @@ msgstr "Niente avvisi per cali minimi"
 msgid "Fewer store pause notices"
 msgstr "Meno avvisi di negozi in pausa"
 
+#: src/price_tracker/release_notes.py:66
+msgid "Product photos in the list"
+msgstr "Foto dei prodotti nella lista"
+
+#: src/price_tracker/release_notes.py:67
+msgid "Six products per page"
+msgstr "Sei prodotti per pagina"
+
 #: src/price_tracker/release_notes.py:95
 #, python-brace-format
 msgid "Updated to version {version}"

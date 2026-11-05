@@ -9,10 +9,12 @@ from typing import Any
 
 import aiosqlite
 import structlog
+from PIL import features
 from telegram.ext import Application, ContextTypes
 
 from price_tracker.bot.command_menus import sync_command_menus
 from price_tracker.bot.handlers import register_handlers
+from price_tracker.bot.list_grid import GridRegistry
 from price_tracker.bot.release_updates import announce_release
 from price_tracker.config import Config, parse_bind
 from price_tracker.core.domain_spacing import DomainSpacing
@@ -28,6 +30,8 @@ from price_tracker.core.scheduler import CHECK_TICK_MINUTES, Scheduler, Schedule
 from price_tracker.db import apply_runtime_pragmas
 from price_tracker.db.migrator import apply_migrations
 from price_tracker.db.repository import Repository
+from price_tracker.media.cache import ThumbnailCache
+from price_tracker.media.thumbnails import ThumbnailService
 from price_tracker.notifier.digest import DigestService
 from price_tracker.notifier.preferences import PreferencesManager
 from price_tracker.notifier.telegram import TelegramNotifier
@@ -133,14 +137,46 @@ async def _setup_scheduler(application: Application[Any, Any, Any, Any, Any, Any
             metrics=metrics,
             # Checks on one store start at least this far apart; every client
             # shares the outbound address, so the store sees them as one visitor.
-            domain_spacing=DomainSpacing(min_gap=config.domain_min_gap_seconds),
+            domain_spacing=application.bot_data["domain_spacing"],
             drop_floor=DropFloor(config.min_drop_percent, config.min_drop_absolute),
+            thumbnails=application.bot_data.get("thumbnails"),
         )
     )
 
 
+async def _setup_thumbnails(application: Application[Any, Any, Any, Any, Any, Any]) -> None:
+    config: Config = application.bot_data["config"]
+    if not config.list_images or config.database_path == ":memory:":
+        return
+    if not all(features.check(name) for name in ("jpg", "zlib", "freetype2")):
+        log.warning("thumbnails.disabled", reason="required image feature unavailable")
+        return
+    path = (
+        Path(config.image_cache_dir)
+        if config.image_cache_dir
+        else Path(config.database_path).parent / "thumbs"
+    )
+    cache = ThumbnailCache(path)
+    try:
+        cache.ensure_dir()
+    except OSError as exc:
+        log.warning("thumbnails.disabled", reason=type(exc).__name__)
+        return
+    repo: Repository = application.bot_data["repo"]
+    service = ThumbnailService(
+        cache,
+        client=application.bot_data["http_client"],
+        job_pacing=application.bot_data["domain_spacing"],
+        referenced_urls=repo.list_image_urls,
+    )
+    application.bot_data.update(thumbnails=service, list_grids=GridRegistry())
+
+
 async def _combined_post_init(application: Application[Any, Any, Any, Any, Any, Any]) -> None:
     await post_init(application)
+    config: Config = application.bot_data["config"]
+    application.bot_data["domain_spacing"] = DomainSpacing(min_gap=config.domain_min_gap_seconds)
+    await _setup_thumbnails(application)
     await _setup_scheduler(application)
 
 
@@ -266,11 +302,20 @@ async def amain() -> None:
         announce_release(application.bot, application.bot_data["repo"], config.lang),
         name="release_announcement",
     )
+    service = application.bot_data.get("thumbnails")
+    thumbnail_task = (
+        application.create_task(service.run(), name="thumbnail_worker")
+        if isinstance(service, ThumbnailService)
+        else None
+    )
     try:
         await asyncio.Event().wait()
     finally:
         announcement_task.cancel()
         await asyncio.gather(announcement_task, return_exceptions=True)
+        if thumbnail_task is not None:
+            thumbnail_task.cancel()
+            await asyncio.gather(thumbnail_task, return_exceptions=True)
         if metrics_server is not None:
             await metrics_server.stop()
             log.info("metrics_server.stop")

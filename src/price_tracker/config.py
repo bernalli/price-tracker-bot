@@ -85,6 +85,8 @@ class Config:
     domain_min_gap_seconds: float = DEFAULT_MIN_GAP_SECONDS
     min_drop_percent: Decimal = DEFAULT_MIN_DROP_PERCENT
     min_drop_absolute: Decimal = DEFAULT_MIN_DROP_ABSOLUTE
+    list_images: bool = True
+    image_cache_dir: str = ""
 
     @classmethod
     def from_env(cls) -> Config:
@@ -127,6 +129,8 @@ class Config:
                 name="MIN_DROP_ABSOLUTE",
                 default=DEFAULT_MIN_DROP_ABSOLUTE,
             ),
+            list_images=_parse_bool(os.getenv("LIST_IMAGES", ""), default=True),
+            image_cache_dir=os.getenv("IMAGE_CACHE_DIR", ""),
         )
 
 
