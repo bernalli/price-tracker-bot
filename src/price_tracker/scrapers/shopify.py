@@ -19,7 +19,14 @@ from bs4 import BeautifulSoup
 from price_tracker.core.exceptions import BlockEvent, HTTPBlockStatus, ListingGone
 from price_tracker.core.http_client import public_request
 from price_tracker.core.identity import RequestedIdentity
+from price_tracker.core.image_url import normalize_image_url
 from price_tracker.core.money import MAX_AMOUNT, Money, normalize_currency_code
+from price_tracker.core.page_image import (
+    ImageDocument,
+    ImagePageHTML,
+    PriceImageBinding,
+    extract_page_image,
+)
 from price_tracker.core.pricegrammar import Unreadable, select_offer
 from price_tracker.core.retry_policy import RetryConfig, with_retry
 from price_tracker.core.scraper_base import (
@@ -36,6 +43,59 @@ from price_tracker.core.scraper_base import (
 from price_tracker.core.structured_data import StructureError, decode_json_strict
 
 logger = logging.getLogger(__name__)
+
+
+def _image_id(value: object) -> str | None:
+    if isinstance(value, bool) or not isinstance(value, str | int):
+        return None
+    text = str(value)
+    return text if text.isascii() and text.isdigit() else None
+
+
+def _api_image(product: dict, variant: dict, url: str) -> str | None:
+    """Resolve only the selected variant's unambiguous image association."""
+    requested = _requested_variant_id(url)
+    variant_id = _image_id(variant.get("id"))
+    if requested is not None and variant_id != requested:
+        return None
+
+    def image(value: object) -> str | None:
+        raw = value.get("src") if isinstance(value, dict) else value
+        return normalize_image_url(raw, base_url=url)
+
+    own = image(variant.get("image"))
+    image_id = variant.get("image_id")
+    if image_id is not None:
+        identity = _image_id(image_id)
+        gallery = product.get("images")
+        if identity is None or not isinstance(gallery, list):
+            return None
+        matches = [
+            entry
+            for entry in gallery
+            if isinstance(entry, dict) and _image_id(entry.get("id")) == identity
+        ]
+        if len(matches) != 1:
+            return None
+        selected = image(matches[0])
+        if own is not None and own != selected:
+            return None
+        return selected
+    if own is not None:
+        return own
+    variants = product.get("variants")
+    if not isinstance(variants, list) or not variants:
+        return None
+    common = len(variants) == 1 or all(
+        isinstance(v, dict) and "image_id" in v and v["image_id"] is None for v in variants
+    )
+    if not common:
+        return None
+    main = product.get("image")
+    if main is not None:
+        return image(main)
+    images = product.get("images")
+    return image(images[0]) if isinstance(images, list) and images else None
 
 
 _SHOPIFY_PRODUCT_PATH_RE = re.compile(r"(?:^|/)products/[a-z0-9\-_]+", re.IGNORECASE)
@@ -278,7 +338,7 @@ class ShopifyScraper(AbstractScraper):
         json_url = self._build_json_url(url)
         if json_url:
             try:
-                result = await self._try_json_api(json_url, client)
+                result = await self._try_json_api(json_url, client, requested_url=url)
             except HTTPBlockStatus as json_block:
                 if json_block.status != 429:
                     raise
@@ -363,6 +423,19 @@ class ShopifyScraper(AbstractScraper):
                 return result
 
             soup = BeautifulSoup(html, "lxml")
+            from price_tracker.scrapers.generic import GenericScraper
+
+            document = ImageDocument.parse(soup)
+            attributed = GenericScraper()._try_json_ld_bound(
+                soup, url, getattr(html, "final_url", url), document
+            )
+            if attributed is not None and "image_url" in attributed:
+                return ProductInfo(
+                    name=attributed.get("name"),
+                    price=attributed.get("price"),
+                    currency=attributed.get("currency"),
+                    image_url=attributed["image_url"],
+                )
             css_result = self._try_shopify_selectors(soup)
             if css_result:
                 css_result.currency = normalize_currency_code(self._detect_currency_from_html(html))
@@ -404,7 +477,7 @@ class ShopifyScraper(AbstractScraper):
             # The tracked URL was not a product page to begin with (a collection,
             # say): landing elsewhere says nothing about a listing being removed.
             return None
-        return response.text
+        return ImagePageHTML(response.text, str(response.url))
 
     def _build_json_url(self, url: str) -> str | None:
         """Convert product URL to JSON API endpoint."""
@@ -433,7 +506,9 @@ class ShopifyScraper(AbstractScraper):
         match = re.search(r"/products/([a-z0-9\-_]+)\.json", json_url, re.IGNORECASE)
         return match.group(1) if match else None
 
-    async def _try_json_api(self, json_url: str, client: httpx.AsyncClient) -> ProductInfo | None:
+    async def _try_json_api(
+        self, json_url: str, client: httpx.AsyncClient, *, requested_url: str | None = None
+    ) -> ProductInfo | None:
         """Fetch product data from Shopify JSON API."""
         try:
             logger.debug("Shopify JSON API: fetching %s", json_url)
@@ -508,6 +583,7 @@ class ShopifyScraper(AbstractScraper):
             price: Decimal | None = None
             currency: str | None = None
             available = True
+            selected_variant: dict | None = None
             # Prefer variants the shop declares purchasable: sold-out products
             # often keep a placeholder price on the first variant (#33).
             for variant in variants:
@@ -521,6 +597,7 @@ class ShopifyScraper(AbstractScraper):
                     if parsed:
                         price = parsed
                         currency = normalize_currency_code(variant.get("price_currency"))
+                        selected_variant = variant
                         break
 
             if price is None and declares_availability:
@@ -534,6 +611,7 @@ class ShopifyScraper(AbstractScraper):
                             price = parsed
                             currency = normalize_currency_code(variant.get("price_currency"))
                             available = False
+                            selected_variant = variant
                             break
 
             if price is None:
@@ -546,6 +624,16 @@ class ShopifyScraper(AbstractScraper):
                 # usable ``price_currency``: the caller then reads it from the HTML.
                 currency=currency,
                 available=available,
+                image_url=(
+                    _api_image(
+                        product, selected_variant, requested_url or json_url.removesuffix(".json")
+                    )
+                    if selected_variant is not None
+                    and requested_handle
+                    and returned_handle
+                    and requested_handle.lower() == str(returned_handle).lower()
+                    else None
+                ),
             )
 
         except (json.JSONDecodeError, httpx.HTTPError, ValueError, KeyError, AttributeError) as e:
@@ -579,21 +667,30 @@ class ShopifyScraper(AbstractScraper):
             return None
 
         soup = BeautifulSoup(html, "lxml")
+        document = ImageDocument.parse(soup)
         groups: list[Mapping[str, object]] = []
-        for script in soup.find_all("script", type="application/ld+json"):
-            raw = script.string or script.get_text(strip=True)
-            if not raw:
-                continue
-            try:
-                data = decode_json_strict(raw)
-            except StructureError:
-                continue
-            for node in unwrap_jsonld_graph(data):
-                if "productgroup" not in _schema_type_names(node):
-                    continue
-                if _url_matches_requested(node.get("url"), requested):
+        refs: list[str] = []
+        if document.valid:
+            for ref, node in document.nodes.items():
+                if "productgroup" in _schema_type_names(node) and _url_matches_requested(
+                    node.get("url"), requested
+                ):
                     groups.append(node)
-
+                    refs.append(ref)
+        else:
+            for script in soup.find_all("script", type="application/ld+json"):
+                raw = script.string or script.get_text(strip=True)
+                if not raw:
+                    continue
+                try:
+                    data = decode_json_strict(raw)
+                except StructureError:
+                    continue
+                for node in unwrap_jsonld_graph(data):
+                    if "productgroup" not in _schema_type_names(node):
+                        continue
+                    if _url_matches_requested(node.get("url"), requested):
+                        groups.append(node)
         if not groups:
             return None
 
@@ -604,6 +701,44 @@ class ShopifyScraper(AbstractScraper):
         if any((r.price, r.currency) != (first.price, first.currency) for r in results[1:]):
             return ProductInfo(
                 error="Prezzo ambiguo (Shopify): ProductGroup discordanti per lo stesso prodotto"
+            )
+        if first.price is not None and document.valid:
+            variant_id = _requested_variant_id(url)
+            variant_refs: list[str] = []
+            compatible = True
+            for group in groups:
+                raw = group.get("hasVariant")
+                variants = raw if isinstance(raw, list) else [raw]
+                compatible = compatible and len(variants) == 1
+                if variant_id is not None:
+                    chosen = [
+                        v
+                        for v in variants
+                        if isinstance(v, Mapping) and _variant_offer_id(v) == variant_id
+                    ]
+                    for selected in chosen:
+                        variant_refs.extend(
+                            ref for ref, node in document.nodes.items() if node is selected
+                        )
+            first.image_url = extract_page_image(
+                soup,
+                page_url=getattr(html, "final_url", url),
+                price_binding=PriceImageBinding(
+                    document,
+                    url,
+                    tuple(refs),
+                    requested.url,
+                    True,
+                    variant_refs=tuple(variant_refs),
+                    variant_identity=variant_id,
+                    product_image_compatible=compatible,
+                    page_scope=(
+                        "product"
+                        if variant_id is None
+                        and soup.select('link[rel="canonical"], meta[property="og:url"]')
+                        else None
+                    ),
+                ),
             )
         return first
 

@@ -18,6 +18,17 @@ MAX_NODES = 10_000
 MAX_CANDIDATES = 20
 
 
+class ImagePageHTML(str):
+    """HTML retaining the final response URL without changing string consumers."""
+
+    final_url: str
+
+    def __new__(cls, text: str, final_url: str) -> ImagePageHTML:
+        value = super().__new__(cls, text)
+        value.final_url = final_url
+        return value
+
+
 def _payloads(soup: BeautifulSoup) -> tuple[str, ...]:
     return tuple(
         script.get_text()

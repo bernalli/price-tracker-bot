@@ -106,6 +106,9 @@ def test_price_core_has_documented_callers_only() -> None:
     }
     allowed_callers = {
         SRC_ROOT / "scrapers" / "shopify.py",
+        # Image capture verifies the identity selected by the price path.
+        SRC_ROOT / "scrapers" / "generic.py",
+        SRC_ROOT / "scrapers" / "amazon.py",
         # scraper_base.parse_price/detect_currency delegate to the price grammar
         # and the currency engine.
         SRC_ROOT / "core" / "scraper_base.py",

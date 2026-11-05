@@ -27,6 +27,13 @@ from bs4 import BeautifulSoup, Tag
 
 from price_tracker.core.exceptions import BlockEvent, ListingGone
 from price_tracker.core.http_client import public_request
+from price_tracker.core.identity import RequestedIdentity, check_echoes, normalize_url
+from price_tracker.core.page_image import (
+    ImageDocument,
+    ImagePageHTML,
+    PriceImageBinding,
+    extract_page_image,
+)
 from price_tracker.core.retry_policy import RetryConfig, with_retry
 from price_tracker.core.scraper_base import (
     AbstractScraper,
@@ -91,7 +98,7 @@ async def _fetch_generic_html(url: str, client: httpx.AsyncClient) -> str:
     )
     detect_listing_gone(status_code=response.status_code, url=url)
     response.raise_for_status()
-    return response.text
+    return ImagePageHTML(response.text, str(response.url))
 
 
 async def _fetch_with_curl_cffi(url: str) -> str | None:
@@ -224,9 +231,11 @@ class GenericScraper(AbstractScraper):
 
         soup = BeautifulSoup(html, "lxml")
         info = ProductInfo()
+        image_document = ImageDocument.parse(soup)
+        page_url = getattr(html, "final_url", url)
 
         strategies = [
-            ("JSON-LD", self._try_json_ld),
+            ("JSON-LD", lambda s: self._try_json_ld_bound(s, url, page_url, image_document)),
             ("Microdata", self._try_microdata),
             ("OpenGraph", self._try_opengraph),
             ("RDFa", self._try_rdfa),
@@ -244,6 +253,7 @@ class GenericScraper(AbstractScraper):
                 if result:
                     if result.get("price") is not None and info.price is None:
                         info.price = result["price"]
+                        info.image_url = result.get("image_url")
                         successful_strategy = strategy_name
                         logger.debug("Price found via %s: %s", strategy_name, info.price)
                     if result.get("name") and info.name is None:
@@ -281,7 +291,81 @@ class GenericScraper(AbstractScraper):
         if info.price is None:
             info.error = "Prezzo non trovato nella pagina"
 
+        if successful_strategy in {"OpenGraph", "Meta tags"} and info.price is not None:
+            echoes = soup.select('link[rel="canonical"], meta[property="og:url"]')
+            if echoes and "variant=" not in url:
+                info.image_url = extract_page_image(
+                    soup,
+                    page_url=page_url,
+                    price_binding=PriceImageBinding(
+                        image_document,
+                        url,
+                        (),
+                        normalize_url(url),
+                        True,
+                        price_source="page",
+                        page_scope="product",
+                    ),
+                )
         return info
+
+    def _try_json_ld_bound(
+        self, soup: BeautifulSoup, url: str, page_url: str, document: ImageDocument
+    ) -> dict | None:
+        """Select attributed nodes before reading their prices and images together."""
+        try:
+            requested = RequestedIdentity.from_url(url)
+        except ValueError:
+            return self._try_json_ld(soup)
+        selected: list[tuple[str, dict]] = []
+        if document.valid and check_echoes(requested, final_url=page_url).ok:
+            for ref, node in document.nodes.items():
+                raw_urls = node.get("url")
+                urls = raw_urls if isinstance(raw_urls, list) else [raw_urls]
+                if not urls or not all(
+                    isinstance(raw, str) and requested.resolve(raw) == requested.url for raw in urls
+                ):
+                    continue
+                node_id = node.get("@id")
+                if node_id is not None and (
+                    not isinstance(node_id, str) or requested.resolve(node_id) != requested.url
+                ):
+                    continue
+                kinds = node.get("@type")
+                if kinds != "Product" and not (
+                    isinstance(kinds, list)
+                    and "Product" in kinds
+                    and all(isinstance(t, str) for t in kinds)
+                ):
+                    continue
+                price = self._extract_price_from_offers(node.get("offers", node.get("Offers", {})))
+                if not price:
+                    for key in ("price", "lowPrice", "highPrice"):
+                        if node.get(key) is not None and (amount := parse_price(str(node[key]))):
+                            price = {"price": amount, "currency": node.get("priceCurrency", "EUR")}
+                            break
+                if price:
+                    selected.append((ref, {"name": node.get("name"), **price}))
+        if not selected:
+            return self._try_json_ld(soup)
+        first = selected[0][1]
+        if any(
+            (r.get("price"), r.get("currency")) != (first.get("price"), first.get("currency"))
+            for _, r in selected[1:]
+        ):
+            return self._try_json_ld(soup)
+        first["image_url"] = extract_page_image(
+            soup,
+            page_url=page_url,
+            price_binding=PriceImageBinding(
+                document,
+                url,
+                tuple(ref for ref, _ in selected),
+                normalize_url(url),
+                True,
+            ),
+        )
+        return first
 
     # ── Strategy 1: JSON-LD ────────────────────────────────────────
 
