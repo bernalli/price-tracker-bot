@@ -235,6 +235,22 @@ async def test_a_png_chart_photo_upload_is_accepted():
         assert remote.photo_size == (32, 24)
 
 
+def test_photo_limit_checks_restore_the_pixel_cap_even_on_decode_failure(monkeypatch):
+    from price_tracker.media import decode
+
+    request = FakeRequest()
+    before = Image.MAX_IMAGE_PIXELS
+    assert before == decode.MAX_SOURCE_PIXELS // 2
+    for data in (photo((5001, 5000)), b"invalid"):
+        monkeypatch.setattr(request, "_photo_bytes", lambda *args, payload=data: payload)
+        request._check_limits("sendPhoto", {})
+        assert before == Image.MAX_IMAGE_PIXELS
+    assert request.violations == [
+        "sendPhoto: photo dimensions 5001x5000",
+        "sendPhoto: photo decode failed",
+    ]
+
+
 async def test_a_csv_document_upload_is_not_checked_as_a_photo():
     request = FakeRequest()
     async with make_application(request) as app:

@@ -17,6 +17,7 @@ import asyncio
 import hashlib
 import itertools
 import json
+import warnings
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -212,19 +213,27 @@ class FakeRequest(BaseRequest):
         if method == "sendPhoto" or (
             method == "editMessageMedia" and media is not None and media.get("type") == "photo"
         ):
+            self._checked_photo_size = (1, 1)
             data = self._photo_bytes(params, request_data)
             if len(data) > 10_000_000:
                 self.violations.append(f"{method}: photo size {len(data)}")
+            previous_pixel_cap = Image.MAX_IMAGE_PIXELS
             try:
-                with Image.open(BytesIO(data), formats=("JPEG", "PNG")) as image:
-                    image.load()
-                    width, height = image.size
+                Image.MAX_IMAGE_PIXELS = None
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", Image.DecompressionBombWarning)
+                    with Image.open(BytesIO(data), formats=("JPEG", "PNG")) as image:
+                        image.load()
+                        width, height = image.size
+                self._checked_photo_size = (width, height)
                 if width + height > 10000:
                     self.violations.append(f"{method}: photo dimensions {width}x{height}")
                 if max(width, height) / min(width, height) > 20:
                     self.violations.append(f"{method}: photo ratio {width}x{height}")
             except (OSError, ValueError, UnidentifiedImageError):
                 self.violations.append(f"{method}: photo decode failed")
+            finally:
+                Image.MAX_IMAGE_PIXELS = previous_pixel_cap
 
     @staticmethod
     def _photo_bytes(params: dict[str, Any], request_data: RequestData | None) -> bytes:
@@ -358,11 +367,7 @@ class FakeRequest(BaseRequest):
                 message["reply_markup"] = json.loads(markup) if isinstance(markup, str) else markup
             if api_method in {"sendPhoto", "editMessageMedia"}:
                 data = self._photo_bytes(params, request_data)
-                try:
-                    with Image.open(BytesIO(data)) as image:
-                        size = image.size
-                except (OSError, ValueError, UnidentifiedImageError):
-                    size = (1, 1)
+                size = self._checked_photo_size
                 media = _json_dict(params.get("media")) or params
                 caption = media.get("caption")
                 message.pop("text", None)
