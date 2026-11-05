@@ -135,6 +135,43 @@ def test_a_shorter_deferral_never_cuts_a_longer_one() -> None:
 # ── Gap and state ────────────────────────────────────────────────
 
 
+def test_remaining_deferral_counts_down_without_mutating_state() -> None:
+    clock = _Clock()
+    spacing = _spacing(clock)
+    assert spacing.deferred_for("store.com") == 0.0
+    spacing.defer("store.com", "120")
+    assert spacing.deferred_for("store.com") == 120.0
+    clock.now = 20.0
+    spacing.defer("store.com", "10")
+    assert spacing.deferred_for("store.com") == 100.0
+    assert spacing.deferred_for("other.com") == 0.0
+    clock.now = 120.0
+    assert spacing.deferred_for("store.com") == 0.0
+    clock.now = 150.0
+    assert spacing.deferred_for("store.com") == 0.0
+    assert spacing.tracked_domains() == 1
+
+
+@given(
+    start=st.integers(min_value=-1_000_000, max_value=1_000_000),
+    seconds=st.integers(min_value=0, max_value=10_000),
+    elapsed=st.integers(min_value=0, max_value=20_000),
+)
+def test_remaining_deferral_matches_the_boolean_property(
+    start: int, seconds: int, elapsed: int
+) -> None:
+    clock = _Clock()
+    clock.now = float(start)
+    spacing = _spacing(clock)
+    spacing.defer("store.com", str(seconds))
+    before = spacing.tracked_domains()
+    clock.now += elapsed
+    remaining = spacing.deferred_for("store.com")
+    assert remaining == max(0.0, min(seconds, MAX_DEFERRAL_SECONDS) - elapsed)
+    assert spacing.is_deferred("store.com") == (remaining > 0.0)
+    assert spacing.tracked_domains() == before
+
+
 def test_the_gap_counts_from_the_latest_start() -> None:
     clock = _Clock()
     spacing = _spacing(clock)
