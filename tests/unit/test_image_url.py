@@ -45,7 +45,7 @@ from price_tracker.core.image_url import MAX_IMAGE_URL_LENGTH, normalize_image_u
         ("https://u@cdn.example/x.jpg", "", None),
         ("https://cdn.example:8443/x.jpg", "", None),
         ("https://cdn.example:443/x.jpg", "", "https://cdn.example/x.jpg"),
-        ("https://10.0.0.5/x.jpg", "", None),
+        ("https://192.0.2.5/x.jpg", "", None),
         ("https://127.1/x.jpg", "", None),
         ("https://0x7f.0.0.1/x.jpg", "", None),
         ("https://1.2.3.4.5/x.jpg", "", None),

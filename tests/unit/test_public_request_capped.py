@@ -283,7 +283,7 @@ async def test_mixed_dns_and_rebinding_are_refused(
     original = network.resolve
 
     def resolve(host: str, port: int, *args: Any, **kwargs: Any) -> list[Any]:
-        network.answers = [PUBLIC] if rebinding and not network.lookups else [PUBLIC, "10.0.0.1"]
+        network.answers = [PUBLIC] if rebinding and not network.lookups else [PUBLIC, "127.0.0.1"]
         return original(host, port, *args, **kwargs)
 
     monkeypatch.setattr(socket, "getaddrinfo", resolve)
