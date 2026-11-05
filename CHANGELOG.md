@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-11-05
+
+### Added
+
+- `/list` shows the products as a grid photo with numbered thumbnails, followed by a text message with the
+  numbered prices and the navigation buttons. Product images are taken from the store page (Shopify, Amazon and
+  pages with structured product data) and downloaded in the background after a price check or when a product is
+  added, never when the list is opened. Set `LIST_IMAGES=0` to keep the text-only list; thumbnails are stored in
+  `IMAGE_CACHE_DIR` (by default `thumbs` beside the database).
+- The product card shows the product image as its link preview when one is known.
+
+### Changed
+
+- Lists show six products per page instead of five.
+- Image downloads follow the same per-store spacing and `Retry-After` pauses as price checks.
+
 ## [1.9.0] - 2026-11-05
 
 ### Added
