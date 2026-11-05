@@ -85,13 +85,16 @@ def public_dns(monkeypatch: pytest.MonkeyPatch) -> None:
 MAX_TEST_ID_LENGTH = 16_384
 
 
-def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+@pytest.hookimpl(tryfirst=True)
+def pytest_collection_finish(session: pytest.Session) -> None:
     """Refuse parametrize ids that would flood the verbose test log.
 
     pytest builds ids from parameter values, so a large bytes payload becomes a
     multi-megabyte log line that CI runners cannot stream. Pass ``ids=`` instead.
     """
-    long_ids = [item.nodeid[:120] for item in items if len(item.nodeid) > MAX_TEST_ID_LENGTH]
+    long_ids = [
+        item.nodeid[:120] for item in session.items if len(item.nodeid) > MAX_TEST_ID_LENGTH
+    ]
     if long_ids:
         raise pytest.UsageError(
             f"test ids longer than {MAX_TEST_ID_LENGTH} characters (pass ids= to parametrize): "
