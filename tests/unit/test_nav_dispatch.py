@@ -46,7 +46,7 @@ from price_tracker.bot.handlers.settings import (
     unmute_command,
 )
 from price_tracker.bot.messages import set_locale
-from price_tracker.bot.ui.cards import list_page
+from price_tracker.bot.ui.list_text import list_page
 from price_tracker.bot.ui.panels import home_screen
 from price_tracker.core.health import HealthManager
 from price_tracker.core.textlimits import TELEGRAM_MESSAGE_LIMIT, visible_length
@@ -602,7 +602,7 @@ async def test_the_sold_out_filter_lists_only_active_sold_out_products(repo: Rep
     assert "Toaster" in text
     assert "Kettle" not in text
     assert "Fan" not in text
-    opens = [b.callback_data for r in markup.inline_keyboard for b in r if b.text.startswith("#")]
+    opens = [b.callback_data for r in markup.inline_keyboard for b in r if b.text.isdigit()]
     assert opens == [f"l:o:1:{gone}"]
 
 

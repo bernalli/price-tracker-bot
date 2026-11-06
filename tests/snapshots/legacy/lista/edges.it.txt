@@ -8,16 +8,17 @@
    param parse_mode="HTML"
    text:
    | 📦 <b>I tuoi prodotti</b>
-   | attivi (2)
-   | pagina 1/1
+   | attivi (2) · pagina 1/1
    |
-   | <b>99,50 €</b> ▼0,5% ⚠️ Long NNNNNNNNN…
-   | <b>0,80 €</b> ▼11,1% Sticker
+   | <b>1.</b> Long NNNNNNNNNNNNNNNNNNNNNNNNN…
+   |     <b>99,50 €</b>  ▼ 0,5%  ⚠️
+   |
+   | <b>2.</b> Sticker
+   |     <b>0,80 €</b>  ▼ 11,1%
    keyboard:
-   | [#1 Long NNNNNNNN… → l:a:1:1] [#2 Sticker → l:a:1:2]
-   | [✅ Attivi ✓ → l:a:1] [⏸ In pausa → l:p:1]
-   | [⚠️ Errori → l:e:1] [🚫 Esaurito → l:o:1]
-   | [🗑 Elimina tutti → l:rmall] [➕ Aggiungi → ad]
-   | [🏠 Home → h]
+   | [1 → l:a:1:1] [2 → l:a:1:2]
+   | [• ✅ 2 • → l:a:1] [⏸ 0 → l:p:1] [⚠️ 1 → l:e:1] [🚫 0 → l:o:1]
+   | [🗑 Elimina tutti → l:rmall]
+   | [➕ Aggiungi → ad] [🏠 Home → h]
 ## db after step 1
 ~ users user_id=10 display_name: NULL -> "U10"

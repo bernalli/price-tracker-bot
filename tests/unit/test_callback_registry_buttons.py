@@ -11,7 +11,8 @@ from price_tracker.app.views import HomeView, ListPage, ProductView
 from price_tracker.bot.callbacks import Action, InvalidCallback, decode, encode
 from price_tracker.bot.handlers._cards import card_actions
 from price_tracker.bot.keyboards import build_threshold_keyboard, menu_back_button
-from price_tracker.bot.ui.cards import list_page, product_card
+from price_tracker.bot.ui.cards import product_card
+from price_tracker.bot.ui.list_text import list_page
 from price_tracker.bot.ui.panels import home_screen
 
 

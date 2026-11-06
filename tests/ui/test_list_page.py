@@ -12,7 +12,7 @@ from price_tracker.app.views import PAGE_SIZE, ListPage
 from price_tracker.bot.callbacks import ID_MAX, Action, decode, encode
 from price_tracker.bot.handlers._cards import list_view
 from price_tracker.bot.messages import set_locale
-from price_tracker.bot.ui.cards import list_page
+from price_tracker.bot.ui.list_text import list_page
 from price_tracker.bot.ui.width import display_width
 from price_tracker.core.textlimits import SAFE_LIMIT, _is_valid_telegram_markup, visible_length
 from tests.support.list_variants import HOSTILE, SCREENS, record, view
@@ -24,8 +24,6 @@ if TYPE_CHECKING:
 
 _SNAPSHOT_DIR = Path(__file__).parent / "snapshots" / "list"
 _NOW_TEXT = "2026-03-01T12:00:00Z"
-HALF_WIDTH = 17
-ROW_WIDTH = 34
 LOCALES = ("en", "it", "zh_Hans", "fr", "es", "de", "uk", "pt_BR", "ja")
 
 
@@ -149,12 +147,10 @@ def test_products_open_the_card_on_this_page_and_filter(ui_locales: Path) -> Non
 
 
 @pytest.mark.parametrize("list_filter", ["a", "p", "e", "o"])
-def test_exactly_one_filter_carries_the_check_mark(
-    list_filter: ListFilter, ui_locales: Path
-) -> None:
+def test_exactly_one_filter_is_marked_as_shown(list_filter: ListFilter, ui_locales: Path) -> None:
     set_locale("en")
     screen = list_page(build(3, list_filter, 1))
-    checked = [btn for row in screen.rows for btn in row if btn.label.endswith("✓")]
+    checked = [btn for row in screen.rows for btn in row if btn.label.startswith("• ")]
     assert [btn.callback for btn in checked] == [f"l:{list_filter}:1"]
     filters = {f"l:{f}:1" for f in "apeo"}
     assert filters <= set(callbacks(screen))
@@ -162,7 +158,7 @@ def test_exactly_one_filter_carries_the_check_mark(
 
 @pytest.mark.parametrize("locale", LOCALES)
 @pytest.mark.parametrize("list_filter", ["a", "p", "e", "o"])
-def test_the_four_filters_sit_in_two_rows_of_two_within_the_budget(
+def test_the_four_filters_share_one_short_row(
     list_filter: ListFilter, locale: str, ui_locales: Path
 ) -> None:
     set_locale(locale)
@@ -174,11 +170,9 @@ def test_the_four_filters_sit_in_two_rows_of_two_within_the_budget(
         and all(b.callback is not None and b.callback.count(":") == 2 for b in row)
     ]
     assert [b.callback for row in rows for b in row] == ["l:a:1", "l:p:1", "l:e:1", "l:o:1"]
-    for row in rows:
-        limit = HALF_WIDTH if len(row) == 2 else ROW_WIDTH
-        assert all(display_width(b.label) <= limit for b in row), row
-    if locale in ("en", "it"):
-        assert [len(row) for row in rows] == [2, 2]
+    assert len(rows) == 1
+    # Short labels: Telegram never has to cut them on a narrow phone.
+    assert all(display_width(b.label) <= 9 for b in rows[0]), rows[0]
 
 
 def test_navigation_follows_the_page(ui_locales: Path) -> None:
@@ -232,23 +226,33 @@ def test_the_header_and_the_rows(ui_locales: Path) -> None:
         ),
     )
     lines = list_page(page).text.split("\n")
-    assert lines[:3] == ["📦 <b>Your products</b>", "active ones (3)", "page 1/1"]
-    assert lines[4:] == [
-        "<b>€19.99</b> Kettle",
-        "<b>€19.99</b> ⏸ Fan",
-        "<b>N/A</b> ⚠️ Lamp",
-        "<b>€19.99</b> 🚫 Iron",
-        "<b>€19.99</b> ⚠️ Mixer",
+    assert lines[:2] == ["📦 <b>Your products</b>", "active ones (3) · page 1/1"]
+    assert lines[2:] == [
+        "",
+        "<b>1.</b> Kettle",
+        "    <b>€19.99</b>",
+        "",
+        "<b>2.</b> Fan",
+        "    <b>€19.99</b>  ⏸",
+        "",
+        "<b>3.</b> Lamp",
+        "    <b>N/A</b>  ⚠️",
+        "",
+        "<b>4.</b> Iron",
+        "    <b>€19.99</b>  🚫",
+        "",
+        "<b>5.</b> Mixer",
+        "    <b>€19.99</b>  ⚠️",
     ]
 
 
 def test_the_sold_out_header(ui_locales: Path) -> None:
     set_locale("en")
     header = list_page(build(2, "o", 1)).text.split("\n")[1]
-    assert header == "sold out (2)"
+    assert header == "sold out (2) · page 1/1"
     set_locale("it")
     header = list_page(build(2, "o", 1)).text.split("\n")[1]
-    assert header == "esauriti (2)"
+    assert header == "esauriti (2) · pagina 1/1"
     set_locale("en")
 
 
@@ -260,11 +264,11 @@ def test_an_empty_filter_says_so_and_keeps_filters_and_home(ui_locales: Path) ->
     assert {"l:a:1", "l:p:1", "l:e:1", "l:o:1", "h"} <= set(callbacks(screen))
 
 
-def test_a_long_name_uses_only_the_remaining_cells(ui_locales: Path) -> None:
+def test_a_long_name_fills_its_own_line(ui_locales: Path) -> None:
     set_locale("en")
-    row = list_page(ListPage("a", 1, 1, 1, (view(1, "N" * 100),))).text.split("\n")[4]
-    name = row.split("</b> ", 1)[1].split(" · ", 1)[0]
-    assert display_width(name) == 25
+    row = list_page(ListPage("a", 1, 1, 1, (view(1, "N" * 100),))).text.split("\n")[3]
+    name = row.split("</b> ", 1)[1]
+    assert display_width("1. " + name) == 34
     assert name.endswith("…")
 
 
@@ -281,9 +285,7 @@ def test_every_screen_fits_and_matches_its_snapshot_in_every_locale(
     assert "\n</b>" not in screen.text
     for row in screen.rows:
         if any(btn.callback and btn.callback.count(":") == 3 for btn in row):
-            limit = HALF_WIDTH if len(row) == 2 else ROW_WIDTH
-            assert len(row) <= 2
-            assert all(display_width(btn.label) <= limit for btn in row), row
+            assert all(btn.label.isdigit() for btn in row), row
     content = render_snapshot(screen, screen_name=f"list.{name}", locale=locale, now=_NOW_TEXT)
     compare_or_update(_SNAPSHOT_DIR / f"{name}.{locale}.txt", content)
 

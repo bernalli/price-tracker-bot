@@ -8,14 +8,13 @@
    param parse_mode="HTML"
    text:
    | 📦 <b>I tuoi prodotti</b>
-   | attivi (1)
-   | pagina 1/1
+   | attivi (1) · pagina 1/1
    |
-   | <b>100,00 €</b> Kettle
+   | <b>1.</b> Kettle
+   |     <b>100,00 €</b>
    keyboard:
-   | [#1 Kettle → l:a:1:1]
-   | [✅ Attivi ✓ → l:a:1] [⏸ In pausa → l:p:1]
-   | [⚠️ Errori → l:e:1] [🚫 Esaurito → l:o:1]
+   | [1 → l:a:1:1]
+   | [• ✅ 1 • → l:a:1] [⏸ 0 → l:p:1] [⚠️ 0 → l:e:1] [🚫 0 → l:o:1]
    | [➕ Aggiungi → ad] [🏠 Home → h]
 ## db after step 1
 ~ users user_id=10 display_name: NULL -> "U10"

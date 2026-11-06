@@ -6,7 +6,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
 from price_tracker.app.views import ListPage, ProductStatus, ProductView
-from price_tracker.bot.ui.cards import list_page
+from price_tracker.bot.ui.list_text import list_page
 
 if TYPE_CHECKING:
     from collections.abc import Callable

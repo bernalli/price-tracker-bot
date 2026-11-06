@@ -4,27 +4,25 @@
 # now: 2026-03-01T12:00:00Z
 text:
    | [📦 <b>Your products</b>
-   | [active ones active ones active ones] (12)
-   | page 2/3 📦 <b>Your products</b>
-   | [active ones active ones active ones] (12)
-   | page 2/3 📦 <b>Your products</b>
-   | [active ones active ones active ones] (12)
-   | page 2/3]
+   | [active ones active ones active ones] (12) · page 2/3 📦 <b>Your products</b> · [active ones active ones active ones] (12) · page 2/3 📦 <b>Your products</b> · [active ones active ones active ones] (12) · page 2/3]
    | 
-   | <b>€19.99</b> Kettle
-   | <b>€19.99</b> ⚠️ Fan
-   | <b>[N/A N/A N/A]</b> Lamp
-   | <b>CHF1,299.50</b> Heater
-   | <b>€19.99</b> Wireless Headphones X200…
+   | <b>1.</b> Kettle
+   |     <b>€19.99</b>
+   | 
+   | <b>2.</b> Fan
+   |     <b>€19.99</b>  ⚠️
+   | 
+   | <b>3.</b> Lamp
+   |     <b>[N/A N/A N/A]</b>
+   | 
+   | <b>4.</b> Heater
+   |     <b>CHF1,299.50</b>
+   | 
+   | <b>5.</b> Wireless Headphones X200 Pro E…
+   |     <b>€19.99</b>
 keyboard:
-   [#6 Kettle](cb:l:a:2:6)  [#7 Fan](cb:l:a:2:7)
-   [#8 Lamp](cb:l:a:2:8)  [#9 Heater](cb:l:a:2:9)
-   [#10 Wireless Hea…](cb:l:a:2:10)
-   [⬅️](cb:l:a:1)  [2/3](cb:noop)  [▶️](cb:l:a:3)
-   [[✅ Active ✅ Active ✅ Active] ✓](cb:l:a:1)
-   [[⏸ Paused ⏸ Paused ⏸ Paused]](cb:l:p:1)
-   [[⚠️ Errors ⚠️ Errors ⚠️ Errors]](cb:l:e:1)
-   [[🚫 Sold out 🚫 Sold out 🚫 Sold …](cb:l:o:1)
-   [[🗑 Delete all 🗑 Delete all 🗑 D…](cb:l:rmall)
-   [[➕ Add ➕ Add ➕ Add]](cb:ad)
-   [[🏠 Home 🏠 Home 🏠 Home]](cb:h)
+   [1](cb:l:a:2:6)  [2](cb:l:a:2:7)  [3](cb:l:a:2:8)  [4](cb:l:a:2:9)  [5](cb:l:a:2:10)
+   [◀️](cb:l:a:1)  [2/3](cb:noop)  [▶️](cb:l:a:3)
+   [• ✅ •](cb:l:a:1)  [⏸](cb:l:p:1)  [⚠️](cb:l:e:1)  [🚫](cb:l:o:1)
+   [[🗑 Delete all 🗑 Delete all 🗑 Delete all]](cb:l:rmall)
+   [[➕ Add ➕ Add ➕ Add]](cb:ad)  [[🏠 Home 🏠 Home 🏠 Home]](cb:h)

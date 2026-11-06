@@ -161,7 +161,8 @@ def test_product_image_configuration_defaults_and_switch(monkeypatch, raw):
     else:
         monkeypatch.setenv("LIST_IMAGES", raw)
     config = Config.from_env()
-    assert config.list_images is (raw not in ("0", "false"))
+    # The grid photo is opt-in: only an explicit true value turns it on.
+    assert config.list_images is (raw in ("1", "true"))
     assert config.image_cache_dir == ""
 
 

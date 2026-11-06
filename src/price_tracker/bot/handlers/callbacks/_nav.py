@@ -28,9 +28,9 @@ from price_tracker.bot.handlers._cards import (
 )
 from price_tracker.bot.handlers.debug import errors_text, health_text, no_errors_text
 from price_tracker.bot.messages import _, reset_locale, set_locale, user_locale
-from price_tracker.bot.ui.cards import list_page, product_card
+from price_tracker.bot.ui.cards import product_card
 from price_tracker.bot.ui.labels import button, layout_rows
-from price_tracker.bot.ui.list_text import list_text_page
+from price_tracker.bot.ui.list_text import list_page
 from price_tracker.bot.ui.panels import (
     QUIET_WINDOWS,
     add_button,
@@ -315,9 +315,13 @@ async def show_list(
     else:
         interval = await default_interval(context)
         result = list_view(records, list_filter, page, default_interval_minutes=interval)
-        screen = list_text_page(result)
+        screen = list_page(result)
         items = result.items
-    await list_media.edit_list(query, mode, _with_notice(screen, notice), items)
+    try:
+        await list_media.edit_list(query, mode, _with_notice(screen, notice), items)
+    except Exception:  # noqa: BLE001 — the optional grid must never cost the user the list
+        logger.exception("list edit with grid photo failed; editing the text only")
+        await _edit(query, _with_notice(screen, notice))
 
 
 async def show_card(
@@ -340,7 +344,11 @@ async def show_card(
     if mode is None:
         await _edit(query, _with_notice(screen, notice))
     else:
-        await list_media.edit_card(query, mode, _with_notice(screen, notice), view.image_url)
+        try:
+            await list_media.edit_card(query, mode, _with_notice(screen, notice), view.image_url)
+        except Exception:  # noqa: BLE001 — a link preview must never cost the user the card
+            logger.exception("card edit with link preview failed; editing the text only")
+            await _edit(query, _with_notice(screen, notice))
 
 
 async def _list_page(

@@ -4,12 +4,11 @@
 # now: 2026-03-01T12:00:00Z
 text:
    | 📦 <b>Your products</b>
-   | sold out (1)
-   | page 1/1
+   | sold out (1) · page 1/1
    | 
-   | <b>€19.99</b> 🚫 Toaster
+   | <b>1.</b> Toaster
+   |     <b>€19.99</b>  🚫
 keyboard:
-   [#11 Toaster](cb:l:o:1:11)
-   [✅ Active](cb:l:a:1)  [⏸ Paused](cb:l:p:1)
-   [⚠️ Errors](cb:l:e:1)  [🚫 Sold out ✓](cb:l:o:1)
+   [1](cb:l:o:1:11)
+   [✅](cb:l:a:1)  [⏸](cb:l:p:1)  [⚠️](cb:l:e:1)  [• 🚫 •](cb:l:o:1)
    [➕ Add](cb:ad)  [🏠 Home](cb:h)

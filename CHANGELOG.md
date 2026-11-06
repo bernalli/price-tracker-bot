@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.10.1] - 2026-11-06
+
+### Fixed
+
+- `/list` no longer answers "An error occurred" when the product photo grid cannot be sent or edited: the
+  list is sent, or the page edited, as a plain text message instead, and the cause is logged. The same applies
+  to the product card and its link preview.
+
+### Changed
+
+- `/list` is one message again: each product takes two lines, its name on the first and its price, change
+  and status on the second, so names are no longer cut after a few letters.
+- The list buttons fit narrow phones: the filters show an icon and a count (the shown one between dots),
+  Add sits next to Home, and Delete all has its own row.
+- The product photo grid is off by default; set `LIST_IMAGES=1` to send it above the list.
+
 ## [1.10.0] - 2026-11-05
 
 ### Added

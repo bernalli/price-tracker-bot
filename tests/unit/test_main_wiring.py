@@ -41,6 +41,8 @@ def fake_config(tmp_path: Path) -> Config:
         lang="en",
         prometheus_bind="127.0.0.1:0",
         metrics_enabled=False,
+        # The grid photo is opt-in; these tests exercise the wiring it needs.
+        list_images=True,
     )
 
 

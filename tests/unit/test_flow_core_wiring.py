@@ -190,7 +190,6 @@ def test_coordinator_modules_have_the_expected_importers() -> None:
         "price_tracker.bot.handlers.monitoring",
         "price_tracker.bot.handlers.product",
         "price_tracker.bot.keyboards",
-        "price_tracker.bot.ui.cards",
         "price_tracker.bot.ui.list_text",
         "price_tracker.bot.ui.panels",
         "price_tracker.core.alert",

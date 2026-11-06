@@ -66,6 +66,7 @@ RELEASE_NOTES: dict[str, tuple[str, ...]] = {
         N_("Product photos in the list"),
         N_("Six products per page"),
     ),
+    "1.10.1": (),
 }
 
 MESSAGE_LIMIT = 1200

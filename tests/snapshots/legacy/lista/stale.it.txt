@@ -8,17 +8,18 @@
    param parse_mode="HTML"
    text:
    | 📦 <b>I tuoi prodotti</b>
-   | attivi (2)
-   | pagina 1/1
+   | attivi (2) · pagina 1/1
    |
-   | <b>80,00 €</b> ▼20% Kettle
-   | <b>N/D</b> Fan
+   | <b>1.</b> Kettle
+   |     <b>80,00 €</b>  ▼ 20%
+   |
+   | <b>2.</b> Fan
+   |     <b>N/D</b>
    keyboard:
-   | [#1 Kettle → l:a:1:1] [#2 Fan → l:a:1:2]
-   | [✅ Attivi ✓ → l:a:1] [⏸ In pausa → l:p:1]
-   | [⚠️ Errori → l:e:1] [🚫 Esaurito → l:o:1]
-   | [🗑 Elimina tutti → l:rmall] [➕ Aggiungi → ad]
-   | [🏠 Home → h]
+   | [1 → l:a:1:1] [2 → l:a:1:2]
+   | [• ✅ 2 • → l:a:1] [⏸ 0 → l:p:1] [⚠️ 0 → l:e:1] [🚫 0 → l:o:1]
+   | [🗑 Elimina tutti → l:rmall]
+   | [➕ Aggiungi → ad] [🏠 Home → h]
 ## db after step 1
 ~ users user_id=10 display_name: NULL -> "U10"
 ## step 2: seed "delete product"
@@ -31,14 +32,13 @@
    | Prodotto non trovato.
    |
    | 📦 <b>I tuoi prodotti</b>
-   | attivi (1)
-   | pagina 1/1
+   | attivi (1) · pagina 1/1
    |
-   | <b>N/D</b> Fan
+   | <b>1.</b> Fan
+   |     <b>N/D</b>
    keyboard:
-   | [#2 Fan → l:a:1:2]
-   | [✅ Attivi ✓ → l:a:1] [⏸ In pausa → l:p:1]
-   | [⚠️ Errori → l:e:1] [🚫 Esaurito → l:o:1]
+   | [1 → l:a:1:2]
+   | [• ✅ 1 • → l:a:1] [⏸ 0 → l:p:1] [⚠️ 0 → l:e:1] [🚫 0 → l:o:1]
    | [➕ Aggiungi → ad] [🏠 Home → h]
 ## db after step 3
 (no changes)
@@ -51,14 +51,13 @@
    | Prodotto non trovato.
    |
    | 📦 <b>I tuoi prodotti</b>
-   | attivi (1)
-   | pagina 1/1
+   | attivi (1) · pagina 1/1
    |
-   | <b>N/D</b> Fan
+   | <b>1.</b> Fan
+   |     <b>N/D</b>
    keyboard:
-   | [#2 Fan → l:a:1:2]
-   | [✅ Attivi ✓ → l:a:1] [⏸ In pausa → l:p:1]
-   | [⚠️ Errori → l:e:1] [🚫 Esaurito → l:o:1]
+   | [1 → l:a:1:2]
+   | [• ✅ 1 • → l:a:1] [⏸ 0 → l:p:1] [⚠️ 0 → l:e:1] [🚫 0 → l:o:1]
    | [➕ Aggiungi → ad] [🏠 Home → h]
 ## db after step 4
 (no changes)

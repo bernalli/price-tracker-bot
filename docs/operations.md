@@ -60,7 +60,7 @@ All configuration is via environment variables, loaded from `.env` (or the host 
 | ----------------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | `TELEGRAM_BOT_TOKEN`          | (required)              | Telegram bot API token                                                                                                 |
 | `ALLOWED_USERS`               | (required)              | Comma-separated Telegram user IDs authorized to use the bot (first listed becomes admin)                               |
-| `LIST_IMAGES`                 | `1`                     | Enable the grid photo and numbered text list; `0` or `false` keeps the text list |
+| `LIST_IMAGES`                 | `0`                     | `1` sends a grid photo of the product images above the `/list` message; off by default |
 | `IMAGE_CACHE_DIR`             | (derived)               | Thumbnail directory; empty uses `thumbs` beside `DATABASE_PATH`. Images are disabled with `:memory:` |
 | `DATABASE_PATH`               | `/data/pricetracker.db` | SQLite database path                                                                                                   |
 | `LOCALE`                      | `en`                    | Default locale fallback when Telegram `language_code` missing (`en`, `it`)                                             |

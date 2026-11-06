@@ -29,7 +29,8 @@ from price_tracker.bot.handlers._cards import (
 )
 from price_tracker.bot.handlers.callbacks import handle_callback
 from price_tracker.bot.messages import set_locale
-from price_tracker.bot.ui.cards import list_page, product_card
+from price_tracker.bot.ui.cards import product_card
+from price_tracker.bot.ui.list_text import list_page
 from price_tracker.core.alert import PriceAlert
 from price_tracker.core.scheduler import CheckResult
 from price_tracker.db.migrator import apply_migrations
