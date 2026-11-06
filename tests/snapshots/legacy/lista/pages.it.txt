@@ -8,24 +8,31 @@
    param parse_mode="HTML"
    text:
    | 📦 <b>I tuoi prodotti</b>
-   | attivi (7)
-   | pagina 1/2
+   | attivi (7) · pagina 1/2
    |
-   | <b>18,00 €</b> ▼10% Kettle
-   | <b>18,00 €</b> ▼10% Fan
-   | <b>18,00 €</b> ▼10% Lamp
-   | <b>18,00 €</b> ▼10% Heater
-   | <b>18,00 €</b> ▼10% ⚠️ Mixer
-   | <b>18,00 €</b> ▼10% Toaster
+   | <b>1.</b> Kettle
+   |     <b>18,00 €</b>  ▼ 10%
+   |
+   | <b>2.</b> Fan
+   |     <b>18,00 €</b>  ▼ 10%
+   |
+   | <b>3.</b> Lamp
+   |     <b>18,00 €</b>  ▼ 10%
+   |
+   | <b>4.</b> Heater
+   |     <b>18,00 €</b>  ▼ 10%
+   |
+   | <b>5.</b> Mixer
+   |     <b>18,00 €</b>  ▼ 10%  ⚠️
+   |
+   | <b>6.</b> Toaster
+   |     <b>18,00 €</b>  ▼ 10%
    keyboard:
-   | [#1 Kettle → l:a:1:1] [#2 Fan → l:a:1:2]
-   | [#3 Lamp → l:a:1:3] [#4 Heater → l:a:1:4]
-   | [#5 Mixer → l:a:1:5] [#6 Toaster → l:a:1:6]
+   | [1 → l:a:1:1] [2 → l:a:1:2] [3 → l:a:1:3] [4 → l:a:1:4] [5 → l:a:1:5] [6 → l:a:1:6]
    | [1/2 → noop] [▶️ → l:a:2]
-   | [✅ Attivi ✓ → l:a:1] [⏸ In pausa → l:p:1]
-   | [⚠️ Errori → l:e:1] [🚫 Esaurito → l:o:1]
-   | [🗑 Elimina tutti → l:rmall] [➕ Aggiungi → ad]
-   | [🏠 Home → h]
+   | [• ✅ 7 • → l:a:1] [⏸ 0 → l:p:1] [⚠️ 1 → l:e:1] [🚫 0 → l:o:1]
+   | [🗑 Elimina tutti → l:rmall]
+   | [➕ Aggiungi → ad] [🏠 Home → h]
 ## db after step 1
 ~ users user_id=10 display_name: NULL -> "U10"
 ## step 2: press "l:a:2" user=10 on=1000
@@ -35,17 +42,16 @@
    param parse_mode="HTML"
    text:
    | 📦 <b>I tuoi prodotti</b>
-   | attivi (7)
-   | pagina 2/2
+   | attivi (7) · pagina 2/2
    |
-   | <b>18,00 €</b> ▼10% Blender
+   | <b>1.</b> Blender
+   |     <b>18,00 €</b>  ▼ 10%
    keyboard:
-   | [#7 Blender → l:a:2:7]
-   | [⬅️ → l:a:1] [2/2 → noop]
-   | [✅ Attivi ✓ → l:a:1] [⏸ In pausa → l:p:1]
-   | [⚠️ Errori → l:e:1] [🚫 Esaurito → l:o:1]
-   | [🗑 Elimina tutti → l:rmall] [➕ Aggiungi → ad]
-   | [🏠 Home → h]
+   | [1 → l:a:2:7]
+   | [◀️ → l:a:1] [2/2 → noop]
+   | [• ✅ 7 • → l:a:1] [⏸ 0 → l:p:1] [⚠️ 1 → l:e:1] [🚫 0 → l:o:1]
+   | [🗑 Elimina tutti → l:rmall]
+   | [➕ Aggiungi → ad] [🏠 Home → h]
 ## db after step 2
 (no changes)
 ## step 3: press "l:e:1" user=10 on=1000
@@ -55,14 +61,13 @@
    param parse_mode="HTML"
    text:
    | 📦 <b>I tuoi prodotti</b>
-   | errori (1)
-   | pagina 1/1
+   | errori (1) · pagina 1/1
    |
-   | <b>18,00 €</b> ▼10% ⚠️ Mixer
+   | <b>1.</b> Mixer
+   |     <b>18,00 €</b>  ▼ 10%  ⚠️
    keyboard:
-   | [#5 Mixer → l:e:1:5]
-   | [✅ Attivi → l:a:1] [⏸ In pausa → l:p:1]
-   | [⚠️ Errori ✓ → l:e:1] [🚫 Esaurito → l:o:1]
+   | [1 → l:e:1:5]
+   | [✅ 7 → l:a:1] [⏸ 0 → l:p:1] [• ⚠️ 1 • → l:e:1] [🚫 0 → l:o:1]
    | [➕ Aggiungi → ad] [🏠 Home → h]
 ## db after step 3
 (no changes)
@@ -96,14 +101,13 @@
    param parse_mode="HTML"
    text:
    | 📦 <b>I tuoi prodotti</b>
-   | errori (1)
-   | pagina 1/1
+   | errori (1) · pagina 1/1
    |
-   | <b>18,00 €</b> ▼10% ⚠️ Mixer
+   | <b>1.</b> Mixer
+   |     <b>18,00 €</b>  ▼ 10%  ⚠️
    keyboard:
-   | [#5 Mixer → l:e:1:5]
-   | [✅ Attivi → l:a:1] [⏸ In pausa → l:p:1]
-   | [⚠️ Errori ✓ → l:e:1] [🚫 Esaurito → l:o:1]
+   | [1 → l:e:1:5]
+   | [✅ 7 → l:a:1] [⏸ 0 → l:p:1] [• ⚠️ 1 • → l:e:1] [🚫 0 → l:o:1]
    | [➕ Aggiungi → ad] [🏠 Home → h]
 ## db after step 5
 (no changes)

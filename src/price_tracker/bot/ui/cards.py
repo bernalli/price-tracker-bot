@@ -6,14 +6,11 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from price_tracker.bot.callbacks import Action, encode
 from price_tracker.bot.messages import _, current_locale, ngettext
 from price_tracker.bot.ui.escape import escape_html
 from price_tracker.bot.ui.labels import button, layout_rows
-from price_tracker.bot.ui.panels import add_button, home_button
-from price_tracker.bot.ui.product_rows import product_row
 from price_tracker.bot.ui.screens import Button, Screen
-from price_tracker.bot.ui.width import sanitize_label, truncate_to_width
+from price_tracker.bot.ui.width import truncate_to_width
 from price_tracker.core.textlimits import DOMAIN_BUDGET, NAME_BUDGET
 from price_tracker.i18n.format import ago, change, duration, money, percent
 
@@ -195,64 +192,8 @@ def list_mark(view: ProductView) -> str:
     return ""
 
 
-def _list_row(view: ProductView) -> str:
-    return product_row(
-        view.name, view.current, initial=view.initial, currency=view.currency, mark=list_mark(view)
-    )
-
-
-def _list_keyboard(page: ListPage) -> tuple[tuple[Button, ...], ...]:
-    def go(target: int) -> str:
-        return encode(Action("list.page", (page.filter, target)))
-
-    opens = [
-        button(
-            truncate_to_width(f"#{item.id} {sanitize_label(item.name)}", 17),
-            callback=encode(Action("list.open", (page.filter, page.page, item.id))),
-        )
-        for item in page.items
-    ]
-    rows = list(layout_rows(opens))
-    if page.pages > 1:
-        nav = []
-        if page.page > 1:
-            nav.append(button("⬅️", callback=go(page.page - 1)))
-        nav.append(button(f"{page.page}/{page.pages}", callback=encode(Action("noop"))))
-        if page.page < page.pages:
-            nav.append(button("▶️", callback=go(page.page + 1)))
-        rows.append(tuple(nav))
-    labels = {
-        "a": _("✅ Active"),
-        "p": _("⏸ Paused"),
-        "e": _("⚠️ Errors"),
-        "o": _("🚫 Sold out"),
-    }
-    rows.extend(
-        layout_rows(
-            [
-                button(
-                    f"{label} ✓" if key == page.filter else label,
-                    callback=encode(Action("list.page", (key, 1))),
-                )
-                for key, label in labels.items()
-            ]
-        )
-    )
-    footer = []
-    if page.filter == "a" and page.total > 1:
-        footer.append(button(_("🗑 Delete all"), callback=encode(Action("list.remove_all"))))
-    footer += [add_button(), home_button()]
-    return (*rows, *layout_rows(footer))
-
-
 def list_header(page: ListPage) -> str:
     header = _("📦 <b>Your products</b> · {filter} ({total}) · page {page}/{pages}").format(
         filter=_filter_word(page.filter), total=page.total, page=page.page, pages=page.pages
     )
-    return header.replace(" · ", "\n")
-
-
-def list_page(page: ListPage) -> Screen:
-    """Render one page of the product list. Pure: the locale is the current one."""
-    body = [_list_row(item) for item in page.items] or [_("Nothing here.")]
-    return Screen(text="\n".join([list_header(page), "", *body]), rows=_list_keyboard(page))
+    return header.replace(" · ", "\n", 1)

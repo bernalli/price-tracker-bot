@@ -43,29 +43,27 @@ def test_six_products_have_one_number_row_navigation_counts_and_footer(
     assert [decode(button.callback) for button in screen.rows[0]] == [
         Action("list.open", ("a", 2, n)) for n in range(7, 13)
     ]
-    assert [button.label for button in screen.rows[1]] == ["⬅️", "2/3", "▶️"]
+    assert [button.label for button in screen.rows[1]] == ["◀️", "2/3", "▶️"]
     assert [decode(button.callback) for button in screen.rows[1]] == [
         Action("list.page", ("a", 1)),
         Action("noop"),
         Action("list.page", ("a", 3)),
     ]
-    assert [button.label for button in screen.rows[2]] == [
-        f"{_('✅ Active')} 18",
-        "⏸ 2",
-        "⚠️ 1",
-        "🚫 0",
-    ]
-    assert [decode(button.callback) for button in screen.rows[3]] == [
+    assert [button.label for button in screen.rows[2]] == ["• ✅ 18 •", "⏸ 2", "⚠️ 1", "🚫 0"]
+    assert [decode(button.callback) for button in screen.rows[3]] == [Action("list.remove_all")]
+    assert [decode(button.callback) for button in screen.rows[4]] == [
         Action("add"),
-        Action("list.remove_all"),
         Action("home"),
     ]
-    rows = [line for line in screen.text.splitlines() if re.match(r"^\d\. ", line)]
+    assert [button.label for button in screen.rows[4]] == [_("➕ Add"), _("🏠 Home")]
+    lines = screen.text.splitlines()
+    rows = [n for n, line in enumerate(lines) if re.match(r"^<b>\d\.</b> ", line)]
     assert len(rows) == 6
-    for n, row in enumerate(rows, 1):
-        assert row.startswith(f"{n}. <b>")
-        assert display_width(plain(row)) <= 32
-        assert f"Product {n + 6}" in row
+    for n, index in enumerate(rows, 1):
+        assert lines[index].startswith(f"<b>{n}.</b> ")
+        assert display_width(plain(lines[index])) <= 34
+        assert f"Product {n + 6}" in lines[index]
+        assert lines[index + 1].startswith("    <b>")
     assert screen.disable_link_preview
 
 
@@ -79,11 +77,11 @@ def test_paused_empty_pages_and_large_filter_counts(ui_locales: Any, locale: str
     assert _("Nothing here.") in screen.text
     assert [button.label for button in screen.rows[0]] == [
         "✅ 100000",
-        "⏸ 0 ✓",
+        "• ⏸ 0 •",
         "⚠️ 100000",
         "🚫 100000",
     ]
-    assert sum(display_width(button.label) for button in screen.rows[0]) <= 34
+    assert all(display_width(button.label) <= 9 for button in screen.rows[0])
     assert [decode(button.callback) for button in screen.rows[-1]] == [
         Action("add"),
         Action("home"),
@@ -91,9 +89,9 @@ def test_paused_empty_pages_and_large_filter_counts(ui_locales: Any, locale: str
     assert len(screen.rows) == 2
 
 
-def test_counts_are_required() -> None:
-    with pytest.raises(ValueError, match="counts"):
-        list_text_page(ListPage(filter="a", page=1, pages=1, total=0, items=()))
+def test_filters_without_counts_show_their_icons() -> None:
+    screen = list_text_page(ListPage(filter="a", page=1, pages=1, total=0, items=()))
+    assert [button.label for button in screen.rows[0]] == ["• ✅ •", "⏸", "⚠️", "🚫"]
 
 
 @pytest.mark.parametrize("width", [15, True, "32", 32.0, None, -1])
@@ -127,11 +125,13 @@ def test_hostile_names_prices_and_notices_stay_safe(
     screen = _with_notice(base, escape(notice))
     assert visible_length(screen.text) <= TELEGRAM_MESSAGE_LIMIT
     assert _is_valid_telegram_markup(screen.text)
-    rows = [line for line in base.text.splitlines() if re.match(r"^\d\. ", line)]
+    lines = base.text.splitlines()
+    rows = [n for n, line in enumerate(lines) if re.match(r"^<b>\d\.</b> ", line)]
     assert len(rows) == count
-    for n, row in enumerate(rows, 1):
-        assert row.startswith(f"{n}. ")
-        assert display_width(plain(row)) <= 32
+    for n, index in enumerate(rows, 1):
+        assert lines[index].startswith(f"<b>{n}.</b> ")
+        assert display_width(plain(lines[index])) <= 34
+        assert display_width(plain(lines[index + 1])) <= 34
         assert decode(screen.rows[0][n - 1].callback) == Action("list.open", ("a", 1, n))
     for keyboard_row in screen.rows:
         if len(keyboard_row) == 4:

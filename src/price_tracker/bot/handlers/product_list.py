@@ -6,6 +6,7 @@ budget.
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 from telegram.ext import Application, CommandHandler, ContextTypes
@@ -18,11 +19,12 @@ from price_tracker.bot.handlers._cards import (
     list_view,
     reply_screen,
 )
-from price_tracker.bot.ui.cards import list_page
-from price_tracker.bot.ui.list_text import list_text_page
+from price_tracker.bot.ui.list_text import list_page
 
 if TYPE_CHECKING:
     from telegram import Update
+
+logger = logging.getLogger(__name__)
 
 
 @with_locale
@@ -35,11 +37,16 @@ async def cmd_list(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     interval = await default_interval(context)
     page = list_view(records, "a", 1, default_interval_minutes=interval)
+    screen = list_page(page)
     mode = list_media.two_message_mode(context)
-    if mode is None:
-        await reply_screen(update.message, list_page(page))
-    else:
-        await list_media.send_list(update.message, mode, list_text_page(page), page.items)
+    if mode is not None:
+        try:
+            await list_media.send_list(update.message, mode, screen, page.items)
+        except Exception:  # noqa: BLE001 — the optional grid must never cost the user the list
+            logger.exception("list with grid photo failed; sending the text list")
+        else:
+            return
+    await reply_screen(update.message, screen)
 
 
 def register(app: Application) -> None:

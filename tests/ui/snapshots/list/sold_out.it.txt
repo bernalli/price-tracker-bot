@@ -4,12 +4,11 @@
 # now: 2026-03-01T12:00:00Z
 text:
    | 📦 <b>I tuoi prodotti</b>
-   | esauriti (1)
-   | pagina 1/1
+   | esauriti (1) · pagina 1/1
    | 
-   | <b>19,99 €</b> 🚫 Toaster
+   | <b>1.</b> Toaster
+   |     <b>19,99 €</b>  🚫
 keyboard:
-   [#11 Toaster](cb:l:o:1:11)
-   [✅ Attivi](cb:l:a:1)  [⏸ In pausa](cb:l:p:1)
-   [⚠️ Errori](cb:l:e:1)  [🚫 Esaurito ✓](cb:l:o:1)
+   [1](cb:l:o:1:11)
+   [✅](cb:l:a:1)  [⏸](cb:l:p:1)  [⚠️](cb:l:e:1)  [• 🚫 •](cb:l:o:1)
    [➕ Aggiungi](cb:ad)  [🏠 Home](cb:h)

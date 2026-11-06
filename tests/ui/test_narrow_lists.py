@@ -22,7 +22,7 @@ from price_tracker.bot.handlers.callbacks import _ops
 from price_tracker.bot.handlers.callbacks._menu import handle_menu_navigation
 from price_tracker.bot.handlers.monitoring import cmd_checkall
 from price_tracker.bot.messages import reset_locale, set_locale
-from price_tracker.bot.ui.cards import list_page
+from price_tracker.bot.ui.list_text import list_page
 from price_tracker.bot.ui.product_rows import product_row
 from price_tracker.bot.ui.width import display_width
 from price_tracker.core.textlimits import _is_valid_telegram_markup, paginate
@@ -53,6 +53,18 @@ def assert_rows(rows: list[str], count: int) -> None:
     assert all(sum(f"P{i}:" in plain(row) for row in rows) == 1 for i in range(1, count + 1))
 
 
+def assert_list_blocks(blocks: list[str], count: int) -> None:
+    """/list shows each product as a name line over a price line."""
+    assert len(blocks) == count
+    for index, block in enumerate(blocks, 1):
+        assert _is_valid_telegram_markup(block)
+        name, price = (plain(line) for line in block.split("\n"))
+        assert re.match(rf"[1-6]\. P{index}:", name), name
+        assert display_width(name) <= 34
+        assert display_width(price) <= 34
+        assert all(part in price for part in ("90", "▼", "10", "%"))
+
+
 @pytest.mark.parametrize("locale", ["en", "it", "de", "fr", "es", "uk", "pt_BR", "ja", "zh_Hans"])
 @settings(max_examples=12, deadline=None)
 @given(
@@ -68,11 +80,11 @@ async def test_every_list_has_one_narrow_row_per_product(
             record(i, name=f"P{i}:{tail}\ncontinued", current_price="90", initial_price="100")
             for i in range(1, count + 1)
         ]
-        rows: list[str] = []
+        list_blocks: list[str] = []
         for page in range(1, (count + PAGE_SIZE - 1) // PAGE_SIZE + 1):
             screen = list_page(list_view(products, "a", page, default_interval_minutes=60))
-            rows.extend(screen.text.split("\n\n", 1)[1].splitlines())
-        assert_rows(rows, count)
+            list_blocks.extend(screen.text.split("\n\n")[1:])
+        assert_list_blocks(list_blocks, count)
 
         db = MagicMock()
         db.get_active_products = AsyncMock(return_value=products)
