@@ -18,15 +18,15 @@ dependencies = [
     "beautifulsoup4>=4.15.0",
     "lxml>=6.1.3",
     "aiosqlite>=0.20.0",
-    "python-dotenv>=1.2.3",
+    "python-dotenv>=1.2.4",
     "matplotlib>=3.11.2",
     # Decodes product images into thumbnails; previously only a transitive dependency of matplotlib.
     "pillow>=13.0.0",
-    "curl_cffi>=0.16.3",
-    "scrapling>=0.4.15",
+    "curl_cffi>=0.17.0",
+    "scrapling>=0.5",
     "browserforge>=1.0.0",
-    "tenacity>=8.5.0",
-    "tldextract>=5.3.2",
+    "tenacity>=9.2.1",
+    "tldextract>=5.4.0",
     "structlog>=24.1.0",
     "prometheus_client>=0.26.0",
     # Floor raised for PYSEC-2026-3545/-3546/-3547 (fixed in 3.14.2/3.14.3)
@@ -45,22 +45,22 @@ Funding = "https://github.com/sponsors/bernalli"
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=9.1.1",
-    "pytest-asyncio>=1.4.0",
+    "pytest>=9.2.0",
+    "pytest-asyncio>=1.4.1.post1",
     "pytest-cov>=4.1",
     "respx>=0.21",
     # Pinned exactly: CI runs `ruff format --check`, so an unpinned formatter
     # turns any upstream release into a red build on files nobody touched —
     # which is how main broke on docs/plugins.md. Bump deliberately, with the
     # reformat it implies in the same commit.
-    "ruff==0.16.9",
-    "mypy>=2.3.1",
+    "ruff==0.17.3",
+    "mypy>=2.4.1",
     "types-beautifulsoup4",
     "types-python-dateutil",
-    "pre-commit>=4.6.2",
+    "pre-commit>=4.7.0",
     "freezegun>=1.5",
-    "hypothesis==6.168.3",
-    "wcwidth==0.9.1",
+    "hypothesis==6.170.14",
+    "wcwidth==0.9.4",
 ]
 
 [project.entry-points."price_tracker.scrapers"]
