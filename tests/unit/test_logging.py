@@ -295,3 +295,38 @@ class TestStdlibLoggersReachTheLogStream:
             patch.setattr("sys.stdout", replacement)
             logging.getLogger("price_tracker.main").info("after swap")
         assert json.loads(replacement.getvalue())["event"] == "after swap"
+
+
+@given(
+    tail=TOKEN_TAILS,
+    file_api=st.booleans(),
+    encoding=st.sampled_from(("plain", "escaped", "percent")),
+    field=st.sampled_from(("event", "exception", "stack")),
+)
+def test_json_formatter_redacts_before_json_encoding(tail, file_api, encoding, field):
+    from price_tracker.observability.logging import _JsonFormatter
+
+    token = "123:" + tail
+    url = (
+        "https://api.telegram.org/" + ("file/" if file_api else "") + "bot" + token + "/sendMessage"
+    )
+    if encoding == "escaped":
+        url = url.replace("/", chr(92) + "/")
+    elif encoding == "percent":
+        url = quote(url, safe=".")
+    record = logging.LogRecord(
+        "review",
+        logging.ERROR,
+        "review.py",
+        1,
+        url if field == "event" else "event",
+        (),
+        None,
+    )
+    if field == "exception":
+        record.exc_info = (RuntimeError, RuntimeError(url), None)
+    if field == "stack":
+        record.stack_info = url
+    rendered = _JsonFormatter().format(record)
+    assert token not in rendered
+    assert quote(token, safe="") not in rendered

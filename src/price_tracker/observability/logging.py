@@ -135,7 +135,10 @@ class _JsonFormatter(logging.Formatter):
             payload["exception"] = self.formatException(record.exc_info)
         if record.stack_info:
             payload["stack"] = self.formatStack(record.stack_info)
-        return _redact_tokens(json.dumps(payload, ensure_ascii=False))
+        return json.dumps(
+            {key: _redact_tokens(value) for key, value in payload.items()},
+            ensure_ascii=False,
+        )
 
 
 if TYPE_CHECKING:
