@@ -113,10 +113,21 @@ _AVAILABILITY_SELECTORS: tuple[str, ...] = (
 )
 
 
-def _is_unavailable(soup: BeautifulSoup) -> bool:
+def _is_unavailable(
+    soup: BeautifulSoup | Tag,
+    target_asin: str | None = None,
+    *,
+    ignore_offer_rows: bool = False,
+) -> bool:
     """Whether the page states the product itself is sold out / unavailable."""
     for selector in _AVAILABILITY_SELECTORS:
         for el in soup.select(selector):
+            if not _offer_evidence_owned(el, target_asin):
+                continue
+            if ignore_offer_rows and any(
+                "accordionrow" in str(node.get("id") or "").lower() for node in el.parents
+            ):
+                continue
             text = el.get_text(" ", strip=True).lower()
             if any(phrase in text for phrase in _UNAVAILABLE_PHRASES):
                 return True
@@ -161,6 +172,8 @@ _PURCHASE_CONTROLS = (
 
 # The buy box lists several offers of one product (new, used, renewed) as rows.
 _OFFER_ROW_SELECTOR = '[id*="AccordionRow"]'
+_BUYBOX_IDS = frozenset({"desktop_buybox", "buyBoxInner", "buybox", "buybox_feature_div"})
+_BUYBOX_SELECTOR = ", ".join(f"#{value}" for value in sorted(_BUYBOX_IDS))
 
 
 def _offer_scope(price_node: Tag, soup: BeautifulSoup) -> Tag | None:
@@ -177,7 +190,17 @@ def _offer_scope(price_node: Tag, soup: BeautifulSoup) -> Tag | None:
             return node
     if soup.select_one(_OFFER_ROW_SELECTOR) is not None:
         return None
-    return soup.select_one("#desktop_buybox, #buyBoxInner, #buybox, #buybox_feature_div")
+    for node in price_node.parents:
+        if node.get("id") in _BUYBOX_IDS:
+            return node
+    # Price and stock can occupy separate columns, but several disjoint buy
+    # boxes do not identify which offer the outside price belongs to.
+    boxes = [
+        box
+        for box in soup.select(_BUYBOX_SELECTOR)
+        if not any(parent.get("id") in _BUYBOX_IDS for parent in box.parents)
+    ]
+    return boxes[0] if len(boxes) == 1 else None
 
 
 def _offer_evidence_owned(element: Tag, target_asin: str | None) -> bool:
@@ -462,11 +485,6 @@ class AmazonScraper(AbstractScraper):
         if _is_not_found_page(soup):
             raise ListingGone(status=404, url=url, http_status_observed=False)
 
-        # Sold-out / "currently unavailable" listing, in any supported locale.
-        if _is_unavailable(soup):
-            info.available = False
-            info.stock_evidence = True
-
         # Extract price — CSS selectors first (buybox = real price for Amazon).
         # Prices are accepted only if they belong to this product's ASIN, so a
         # recommendation card can never stand in for a missing buy-box price.
@@ -540,6 +558,19 @@ class AmazonScraper(AbstractScraper):
                 info.seller = None
                 json_selected = False
                 css_sources = new_sources
+
+        # Bind negative markup to the selected CSS offer too. A used offer or
+        # a foreign recommendation cannot declare the selected new one sold out.
+        negative_scope = (
+            _offer_scope(css_sources[0], soup) if css_sources and not json_selected else soup
+        )
+        if negative_scope is not None and _is_unavailable(
+            negative_scope,
+            target_asin,
+            ignore_offer_rows=json_selected and info.price is not None,
+        ):
+            info.available = False
+            info.stock_evidence = True
 
         ambiguous = False
         if json_selected:
