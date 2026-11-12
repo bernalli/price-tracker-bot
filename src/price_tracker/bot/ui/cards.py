@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from price_tracker.bot.messages import _, current_locale, ngettext
-from price_tracker.bot.ui.check_status import check_reason
+from price_tracker.bot.ui.check_status import STORE_REFUSAL_OUTCOMES, check_reason
 from price_tracker.bot.ui.escape import escape_html
 from price_tracker.bot.ui.labels import button, layout_rows
 from price_tracker.bot.ui.screens import Button, Screen
@@ -200,6 +200,9 @@ def _filter_word(list_filter: str) -> str:
 def list_mark(view: ProductView) -> str:
     if view.status != "active":
         return "⏸"
+    if view.last_check_outcome in STORE_REFUSAL_OUTCOMES:
+        # The store is the cause, whatever error count the product still carries.
+        return "🔒"
     if view.consecutive_errors > 0:
         return "⚠️"
     if view.out_of_stock:
