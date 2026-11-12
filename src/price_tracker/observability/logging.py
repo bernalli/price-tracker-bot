@@ -138,7 +138,14 @@ class _JsonFormatter(logging.Formatter):
         return _redact_tokens(json.dumps(payload, ensure_ascii=False))
 
 
-class _StdoutHandler(logging.StreamHandler[TextIO]):
+if TYPE_CHECKING:
+    _TextStreamHandler = logging.StreamHandler[TextIO]
+else:
+    # The class is generic for type checkers only; no runtime subscript is needed.
+    _TextStreamHandler = logging.StreamHandler
+
+
+class _StdoutHandler(_TextStreamHandler):
     """Write to whatever ``sys.stdout`` is at emit time, not at creation time."""
 
     def __init__(self) -> None:
