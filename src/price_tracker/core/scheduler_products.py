@@ -361,11 +361,18 @@ class ProductChecksMixin:
         reason = None
         if info.stock_evidence:
             await self.deps.repo.record_availability(p.id, available=info.available)
-        else:
+        elif p.is_available is False or p.sold_out_streak > 0 or info.available is False:
+            # The price is accepted, but something casts doubt on the stock and
+            # this reading cannot settle it: the product is confirmed sold out,
+            # a sold-out reading awaits its confirmation, or the scraper hinted
+            # at unavailability without proof.
             reason = "availability_unknown"
             await self.deps.repo.record_check_outcome(p.id, reason=reason)
             if p.is_available is False:
                 return (p.user_id, None, False, reason)
+        # Otherwise the product was purchasable at its last confirmed reading and
+        # nothing contradicts it. Most pages never state their stock, so flagging
+        # every such read put a permanent warning on products that work.
 
         if old_price is None:
             return (p.user_id, None, False, reason)
