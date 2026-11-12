@@ -1120,24 +1120,27 @@ class AmazonScraper(AbstractScraper):
                 for offer in offers if isinstance(offers, list) else [offers]:
                     if not isinstance(offer, dict):
                         continue
-                    identity = {
-                        key: offer[key] for key in ("asin", "sku", "productID") if key in offer
-                    }
-                    if identity and not self._jsonld_owned_by(
-                        {"asin": target_asin, **identity}, target_asin
-                    ):
+                    try:
+                        identity = {
+                            key: offer[key] for key in ("asin", "sku", "productID") if key in offer
+                        }
+                        if identity and not self._jsonld_owned_by(
+                            {"asin": target_asin, **identity}, target_asin
+                        ):
+                            return None
+                        items = offer.get("itemOffered", [])
+                        for item in items if isinstance(items, list) else [items]:
+                            if (
+                                isinstance(item, str)
+                                and (_extract_asin(item) or target_asin) != target_asin
+                            ):
+                                return None
+                            if isinstance(item, dict) and not self._jsonld_owned_by(
+                                {"asin": target_asin, **item}, target_asin
+                            ):
+                                return None
+                    except ValueError:
                         return None
-                    items = offer.get("itemOffered", [])
-                    for item in items if isinstance(items, list) else [items]:
-                        if (
-                            isinstance(item, str)
-                            and (_extract_asin(item) or target_asin) != target_asin
-                        ):
-                            return None
-                        if isinstance(item, dict) and not self._jsonld_owned_by(
-                            {"asin": target_asin, **item}, target_asin
-                        ):
-                            return None
             selected = offer_evidence(raw.get("offers", {}))
             if selected is not None:
                 choices.append((ref, selected))

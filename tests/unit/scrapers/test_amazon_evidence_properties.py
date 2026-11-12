@@ -205,3 +205,22 @@ async def test_an_offer_consistent_with_the_tracked_product_keeps_its_price(
     assert info.price == Decimal("29.99")
     assert info.available is True
     assert info.stock_evidence is True
+
+
+@pytest.mark.parametrize(
+    "offers",
+    [
+        offer(sku="http://["),
+        offer(productID="http://["),
+        offer(itemOffered="http://["),
+        offer(itemOffered={"url": "http://["}),
+    ],
+    ids=["sku", "product-id", "item-string", "item-url"],
+)
+async def test_an_unparsable_offer_identity_drops_only_the_structured_data(
+    monkeypatch: pytest.MonkeyPatch, offers: object
+) -> None:
+    script = product_page(offers).removeprefix(HEAD).removesuffix("</div>")
+    info = await scrape(monkeypatch, HEAD + CENTRE_PRICE + script + "</div>")
+    assert info.error is None
+    assert info.price == Decimal("29.99")
