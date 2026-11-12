@@ -176,7 +176,7 @@ _BUYBOX_IDS = frozenset({"desktop_buybox", "buyBoxInner", "buybox", "buybox_feat
 _BUYBOX_SELECTOR = ", ".join(f"#{value}" for value in sorted(_BUYBOX_IDS))
 
 
-def _offer_scope(price_node: Tag, soup: BeautifulSoup) -> Tag | None:
+def _offer_scope(price_node: Tag, soup: BeautifulSoup, *, contained: bool = False) -> Tag | None:
     """The markup describing the offer that ``price_node`` prices, or None.
 
     With several offers on the page it is the row holding the price: a stock
@@ -184,15 +184,21 @@ def _offer_scope(price_node: Tag, soup: BeautifulSoup) -> Tag | None:
     every row cannot be tied to one of them. A page with a single offer keeps
     the price and the stock statement in different columns, so its buy box is
     the evidence scope. An unknown layout cannot prove stock from page-wide controls.
+    ``contained`` is for a price read outside the main price block (the new
+    offer next to a used buy box): only a scope holding the node describes it.
     """
     for node in price_node.parents:
         if "accordionrow" in str(node.get("id") or "").lower():
             return node
     if soup.select_one(_OFFER_ROW_SELECTOR) is not None:
         return None
-    for node in price_node.parents:
-        if node.get("id") in _BUYBOX_IDS:
-            return node
+    # Known buy-box ids nest (``desktop_buybox`` > ``buybox`` > ``buyBoxInner``):
+    # the outermost one is the offer's box, as for a price outside every box.
+    enclosing = [node for node in price_node.parents if node.get("id") in _BUYBOX_IDS]
+    if enclosing:
+        return enclosing[-1]
+    if contained:
+        return None
     # Price and stock can occupy separate columns, but several disjoint buy
     # boxes do not identify which offer the outside price belongs to.
     boxes = [
@@ -201,6 +207,24 @@ def _offer_scope(price_node: Tag, soup: BeautifulSoup) -> Tag | None:
         if not any(parent.get("id") in _BUYBOX_IDS for parent in box.parents)
     ]
     return boxes[0] if len(boxes) == 1 else None
+
+
+def _sold_out_scope(
+    price_node: Tag, soup: BeautifulSoup, *, contained: bool = False
+) -> BeautifulSoup | Tag | None:
+    """Where a sold-out statement binds to the offer that ``price_node`` prices.
+
+    It is the offer's own scope when the layout identifies one. A page with no
+    offer rows and no known buy box shows one offer in a layout this module
+    does not know: its owned statements still describe that offer, so the page
+    is the scope. Several offers that cannot be tied to the price stay unbound.
+    """
+    scope = _offer_scope(price_node, soup, contained=contained)
+    if scope is not None or contained:
+        return scope
+    if soup.select_one(_OFFER_ROW_SELECTOR) is None and soup.select_one(_BUYBOX_SELECTOR) is None:
+        return soup
+    return None
 
 
 def _offer_evidence_owned(element: Tag, target_asin: str | None) -> bool:
@@ -216,20 +240,26 @@ def _offer_evidence_owned(element: Tag, target_asin: str | None) -> bool:
 
 def _purchase_control_enabled(element: Tag) -> bool:
     """A disabled control, including one in a disabled fieldset, cannot buy stock."""
+    if str(element.get("type") or "").lower() == "hidden":
+        return False
     return not any(
-        node.has_attr("disabled") or str(node.get("aria-disabled") or "").lower() == "true"
+        node.has_attr("disabled")
+        or str(node.get("aria-disabled") or "").lower() == "true"
+        or not {"a-button-disabled", "aok-hidden"}.isdisjoint(node.get("class") or [])
         for node in (element, *element.parents)
     )
 
 
-def _offer_in_stock(price_node: Tag, soup: BeautifulSoup, target_asin: str | None) -> bool:
+def _offer_in_stock(
+    price_node: Tag, soup: BeautifulSoup, target_asin: str | None, *, contained: bool = False
+) -> bool:
     """Whether the offer of the selected price explicitly states it can be bought.
 
     Evidence is a stock statement or a purchase control inside the offer's own
     scope and owned by the tracked product. Any sold-out wording in that scope
     wins, so this never turns a doubtful page into a positive reading.
     """
-    scope = _offer_scope(price_node, soup)
+    scope = _offer_scope(price_node, soup, contained=contained)
     if scope is None:
         return False
     statements = [
@@ -240,8 +270,21 @@ def _offer_in_stock(price_node: Tag, soup: BeautifulSoup, target_asin: str | Non
     ]
     if any(veto in text for text in statements for veto in _NOT_AVAILABLE_VETOES):
         return False
-    if any(phrase in text for text in statements for phrase in _AVAILABLE_PHRASES):
-        return True
+    statements = [text for text in statements if text]
+    if statements:
+        literals = "|".join(
+            re.escape(phrase) for phrase in _AVAILABLE_PHRASES if phrase != "disponibilità: solo"
+        )
+        affirmative = (
+            rf"(?:{literals}"
+            r"|only [1-9][0-9]* left in stock(?:\s*[-–—]\s*order soon)?"
+            r"|disponibilità: solo [1-9][0-9]*)[.!]?"
+        )
+        # Unknown, negated, future or conflicting text is not current stock.
+        # A purchase control cannot override an unresolved stock statement.
+        return all(
+            re.fullmatch(affirmative, " ".join(text.split())) is not None for text in statements
+        )
     return any(
         _offer_evidence_owned(el, target_asin) and _purchase_control_enabled(el)
         for el in scope.select(_PURCHASE_CONTROLS)
@@ -541,6 +584,7 @@ class AmazonScraper(AbstractScraper):
         info.condition = self._detect_condition(soup, seller_name=seller_name)
 
         # If buybox shows used/renewed, try to find the new price and override
+        new_override = False
         if info.condition != "new":
             new_sources: list[Tag] = []
             new_price = self._extract_new_price(
@@ -558,11 +602,14 @@ class AmazonScraper(AbstractScraper):
                 info.seller = None
                 json_selected = False
                 css_sources = new_sources
+                new_override = True
 
         # Bind negative markup to the selected CSS offer too. A used offer or
         # a foreign recommendation cannot declare the selected new one sold out.
         negative_scope = (
-            _offer_scope(css_sources[0], soup) if css_sources and not json_selected else soup
+            _sold_out_scope(css_sources[0], soup, contained=new_override)
+            if css_sources and not json_selected
+            else soup
         )
         if negative_scope is not None and _is_unavailable(
             negative_scope,
@@ -591,7 +638,9 @@ class AmazonScraper(AbstractScraper):
             # A price read from the markup carries no availability of its own.
             # Without this the result stays "availability unknown" forever on
             # the ordinary in-stock page, whose JSON-LD has no offer.
-            if not info.stock_evidence and _offer_in_stock(source, soup, target_asin):
+            if not info.stock_evidence and _offer_in_stock(
+                source, soup, target_asin, contained=new_override
+            ):
                 info.available = True
                 info.stock_evidence = True
         if ambiguous:
@@ -1071,12 +1120,20 @@ class AmazonScraper(AbstractScraper):
                 for offer in offers if isinstance(offers, list) else [offers]:
                     if not isinstance(offer, dict):
                         continue
-                    if "asin" in offer and not self._jsonld_owned_by(
-                        {"asin": offer["asin"]}, target_asin
+                    identity = {
+                        key: offer[key] for key in ("asin", "sku", "productID") if key in offer
+                    }
+                    if identity and not self._jsonld_owned_by(
+                        {"asin": target_asin, **identity}, target_asin
                     ):
                         return None
                     items = offer.get("itemOffered", [])
                     for item in items if isinstance(items, list) else [items]:
+                        if (
+                            isinstance(item, str)
+                            and (_extract_asin(item) or target_asin) != target_asin
+                        ):
+                            return None
                         if isinstance(item, dict) and not self._jsonld_owned_by(
                             {"asin": target_asin, **item}, target_asin
                         ):
