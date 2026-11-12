@@ -40,11 +40,11 @@
    | ⚠️ <b>Controllo terminato</b>
    | 6 prodotti
    |
-   | <b>25,00 €</b> ⚠️ Amazon 1
+   | <b>25,00 €</b> 🔒 Amazon 1
    |    Il sito sta bloccando i controlli automatici.
-   | <b>25,00 €</b> ⚠️ Amazon 2
+   | <b>25,00 €</b> 🔒 Amazon 2
    |    Il sito sta bloccando i controlli automatici.
-   | <b>25,00 €</b> ⚠️ Amazon 3
+   | <b>25,00 €</b> 🔒 Amazon 3
    |    Il sito sta bloccando i controlli automatici.
    | <b>40,00 €</b> ⚠️ Gone
    |    Non trovo la pagina del prodotto. Controlla il link.

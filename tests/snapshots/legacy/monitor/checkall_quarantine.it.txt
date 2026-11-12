@@ -33,11 +33,11 @@
    | ⚠️ <b>Controllo terminato</b>
    | 3 prodotti
    |
-   | <b>80,00 €</b> ▼20% ⚠️ Kettle
+   | <b>80,00 €</b> ▼20% 🔒 Kettle
    |    Controllo rinviato: le richieste al sito sono temporaneamente limitate.
    | <b>25,00 €</b> ⚠️ Amazon 1
    |    Non sono riuscito a leggere il prezzo.
-   | <b>25,00 €</b> ⚠️ Amazon 2
+   | <b>25,00 €</b> 🔒 Amazon 2
    |    Controllo rinviato: è in corso una verifica del sito.
 ## db after step 9
 + bot_config key="warning_notice:10:amazon.com:parse_error" {value="2026-03-01T12:00:00+00:00"}
