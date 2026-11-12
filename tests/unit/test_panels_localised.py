@@ -205,6 +205,7 @@ ITALIAN: dict[str, str] = {
     ),
     "errors": (
         "⚠️ <b>Errori recenti (1)</b>\n\n"
+        "Ultimo prezzo registrato:\n"
         "<b>N/D</b> ⚠️3 Sconosciuto\n"
         "#1: Non sono riuscito a leggere il prezzo.\n"
         "🔒 I controlli su questo sito sono temporaneamente in pausa.\n\n"

@@ -7,6 +7,7 @@ from html import escape
 from typing import TYPE_CHECKING, Any
 
 from price_tracker.bot.messages import _, current_locale
+from price_tracker.bot.ui.check_status import STORE_REFUSAL_OUTCOMES
 from price_tracker.bot.ui.width import display_width, sanitize_label, truncate_to_width
 from price_tracker.i18n.format import change, money
 
@@ -85,6 +86,8 @@ def record_row(product: Mapping[str, Any], *, html: bool = True) -> str:
     mark = ""
     if not product.get("is_active", True):
         mark = "⏸"
+    elif product.get("last_check_outcome") in STORE_REFUSAL_OUTCOMES:
+        mark = "🔒"
     elif product.get("consecutive_errors", 0):
         mark = "⚠️"
     elif not product.get("is_available", True):

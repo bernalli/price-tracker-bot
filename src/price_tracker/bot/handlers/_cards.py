@@ -30,6 +30,7 @@ from price_tracker.bot.callbacks import Action, encode
 from price_tracker.bot.decorators import _config, _db, _get_conversion_rate
 from price_tracker.bot.messages import _
 from price_tracker.bot.ui.cards import CardActions
+from price_tracker.bot.ui.check_status import STORE_REFUSAL_OUTCOMES
 from price_tracker.core.image_url import normalize_image_url
 from price_tracker.core.url_utils import extract_etld_plus_one
 
@@ -169,10 +170,19 @@ def empty_list_text() -> str:
     return _("📭 Non hai prodotti tracciati.\nIncollami un link per iniziare!")
 
 
+def _has_errors(record: _Record) -> bool:
+    """Counted read errors, or an active product kept unread by a refusing store."""
+    if int(record.get("consecutive_errors") or 0) > 0:
+        return True
+    return (
+        bool(record.get("is_active")) and record.get("last_check_outcome") in STORE_REFUSAL_OUTCOMES
+    )
+
+
 _FILTERS = {
     "a": lambda record: bool(record.get("is_active")),
     "p": lambda record: not record.get("is_active"),
-    "e": lambda record: int(record.get("consecutive_errors") or 0) > 0,
+    "e": _has_errors,
     "o": _out_of_stock,
 }
 

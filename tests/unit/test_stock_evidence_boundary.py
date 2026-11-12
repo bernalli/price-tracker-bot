@@ -174,3 +174,78 @@ async def test_scheduler_rejects_price_returned_with_scrape_error(repo_with_prod
     assert result.reason == "price_none"
     assert row.current_price == Decimal("100")
     assert await repo.get_price_history(pid) == []
+
+
+async def test_priced_read_with_unknown_stock_is_a_clean_check_for_an_available_product(
+    repo_with_product,  # noqa: F811
+):
+    """Nothing casts doubt on the product: an updated price is not an incomplete check."""
+    from tests.unit.test_check_out_of_stock import _pull
+
+    repo, pid = repo_with_product
+    (result,) = await _pull(
+        repo, pid, [ProductInfo(price=Decimal("95"), currency="EUR", stock_evidence=False)]
+    )
+    row = await repo.get_product(pid)
+    assert result.reason is None
+    assert row.last_check_outcome is None
+    assert row.current_price == Decimal("95")
+    assert row.is_available is True
+    assert row.consecutive_errors == 0
+
+
+async def test_unknown_stock_still_triggers_the_price_alert_of_an_available_product(
+    repo_with_product,  # noqa: F811
+):
+    from tests.unit.test_check_out_of_stock import _pull
+
+    repo, pid = repo_with_product
+    (result,) = await _pull(
+        repo, pid, [ProductInfo(price=Decimal("80"), currency="EUR", stock_evidence=False)]
+    )
+    assert result.reason is None
+    assert result.alert is not None
+    assert result.alert.new_price == Decimal("80")
+
+
+async def test_unknown_stock_stays_flagged_while_a_sold_out_reading_awaits_confirmation(
+    repo_with_product,  # noqa: F811
+):
+    from tests.unit.test_check_out_of_stock import _pull
+
+    repo, pid = repo_with_product
+    results = await _pull(
+        repo,
+        pid,
+        [
+            ProductInfo(available=False),
+            ProductInfo(price=Decimal("100"), currency="EUR", stock_evidence=False),
+        ],
+    )
+    row = await repo.get_product(pid)
+    assert [r.reason for r in results] == ["out_of_stock", "availability_unknown"]
+    assert row.last_check_outcome == "availability_unknown"
+    assert row.is_available is True
+    assert row.sold_out_streak == 1
+
+
+async def test_unknown_stock_stays_flagged_for_a_confirmed_sold_out_product(
+    repo_with_product,  # noqa: F811
+):
+    from tests.unit.test_check_out_of_stock import _pull
+
+    repo, pid = repo_with_product
+    results = await _pull(
+        repo,
+        pid,
+        [
+            ProductInfo(available=False),
+            ProductInfo(available=False),
+            ProductInfo(price=Decimal("80"), currency="EUR", stock_evidence=False),
+        ],
+    )
+    row = await repo.get_product(pid)
+    assert results[-1].reason == "availability_unknown"
+    assert results[-1].alert is None
+    assert row.is_available is False
+    assert row.last_check_outcome == "availability_unknown"

@@ -204,3 +204,129 @@ class TestTelegramTokenStaysOutOfStdlibLogs:
         assert TelegramTokenRedactingFilter().filter(record) is True
         assert record.msg == "%d"
         assert record.args == ("x",)
+
+
+@pytest.fixture
+def clean_stdlib_root():
+    """Run with the root logger as a fresh process has it, and restore it afterwards."""
+    root = logging.getLogger()
+    saved_factory = logging.getLogRecordFactory()
+    saved_level = root.level
+    saved_handlers = list(root.handlers)
+    quiet = ("httpx", "httpcore", "apscheduler")
+    saved_levels = {name: logging.getLogger(name).level for name in quiet}
+    root.handlers[:] = []
+    try:
+        yield
+    finally:
+        root.handlers[:] = saved_handlers
+        root.setLevel(saved_level)
+        logging.setLogRecordFactory(saved_factory)
+        for name, level in saved_levels.items():
+            logging.getLogger(name).setLevel(level)
+
+
+def _json_lines(text: str) -> list[dict[str, object]]:
+    return [json.loads(line) for line in text.strip().splitlines() if line.strip()]
+
+
+class TestStdlibLoggersReachTheLogStream:
+    """Almost every module logs through ``logging.getLogger``: those records must be emitted."""
+
+    def test_info_from_a_stdlib_logger_is_emitted_as_json(self, capsys, clean_stdlib_root):
+        configure_logging(level="INFO")
+        logging.getLogger("price_tracker.core.scheduler").info("sweep done: %d checked", 3)
+        records = _json_lines(capsys.readouterr().out)
+        assert len(records) == 1
+        record = records[0]
+        assert record["event"] == "sweep done: 3 checked"
+        assert record["level"] == "info"
+        assert record["logger"] == "price_tracker.core.scheduler"
+        assert str(record["timestamp"]).endswith("Z")
+
+    def test_level_filters_stdlib_records(self, capsys, clean_stdlib_root):
+        configure_logging(level="WARNING")
+        logger = logging.getLogger("price_tracker.scrapers.amazon")
+        logger.info("dropped")
+        logger.warning("kept")
+        events = [record["event"] for record in _json_lines(capsys.readouterr().out)]
+        assert events == ["kept"]
+
+    def test_configuring_twice_emits_each_record_once(self, capsys, clean_stdlib_root):
+        configure_logging(level="INFO")
+        configure_logging(level="INFO")
+        logging.getLogger("price_tracker.main").info("once")
+        events = [record["event"] for record in _json_lines(capsys.readouterr().out)]
+        assert events == ["once"]
+
+    def test_exception_is_rendered_inside_the_json_line(self, capsys, clean_stdlib_root):
+        configure_logging(level="INFO")
+        try:
+            raise RuntimeError("boom")
+        except RuntimeError:
+            logging.getLogger("price_tracker.core.scheduler").exception("check failed")
+        records = _json_lines(capsys.readouterr().out)
+        assert len(records) == 1
+        assert records[0]["level"] == "error"
+        assert "RuntimeError: boom" in str(records[0]["exception"])
+
+    def test_token_in_a_traceback_is_redacted(self, capsys, clean_stdlib_root):
+        configure_logging(level="INFO")
+        try:
+            raise RuntimeError(f"POST https://api.telegram.org/bot{FAKE_TOKEN}/sendMessage failed")
+        except RuntimeError:
+            logging.getLogger("price_tracker.notifier.telegram").exception("delivery failed")
+        out = capsys.readouterr().out
+        assert FAKE_TOKEN not in out
+        assert "bot***" in out
+
+    def test_job_runner_chatter_is_silenced_below_warning(self, capsys, clean_stdlib_root):
+        configure_logging(level="INFO")
+        logging.getLogger("apscheduler.executors.default").info("Running job digest_flush")
+        logging.getLogger("apscheduler.executors.default").warning("job missed")
+        events = [record["event"] for record in _json_lines(capsys.readouterr().out)]
+        assert events == ["job missed"]
+
+    def test_the_handler_follows_a_replaced_stdout(self, capsys, clean_stdlib_root):
+        configure_logging(level="INFO")
+        capsys.readouterr()
+        with pytest.MonkeyPatch.context() as patch:
+            replacement = io.StringIO()
+            patch.setattr("sys.stdout", replacement)
+            logging.getLogger("price_tracker.main").info("after swap")
+        assert json.loads(replacement.getvalue())["event"] == "after swap"
+
+
+@given(
+    tail=TOKEN_TAILS,
+    file_api=st.booleans(),
+    encoding=st.sampled_from(("plain", "escaped", "percent")),
+    field=st.sampled_from(("event", "exception", "stack")),
+)
+def test_json_formatter_redacts_before_json_encoding(tail, file_api, encoding, field):
+    from price_tracker.observability.logging import _JsonFormatter
+
+    token = "123:" + tail
+    url = (
+        "https://api.telegram.org/" + ("file/" if file_api else "") + "bot" + token + "/sendMessage"
+    )
+    if encoding == "escaped":
+        url = url.replace("/", chr(92) + "/")
+    elif encoding == "percent":
+        url = quote(url, safe=".")
+    record = logging.LogRecord(
+        "review",
+        logging.ERROR,
+        "review.py",
+        1,
+        url if field == "event" else "event",
+        (),
+        None,
+    )
+    if field == "exception":
+        record.exc_info = (RuntimeError, RuntimeError(url), None)
+    if field == "stack":
+        record.stack_info = url
+    rendered = _JsonFormatter().format(record)
+    assert token not in rendered
+    assert quote(token, safe="") not in rendered

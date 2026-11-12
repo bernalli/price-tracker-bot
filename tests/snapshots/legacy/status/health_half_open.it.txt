@@ -39,9 +39,10 @@
    text:
    | ⚠️ <b>Errori recenti (2)</b>
    |
-   | <b>N/D</b> ⚠️2 Amazon Widget
+   | Ultimo prezzo registrato:
+   | <b>25,00 €</b> ⚠️2 Amazon Widget
    | #2: Non sono riuscito a completare il controllo.
-   | <b>N/D</b> ⚠️1 Kettle
+   | <b>80,00 €</b> ⚠️1 Kettle
    | #1: Non sono riuscito a leggere il prezzo.
    | ⏳ Il sito sarà verificato di nuovo.
    |

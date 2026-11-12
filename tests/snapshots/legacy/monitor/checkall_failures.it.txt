@@ -21,23 +21,6 @@
    param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
-   | ⏳ <b>Controlli in errore su amazon.com</b> (3)
-   |
-   | 3 prodotti richiedono attenzione. Errori ripetuti possono sospendere il monitoraggio.
-   |
-   | <b>25,00 €</b> ⚠️ Amazon 1
-   | #1: bloccato (1/2)
-   | <b>25,00 €</b> ⚠️ Amazon 2
-   | #2: bloccato (1/2)
-   | <b>25,00 €</b> ⚠️ Amazon 3
-   | #3: bloccato (1/2)
-   |
-   | Dettagli con /errori.
-   markup: {}
--> sendMessage chat=10
-   param link_preview_options={"is_disabled": true}
-   param parse_mode="HTML"
-   text:
    | ⏳ <b>Controlli in errore su example.com</b> (3)
    |
    | 3 prodotti richiedono attenzione. Errori ripetuti possono sospendere il monitoraggio.
@@ -57,11 +40,11 @@
    | ⚠️ <b>Controllo terminato</b>
    | 6 prodotti
    |
-   | <b>25,00 €</b> ⚠️ Amazon 1
+   | <b>25,00 €</b> 🔒 Amazon 1
    |    Il sito sta bloccando i controlli automatici.
-   | <b>25,00 €</b> ⚠️ Amazon 2
+   | <b>25,00 €</b> 🔒 Amazon 2
    |    Il sito sta bloccando i controlli automatici.
-   | <b>25,00 €</b> ⚠️ Amazon 3
+   | <b>25,00 €</b> 🔒 Amazon 3
    |    Il sito sta bloccando i controlli automatici.
    | <b>40,00 €</b> ⚠️ Gone
    |    Non trovo la pagina del prodotto. Controlla il link.
@@ -71,19 +54,15 @@
    |    Non sono riuscito a completare il controllo.
 ## db after step 1
 + bot_config key="quarantine_notice:10:amazon.com" {value="2026-03-01T12:00:00+00:00"}
-+ bot_config key="warning_notice:10:amazon.com:block" {value="2026-03-01T12:00:00+00:00"}
 + bot_config key="warning_notice:10:example.com:http_error" {value="2026-03-01T12:00:00+00:00"}
 + bot_config key="warning_notice:10:example.com:listing_gone" {value="2026-03-01T12:00:00+00:00"}
 + bot_config key="warning_notice:10:example.com:unexpected" {value="2026-03-01T12:00:00+00:00"}
-~ products id=1 consecutive_errors: 0 -> 1
 ~ products id=1 last_error: NULL -> "block: HTTP 403 block on https://www.amazon.com/dp/B0FIXTURE1"
 ~ products id=1 last_error_at: NULL -> <now:9999-99-99 99:99:99>
 ~ products id=1 last_check_outcome: NULL -> "block"
-~ products id=2 consecutive_errors: 0 -> 1
 ~ products id=2 last_error: NULL -> "block: HTTP 403 block on https://www.amazon.com/dp/B0FIXTURE2"
 ~ products id=2 last_error_at: NULL -> <now:9999-99-99 99:99:99>
 ~ products id=2 last_check_outcome: NULL -> "block"
-~ products id=3 consecutive_errors: 0 -> 1
 ~ products id=3 last_error: NULL -> "block: HTTP 403 block on https://www.amazon.com/dp/B0FIXTURE3"
 ~ products id=3 last_error_at: NULL -> <now:9999-99-99 99:99:99>
 ~ products id=3 last_check_outcome: NULL -> "block"

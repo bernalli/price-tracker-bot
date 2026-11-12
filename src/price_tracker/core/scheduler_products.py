@@ -361,11 +361,19 @@ class ProductChecksMixin:
         reason = None
         if info.stock_evidence:
             await self.deps.repo.record_availability(p.id, available=info.available)
-        else:
+        elif p.is_available is False or p.sold_out_streak > 0 or info.available is False:
+            # The price is accepted, but something casts doubt on the stock and
+            # this reading cannot settle it: the product is confirmed sold out,
+            # a sold-out reading awaits its confirmation, or the scraper hinted
+            # at unavailability without proof.
             reason = "availability_unknown"
             await self.deps.repo.record_check_outcome(p.id, reason=reason)
             if p.is_available is False:
                 return (p.user_id, None, False, reason)
+        # Otherwise nothing contradicts availability. This is not proof that the
+        # stock was ever confirmed: a new product starts as available. Most pages
+        # never state their stock, so flagging every such read put a permanent
+        # warning on products that work.
 
         if old_price is None:
             return (p.user_id, None, False, reason)
@@ -486,21 +494,23 @@ class ProductChecksMixin:
         scraper_name: str = "unknown",
         domain: str = "unknown",
         collector: NoticeCollector,
-    ) -> None:
+    ) -> str:
         """Push-mode check used by the periodic job: scrape and dispatch via notifier.
 
         Operational notices are accumulated by
         :meth:`_record_failure_and_maybe_disable`; this wrapper only handles
-        the price-drop alert path.
+        the price-drop alert path. Returns the outcome for the sweep summary:
+        ``"ok"``, the reason of an unaccepted check, or ``"inactive"``.
         """
         outcome = await self._check_product_core(
             product_id, scraper_name=scraper_name, domain=domain, collector=collector
         )
         if outcome is None:
-            return
-        user_id, alert, _disabled, _reason = outcome
+            return "inactive"
+        user_id, alert, _disabled, reason = outcome
+        label = reason or "ok"
         if alert is None:
-            return
+            return label
         # Anti-flap dedup: an oscillating price re-crosses the threshold on every
         # downswing. Suppress the repeat push so the user is notified once per
         # drop episode (re-notifying only on a new low or after the cooldown).
@@ -508,7 +518,7 @@ class ProductChecksMixin:
         if product is not None and self._is_duplicate_alert(product, new_price=alert.new_price):
             if self.deps.metrics is not None:
                 self.deps.metrics.notification_skipped_total.labels(reason="cooldown").inc()
-            return
+            return label
         async with self._recipient_locale(user_id):
             text = format_alert(alert)
         if await self._notify(
@@ -518,6 +528,7 @@ class ProductChecksMixin:
             payload=_alert_payload(alert, domain=domain),
         ):
             await self.deps.repo.record_alert_sent(alert.product_id, alert.new_price)
+        return label
 
     def _is_duplicate_alert(
         self, product: ProductRecord, *, new_price: Decimal, now: datetime | None = None

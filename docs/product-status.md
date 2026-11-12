@@ -21,6 +21,14 @@ Availability is separate from a price:
   history, but does not confirm availability or reset the sold-out evidence.
   If the product was already confirmed unavailable, this reading produces
   neither a restock notice nor a price-drop alert.
+- That reading is reported as "availability could not be verified" only when
+  something casts doubt on the stock: the product is confirmed unavailable, a
+  sold-out observation awaits its confirmation, or the store hinted at
+  unavailability without proof. Otherwise it is an ordinary successful check:
+  most pages never state their stock, and a permanent warning on a working
+  product hides real ones. This does not mean the stock was ever confirmed: a
+  product added from a page that never states its stock counts as available
+  until a reading says otherwise.
 - A confirmed in-stock observation with an accepted price restores availability
   in one check. A restock notice includes the recorded price.
 
@@ -41,6 +49,13 @@ HTTP 404/410 responses and recognized store-specific not-found documents, such a
 Amazon's not-found page returned with HTTP 2xx. A redirect alone does not establish
 that the listing is gone. Another failure threshold
 can suspend a product sooner without confirming its removal.
+
+A store that refuses the bot (HTTP 403/429, a challenge page) is a condition of
+the store, not a failure of the product. The refusal pauses the whole store and
+is announced once; it does not count toward a product's failure threshold and
+never suspends a product, so tracking resumes by itself when the store answers
+again. The products the store keeps unread are listed by `/errori` and by the
+list's error filter, marked with a lock instead of an error count.
 
 Warnings are combined per user and domain, with each cause on its own 24-hour
 persisted cooldown. Suspension notices are grouped by user, domain and cause.

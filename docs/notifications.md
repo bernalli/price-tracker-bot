@@ -138,7 +138,9 @@ Besides price-drop alerts, the bot sends **operational notices**: automatic repo
 product's *tracking health* rather than its price — the listing was removed, the price could
 no longer be read, the site stopped answering, the site is blocking automated checks, or a
 site-wide quarantine. A pre-suspension warning fires at half the failure threshold, before the
-product is actually suspended.
+product is actually suspended. A site that blocks automated checks is reported by the site-wide
+quarantine notice alone: a block does not count toward the failure threshold, so it produces
+neither a pre-suspension warning nor a suspension.
 
 ### Aggregation
 

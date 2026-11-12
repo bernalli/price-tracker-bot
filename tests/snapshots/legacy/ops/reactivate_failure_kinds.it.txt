@@ -13,12 +13,10 @@
    param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
-   | ⏳ <b>Controlli in errore su example.com</b> (4)
+   | ⏳ <b>Controlli in errore su example.com</b> (3)
    |
-   | 4 prodotti richiedono attenzione. Errori ripetuti possono sospendere il monitoraggio.
+   | 3 prodotti richiedono attenzione. Errori ripetuti possono sospendere il monitoraggio.
    |
-   | <b>80,00 €</b> ⚠️ Kettle
-   | #1: bloccato (1/2)
    | <b>40,00 €</b> ⚠️ Speaker
    | #2: pagina non trovata (HTTP 404) (1/2)
    | <b>60,00 €</b> ⚠️ Mixer
@@ -41,12 +39,11 @@
    | <b>40,00 €</b> ⚠️ Heater
    |    Non sono riuscito a completare il controllo.
 ## db after step 3
-+ bot_config key="warning_notice:10:example.com:block" {value="2026-03-01T12:00:00+00:00"}
 + bot_config key="warning_notice:10:example.com:http_error" {value="2026-03-01T12:00:00+00:00"}
 + bot_config key="warning_notice:10:example.com:listing_gone" {value="2026-03-01T12:00:00+00:00"}
 + bot_config key="warning_notice:10:example.com:unexpected" {value="2026-03-01T12:00:00+00:00"}
 ~ products id=1 is_active: 0 -> 1
-~ products id=1 consecutive_errors: 2 -> 1
+~ products id=1 consecutive_errors: 2 -> 0
 ~ products id=1 last_error: "parse_error: no price" -> "block: HTTP 403 block on https://shop.example.com/item/1"
 ~ products id=1 suspension_kind: "automatic" -> NULL
 ~ products id=1 suspension_reason: "parse_error" -> NULL
