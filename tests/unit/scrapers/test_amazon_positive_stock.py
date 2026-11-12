@@ -129,3 +129,19 @@ async def test_price_outside_every_offer_row_stays_unknown_when_rows_exist(monke
     info = await scrape(monkeypatch, page)
     assert info.price == Decimal("29.99")
     assert info.stock_evidence is False
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Disponibile presso questi venditori.",
+        "Available from these sellers.",
+        "Dostępny u tych sprzedawców.",
+    ],
+)
+async def test_offers_from_other_sellers_are_not_the_selected_offer_in_stock(monkeypatch, text):
+    """The statement points at other sellers' offers, whose price is not the one selected."""
+    for page in (accordion_page(availability(text)), single_offer_page(availability(text))):
+        info = await scrape(monkeypatch, page)
+        assert info.price == Decimal("29.99")
+        assert info.stock_evidence is False

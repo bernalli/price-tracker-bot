@@ -124,16 +124,17 @@ def _is_unavailable(soup: BeautifulSoup) -> bool:
 
 
 # Lower-case phrases stating the offer can be bought now, per locale. They are
-# read only after the sold-out phrases: "non disponibile" contains "disponibile".
+# read only after the sold-out phrases: "nicht auf lager" contains "auf lager".
+# A bare "available" word is left out on purpose: "available from these
+# sellers" points at other offers. Where the wording is not listed here, the
+# purchase control of the offer is the evidence.
 _AVAILABLE_PHRASES: tuple[str, ...] = (
     "in stock",  # com, co.uk, ca, com.au ("only 3 left in stock")
     "disponibilità immediata",  # it
     "disponibilità: solo",
-    "disponibile",
     "auf lager",  # de
     "en stock",  # fr, es
     "op voorraad",  # nl
-    "dostępny",  # pl
     "i lager",  # se
     "在庫あり",  # co.jp
 )
