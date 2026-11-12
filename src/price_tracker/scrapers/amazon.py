@@ -123,6 +123,84 @@ def _is_unavailable(soup: BeautifulSoup) -> bool:
     return False
 
 
+# Lower-case phrases stating the offer can be bought now, per locale. They are
+# read only after the sold-out phrases: "non disponibile" contains "disponibile".
+_AVAILABLE_PHRASES: tuple[str, ...] = (
+    "in stock",  # com, co.uk, ca, com.au ("only 3 left in stock")
+    "disponibilità immediata",  # it
+    "disponibilità: solo",
+    "disponibile",
+    "auf lager",  # de
+    "en stock",  # fr, es
+    "op voorraad",  # nl
+    "dostępny",  # pl
+    "i lager",  # se
+    "在庫あり",  # co.jp
+)
+
+# Sold-out wording that contains one of the phrases above or is absent from
+# ``_UNAVAILABLE_PHRASES``; it only ever vetoes a positive reading.
+_NOT_AVAILABLE_VETOES: tuple[str, ...] = (
+    *_UNAVAILABLE_PHRASES,
+    "out of stock",
+    "nicht auf lager",
+    "esaurito",
+    "épuisé",
+    "rupture de stock",
+    "agotado",
+    "uitverkocht",
+    "ej i lager",
+)
+
+# Controls that put this offer in the basket; their ids do not depend on the locale.
+_PURCHASE_CONTROLS = (
+    "#add-to-cart-button, #buy-now-button, "
+    'input[name="submit.add-to-cart"], input[name="submit.buy-now"]'
+)
+
+# The buy box lists several offers of one product (new, used, renewed) as rows.
+_OFFER_ROW_SELECTOR = '[id*="AccordionRow"]'
+
+
+def _offer_scope(price_node: Tag, soup: BeautifulSoup) -> Tag | None:
+    """The markup describing the offer that ``price_node`` prices, or None.
+
+    With several offers on the page it is the row holding the price: a stock
+    statement of the used offer says nothing about the new one. A price outside
+    every row cannot be tied to one of them. A page with a single offer keeps
+    the price and the stock statement in different columns, so the page is the scope.
+    """
+    for node in price_node.parents:
+        if "accordionrow" in str(node.get("id") or "").lower():
+            return node
+    if soup.select_one(_OFFER_ROW_SELECTOR) is not None:
+        return None
+    return soup
+
+
+def _offer_in_stock(price_node: Tag, soup: BeautifulSoup, target_asin: str | None) -> bool:
+    """Whether the offer of the selected price explicitly states it can be bought.
+
+    Evidence is a stock statement or a purchase control inside the offer's own
+    scope and owned by the tracked product. Any sold-out wording in that scope
+    wins, so this never turns a doubtful page into a positive reading.
+    """
+    scope = _offer_scope(price_node, soup)
+    if scope is None:
+        return False
+    statements = [
+        el.get_text(" ", strip=True).lower()
+        for selector in _AVAILABILITY_SELECTORS
+        for el in scope.select(selector)
+        if _owned_by(el, target_asin)
+    ]
+    if any(veto in text for text in statements for veto in _NOT_AVAILABLE_VETOES):
+        return False
+    if any(phrase in text for text in statements for phrase in _AVAILABLE_PHRASES):
+        return True
+    return any(_owned_by(el, target_asin) for el in scope.select(_PURCHASE_CONTROLS))
+
+
 def _has_no_buybox_offer(soup: BeautifulSoup) -> bool:
     """Whether the page has no buy box, only a link to other sellers' offers."""
     return (
@@ -455,6 +533,12 @@ class AmazonScraper(AbstractScraper):
                 price_text = f"{symbol.get_text(strip=True) if symbol else ''}{info.price}"
             declared = json_currencies[0] if ld_price == info.price and json_currencies else None
             info.currency, ambiguous = price_currency(price_text, declared)
+            # A price read from the markup carries no availability of its own.
+            # Without this the result stays "availability unknown" forever on
+            # the ordinary in-stock page, whose JSON-LD has no offer.
+            if not info.stock_evidence and _offer_in_stock(source, soup, target_asin):
+                info.available = True
+                info.stock_evidence = True
         if ambiguous:
             info.price = None
             info.error = "currency_ambiguous"
