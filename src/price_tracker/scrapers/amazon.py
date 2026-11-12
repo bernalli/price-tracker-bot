@@ -150,6 +150,43 @@ _AVAILABLE_PHRASES: tuple[str, ...] = (
     "在庫あり",  # co.jp
 )
 
+# Stems that mark a statement as speaking about stock, per locale. Such a
+# statement must be one complete affirmative phrase to confirm stock, and a
+# purchase control cannot override it. A statement without them ("usually
+# dispatched within 2 to 3 days") leaves the decision to the purchase control.
+_STOCK_STEMS: tuple[str, ...] = (
+    "stock",  # com, co.uk, ca, com.au, fr, es
+    "disponibilità",  # it
+    "lager",  # de, se
+    "voorraad",  # nl
+    "在庫",  # co.jp
+)
+
+# Positive stock counts: a quantity of zero or below never confirms stock.
+_STOCK_QUANTITY = r"[1-9][0-9]*"
+
+# Complete affirmative stock statements, matched against the whole lower-case
+# statement with collapsed whitespace. The bare phrases take no suffix, so
+# "in stock on <date>" stays unresolved. Only the forms with a quantity accept
+# a hurry-up suffix or a parenthetical ("(more on the way)").
+_AFFIRMATIVE_STOCK = re.compile(
+    "(?:(?:"
+    + "|".join(
+        re.escape(phrase) for phrase in _AVAILABLE_PHRASES if phrase != "disponibilità: solo"
+    )
+    + ")"
+    + rf"|(?:only {_STOCK_QUANTITY} left in stock"
+    + rf"|disponibilità: solo {_STOCK_QUANTITY}"
+    + rf"|nur noch {_STOCK_QUANTITY} (?:stück )?auf lager"
+    + rf"|(?:il ne reste plus que|plus que) {_STOCK_QUANTITY} (?:exemplaire\(s\)|ex\.) en stock"
+    + rf"|s[oó]lo queda(?:\(n\)|n)? {_STOCK_QUANTITY} en stock"
+    + rf"|(?:nog maar|slechts) {_STOCK_QUANTITY} op voorraad"
+    + rf"|endast {_STOCK_QUANTITY} kvar i lager)"
+    + r"(?:\s*[-–—]\s*"
+    + r"(?:order soon|ordina subito|jetzt bestellen|commandez vite|haz tu pedido pronto)"
+    + r"|\s*\([^()]*\))?)[.!。]?"
+)
+
 # Sold-out wording that contains one of the phrases above or is absent from
 # ``_UNAVAILABLE_PHRASES``; it only ever vetoes a positive reading.
 _NOT_AVAILABLE_VETOES: tuple[str, ...] = (
@@ -270,21 +307,17 @@ def _offer_in_stock(
     ]
     if any(veto in text for text in statements for veto in _NOT_AVAILABLE_VETOES):
         return False
-    statements = [text for text in statements if text]
-    if statements:
-        literals = "|".join(
-            re.escape(phrase) for phrase in _AVAILABLE_PHRASES if phrase != "disponibilità: solo"
-        )
-        affirmative = (
-            rf"(?:{literals}"
-            r"|only [1-9][0-9]* left in stock(?:\s*[-–—]\s*order soon)?"
-            r"|disponibilità: solo [1-9][0-9]*)[.!]?"
-        )
-        # Unknown, negated, future or conflicting text is not current stock.
-        # A purchase control cannot override an unresolved stock statement.
-        return all(
-            re.fullmatch(affirmative, " ".join(text.split())) is not None for text in statements
-        )
+    stock_statements = [
+        " ".join(text.split())
+        for text in statements
+        if any(phrase in text for phrase in _AVAILABLE_PHRASES)
+        or any(stem in text for stem in _STOCK_STEMS)
+    ]
+    if stock_statements:
+        # A negated, future, truncated or conflicting stock statement is not
+        # current stock, and a purchase control cannot override it.
+        return all(_AFFIRMATIVE_STOCK.fullmatch(text) is not None for text in stock_statements)
+    # No statement speaks about stock: the offer's purchase control decides.
     return any(
         _offer_evidence_owned(el, target_asin) and _purchase_control_enabled(el)
         for el in scope.select(_PURCHASE_CONTROLS)

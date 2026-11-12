@@ -2,6 +2,7 @@
 
 import string
 
+import pytest
 from bs4 import BeautifulSoup
 from hypothesis import given
 from hypothesis import strategies as st
@@ -31,7 +32,11 @@ def test_unresolved_stock_cannot_be_overridden(fragment, statement, copies, reve
     assert amazon._offer_in_stock(price, soup, ASIN) is False
 
 
-@given(statement=st.sampled_from(("In", "Only 3 left in", "Disponibilità: solo")))
+@given(
+    statement=st.sampled_from(
+        ("Disponibilità: solo", "In stock on", "Only 3 left in stock on", "Nur noch 3 auf Lager ab")
+    )
+)
 def test_truncated_stock_statement_is_not_evidence(statement):
     soup = BeautifulSoup(accordion_page(availability(statement) + CART), "html.parser")
     price = soup.select_one(".a-offscreen")
@@ -49,3 +54,52 @@ def test_nonpositive_stock_quantity_cannot_confirm_stock(quantity):
         price = soup.select_one(".a-offscreen")
         assert price is not None
         assert amazon._offer_in_stock(price, soup, ASIN) is False
+
+
+def offer_in_stock(page: str) -> bool:
+    soup = BeautifulSoup(page, "html.parser")
+    price = soup.select_one(".a-offscreen")
+    assert price is not None
+    return amazon._offer_in_stock(price, soup, ASIN)
+
+
+@pytest.mark.parametrize(
+    "statement",
+    [
+        "In stock",
+        "In Stock.",
+        "Disponibilità immediata.",
+        "Disponibilità: solo 2",
+        "Only 3 left in stock - order soon.",
+        "Auf Lager.",
+        "En stock.",
+        "在庫あり",
+        "在庫あり。",
+        "Only 1 left in stock (more on the way).",
+        "Disponibilità: solo 2 - ordina subito.",
+        "Nur noch 3 auf Lager",
+        "Il ne reste plus que 3 exemplaire(s) en stock.",
+    ],
+)
+@pytest.mark.parametrize("cart", [CART, ""])
+def test_real_affirmative_stock_statement_is_evidence(statement, cart):
+    assert offer_in_stock(accordion_page(availability(statement) + cart)) is True
+
+
+NON_STOCK = "Usually dispatched within 2 to 3 days."
+
+
+def test_non_stock_statement_leaves_the_decision_to_an_enabled_purchase_control():
+    assert offer_in_stock(accordion_page(availability(NON_STOCK) + CART)) is True
+
+
+@pytest.mark.parametrize(
+    "control",
+    [
+        "",
+        '<input id="add-to-cart-button" name="submit.add-to-cart" type="submit" disabled>',
+        '<span class="a-button-disabled">' + CART + "</span>",
+    ],
+)
+def test_non_stock_statement_without_an_enabled_purchase_control_is_not_evidence(control):
+    assert offer_in_stock(accordion_page(availability(NON_STOCK) + control)) is False
