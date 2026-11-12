@@ -1035,6 +1035,21 @@ class AmazonScraper(AbstractScraper):
                 lambda value: value.startswith("#") or _extract_asin(value) == target_asin,
             ):
                 return None
+            if target_asin:
+                offers = raw.get("offers", {})
+                for offer in offers if isinstance(offers, list) else [offers]:
+                    if not isinstance(offer, dict):
+                        continue
+                    if "asin" in offer and not self._jsonld_owned_by(
+                        {"asin": offer["asin"]}, target_asin
+                    ):
+                        return None
+                    items = offer.get("itemOffered", [])
+                    for item in items if isinstance(items, list) else [items]:
+                        if isinstance(item, dict) and not self._jsonld_owned_by(
+                            {"asin": target_asin, **item}, target_asin
+                        ):
+                            return None
             selected = offer_evidence(raw.get("offers", {}))
             if selected is not None:
                 choices.append((ref, selected))
