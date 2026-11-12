@@ -470,10 +470,10 @@ async def test_scheduler_awaiting_confirmation_resets_error_counters(
 
 
 @pytest.mark.asyncio
-async def test_scheduler_currency_none_persists_normally(
+async def test_scheduler_currency_none_does_not_persist(
     repo_with_product: tuple[Repository, int],
 ) -> None:
-    """Guard #20 must not fire when the scraper reports no currency."""
+    """A numeric amount without an observed currency cannot be persisted."""
     repo, pid = repo_with_product
     stub = _StubScraper(ProductInfo(name="Widget", price=Decimal("80"), currency=None))
     registry = ScraperRegistry()
@@ -493,7 +493,10 @@ async def test_scheduler_currency_none_persists_normally(
         await scheduler.run_check_for_user(user_id=1)
     p = await repo.get_product(pid)
     assert p is not None
-    assert p.current_price == Decimal("80")
+    assert p.current_price == Decimal("100")
+    assert p.last_check_outcome == "currency_unknown"
+    assert await repo.get_price_history(pid) == []
+    notifier.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -916,7 +919,7 @@ async def test_check_user_products_for_user_respects_locked_domain(
             )
         )
         results = await scheduler.check_user_products_for_user(user_id=1)
-    assert results == []
+    assert [(r.product_id, r.reason) for r in results] == [(pid, "quarantined")]
 
 
 @pytest.mark.asyncio
@@ -1322,7 +1325,11 @@ async def test_check_products_for_user_skips_foreign_and_missing_ids(
         results = await scheduler.check_products_for_user(
             product_ids=[999_999, foreign_id, own_id], user_id=1, delay_between_products=0.0
         )
-    assert [result.product_id for result in results] == [own_id]
+    assert [(r.product_id, r.reason) for r in results] == [
+        (999_999, "not_found"),
+        (foreign_id, "not_found"),
+        (own_id, None),
+    ]
 
 
 @pytest.mark.asyncio
@@ -2105,7 +2112,9 @@ async def test_out_of_stock_reads_never_suspend_the_product(
     assert p.is_available is False
     assert p.current_price == Decimal("100")  # seeded at add, untouched
     assert await repo.get_price_history(pid) == []
-    assert notifier.await_count == 0
+    assert notifier.await_count == 1
+    assert notifier.await_args is not None
+    assert notifier.await_args.kwargs["payload"]["event"] == "unavailable"
 
 
 @pytest.mark.asyncio
@@ -2121,11 +2130,15 @@ async def test_back_in_stock_after_out_of_stock_reads_notifies_exactly_once(
     assert p.is_available is True
     assert p.current_price == Decimal("100")
     assert p.consecutive_errors == 0
-    assert notifier.await_count == 1
+    assert notifier.await_count == 2
+    assert [c.kwargs["payload"]["event"] for c in notifier.await_args_list] == [
+        "unavailable",
+        "restocked",
+    ]
     sent = notifier.await_args
     assert sent is not None
     assert sent.kwargs["product_id"] == pid
-    assert sent.kwargs["payload"]["kind"] == "price"
+    assert sent.kwargs["payload"]["kind"] == "availability"
 
 
 @pytest.mark.asyncio
@@ -2160,7 +2173,9 @@ async def test_out_of_stock_read_resets_a_streak_of_price_failures(
     assert p.consecutive_errors == 0
     assert p.is_active is True
     assert p.is_available is False
-    assert notifier.await_count == 0
+    assert notifier.await_count == 1
+    assert notifier.await_args is not None
+    assert notifier.await_args.kwargs["payload"]["event"] == "unavailable"
 
 
 @pytest.mark.asyncio
@@ -2180,7 +2195,9 @@ async def test_sold_out_flag_with_a_price_writes_no_price_and_no_history(
     assert p.current_price == Decimal("100")  # the price seeded at add, untouched
     assert p.is_available is False
     assert await repo.get_price_history(pid) == []
-    assert notifier.await_count == 0
+    assert notifier.await_count == 1
+    assert notifier.await_args is not None
+    assert notifier.await_args.kwargs["payload"]["event"] == "unavailable"
 
 
 @pytest.mark.asyncio

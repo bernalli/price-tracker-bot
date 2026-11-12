@@ -472,8 +472,9 @@ async def test_forbidden_on_supersede_edit_skips_new_prompt(h: Harness) -> None:
 
 
 async def test_unknown_currency_holds_no_row_until_a_choice(h: Harness) -> None:
-    """AWAIT_CURRENCY inserts nothing; the button inserts with USD."""
+    """The user confirms this price's unit before a row is inserted."""
     await h.text(PRIVATE, USER, URL_NOCUR)
+    assert "Which currency is this price in?" in h.texts_to(PRIVATE)[-1]
     assert h.services.writes == []
     token = _token_of(h.last_prompt(PRIVATE).callback_data())
 

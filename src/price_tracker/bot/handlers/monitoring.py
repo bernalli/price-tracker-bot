@@ -27,6 +27,8 @@ from price_tracker.bot.decorators import (
     restricted,
     with_locale,
 )
+from price_tracker.bot.handlers._cards import _currency
+from price_tracker.bot.handlers._check_status import check_reason, check_summary
 from price_tracker.bot.handlers._helpers import (
     _escape_html,
     _get_user_product,
@@ -38,7 +40,7 @@ from price_tracker.bot.messages import _, current_locale
 from price_tracker.bot.ui.product_rows import record_row
 from price_tracker.bot.ui.width import truncate_to_width
 from price_tracker.core.textlimits import fit_html, split_message
-from price_tracker.i18n.format import duration
+from price_tracker.i18n.format import duration, money
 
 if TYPE_CHECKING:
     from telegram import Update
@@ -196,12 +198,16 @@ async def cmd_check(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     result = await scheduler.check_one_product_for_user(
         product_id=product_id, user_id=update.effective_user.id
     )
-    alert = result.alert
+    alert = result.alert if result is not None else None
 
     product = await _db(context).get_product(product_id) or {}
     name = product.get("name") or _("Unknown")
     current = _safe_dec(product.get("current_price"))
-    price_str = f"€{current:.2f}" if current else _("N/A")
+    price_str = (
+        money(current, _currency(product.get("currency")), locale=current_locale())
+        if current is not None
+        else _("N/A")
+    )
 
     if alert:
         # Manual /check command: delete placeholder and send photo+caption when possible
@@ -210,9 +216,15 @@ async def cmd_check(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await _send_alert(context.bot, alert, _db(context), chat_id=update.effective_user.id)
     else:
         name_html = _escape_html(truncate_to_width(name, 80))
-        if result.reason == "out_of_stock":
-            text = _("✅ <b>{name}</b>\n💰 Price: {price}\n{status}").format(
+        if result is not None and result.reason == "out_of_stock":
+            text = _("✅ <b>{name}</b>\n💰 Last recorded price: {price}\n{status}").format(
                 name=name_html, price=price_str, status=out_of_stock_line()
+            )
+        elif result is None or result.reason is not None:
+            text = _("⚠️ <b>{name}</b>\n💰 Last recorded price: {price}\n{reason}").format(
+                name=name_html,
+                price=price_str,
+                reason=check_reason(result.reason if result else None),
             )
         else:
             text = _("✅ <b>{name}</b>\n💰 Price: {price}\n📊 No significant change.").format(
@@ -246,14 +258,7 @@ async def cmd_checkall(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     # Build summary of all products after check
     updated_products = await db.get_active_products(user_id)
-    summary_lines = [
-        _("✅ <b>Check complete</b> — {n} products")
-        .format(n=len(updated_products))
-        .replace(" — ", "\n")
-        + chr(10)
-    ]
-    for p in updated_products:
-        summary_lines.append(record_row(p))
+    summary_lines = check_summary(products, updated_products, results)
 
     if alerts:
         summary_lines.append(chr(10) + _("🔔 <b>{n} changes found!</b>").format(n=len(alerts)))

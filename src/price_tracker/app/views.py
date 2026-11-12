@@ -121,6 +121,7 @@ class ProductView:
     reference_currency: str
     out_of_stock: bool = False
     image_url: str | None = None
+    last_check_outcome: str | None = None
 
     def __post_init__(self) -> None:
         _check_int("id", self.id, minimum=1)
@@ -142,6 +143,7 @@ class ProductView:
         _check_int("default_interval_minutes", self.default_interval_minutes, minimum=1)
         _check_aware_datetime("last_checked_at", self.last_checked_at)
         _check_bool("out_of_stock", self.out_of_stock)
+        _check_optional_str("last_check_outcome", self.last_check_outcome)
         if self.image_url is not None:
             # Deferred on purpose: importing this module must not load httpx
             # (tests/ui/test_layers.py::test_ui_imports_are_effect_free), and the

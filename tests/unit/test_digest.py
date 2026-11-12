@@ -21,7 +21,9 @@ from price_tracker.notifier.digest import DigestService, _digest_blocks
 
 @pytest.fixture
 def repo_mock() -> AsyncMock:
-    return AsyncMock()
+    repo = AsyncMock()
+    repo.get_notification_prefs.return_value = None
+    return repo
 
 
 @pytest.fixture
@@ -185,8 +187,10 @@ def test_digest_renders_operational_section() -> None:
     text = "\n".join([header, *(block for _, block in blocks), footer])
     assert "1 price change" in header
     assert "⚠️ Operational notices" in text
-    assert "shop.example — 2 products: tracking suspended (page not found (HTTP 404))" in text
-    assert "shop.example — 2 products: checks failing (5/10)" in text
+    assert "shop.example — 2 products: tracking suspended (product page unavailable)" in text
+    assert "shop.example — 2 products: checks failing" in text
+    assert "#1: Product 1 — price not readable (5/10)" in text
+    assert "#2: Product 2 — price not readable (5/10)" in text
     assert "Use /reactivate or /errori for details." in footer
     assert unrenderable_ids == []
 
@@ -216,7 +220,7 @@ def test_digest_operational_entry_without_fields_does_not_crash() -> None:
     )
 
     assert blocks == [
-        (1, "⚠️ Operational notices\nunknown — 1 products: tracking suspended (check failed)")
+        (1, "⚠️ Operational notices\nunknown — 1 product: tracking suspended (check failed)")
     ]
     assert unrenderable_ids == []
 

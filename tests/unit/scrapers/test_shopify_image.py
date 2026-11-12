@@ -121,11 +121,11 @@ JSONLD_PRODUCT = owner(name="Kettle JSON", offers={"price": "25.00", "priceCurre
             '<div class="product-price">19,00 \u20ac</div>' + ld(JSONLD_PRODUCT),
             ("Kettle CSS", Decimal("19.00"), "EUR", None),
         ),
-        # The JSON-LD Product only supplies the currency, as it always did.
+        # A different JSON-LD amount cannot supply this CSS price's currency.
         (
             '<h1>Kettle CSS</h1><span class="price"><span class="money">12.50</span></span>'
             + ld(JSONLD_PRODUCT),
-            ("Kettle CSS", Decimal("12.50"), "USD", None),
+            ("Kettle CSS", Decimal("12.50"), None, None),
         ),
         # A JSON-LD Product alone never decided a price on this path.
         (ld(JSONLD_PRODUCT), (None, None, None, "Prezzo non trovato (Shopify)")),

@@ -72,7 +72,8 @@ def _parse_db_timestamp(value: str) -> datetime:
 def _failure_reason(exc: BaseException) -> tuple[str, str]:
     """Map a failed check to a supported ``(reason, detail)`` pair."""
     if isinstance(exc, ListingGone):
-        return "listing_gone", f"HTTP {exc.status}"
+        detail = f"HTTP {exc.status}" if exc.http_status_observed else "product page missing"
+        return "listing_gone", detail
     if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code in LISTING_GONE_STATUSES:
         return "listing_gone", f"HTTP {exc.response.status_code}"
     if isinstance(exc, ParseError):

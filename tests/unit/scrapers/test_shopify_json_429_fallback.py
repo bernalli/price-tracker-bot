@@ -39,7 +39,7 @@ _JSON_URL = f"{_URL}.json"
 _PAGE = (
     '<html><head><script>var meta = {"product":{"id":1,"vendor":"Shop",'
     '"handle":"haywood-white-wood-ash","variants":['
-    '{"id":11,"price":19900,"name":"HAYWOOD - 36","sku":"A1"}]},'
+    '{"id":11,"price":19900,"price_currency":"EUR","name":"HAYWOOD - 36","sku":"A1"}]},'
     '"page":{"pageType":"product"}};</script></head><body></body></html>'
 )
 _MIGRATIONS_DIR = Path("src/price_tracker/db/migrations")

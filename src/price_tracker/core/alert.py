@@ -10,7 +10,7 @@ from decimal import Decimal
 from typing import Literal
 
 from price_tracker.bot.callbacks import Action, encode
-from price_tracker.bot.messages import N_, _
+from price_tracker.bot.messages import N_, _, current_locale, ngettext
 from price_tracker.bot.ui.product_rows import product_row
 from price_tracker.core.drop_floor import DropFloor, clears_drop_floor
 from price_tracker.core.notices import (
@@ -20,8 +20,10 @@ from price_tracker.core.notices import (
 )
 from price_tracker.core.textlimits import (
     DOMAIN_BUDGET,
+    WHY_BUDGET,
     truncate_visible,
 )
+from price_tracker.i18n.format import money
 
 ThresholdType = Literal["percentage", "absolute", "target", "any_drop"]
 
@@ -53,35 +55,53 @@ def _escape_html(text: str) -> str:
 
 _UNREADABLE_COPY = (
     N_("Price unreadable on {domain}"),
-    N_(
-        "The pages load, but the price could not be read anymore "
-        "(layout change or a different offer)."
-    ),
+    N_("A reliable price could not be obtained. The page layout or offer may have changed."),
     N_("Reactivate to run a fresh check right now."),
     False,
 )
 
 _REASON_COPY: dict[str, tuple[str, str, str, bool]] = {
     "listing_gone": (
-        N_("Listings removed on {domain}"),
-        N_("These pages answer HTTP 404/410: the store took them off the catalog."),
-        N_("Deleting keeps your list clean. Reactivate only if the store restores them."),
-        True,
+        N_("Product pages unavailable on {domain}"),
+        N_(
+            "The store repeatedly returned a missing-page response. "
+            "The listings may have been removed or moved."
+        ),
+        N_("Tracking is paused. Check the links before reactivating or deleting these products."),
+        False,
+    ),
+    "listing_unconfirmed": (
+        N_("Product pages could not be verified on {domain}"),
+        N_(
+            "Checks kept failing. The latest response suggests a missing page, "
+            "but its status is unconfirmed."
+        ),
+        N_("Tracking is paused. Check the links and reactivate to try again."),
+        False,
     ),
     "parse_error": _UNREADABLE_COPY,
     "price_none": _UNREADABLE_COPY,
     "no_scraper": _UNREADABLE_COPY,
     "condition_mismatch": _UNREADABLE_COPY,
     "implausible_read": _UNREADABLE_COPY,
+    "currency_unknown": (
+        N_("Price currency unclear on {domain}"),
+        N_("The currency could not be verified. The last confirmed price has been preserved."),
+        N_("Check the store's currency and reactivate to try again."),
+        False,
+    ),
     "http_error": (
         N_("Site unreachable: {domain}"),
-        N_("The site did not answer {max} checks in a row."),
+        N_("The checks could not be completed because of connection or HTTP errors."),
         N_("Try again later. Reactivate once the site is back."),
         False,
     ),
     "unexpected": (
-        N_("Site unreachable: {domain}"),
-        N_("The site did not answer {max} checks in a row."),
+        N_("Checks interrupted on {domain}"),
+        N_(
+            "An internal error prevented the checks from completing. "
+            "The last confirmed price has been preserved."
+        ),
         N_("Try again later. Reactivate once the site is back."),
         False,
     ),
@@ -110,8 +130,13 @@ def _why(reason: str | None, detail: str | None) -> str:
     """Render a compact, reason-aware explanation for a product row."""
     if reason == "listing_gone":
         status_match = _STATUS_RE.search(detail or "")
-        status = status_match.group(1) if status_match is not None else "404"
-        return _("page not found (HTTP {status})").format(status=status)
+        if status_match is not None:
+            return _("page not found (HTTP {status})").format(status=status_match.group(1))
+        return _("product page unavailable")
+    if reason == "listing_unconfirmed":
+        return _("page status unconfirmed")
+    if reason == "currency_unknown":
+        return _("currency not verified")
     if reason == "block":
         return _("blocked")
     if reason in {
@@ -122,8 +147,10 @@ def _why(reason: str | None, detail: str | None) -> str:
         "implausible_read",
     }:
         return _("price not readable")
-    if reason in {"http_error", "unexpected"}:
-        return _("site unreachable")
+    if reason == "http_error":
+        return _("communication or processing error")
+    if reason == "unexpected":
+        return _("check interrupted")
     return _("check failed")
 
 
@@ -152,7 +179,10 @@ def _product_lines(event: OperationalEvent) -> list[str]:
             event.last_price,
             currency=event.currency or "EUR",
             mark="⚠️",
-        )
+        ),
+        f"#{event.product_id}: "
+        f"{_escape_html(truncate_visible(_why(event.reason, event.detail), WHY_BUDGET))}"
+        + (f" ({event.error_count}/{event.max_errors})" if event.event == "warning" else ""),
     ]
 
 
@@ -187,14 +217,14 @@ def format_warning_notice(group: NoticeGroup) -> str:
     if not group.events:
         raise ValueError("notice group must contain at least one event")
     domain = _escape_html(truncate_visible(group.group_key, DOMAIN_BUDGET))
-    first = group.events[0]
     lines = [
         f"⏳ <b>{_('Checks failing on {domain}').format(domain=domain)}</b> ({len(group.events)})",
         "",
-        _(
-            "{n} products failed {count}/{max} checks in a row. If it keeps failing "
-            "they will be suspended automatically."
-        ).format(n=len(group.events), count=first.error_count, max=first.max_errors),
+        ngettext(
+            "{n} product needs attention. Repeated failures may suspend tracking.",
+            "{n} products need attention. Repeated failures may suspend tracking.",
+            len(group.events),
+        ).format(n=len(group.events)),
         "",
     ]
     for event in group.events[:MAX_LISTED_PRODUCTS]:
@@ -204,6 +234,26 @@ def format_warning_notice(group: NoticeGroup) -> str:
         lines.append(_("… and {k} more").format(k=remaining))
     lines.extend(("", _("Details with /errori.")))
     return "\n".join(lines)
+
+
+def format_stock_notice(event: OperationalEvent) -> str:
+    """Describe a confirmed stock transition without inventing a current price."""
+    name = _escape_html(truncate_visible(event.product_name or event.url, 180))
+    url = _escape_html(event.url)
+    if event.event == "unavailable":
+        title = _("Product currently unavailable")
+        detail = _(
+            "The store reported this product unavailable in repeated checks. "
+            "Monitoring continues; you will be notified when it is available again."
+        )
+    else:
+        title = _("Product available again")
+        detail = _("The store reports this product available again with a verified price.")
+        if event.last_price is not None:
+            detail += "\n" + _("Last recorded price: {price}").format(
+                price=money(event.last_price, event.currency or "EUR", locale=current_locale())
+            )
+    return f'<b>{title}</b>\n\n#{event.product_id}: <a href="{url}">{name}</a>\n\n{detail}'
 
 
 def operational_buttons(group: NoticeGroup) -> list[list[dict[str, str]]]:
@@ -369,4 +419,4 @@ def format_quarantine_notification(
         "I am pausing the checks on this site for a while, so as not to push "
         "against a block.{until}\n\n"
         "Details with /errori."
-    ).format(domain=_escape_html(domain), reason=_escape_html(reason), until=until)
+    ).format(domain=_escape_html(domain), reason=_("automated checks blocked"), until=until)

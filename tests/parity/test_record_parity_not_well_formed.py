@@ -914,12 +914,12 @@ def test_harvest_plugin_records_every_binding(tmp_path: Path) -> None:
     synth_dir = tmp_path / "synth"
     synth_dir.mkdir()
     (synth_dir / "test_synth.py").write_text(
-        "from price_tracker.scrapers import otto\n"
+        "from price_tracker.scrapers import secondary_evidence\n"
         "from price_tracker.core import scraper_base\n"
         "\n"
         "\n"
         "def test_calls_the_wrapped_functions() -> None:\n"
-        '    otto.parse_price("1 €")\n'
+        '    secondary_evidence.parse_price("1 €")\n'
         '    scraper_base.detect_currency("€")\n',
         encoding="utf-8",
     )

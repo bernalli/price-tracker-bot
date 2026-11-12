@@ -2591,3 +2591,260 @@ msgstr ""
 #, python-brace-format
 msgid "A price drop is announced only when it is at least this share of the old price and at least {amount} in the product's currency."
 msgstr ""
+
+msgid "The site is blocking automated checks."
+msgstr "The site is blocking automated checks."
+
+msgid "Check postponed while the site is temporarily restricted."
+msgstr "Check postponed while the site is temporarily restricted."
+
+msgid "The product was not found."
+msgstr "The product was not found."
+
+msgid "Check postponed while the site is being tested."
+msgstr "Check postponed while the site is being tested."
+
+msgid "Not checked: tracking is paused or the product is no longer available."
+msgstr "Not checked: tracking is paused or the product is no longer available."
+
+msgid "This site cannot be checked right now."
+msgstr "This site cannot be checked right now."
+
+msgid "The price could not be read."
+msgstr "The price could not be read."
+
+msgid "No offer matched the selected condition."
+msgstr "No offer matched the selected condition."
+
+msgid "The price currency could not be determined."
+msgstr "The price currency could not be determined."
+
+msgid "The price uses a different currency and was not saved."
+msgstr "The price uses a different currency and was not saved."
+
+msgid "The price reading could not be accepted."
+msgstr "The price reading could not be accepted."
+
+msgid "A price was found and needs another check before it is saved."
+msgstr "A price was found and needs another check before it is saved."
+
+msgid "The product page could not be found. Check the link."
+msgstr "The product page could not be found. Check the link."
+
+msgid "The site could not be reached."
+msgstr "The site could not be reached."
+
+msgid "The check could not be completed."
+msgstr "The check could not be completed."
+
+msgid "The product is currently unavailable."
+msgstr "The product is currently unavailable."
+
+msgid "⚠️ <b>Check finished</b> — {n} products"
+msgstr "⚠️ <b>Check finished</b> — {n} products"
+
+msgid "   {reason}"
+msgstr "   {reason}"
+
+msgid "   Tracking suspended; use /reactivate to resume."
+msgstr "   Tracking suspended; use /reactivate to resume."
+
+msgid "⚠️ <b>{name}</b>\n💰 Last recorded price: {price}\n{reason}"
+msgstr "⚠️ <b>{name}</b>\n💰 Last recorded price: {price}\n{reason}"
+
+msgid "⚠️ {reason}"
+msgstr "⚠️ {reason}"
+
+msgid "#{id}: {reason}"
+msgstr "#{id}: {reason}"
+
+msgid "🔒 Checks for this site are temporarily paused."
+msgstr "🔒 Checks for this site are temporarily paused."
+
+msgid "⏳ The site will be tested again."
+msgstr "⏳ The site will be tested again."
+
+msgid "Use /reactivate to resume a suspended product."
+msgstr "Use /reactivate to resume a suspended product."
+
+msgid "❌ The product page could not be found. Check the link and try again."
+msgstr "❌ The product page could not be found. Check the link and try again."
+
+msgid "🛡 The site blocked this automated check, so I couldn't read the price.\nPlease try again later."
+msgstr "🛡 The site blocked this automated check, so I couldn't read the price.\nPlease try again later."
+
+msgid "📦 This product is currently unavailable. Try adding it again later."
+msgstr "📦 This product is currently unavailable. Try adding it again later."
+
+msgid "❌ The price currency could not be determined. Check the product page and try again."
+msgstr "❌ The price currency could not be determined. Check the product page and try again."
+
+msgid "❌ I couldn't read the price. Check the link and try again later."
+msgstr "❌ I couldn't read the price. Check the link and try again later."
+
+msgid "❌ I couldn't read the CSV. Save it as UTF-8 and try again."
+msgstr "❌ I couldn't read the CSV. Save it as UTF-8 and try again."
+
+msgid "💰 Last recorded price: {price}"
+msgstr "💰 Last recorded price: {price}"
+
+msgid "🔄 <b>Check results for {n} products on {domain}</b>"
+msgstr "🔄 <b>Check results for {n} products on {domain}</b>"
+
+msgid "Clear product availability"
+msgstr "Clear product availability"
+
+msgid "Accurate check results"
+msgstr "Accurate check results"
+
+msgid "Fewer repeated warnings"
+msgstr "Fewer repeated warnings"
+
+msgid "✅ <b>{name}</b>\n💰 Last recorded price: {price}\n{status}"
+msgstr "✅ <b>{name}</b>\n💰 Last recorded price: {price}\n{status}"
+
+msgid "A reliable price could not be obtained. The page layout or offer may have changed."
+msgstr "A reliable price could not be obtained. The page layout or offer may have changed."
+
+msgid "Product pages unavailable on {domain}"
+msgstr "Product pages unavailable on {domain}"
+
+msgid "The store repeatedly returned a missing-page response. The listings may have been removed or moved."
+msgstr "The store repeatedly returned a missing-page response. The listings may have been removed or moved."
+
+msgid "Tracking is paused. Check the links before reactivating or deleting these products."
+msgstr "Tracking is paused. Check the links before reactivating or deleting these products."
+
+msgid "Product pages could not be verified on {domain}"
+msgstr "Product pages could not be verified on {domain}"
+
+msgid "Checks kept failing. The latest response suggests a missing page, but its status is unconfirmed."
+msgstr "Checks kept failing. The latest response suggests a missing page, but its status is unconfirmed."
+
+msgid "Tracking is paused. Check the links and reactivate to try again."
+msgstr "Tracking is paused. Check the links and reactivate to try again."
+
+msgid "Price currency unclear on {domain}"
+msgstr "Price currency unclear on {domain}"
+
+msgid "The currency could not be verified. The last confirmed price has been preserved."
+msgstr "The currency could not be verified. The last confirmed price has been preserved."
+
+msgid "Check the store's currency and reactivate to try again."
+msgstr "Check the store's currency and reactivate to try again."
+
+msgid "The checks could not be completed because of connection or HTTP errors."
+msgstr "The checks could not be completed because of connection or HTTP errors."
+
+msgid "Checks interrupted on {domain}"
+msgstr "Checks interrupted on {domain}"
+
+msgid "An internal error prevented the checks from completing. The last confirmed price has been preserved."
+msgstr "An internal error prevented the checks from completing. The last confirmed price has been preserved."
+
+msgid "product page unavailable"
+msgstr "product page unavailable"
+
+msgid "page status unconfirmed"
+msgstr "page status unconfirmed"
+
+msgid "currency not verified"
+msgstr "currency not verified"
+
+msgid "check interrupted"
+msgstr "check interrupted"
+
+msgid "Product currently unavailable"
+msgstr "Product currently unavailable"
+
+msgid "The store reported this product unavailable in repeated checks. Monitoring continues; you will be notified when it is available again."
+msgstr "The store reported this product unavailable in repeated checks. Monitoring continues; you will be notified when it is available again."
+
+msgid "Product available again"
+msgstr "Product available again"
+
+msgid "The store reports this product available again with a verified price."
+msgstr "The store reports this product available again with a verified price."
+
+msgid "{name} — currently unavailable; monitoring continues"
+msgstr "{name} — currently unavailable; monitoring continues"
+
+msgid "{name} — available again"
+msgstr "{name} — available again"
+
+msgid "The check could not be completed because of a communication or processing error."
+msgstr "The check could not be completed because of a communication or processing error."
+
+msgid "Not checked: tracking is paused."
+msgstr "Not checked: tracking is paused."
+
+msgid "The site asked to wait before checking again."
+msgstr "The site asked to wait before checking again."
+
+msgid "Previous notice for {domain}: use /lista for the current status."
+msgstr "Previous notice for {domain}: use /lista for the current status."
+
+msgid "communication or processing error"
+msgstr "communication or processing error"
+
+msgid "automated checks blocked"
+msgstr "automated checks blocked"
+
+msgid "{n} product needs attention. Repeated failures may suspend tracking."
+msgid_plural "{n} products need attention. Repeated failures may suspend tracking."
+msgstr[0] "{n} product needs attention. Repeated failures may suspend tracking."
+msgstr[1] "{n} products need attention. Repeated failures may suspend tracking."
+
+msgid "{domain} — {n} product: checks failing"
+msgid_plural "{domain} — {n} products: checks failing"
+msgstr[0] "{domain} — {n} product: checks failing"
+msgstr[1] "{domain} — {n} products: checks failing"
+
+msgid "{domain} — {n} product: tracking suspended ({why})"
+msgid_plural "{domain} — {n} products: tracking suspended ({why})"
+msgstr[0] "{domain} — {n} product: tracking suspended ({why})"
+msgstr[1] "{domain} — {n} products: tracking suspended ({why})"
+
+msgid "Last recorded price: {price}"
+msgstr "Last recorded price: {price}"
+
+msgid "{count} notification remains queued because of your notification settings."
+msgid_plural "{count} notifications remain queued because of your notification settings."
+msgstr[0] "{count} notification remains queued because of your notification settings."
+msgstr[1] "{count} notifications remain queued because of your notification settings."
+
+msgid "Processed {count} digest notification."
+msgid_plural "Processed {count} digest notifications."
+msgstr[0] "Processed {count} digest notification."
+msgstr[1] "Processed {count} digest notifications."
+
+msgid "No notifications remain queued."
+msgstr "No notifications remain queued."
+
+msgid "Digest updated."
+msgstr "Digest updated."
+
+msgid "Digest updated. No notifications remain queued."
+msgstr "Digest updated. No notifications remain queued."
+
+msgid "No notifications are waiting in the digest."
+msgstr "No notifications are waiting in the digest."
+
+msgid "⏳ Awaiting price verification: {count}"
+msgstr "⏳ Awaiting price verification: {count}"
+
+msgid "❌ Rows with invalid or conflicting currency: {count}"
+msgstr "❌ Rows with invalid or conflicting currency: {count}"
+
+msgid "❌ Rows with an invalid target: {count}"
+msgstr "❌ Rows with an invalid target: {count}"
+
+#: src/price_tracker/bot/handlers/product_io.py
+msgid "❌ Currency could not be verified for {count} rows. Add an explicit currency in the Valuta column and import again."
+msgstr "❌ Currency could not be verified for {count} rows. Add an explicit currency in the Valuta column and import again."
+
+msgid "Price updated; availability could not be verified."
+msgstr "Price updated; availability could not be verified."
+
+msgid "🚫 Last confirmed: sold out"
+msgstr "🚫 Last confirmed: sold out"

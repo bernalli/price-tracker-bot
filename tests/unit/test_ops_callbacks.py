@@ -121,6 +121,7 @@ async def test_ops_react_acts_only_on_automatic_suspensions_of_same_domain(
             user_id=USER_ID,
             name=f"Automatic {index}",
             url=f"https://a.example.com/{index}",
+            reason="http_error",
             failures=10,
         )
         for index in range(3)
@@ -161,11 +162,9 @@ async def test_ops_react_acts_only_on_automatic_suspensions_of_same_domain(
 
     scheduler = AsyncMock()
     scheduler.check_products_for_user.return_value = [
-        SimpleNamespace(reason=None),
-        SimpleNamespace(reason="listing_gone"),
-        SimpleNamespace(reason=None),
-        SimpleNamespace(reason="listing_gone"),
-        SimpleNamespace(reason=None),
+        SimpleNamespace(product_id=automatic_ids[0], reason=None, disabled=False),
+        SimpleNamespace(product_id=automatic_ids[1], reason="listing_gone", disabled=False),
+        SimpleNamespace(product_id=automatic_ids[2], reason=None, disabled=False),
     ]
     query = _query()
     context = _context(repo, scheduler)
@@ -177,19 +176,19 @@ async def test_ops_react_acts_only_on_automatic_suspensions_of_same_domain(
 
     assert handled is True
     assert scheduler.check_products_for_user.await_args.kwargs == {
-        "product_ids": automatic_ids,
+        "product_ids": automatic_ids[:3],
         "user_id": USER_ID,
         "delay_between_products": 0.5,
     }
-    for product_id in automatic_ids:
+    for product_id in automatic_ids[:3]:
         assert (await repo.get_product(product_id)).is_active is True  # type: ignore[union-attr]
-    for product_id in (manual_id, unknown_id, other_domain_id, foreign_id):
+    for product_id in (*automatic_ids[3:], manual_id, unknown_id, other_domain_id, foreign_id):
         assert (await repo.get_product(product_id)).is_active is False  # type: ignore[union-attr]
 
     final_text = query.edit_message_text.await_args_list[-1].args[0]
-    assert final_text.count("✅") == 3
-    assert final_text.count("❌") == 2
-    assert final_text.count("page not found") == 2
+    assert final_text.count("✅") == 2
+    assert final_text.count("⚠️") == 1
+    assert "page could not be found" in final_text
 
 
 @pytest.mark.asyncio
@@ -201,7 +200,9 @@ async def test_ops_react_result_is_independent_of_thresholds(repo: Repository) -
         repo, user_id=USER_ID, name="Automatic", url="https://a.example.com/one"
     )
     scheduler = AsyncMock()
-    scheduler.check_products_for_user.return_value = [SimpleNamespace(reason=None)]
+    scheduler.check_products_for_user.return_value = [
+        SimpleNamespace(product_id=product_id, reason=None, disabled=False)
+    ]
     context = _context(repo, scheduler)
     context.bot_data["config"] = SimpleNamespace(max_consecutive_errors=100)
 
@@ -249,7 +250,9 @@ async def test_ops_react_reply_is_chunked(repo: Repository) -> None:
         for index in range(160)
     ]
     scheduler = AsyncMock()
-    scheduler.check_products_for_user.return_value = [SimpleNamespace(reason=None)] * 160
+    scheduler.check_products_for_user.return_value = [
+        SimpleNamespace(product_id=pid, reason=None, disabled=False) for pid in product_ids
+    ]
     query = _query()
     query.answer = AsyncMock()
 

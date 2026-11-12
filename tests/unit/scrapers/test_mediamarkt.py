@@ -61,7 +61,7 @@ async def test_mediamarkt_extracts_price_from_fixture(
 
 
 @pytest.mark.asyncio
-async def test_mediamarkt_default_currency_ch_is_chf() -> None:
+async def test_mediamarkt_missing_quote_does_not_invent_chf_currency() -> None:
     scraper = MediamarktScraper()
     url = "https://www.mediamarkt.ch/de/product/_sample-9999.html"
     with respx.mock(assert_all_called=False) as router:
@@ -69,7 +69,7 @@ async def test_mediamarkt_default_currency_ch_is_chf() -> None:
         async with httpx.AsyncClient() as client:
             info = await scraper.scrape(url, client)
     assert info.price is None
-    assert info.currency == "CHF"
+    assert info.currency is None
     assert info.error is not None
 
 
@@ -127,7 +127,7 @@ async def test_mediamarkt_returns_error_on_http_500(
 
 
 @pytest.mark.asyncio
-async def test_mediamarkt_default_currency_pl_is_pln() -> None:
+async def test_mediamarkt_missing_quote_does_not_invent_pln_currency() -> None:
     """PL TLD → default currency PLN when no JSON-LD/DOM price found."""
     scraper = MediamarktScraper()
     url = "https://www.mediamarkt.pl/pl/product/_sample-9999.html"
@@ -136,7 +136,7 @@ async def test_mediamarkt_default_currency_pl_is_pln() -> None:
         async with httpx.AsyncClient() as client:
             info = await scraper.scrape(url, client)
     assert info.price is None
-    assert info.currency == "PLN"
+    assert info.currency is None
     assert info.error is not None
 
 
@@ -154,7 +154,7 @@ async def test_mediamarkt_reads_price_from_buyaction_wrapped_jsonld(
     """Current pages nest the Product under BuyAction.object, not at top level."""
     html = load_fixture("mediamarkt/sample_product_es_buyaction.html")
     scraper = MediamarktScraper()
-    url = "https://www.mediamarkt.es/es/product/_monitor-1667552.html"
+    url = "https://www.mediamarkt.es/es/product/_monitor-gaming-msi-mag-274qpf-x32-27-wqhd-320-hz-05-ms-altura-ajustable-ips-negro-1667552.html"
     with respx.mock(assert_all_called=False) as router:
         router.get(url).respond(200, text=html)
         async with httpx.AsyncClient() as client:
@@ -185,7 +185,7 @@ async def test_mediamarkt_dom_fallback_reads_loose_branded_price_spans(
     assert "branded-price-whole-value" in html_no_jsonld
 
     scraper = MediamarktScraper()
-    url = "https://www.mediamarkt.es/es/product/_monitor-1667552.html"
+    url = "https://www.mediamarkt.es/es/product/_monitor-gaming-msi-mag-274qpf-x32-27-wqhd-320-hz-05-ms-altura-ajustable-ips-negro-1667552.html"
     with respx.mock(assert_all_called=False) as router:
         router.get(url).respond(200, text=html_no_jsonld)
         async with httpx.AsyncClient() as client:

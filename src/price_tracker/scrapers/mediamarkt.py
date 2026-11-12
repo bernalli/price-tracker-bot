@@ -6,30 +6,29 @@ Strategy: JSON-LD Product/offers (primary) with DOM fallback on the
 
 from __future__ import annotations
 
-import json
 import logging
 import re
-from typing import TYPE_CHECKING, ClassVar, TypedDict
+from typing import ClassVar
 from urllib.parse import urlparse
 
 import httpx
 from bs4 import BeautifulSoup, Tag
 
 from price_tracker.core.fetch import fetch_page
+from price_tracker.core.page_image import ImagePageHTML
 from price_tracker.core.retry_policy import RetryConfig, with_retry
 from price_tracker.core.scraper_base import (
     AbstractScraper,
     ProductInfo,
-    detect_currency,
     get_headers,
     in_carousel_context,
-    parse_price,
-    select_jsonld_offer,
-    unwrap_jsonld_graph,
 )
-
-if TYPE_CHECKING:
-    from decimal import Decimal
+from price_tracker.scrapers.secondary_evidence import (
+    EvidenceResult,
+    dom_evidence,
+    page_matches,
+    product_evidence,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -47,17 +46,14 @@ def _default_currency_for_url(url: str) -> str:
     return "EUR"
 
 
-class StrategyResult(TypedDict, total=False):
-    price: Decimal
-    currency: str
-    name: str
+StrategyResult = EvidenceResult
 
 
 @with_retry(RetryConfig(max_attempts=3, base_wait=2.0, max_wait=10.0))
 async def _fetch_mediamarkt_html(url: str, client: httpx.AsyncClient) -> str:
     headers = get_headers()
     page = await fetch_page(url, client, headers=headers)
-    return page.text
+    return ImagePageHTML(page.text, page.url_final)
 
 
 class MediamarktScraper(AbstractScraper):
@@ -80,19 +76,34 @@ class MediamarktScraper(AbstractScraper):
             html = await _fetch_mediamarkt_html(url, client)
         except (httpx.HTTPError, ValueError) as e:
             logger.debug("Mediamarkt fetch failed for %s: %s", url[:80], e)
-            return ProductInfo(error=f"HTTP error: {e}")
+            return ProductInfo(error=f"HTTP error: {e}", stock_evidence=False)
 
         soup = BeautifulSoup(html, "lxml")
-        info = ProductInfo()
+        if not page_matches(soup, url, getattr(html, "final_url", url)):
+            return ProductInfo(error="identity_mismatch", stock_evidence=False)
+        info = ProductInfo(stock_evidence=False)
 
         for strategy_name, strategy_fn in (
-            ("jsonld", self._try_jsonld),
+            ("jsonld", lambda page: self._try_jsonld(page, url)),
             ("dom", self._try_dom),
         ):
             try:
                 result = strategy_fn(soup)
+                if result and result.get("identity_mismatch"):
+                    return ProductInfo(error="identity_mismatch", stock_evidence=False)
+                if result and result.get("name") and info.name is None:
+                    info.name = result["name"]
+                if result and result.get("currency_ambiguous"):
+                    return ProductInfo(error="currency_ambiguous", stock_evidence=False)
+                if result and result.get("available") is False:
+                    return ProductInfo(
+                        name=result.get("name"), currency=result.get("currency"), available=False
+                    )
                 if result and result.get("price") is not None and info.price is None:
                     info.price = result["price"]
+                    if isinstance(result.get("available"), bool):
+                        info.available = result["available"]
+                        info.stock_evidence = True
                     if result.get("currency") and info.currency is None:
                         info.currency = result["currency"]
                     if result.get("name") and info.name is None:
@@ -111,44 +122,13 @@ class MediamarktScraper(AbstractScraper):
                 if title_text:
                     info.name = title_text[:200]
 
-        if info.currency is None:
-            info.currency = detect_currency(str(info.price or "")) or _default_currency_for_url(url)
+        if info.price is not None and info.currency is None:
+            return ProductInfo(name=info.name, error="currency_ambiguous", stock_evidence=False)
 
         if info.price is None:
             info.error = "Price not found in page"
 
         return info
-
-    def _try_jsonld(self, soup: BeautifulSoup) -> StrategyResult | None:
-        scripts = soup.find_all("script", type="application/ld+json")
-        for script in scripts:
-            raw = script.string or script.get_text(strip=True)
-            if not raw:
-                continue
-            try:
-                data = json.loads(raw)
-            except (json.JSONDecodeError, ValueError):
-                continue
-            # MediaMarkt nests the Product inside a BuyAction (`object`), and
-            # other sites use `@graph`; unwrap_jsonld_graph flattens both.
-            for item in unwrap_jsonld_graph(data):
-                type_val = item.get("@type", "")
-                type_str = " ".join(type_val) if isinstance(type_val, list) else str(type_val)
-                if "Product" not in type_str:
-                    continue
-                selected = select_jsonld_offer(item.get("offers"))
-                if selected is None:
-                    continue
-                parsed, currency = selected
-                result: StrategyResult = {
-                    "price": parsed,
-                    "currency": currency or "EUR",
-                }
-                name = item.get("name")
-                if isinstance(name, str) and name:
-                    result["name"] = name[:200]
-                return result
-        return None
 
     @staticmethod
     def _find_whole_value_span(soup: BeautifulSoup) -> Tag | None:
@@ -163,6 +143,9 @@ class MediamarktScraper(AbstractScraper):
             if not in_carousel_context(candidate):
                 return candidate
         return None
+
+    def _try_jsonld(self, soup: BeautifulSoup, url: str) -> StrategyResult | None:
+        return product_evidence(soup, url)
 
     def _try_dom(self, soup: BeautifulSoup) -> StrategyResult | None:
         """Read the price off the [data-test=branded-price-*] spans.
@@ -199,15 +182,6 @@ class MediamarktScraper(AbstractScraper):
 
         # The currency sits in a sibling span: read it first, so that the grammar can
         # tell "1.299" (thousands under EUR) from a three-decimal fraction.
-        currency: str | None = None
         currency_el = scope.select_one('[data-test="branded-price-currency"]')
-        if isinstance(currency_el, Tag):
-            currency = detect_currency(currency_el.get_text(strip=True))
-
-        parsed = parse_price(text, currency=currency)
-        if parsed is None:
-            return None
-        result: StrategyResult = {"price": parsed}
-        if currency:
-            result["currency"] = currency
-        return result
+        declared = currency_el.get_text(strip=True) if isinstance(currency_el, Tag) else None
+        return dom_evidence(text, declared)

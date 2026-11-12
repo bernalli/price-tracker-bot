@@ -171,12 +171,11 @@ def test_js_product_data_skips_unidentified_object_before_product() -> None:
     assert result["price"] == Decimal("199.99")
 
 
-def test_js_product_data_bare_price_fallback_still_works() -> None:
-    """With no product-identified object anywhere, the bare regex fallback applies."""
+def test_js_product_data_bare_price_has_no_product_ownership() -> None:
+    """A bare price on arbitrary application state does not identify the product."""
     js = 'window.__app = {"currency": "EUR", "price": 49.99};'
     result = GenericScraper()._try_js_product_data(_script_soup(js))
-    assert result is not None
-    assert result["price"] == Decimal("49.99")
+    assert result is None
 
 
 # ── CSS / data-attribute scoping (#26) ───────────────────────────

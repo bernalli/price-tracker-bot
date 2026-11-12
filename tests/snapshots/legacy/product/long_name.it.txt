@@ -45,7 +45,7 @@
    | 📦 <b>⁨Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN…⁩</b>
    | ⁨example.com⁩ · #1 · in pausa
    |
-   | 💰 Ora: 80,00 €
+   | 💰 Ultimo prezzo rilevato: 80,00 €
    | 📌 Inizio: 80,00 €
    | 📉 Minimo: 80,00 €
    | 🔔 Avviso: ribasso del 10% dall'inizio
@@ -58,6 +58,7 @@
 ## db after step 3
 ~ products id=1 is_active: 1 -> 0
 ~ products id=1 suspension_kind: NULL -> "manual"
+~ products id=1 notice_version: 0 -> 1
 ## step 4: press "reactivate_1" user=10 on=1
 -> answerCallbackQuery
 -> editMessageText chat=10 message_id=1
@@ -83,6 +84,7 @@
 ## db after step 4
 ~ products id=1 is_active: 0 -> 1
 ~ products id=1 suspension_kind: "manual" -> NULL
+~ products id=1 notice_version: 1 -> 2
 ## step 5: press "remove_1" user=10 on=1
 -> answerCallbackQuery
 -> editMessageText chat=10 message_id=1

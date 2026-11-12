@@ -303,8 +303,11 @@ async def test_errori_command_lists_products_and_quarantine_state() -> None:
     update.message.reply_html.assert_awaited_once()
     rendered: str = update.message.reply_html.call_args.args[0]
     assert "Canvas Runner" in rendered
-    assert "<b>N/D</b> 🔒4 Canvas Runner" in rendered
+    assert "<b>N/D</b> ⚠️4 Canvas Runner" in rendered
+    assert "#7:" in rendered
+    assert "bloccando i controlli automatici" in rendered
     assert "🔒" in rendered  # quarantine indicator for the locked domain
+    assert "CAPTCHA/captcha-form" not in rendered
 
 
 @pytest.mark.asyncio

@@ -109,6 +109,7 @@ def make_query(data: str | None, user_id: int = USER) -> MagicMock:
     query.from_user.language_code = "en"
     query.answer = AsyncMock()
     query.edit_message_text = AsyncMock()
+    query.message.reply_text = AsyncMock()
     return query
 
 
@@ -980,15 +981,19 @@ async def test_the_error_report_escapes_names_and_shows_error_counts(repo: Repos
     assert "<b>&" not in text
 
 
-async def test_a_long_error_report_is_cut_to_one_message(repo: Repository) -> None:
+async def test_a_long_error_report_is_sent_in_bounded_chunks(repo: Repository) -> None:
     for index in range(60):
         pid = await add_product(repo, USER, f"Product {index} " + "x" * 40)
         await set_error(repo, pid, "e" * 140)
     query = await press(repo, "er")
     query.edit_message_text.assert_awaited_once()
-    text = edited_text(query)
-    assert visible_length(text) <= TELEGRAM_MESSAGE_LIMIT
-    assert "Product 0" in text
+    chunks = [edited_text(query)] + [
+        call.args[0] for call in query.message.reply_text.await_args_list
+    ]
+    assert all(visible_length(text) <= TELEGRAM_MESSAGE_LIMIT for text in chunks)
+    assert "Product 0" in "\n".join(chunks)
+    assert "Product 59" in "\n".join(chunks)
+    assert len(chunks) > 1
 
 
 async def test_add_shows_the_paste_a_link_screen(repo: Repository) -> None:

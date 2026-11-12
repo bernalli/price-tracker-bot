@@ -84,7 +84,7 @@
 -> editMessageText chat=10 message_id=1001
    param parse_mode="HTML"
    text:
-   | ✅ <b>Completato</b>
+   | ✅ <b>Controllo completato</b>
    | 1 prodotti
    |
    | <b>80,00 €</b> ▼20% Long NNNNNNNNNNNNN…

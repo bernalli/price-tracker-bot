@@ -64,7 +64,7 @@ async def test_zalando_extracts_price_from_fixture(
 
 
 @pytest.mark.asyncio
-async def test_zalando_default_currency_uk_is_gbp() -> None:
+async def test_zalando_missing_quote_does_not_invent_gbp_currency() -> None:
     scraper = ZalandoScraper()
     url = "https://www.zalando.co.uk/missing-product-9999/"
     with respx.mock(assert_all_called=False) as router:
@@ -72,7 +72,7 @@ async def test_zalando_default_currency_uk_is_gbp() -> None:
         async with httpx.AsyncClient() as client:
             info = await scraper.scrape(url, client)
     assert info.price is None
-    assert info.currency == "GBP"
+    assert info.currency is None
     assert info.error is not None
 
 

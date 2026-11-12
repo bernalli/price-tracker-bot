@@ -6,7 +6,7 @@ text:
    | 📦 <b>⁨Toaster⁩</b>
    | ⁨shop.example.com⁩ · #61 · active
    | 
-   | 💰 Now: €39.90
+   | 💰 Last recorded price: €39.90
    | 🚫 Sold out
    | 📌 Start: €44.90 · ▼ 11.1%
    | 📉 Lowest: €39.90

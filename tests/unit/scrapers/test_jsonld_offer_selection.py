@@ -23,13 +23,17 @@ _HTML = (
 
 
 def test_apple_jsonld_skips_financing_offer() -> None:
-    result = AppleStoreScraper()._try_jsonld(BeautifulSoup(_HTML, "lxml"))
+    result = AppleStoreScraper()._try_jsonld(
+        BeautifulSoup(_HTML, "lxml"), "https://example.com/item"
+    )
     assert result is not None
     assert result["price"] == Decimal("1299.00")
 
 
 def test_google_jsonld_skips_financing_offer() -> None:
-    result = GoogleStoreScraper()._try_jsonld(BeautifulSoup(_HTML, "lxml"))
+    result = GoogleStoreScraper()._try_jsonld(
+        BeautifulSoup(_HTML, "lxml"), "https://example.com/item"
+    )
     assert result is not None
     assert result["price"] == Decimal("1299.00")
 
@@ -63,6 +67,6 @@ from price_tracker.scrapers.zalando import ZalandoScraper  # noqa: E402
     ids=lambda c: c.__name__,
 )
 def test_scraper_jsonld_skips_financing_offer(scraper_cls) -> None:
-    result = scraper_cls()._try_jsonld(BeautifulSoup(_HTML, "lxml"))
+    result = scraper_cls()._try_jsonld(BeautifulSoup(_HTML, "lxml"), "https://example.com/item")
     assert result is not None
     assert result["price"] == Decimal("1299.00")

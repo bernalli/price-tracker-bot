@@ -205,9 +205,10 @@ ITALIAN: dict[str, str] = {
     ),
     "errors": (
         "⚠️ <b>Errori recenti (1)</b>\n\n"
-        "<b>N/D</b> 🔒3 Sconosciuto\n\n"
-        "ℹ️ I siti in 🔒 quarantena riprendono da soli; "
-        "usa /reactivate per riattivare un prodotto sospeso."
+        "<b>N/D</b> ⚠️3 Sconosciuto\n"
+        "#1: Non sono riuscito a leggere il prezzo.\n"
+        "🔒 I controlli su questo sito sono temporaneamente in pausa.\n\n"
+        "Usa /reactivate per riprendere il monitoraggio di un prodotto sospeso."
     ),
     "no_errors": "✅ Nessun errore recente sui tuoi prodotti.",
     "back_buttons": "🔔 Ogni ribasso",

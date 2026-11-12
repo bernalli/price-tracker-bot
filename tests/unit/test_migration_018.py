@@ -81,7 +81,7 @@ async def test_upgrading_a_populated_schema_17_only_adds_image_url():
         ]
         before = {table: await rows(conn, f"SELECT * FROM {table}") for table in tables}
         previous_columns = await columns(conn)
-        assert await apply_migrations(conn, MIGRATIONS) == 18
+        assert await apply_migrations(conn, MIGRATIONS, max_version=18) == 18
         assert await columns(conn) == [*previous_columns, "image_url"]
         after = await rows(conn, "SELECT * FROM products")
         assert [r[:-1] for r in after] == before["products"]
@@ -96,9 +96,9 @@ async def test_upgrading_a_populated_schema_17_only_adds_image_url():
 async def test_applying_again_is_a_no_op():
     async with aiosqlite.connect(":memory:") as conn:
         await seed(conn)
-        assert await apply_migrations(conn, MIGRATIONS) == 18
+        assert await apply_migrations(conn, MIGRATIONS, max_version=18) == 18
         before = await rows(conn, "SELECT type, name, sql FROM sqlite_master ORDER BY name")
-        assert await apply_migrations(conn, MIGRATIONS) == 18
+        assert await apply_migrations(conn, MIGRATIONS, max_version=18) == 18
         assert await rows(conn, "SELECT type, name, sql FROM sqlite_master ORDER BY name") == before
 
 
@@ -227,7 +227,7 @@ async def test_the_previous_release_repository_still_works_on_schema_18():
         conn.row_factory = aiosqlite.Row
         await seed(conn)
         await apply_migrations(conn, MIGRATIONS)
-        assert await get_current_version(conn) == 18
+        assert await get_current_version(conn) == 19
         repo = old.Repository(conn)
         assert (await repo.get_product(1)).name == "Kettle"
         assert [u.user_id for u in await repo.list_users()] == [1, 2]
@@ -244,6 +244,6 @@ async def test_the_previous_release_repository_still_works_on_schema_18():
 
 
 def test_no_product_query_selects_star():
-    assert _PRODUCT_COLS.split(", ")[-1] == "image_url"
+    assert _PRODUCT_COLS.split(", ")[31] == "image_url"
     for path in (ROOT / "src/price_tracker/db").glob("*.py"):
         assert not re.search(r"SELECT\s+\*\s+FROM\s+products", path.read_text(), re.IGNORECASE)

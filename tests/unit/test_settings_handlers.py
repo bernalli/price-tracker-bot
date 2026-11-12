@@ -177,12 +177,123 @@ async def test_prefs_renders_resolved():
 async def test_digest_now_invokes_flush():
     digest_svc = AsyncMock()
     digest_svc.flush_user = AsyncMock(return_value=3)
+    digest_svc.pending_count = AsyncMock(return_value=0)
     update = _build_update(42, [])
     context = _build_context([], digest_service=digest_svc)
     await digest_now_command(update, context)
     digest_svc.flush_user.assert_awaited_once_with(user_id=42)
+    digest_svc.pending_count.assert_awaited_once_with(user_id=42)
     msg = update.message.reply_text.call_args.args[0]
     assert "3" in msg
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("processed", "pending", "expected"),
+    [
+        (1, 0, "Processed 1 digest notification.\nNo notifications remain queued."),
+        (3, 0, "Processed 3 digest notifications.\nNo notifications remain queued."),
+        (
+            3,
+            2,
+            "Processed 3 digest notifications.\n"
+            "2 notifications remain queued because of your notification settings.",
+        ),
+        (0, 1, "1 notification remains queued because of your notification settings."),
+        (0, 2, "2 notifications remain queued because of your notification settings."),
+        (0, 0, "No notifications are waiting in the digest."),
+    ],
+)
+async def test_digest_now_reports_processed_and_pending(processed, pending, expected):
+    digest_svc = AsyncMock()
+    digest_svc.flush_user.return_value = processed
+    digest_svc.pending_count.return_value = pending
+    update = _build_update(42, [])
+    context = _build_context([], digest_service=digest_svc)
+    await digest_now_command(update, context)
+    digest_svc.flush_user.assert_awaited_once_with(user_id=42)
+    digest_svc.pending_count.assert_awaited_once_with(user_id=42)
+    update.message.reply_text.assert_awaited_once_with(expected)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("processed", "expected"),
+    [
+        (1, "Elaborata 1 notifica del riepilogo.\nNon restano notifiche in coda."),
+        (3, "Elaborate 3 notifiche del riepilogo.\nNon restano notifiche in coda."),
+    ],
+)
+async def test_digest_now_processed_count_is_localized_in_italian(processed, expected):
+    digest_svc = AsyncMock()
+    digest_svc.flush_user.return_value = processed
+    digest_svc.pending_count.return_value = 0
+    update = _build_update(42, [])
+    update.effective_user.language_code = "it"
+    context = _build_context([], digest_service=digest_svc)
+    context.bot_data["db"].get_user.return_value = None
+    await digest_now_command(update, context)
+    update.message.reply_text.assert_awaited_once_with(expected)
+
+
+@pytest.mark.asyncio
+async def test_digest_now_counts_quarantined_entry_as_processed_not_sent():
+    from datetime import UTC, datetime
+
+    from price_tracker.db.models import DigestEntry
+    from price_tracker.notifier.digest import DigestService
+
+    entry = DigestEntry(
+        id=7,
+        user_id=42,
+        product_id=None,
+        alert_payload_json="{not json",
+        enqueued_at=datetime.now(UTC),
+    )
+    repo = AsyncMock()
+    repo.get_notification_prefs.return_value = None
+    repo.list_pending_digest.side_effect = [[entry], []]
+    bot = AsyncMock()
+    service = DigestService(repo=repo, bot=bot, lang="en")
+    update = _build_update(42, [])
+    context = _build_context([], digest_service=service)
+    await digest_now_command(update, context)
+    repo.mark_digest_flushed.assert_awaited_once_with([7])
+    bot.send_message.assert_not_awaited()
+    update.message.reply_text.assert_awaited_once_with(
+        "Processed 1 digest notification.\nNo notifications remain queued."
+    )
+
+
+@pytest.mark.asyncio
+async def test_digest_now_retires_obsolete_entry_without_claiming_delivery():
+    import json
+    from datetime import UTC, datetime
+
+    from price_tracker.db.models import DigestEntry
+    from price_tracker.notifier.digest import DigestService
+
+    entry = DigestEntry(
+        id=8,
+        user_id=42,
+        product_id=None,
+        alert_payload_json=json.dumps(
+            {"kind": "operational", "event": "warning", "status_versioned": True, "products": []}
+        ),
+        enqueued_at=datetime.now(UTC),
+    )
+    repo = AsyncMock()
+    repo.list_pending_digest.side_effect = [[entry], []]
+    bot = AsyncMock()
+    service = DigestService(repo=repo, bot=bot, lang="en")
+    update = _build_update(42, [])
+    context = _build_context([], digest_service=service)
+    await digest_now_command(update, context)
+    repo.mark_digest_flushed.assert_awaited_once_with([8])
+    bot.send_message.assert_not_awaited()
+    update.message.reply_text.assert_awaited_once_with(
+        "No notifications are waiting in the digest."
+    )
 
 
 # ── Followup: regression coverage for read-before-write

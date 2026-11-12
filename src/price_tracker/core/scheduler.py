@@ -77,5 +77,5 @@ class Scheduler(_PeriodicRunsMixin, _ProductChecksMixin, _NoticeDeliveryMixin):
         # When each product was last attempted by this process, whatever the
         # outcome; run_check_due falls back to the stored timestamps after a restart.
         self._attempted_at: dict[int, datetime] = {}
-        self._sold_out_streaks: dict[int, int] = {}
+        self._notice_lock = asyncio.Lock()
         self._product_locks: dict[int, asyncio.Lock] = {}

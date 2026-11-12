@@ -22,10 +22,13 @@ When the alert engine triggers an alert for a user/product pair, the notifier wa
 5. immediate dispatch — otherwise: send via TelegramNotifier.send_alert
 ```
 
-Operational notices (see below) go through the same chain, with one exception: they
-ignore mute (step 1 is skipped for them).
+Operational notices (see below) ignore mute. During quiet hours or throttling they
+are queued even when digest mode is off. Stock notices are per-product and honor mute.
+At digest delivery, current status and mute/quiet settings are checked again.
 
-Every step records a Prometheus metric. Drops increment `price_tracker_notification_skipped_total{reason="..."}` with one of `mute`, `quiet_hours`, `throttle`, `digest_pending`. Sends increment `price_tracker_notification_sent_total`. INFO-level logs include `user_id` and `product_id` for traceability.
+Notification routing records Prometheus metrics, including
+`price_tracker_notification_skipped_total{reason="..."}` and
+`price_tracker_notification_sent_total`.
 
 ## Commands
 
@@ -37,7 +40,7 @@ Silence alerts for a single product or all products.
   - `/mute 42` — mute product 42 for 24 hours
   - `/mute all 168` — mute everything for a week
   - `/mute 42 forever` — mute product 42 indefinitely
-- **Behavior**: writes to `notification_prefs` (per-user) or sets a per-product expiry. Active mutes are checked at dispatch time; expired mutes auto-clear.
+- **Behavior**: writes to `notification_prefs` (per-user) or sets a per-product expiry. Active mutes are checked at dispatch time; expired mutes no longer suppress alerts.
 
 ### `/unmute [product_id|all]`
 Remove an active mute.
@@ -55,9 +58,14 @@ Switch between immediate and digest delivery.
 - **Behavior**: alerts arriving in `on` mode are batched in `digest_queue` and flushed periodically. Switching to `off` does NOT auto-flush — pending entries stay until `/digest_now` or the next scheduled flush.
 
 ### `/digest_now`
-Flush all pending digest entries immediately.
+Attempt to flush eligible pending digest entries.
 
-- **Behavior**: empties the user's `digest_queue` rows and sends a single combined message. No-op if queue empty.
+- **Behavior**: current status and notification settings are checked again. Quiet hours or
+  mute can leave eligible entries queued; obsolete status entries are retired. Messages can
+  span multiple Telegram pages. The response reports the number processed and the number
+  still queued. Processed includes unreadable entries quarantined by the digest service,
+  so it does not mean that every counted item was sent; obsolete or currently ineligible
+  entries are excluded from that count.
 
 ### `/quiet_hours <HH:MM-HH:MM>`
 Set a daily silent window (timezone-aware).
@@ -77,13 +85,13 @@ Set the user's timezone for quiet hours and digest scheduling.
 Cap the number of alerts the user receives per sliding hour.
 
 - **Examples**: `/throttle 5` (max 5/h), `/throttle off` (disable throttle, unlimited)
-- **Behavior**: a sliding 60-minute window of recent sends is kept per user. When the window is full, further alerts are dropped (logged as `throttled`, counted in metrics) until older entries fall out.
+- **Behavior**: a sliding 60-minute window of recent sends is kept per user. When the window is full, further price and stock alerts are queued if digest mode is on, or dropped otherwise, until older entries fall out. Operational notices are queued.
 
 ### `/prefs [product_id]`
 Show the user's current preferences in a single message.
 
 - **Optional argument**: `product_id` — when provided, the output includes the per-product mute state for that specific product alongside the user-level prefs.
-- **Output includes**: digest mode + interval, quiet hours window, timezone, throttle cap, current mutes (per-product list + global), recent throttle window status.
+- **Output includes**: the selected scope, its effective mute, digest mode + interval, quiet hours, throttle cap and timezone.
 
 ## Defaults for new users
 
@@ -105,7 +113,7 @@ All preferences are stored in the SQLite database at `DATABASE_PATH` — there a
 
 | What                          | Storage                                                  |
 | ----------------------------- | -------------------------------------------------------- |
-| Mute / digest / quiet / timezone / throttle config | `notification_prefs` table (one row per user) |
+| Mute / digest / quiet / timezone / throttle config | `notification_prefs` table (global and per-product rows) |
 | Throttle sliding window state | `notification_prefs.throttle_state_json` column (JSON encoded list of recent send timestamps) |
 | Digest queue (pending alerts) | `digest_queue` table (one row per pending alert)         |
 
@@ -122,7 +130,7 @@ When determining the effective preference for a given alert, the notifier resolv
 2. **User-level prefs** — digest mode, quiet hours, throttle, timezone (no per-product override; these are user-wide).
 3. **Defaults** — applied for any unset field.
 
-The `EffectivePrefs` dataclass (`notifier/preferences.py:21`) is the resolved snapshot used at dispatch time, computed by `PreferencesManager.resolve(*, user_id, product_id)` (`preferences.py:68`).
+The `EffectivePrefs` dataclass in `notifier/preferences.py` is the resolved snapshot used at dispatch time, computed by `PreferencesManager.resolve(*, user_id, product_id)`.
 
 ## Operational notices
 
@@ -134,11 +142,13 @@ product is actually suspended.
 
 ### Aggregation
 
-Notices are grouped **per user and per domain** (the eTLD+1 that groups Shopify stores,
-subdomains, etc. together) and batched during a sweep: a store that goes down taking twenty
-tracked products with it produces **one** message per user for that domain, not twenty. Each
-message lists up to 10 affected products (`… and {k} more` beyond that), with the reason,
-the last good read (price and date) if any, and the raw error truncated to a fixed budget.
+Warnings are grouped **per user and per domain** during a sweep, including different
+causes in one warning. Up to 10 affected products are shown (`… and {k} more` beyond
+that), with their IDs, reasons, failure counters and last recorded prices when available.
+Each warning cause has its own 24-hour cooldown per user and domain, persisted across
+restarts after the notice is sent or queued. Suspensions are grouped by user, domain and
+cause. Stock transitions remain individual so each product's preferences apply. The
+domain key uses eTLD+1 where available.
 
 ### Routing: mute is ignored, only global preferences apply
 
@@ -146,13 +156,11 @@ Operational notices route with `kind="operational"` and always resolve preferenc
 `PreferencesManager.resolve_global(user_id)` — the user's **global** row only, never a
 per-product override. Two consequences:
 
-- **`/mute` has no effect on them.** A muted product can still trigger an operational notice
-  for its domain; mute only suppresses price-drop alerts. There is no separate command to
-  silence operational notices.
-- **Quiet hours, digest mode and throttle apply exactly as for price alerts** (see the
-  resolution chain above), using the user's account-wide settings — never a per-product
-  override, since a notice can cover several products from several owners' worth of
-  preferences in principle, but always resolves to the domain-group's single recipient.
+- **`/mute` has no effect on operational notices.** A muted product can still trigger
+  one for its domain. There is no separate command to silence operational notices.
+- **Quiet hours, digest mode and throttle use account-wide settings.** Operational
+  notices held by quiet hours or throttling are queued even with digest mode off.
+  Stock notifications use the product's effective preferences and honor mute.
 
 When an operational notice is deferred (quiet hours, throttle, or digest mode), it is queued
 with `product_id = NULL` rather than tied to one of the affected products: deleting any single
@@ -163,23 +171,28 @@ product in the group does not drop the others' pending notice.
 Suspension notices carry two buttons, `▶️ Reactivate and recheck (N)` and `🗑 Delete all (N)`
 (button order depends on the reason — deletion comes first when the listing is confirmed
 gone). Deleting asks for a `🗑 Yes, delete N` / `❌ Cancel` confirmation. Both actions apply to
-the **whole domain group** for that user, computed from persisted state at click time (see
-provenance below) — not from whatever the current failure threshold happens to be. The
+the current automatically suspended products for that user, domain and suspension cause,
+computed from persisted state at click time (see provenance below). Membership can change
+between the message and the click; deletion recomputes it again at confirmation. The
 pre-suspension warning carries no buttons; use `/reactivate` or `/errori` for those.
 
 ### `LISTING_GONE_CONFIRMATIONS`
 
 A listing is only ever confirmed *gone* — as opposed to merely unreachable or unreadable —
-after `LISTING_GONE_CONFIRMATIONS` (default `3`) consecutive HTTP 404/410 responses. Any
-other outcome in between (success or a different failure) resets the streak. See
+after `LISTING_GONE_CONFIRMATIONS` (default `3`) consecutive confirmed missing-page
+observations. These include HTTP 404/410 responses and a recognized store-specific
+not-found document, such as Amazon's not-found page even when returned with HTTP 2xx.
+A redirect alone is not proof. A success or a different failure resets the streak. A
+separate failure threshold can suspend tracking earlier without confirming
+the listing gone. See
 [operations.md](operations.md#environment-variables) for the environment variable.
 
 ### Suspension provenance and pre-migration rows
 
 Every automatic suspension records `suspension_kind = 'automatic'` and the `suspension_reason`
 that caused it, distinct from a manual `/pause` (`suspension_kind = 'manual'`). The group
-buttons act only on rows with `suspension_kind = 'automatic'` for that domain: a product a
-user paused by hand is never swept up by "Delete all". Rows suspended **before** this
+buttons act only on rows with `suspension_kind = 'automatic'` for that user, domain and
+the anchor product's suspension cause: a product paused by hand is never swept up by "Delete all". Rows suspended **before** this
 provenance column existed have `suspension_kind IS NULL` — their origin cannot be
 reconstructed, so they are excluded from the group entirely; reactivating or deleting them
 goes through `/reactivate` one product at a time, same as before this feature.
@@ -194,6 +207,7 @@ contract used for digest pages and button responses (`core/textlimits.py`).
 
 ## Related docs
 
+- [product-status.md](product-status.md) — how check results and availability are confirmed.
 - [architecture.md](architecture.md) — where the notifier sits in the data flow.
 - [operations.md](operations.md) — backup/restore and troubleshooting.
 - [observability.md](observability.md) — alert metrics and dashboard panels.

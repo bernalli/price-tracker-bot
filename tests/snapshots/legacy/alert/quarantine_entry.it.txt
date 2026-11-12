@@ -9,7 +9,7 @@
    text:
    | 🔒 <b>Sito in pausa automatica</b>
    |
-   | <b>example.com</b> ha fallito troppi controlli (HTTP 403 block on https://shop.example.com/item/5).
+   | <b>example.com</b> ha fallito troppi controlli (controlli automatici bloccati).
    | Sospendo temporaneamente i check su questo sito per non insistere contro un blocco.
    | 🔁 Riprovo da solo dopo: 2026-03-01 13:00 UTC
    |
@@ -20,23 +20,30 @@
    text:
    | ⏳ <b>Controlli in errore su example.com</b> (3)
    |
-   | 3 prodotti hanno fallito 1/2 controlli di fila. Se continua, verranno sospesi automaticamente.
+   | 3 prodotti richiedono attenzione. Errori ripetuti possono sospendere il monitoraggio.
    |
    | <b>80,00 €</b> ⚠️ Kettle
+   | #1: bloccato (1/2)
    | <b>40,00 €</b> ⚠️ Speaker
+   | #2: bloccato (1/2)
    | <b>60,00 €</b> ⚠️ Mixer
+   | #3: bloccato (1/2)
    |
    | Dettagli con /errori.
    markup: {}
 ## db after step 1
 + bot_config key="quarantine_notice:10:example.com" {value="2026-03-01T12:00:00+00:00"}
++ bot_config key="warning_notice:10:example.com:block" {value="2026-03-01T12:00:00+00:00"}
 ~ products id=1 consecutive_errors: 0 -> 1
 ~ products id=1 last_error: NULL -> "block: HTTP 403 block on https://shop.example.com/item/1"
 ~ products id=1 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=1 last_check_outcome: NULL -> "block"
 ~ products id=2 consecutive_errors: 0 -> 1
 ~ products id=2 last_error: NULL -> "block: HTTP 403 block on https://shop.example.com/item/4"
 ~ products id=2 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=2 last_check_outcome: NULL -> "block"
 ~ products id=3 consecutive_errors: 0 -> 1
 ~ products id=3 last_error: NULL -> "block: HTTP 403 block on https://shop.example.com/item/5"
 ~ products id=3 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=3 last_check_outcome: NULL -> "block"
 + scraper_health domain="example.com" {state="LOCKED_T1", consecutive_blocks=3, locked_until="2026-03-01T13:00:00+00:00", last_block_at="2026-03-01T12:00:00+00:00", last_block_reason="HTTP 403", last_success_at=NULL, updated_at=<now:9999-99-99 99:99:99>}

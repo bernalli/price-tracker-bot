@@ -67,6 +67,11 @@ RELEASE_NOTES: dict[str, tuple[str, ...]] = {
         N_("Six products per page"),
     ),
     "1.10.1": (),
+    "1.11.0": (
+        N_("Clear product availability"),
+        N_("Accurate check results"),
+        N_("Fewer repeated warnings"),
+    ),
 }
 
 MESSAGE_LIMIT = 1200

@@ -21,6 +21,7 @@ import logging
 import re
 from decimal import Decimal
 from typing import ClassVar
+from urllib.parse import urljoin, urlparse
 
 import httpx
 from bs4 import BeautifulSoup, Tag
@@ -42,12 +43,22 @@ from price_tracker.core.scraper_base import (
     detect_currency,
     detect_listing_gone,
     get_headers,
+    in_carousel_context,
+    jsonld_offer_availability,
     parse_price,
     retry_after_header,
-    select_jsonld_offer,
 )
+from price_tracker.scrapers.evidence import offer_evidence, offer_urls_match, price_currency
 
 logger = logging.getLogger(__name__)
+
+
+def _log_host(url: str) -> str:
+    """Keep URL paths, userinfo, and query strings out of logs."""
+    try:
+        return urlparse(url).hostname or "unknown"
+    except ValueError:
+        return "unknown"
 
 
 # Product types recognised in JSON-LD
@@ -74,12 +85,6 @@ _JS_PRICE_KEYS: tuple[str, ...] = (
     "selling_price",
 )
 _JS_IDENTITY_KEYS: tuple[str, ...] = ("name", "title", "sku", "productId", "product_id")
-_JS_PRICE_OBJECT_RE = re.compile(
-    r'\{[^{}]*"(?:' + "|".join(_JS_PRICE_KEYS) + r')"\s*:\s*"?\d[^{}]*\}'
-)
-_JS_BARE_PRICE_PATTERNS: list[str] = [
-    rf'"{key}"\s*:\s*"?(\d{{1,6}}(?:\.\d{{1,2}})?)"?' for key in _JS_PRICE_KEYS
-]
 
 
 @with_retry(RetryConfig(max_attempts=3, base_wait=2.0, max_wait=10.0))
@@ -213,36 +218,62 @@ class GenericScraper(AbstractScraper):
                 logger.debug(
                     "Generic httpx fetch found a removed listing for %s; "
                     "keeping the curl_cffi HTML",
-                    url[:60],
+                    _log_host(url),
                 )
             except (httpx.HTTPError, ValueError) as e:
-                logger.debug("Generic httpx fetch failed for %s: %s", url[:60], e)
+                logger.debug(
+                    "Generic httpx fetch failed for %s: %s", _log_host(url), type(e).__name__
+                )
                 # Keep curl_cffi result (if any)
         if not html:
             if curl_block is not None:
                 # Both paths failed and curl_cffi saw a hard block (403/429):
                 # surface it so the scheduler quarantines the domain (#16).
                 raise curl_block
-            return ProductInfo(error="Impossibile caricare la pagina")
+            return ProductInfo(error="Impossibile caricare la pagina", stock_evidence=False)
 
         # Surface WAF/CAPTCHA challenge bodies (often served with HTTP 200) as a
         # BlockEvent so the scheduler quarantines the domain (#7).
         detect_block_event(status_code=200, body=html, url=url)
 
         soup = BeautifulSoup(html, "lxml")
-        info = ProductInfo()
+        for tag in list(soup.find_all()):
+            if tag.parent is not None and in_carousel_context(tag):
+                tag.decompose()
+        info = ProductInfo(stock_evidence=False)
         image_document = ImageDocument.parse(soup)
         page_url = getattr(html, "final_url", url)
 
+        try:
+            requested = RequestedIdentity.from_url(url)
+        except ValueError:
+            normalized = normalize_url(url)
+            if normalized is None:
+                return ProductInfo(error="Identità del prodotto illeggibile", stock_evidence=False)
+            requested = RequestedIdentity(normalized, urlparse(normalized).hostname or "")
+        final_url = page_url
+        echoes = soup.select('link[rel="canonical"], meta[property="og:url"]')
+        canonical = next((str(t.get("href")) for t in echoes if t.name == "link"), None)
+        if not check_echoes(requested, final_url=final_url, canonical=canonical).ok:
+            return ProductInfo(
+                error="Identità del prodotto non corrispondente", stock_evidence=False
+            )
+        for tag in echoes:
+            echo = str(tag.get("href") or tag.get("content") or "")
+            if requested.resolve(echo, page_url) != requested.url:
+                return ProductInfo(
+                    error="Identità del prodotto non corrispondente", stock_evidence=False
+                )
+
         strategies = [
             ("JSON-LD", lambda s: self._try_json_ld_bound(s, url, page_url, image_document)),
-            ("Microdata", self._try_microdata),
+            ("Microdata", lambda s: self._try_microdata(s, url=url)),
             ("OpenGraph", self._try_opengraph),
             ("RDFa", self._try_rdfa),
             ("Meta tags", self._try_meta_tags),
             ("CSS selectors", self._try_css_selectors),
             ("Data attributes", self._try_data_attributes),
-            ("JS product data", self._try_js_product_data),
+            ("JS product data", lambda s: self._try_js_product_data(s, url=url)),
             ("Regex", self._try_regex),
         ]
 
@@ -251,20 +282,39 @@ class GenericScraper(AbstractScraper):
             try:
                 result = strategy_fn(soup)
                 if result:
+                    if result.get("identity_error"):
+                        return ProductInfo(
+                            error="Identità del prodotto non corrispondente", stock_evidence=False
+                        )
+                    if result.get("currency_ambiguous"):
+                        return ProductInfo(error="currency_ambiguous", stock_evidence=False)
+                    if (
+                        info.price is None
+                        and result.get("available") is False
+                        and result.get("price") is None
+                    ):
+                        return ProductInfo(name=result.get("name"), available=False)
                     if result.get("price") is not None and info.price is None:
+                        currency, ambiguous = price_currency(
+                            result.get("price_text"), result.get("currency")
+                        )
+                        if ambiguous or result.get("currency_ambiguous"):
+                            return ProductInfo(error="currency_ambiguous", stock_evidence=False)
                         info.price = result["price"]
+                        info.currency = currency
                         info.image_url = result.get("image_url")
                         successful_strategy = strategy_name
+                        if isinstance(result.get("available"), bool):
+                            info.available = result["available"]
+                            info.stock_evidence = True
                         logger.debug("Price found via %s: %s", strategy_name, info.price)
                     if result.get("name") and info.name is None:
                         info.name = result["name"]
-                    if result.get("currency") and info.currency is None:
-                        info.currency = result["currency"]
 
                 if info.price is not None and info.name is not None:
                     break
             except (ValueError, KeyError, AttributeError) as e:
-                logger.debug("Strategy %s error: %s", strategy_name, e)
+                logger.debug("Strategy %s error: %s", strategy_name, type(e).__name__)
                 continue
 
         if successful_strategy == "Regex":
@@ -272,7 +322,7 @@ class GenericScraper(AbstractScraper):
             # warning so operators can spot domains that need a tuned scraper.
             logger.warning(
                 "generic.heuristic_fallback: price extracted via regex heuristic for %s",
-                url,
+                _log_host(url),
             )
 
         # Fallback name from <title>
@@ -316,44 +366,64 @@ class GenericScraper(AbstractScraper):
         try:
             requested = RequestedIdentity.from_url(url)
         except ValueError:
-            return self._try_json_ld(soup)
+            normalized = normalize_url(url)
+            if normalized is None:
+                return {"identity_error": True}
+            requested = RequestedIdentity(normalized, urlparse(normalized).hostname or "")
         selected: list[tuple[str, dict]] = []
-        if document.valid and check_echoes(requested, final_url=page_url).ok:
-            for ref, node in document.nodes.items():
-                raw_urls = node.get("url")
-                urls = raw_urls if isinstance(raw_urls, list) else [raw_urls]
-                if not urls or not all(
-                    isinstance(raw, str) and requested.resolve(raw) == requested.url for raw in urls
-                ):
-                    continue
-                node_id = node.get("@id")
-                if node_id is not None and (
-                    not isinstance(node_id, str) or requested.resolve(node_id) != requested.url
-                ):
-                    continue
-                kinds = node.get("@type")
-                if kinds != "Product" and not (
-                    isinstance(kinds, list)
-                    and "Product" in kinds
-                    and all(isinstance(t, str) for t in kinds)
-                ):
-                    continue
-                price = self._extract_price_from_offers(node.get("offers", node.get("Offers", {})))
-                if not price:
-                    for key in ("price", "lowPrice", "highPrice"):
-                        if node.get(key) is not None and (amount := parse_price(str(node[key]))):
-                            price = {"price": amount, "currency": node.get("priceCurrency", "EUR")}
-                            break
-                if price:
-                    selected.append((ref, {"name": node.get("name"), **price}))
+        anonymous: list[tuple[str, dict]] = []
+        foreign_product = False
+        if not document.valid:
+            return {"identity_error": True}
+        for ref, node in document.nodes.items():
+            kinds = node.get("@type")
+            kinds = kinds if isinstance(kinds, list) else [kinds]
+            if not any(
+                isinstance(kind, str) and kind.rsplit("/", 1)[-1] in PRODUCT_TYPES for kind in kinds
+            ):
+                continue
+            identifiers: list[object] = []
+            for key in ("url", "@id"):
+                if key in node:
+                    values = node[key] if isinstance(node[key], list) else [node[key]]
+                    identifiers.extend(values or [None])
+            if identifiers and not all(
+                isinstance(raw, str) and requested.resolve(raw) == requested.url
+                for raw in identifiers
+            ):
+                foreign_product = True
+                continue
+            offers = node.get("offers", node.get("Offers", {}))
+            if not offer_urls_match(
+                offers, lambda value: requested.resolve(value) == requested.url
+            ):
+                return {"identity_error": True}
+            price = self._extract_price_from_offers(offers)
+            if not price:
+                for key in ("price", "lowPrice", "highPrice"):
+                    if node.get(key) is not None and (amount := parse_price(str(node[key]))):
+                        price = {
+                            "price": amount,
+                            "price_text": str(node[key]),
+                            "currency": node.get("priceCurrency"),
+                        }
+                        break
+            if price:
+                target = selected if identifiers else anonymous
+                target.append((ref, {"name": node.get("name"), **price}))
         if not selected:
-            return self._try_json_ld(soup)
+            if foreign_product:
+                return {"identity_error": True}
+            selected = anonymous
+        if not selected:
+            return None
         first = selected[0][1]
         if any(
-            (r.get("price"), r.get("currency")) != (first.get("price"), first.get("currency"))
+            (r.get("price"), r.get("currency"), r.get("available"))
+            != (first.get("price"), first.get("currency"), first.get("available"))
             for _, r in selected[1:]
         ):
-            return self._try_json_ld(soup)
+            return {"identity_error": True}
         first["image_url"] = extract_page_image(
             soup,
             page_url=page_url,
@@ -425,7 +495,7 @@ class GenericScraper(AbstractScraper):
             if result:
                 logger.debug("JSON-LD %s: found data but no price: %s", source, list(result.keys()))
         except (json.JSONDecodeError, ValueError, KeyError, AttributeError) as e:
-            logger.warning("JSON-LD %s parse error: %s: %s", source, type(e).__name__, e)
+            logger.warning("JSON-LD %s parse error: %s", source, type(e).__name__)
         return None
 
     def _extract_from_schema(self, data: object, depth: int = 0) -> dict | None:
@@ -505,16 +575,51 @@ class GenericScraper(AbstractScraper):
         entry (add-on/warranty trap) nor an AggregateOffer ``lowPrice``, and
         normalises the currency to ISO-4217 (no silent EUR default).
         """
-        selected = select_jsonld_offer(offers)
-        if selected is None:
-            return None
-        price, currency = selected
-        return {"price": price, "currency": currency}
+        return offer_evidence(offers)
 
     # ── Strategy 2: Microdata ──────────────────────────────────────
 
-    def _try_microdata(self, soup: BeautifulSoup) -> dict | None:
+    def _try_microdata(self, soup: BeautifulSoup, *, url: str | None = None) -> dict | None:
         result: dict = {}
+        selected_scope: Tag | BeautifulSoup = soup
+
+        def scope_of(tag: Tag) -> Tag | BeautifulSoup:
+            for parent in tag.parents:
+                if isinstance(parent, Tag) and (
+                    parent.has_attr("itemscope") or parent.get("itemtype")
+                ):
+                    return parent
+            return soup
+
+        def local(scope: Tag | BeautifulSoup, name: str) -> Tag | None:
+            return next(
+                (tag for tag in scope.find_all(attrs={"itemprop": name}) if scope_of(tag) is scope),
+                None,
+            )
+
+        def value(tag: Tag | None) -> str | None:
+            if tag is None:
+                return None
+            return str(
+                tag.get("content")
+                or tag.get("href")
+                or tag.get("value")
+                or tag.get_text(strip=True)
+            )
+
+        def owned(scope: Tag | BeautifulSoup) -> bool:
+            if url is None:
+                return True
+            for node in (scope, *scope.parents):
+                if not isinstance(node, Tag):
+                    continue
+                identifiers = [node.get("itemid"), value(local(node, "url"))]
+                if any(
+                    raw is not None and normalize_url(urljoin(url, str(raw))) != normalize_url(url)
+                    for raw in identifiers
+                ):
+                    return False
+            return True
 
         for price_el in soup.find_all(attrs={"itemprop": "price"}):
             price_val = price_el.get("content")
@@ -525,12 +630,31 @@ class GenericScraper(AbstractScraper):
             if price_val:
                 parsed = parse_price(str(price_val))
                 if parsed:
+                    selected_scope = scope_of(price_el)
+                    if not owned(selected_scope):
+                        return {"identity_error": True}
                     result["price"] = parsed
+                    visible = price_el.get_text(strip=True)
+                    result["price_text"] = (
+                        visible if parse_price(visible) == parsed else str(price_val)
+                    )
                     break
 
-        currency_el = soup.find(attrs={"itemprop": "priceCurrency"})
+        currency_el = local(selected_scope, "priceCurrency")
         if currency_el:
-            result["currency"] = currency_el.get("content", "EUR")
+            result["currency"] = value(currency_el)
+
+        result["available"] = jsonld_offer_availability(
+            {"availability": value(local(selected_scope, "availability"))}
+        )
+
+        if not result.get("price"):
+            for availability in soup.find_all(attrs={"itemprop": "availability"}):
+                scope = scope_of(availability)
+                if not owned(scope):
+                    return {"identity_error": True}
+                if jsonld_offer_availability({"availability": value(availability)}) is False:
+                    return {"available": False}
 
         name_el = soup.find(attrs={"itemprop": "name"})
         if name_el:
@@ -552,6 +676,7 @@ class GenericScraper(AbstractScraper):
             parsed = parse_price(og_price.get("content", ""))
             if parsed:
                 result["price"] = parsed
+                result["price_text"] = og_price.get("content", "")
 
         og_currency = soup.find("meta", property="og:price:currency")
         if og_currency:
@@ -580,7 +705,7 @@ class GenericScraper(AbstractScraper):
         parsed = parse_price(str(price_str))
         if parsed is None or parsed <= 0:
             return None
-        result: dict = {"price": parsed}
+        result: dict = {"price": parsed, "price_text": str(price_str)}
         currency_tag = offer.find(attrs={"property": "priceCurrency"})
         currency_val = currency_tag.get("content") if isinstance(currency_tag, Tag) else None
         if currency_val:
@@ -608,6 +733,7 @@ class GenericScraper(AbstractScraper):
                 parsed = parse_price(content)
                 if parsed:
                     result["price"] = parsed
+                    result["price_text"] = content
                     break
 
         for prop in ["product:price:currency", "product:currency"]:
@@ -622,6 +748,7 @@ class GenericScraper(AbstractScraper):
                 parsed = parse_price(el.get("content", ""))
                 if parsed:
                     result["price"] = parsed
+                    result["price_text"] = el.get("content", "")
 
         return result if result.get("price") else None
 
@@ -670,13 +797,19 @@ class GenericScraper(AbstractScraper):
                     if data_val:
                         parsed = parse_price(str(data_val))
                         if parsed:
-                            return {"price": parsed}
+                            visible = el.get_text(strip=True)
+                            return {
+                                "price": parsed,
+                                "price_text": visible
+                                if parse_price(visible) == parsed
+                                else str(data_val),
+                            }
 
                 text = el.get_text(strip=True)
                 if text:
                     parsed = parse_price(text)
                     if parsed:
-                        return {"price": parsed}
+                        return {"price": parsed, "price_text": text}
         return None
 
     # ── Strategy 7: Data attributes ────────────────────────────────
@@ -702,72 +835,66 @@ class GenericScraper(AbstractScraper):
                 val = el.get(attr, "")
                 parsed = parse_price(str(val))
                 if parsed:
-                    return {"price": parsed}
+                    visible = el.get_text(strip=True)
+                    return {
+                        "price": parsed,
+                        "price_text": visible if parse_price(visible) == parsed else str(val),
+                    }
 
         return None
 
     # ── Strategy 8: JS embedded product data ───────────────────────
 
-    def _try_js_product_data(self, soup: BeautifulSoup) -> dict | None:
-        texts: list[str] = []
+    def _try_js_product_data(self, soup: BeautifulSoup, *, url: str | None = None) -> dict | None:
+        # A bare price key or a named object inside analytics/recommendations is
+        # not page ownership. Only an explicit product assignment is a page source.
+        assignment = re.compile(
+            r"(?:\b(?:var|let|const)\s+|\bwindow\.)product(?:Data)?\s*=\s*(?=\{)"
+        )
         for script in soup.find_all("script"):
-            raw = script.string
-            if raw and len(raw) <= 200000:
-                texts.append(raw)
-
-        # Pass 1 — context-aware: accept a price only when co-located with
-        # product identity keys, so analytics/related-item objects appearing
-        # earlier in the page cannot leak their price (#53).
-        for text in texts:
-            result = self._js_identified_object_price(text)
-            if result:
-                return result
-
-        # Pass 2 — Shopify-style variants objects (legacy heuristic).
-        for text in texts:
-            if "variants" in text and "price" in text:
-                for json_match in re.finditer(r'\{[^{}]*"price"\s*:\s*"?\d+\.?\d*"?[^{}]*\}', text):
-                    try:
-                        obj = json.loads(json_match.group())
-                        price = obj.get("price")
-                        if price:
-                            parsed = parse_price(str(price))
-                            if parsed:
-                                return {
-                                    "price": parsed,
-                                    "name": obj.get("name") or obj.get("title"),
-                                }
-                    except (json.JSONDecodeError, AttributeError):
-                        pass
-
-        # Pass 3 — bare key:value regex, last resort when no identified object.
-        for text in texts:
-            for pattern in _JS_BARE_PRICE_PATTERNS:
-                for match in re.findall(pattern, text):
-                    parsed = parse_price(match)
-                    if parsed and Decimal("0.50") < parsed < Decimal("100000"):
-                        return {"price": parsed}
-
+            if script.get("type") == "application/ld+json":
+                continue
+            raw = script.string or ""
+            if len(raw) > 200000:
+                continue
+            for match in assignment.finditer(raw):
+                try:
+                    data, _ = json.JSONDecoder().raw_decode(raw[match.end() :])
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(data, dict):
+                    if url and any(
+                        not isinstance(data[key], str)
+                        or normalize_url(urljoin(url, data[key])) != normalize_url(url)
+                        for key in ("url", "@id")
+                        if key in data
+                    ):
+                        return {"identity_error": True}
+                    result = self._js_identified_object_price(json.dumps(data))
+                    if result:
+                        return result
         return None
 
     def _js_identified_object_price(self, text: str) -> dict | None:
         """Price from a flat JSON object carrying product identity keys (#53)."""
-        for json_match in _JS_PRICE_OBJECT_RE.finditer(text):
-            try:
-                obj = json.loads(json_match.group())
-            except json.JSONDecodeError:
+        try:
+            obj = json.loads(text)
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(obj, dict) or not any(obj.get(key) for key in _JS_IDENTITY_KEYS):
+            return None
+        for key in _JS_PRICE_KEYS:
+            value = obj.get(key)
+            if value is None:
                 continue
-            if not isinstance(obj, dict):
-                continue
-            if not any(obj.get(key) for key in _JS_IDENTITY_KEYS):
-                continue
-            for key in _JS_PRICE_KEYS:
-                value = obj.get(key)
-                if value is None:
-                    continue
-                parsed = parse_price(str(value))
-                if parsed and Decimal("0.50") < parsed < Decimal("100000"):
-                    return {"price": parsed, "name": obj.get("name") or obj.get("title")}
+            parsed = parse_price(str(value))
+            if parsed and Decimal("0.50") < parsed < Decimal("100000"):
+                return {
+                    "price": parsed,
+                    "price_text": str(value),
+                    "currency": obj.get("currency"),
+                    "name": obj.get("name") or obj.get("title"),
+                }
         return None
 
     # ── Strategy 9: Regex fallback ─────────────────────────────────

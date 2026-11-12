@@ -224,18 +224,18 @@ def test_operational_notice_title_is_translated_at_render_time() -> None:
 
     set_locale("en")
     english_text = format_operational_notice(group)
-    assert "Listings removed on example.com" in english_text
+    assert "Product pages unavailable on example.com" in english_text
 
     set_locale("it_IT")
     italian_text = format_operational_notice(group)
-    assert "Prodotti rimossi da example.com" in italian_text
-    assert "Listings removed" not in italian_text
+    assert "Pagine dei prodotti non disponibili su example.com" in italian_text
+    assert "Product pages unavailable" not in italian_text
 
     # Re-render in English on the same process, after having rendered Italian:
     # proves resolution tracks the ContextVar per call, not a cached bind.
     set_locale("en")
     english_again = format_operational_notice(group)
-    assert "Listings removed on example.com" in english_again
+    assert "Product pages unavailable on example.com" in english_again
     get_translation.cache_clear()
 
 
@@ -280,8 +280,8 @@ def test_operational_warning_headline_is_translated_at_render_time() -> None:
                 "count": 3,
                 "reason": "listing_gone",
             },
-            "shop.example — 3 products: tracking suspended",
-            "shop.example — 3 prodotti: tracking sospeso",
+            "shop.example — 3 products: tracking suspended (product page unavailable)",
+            "shop.example — 3 prodotti: monitoraggio sospeso (pagina del prodotto non disponibile)",
             id="suspended",
         ),
         pytest.param(
@@ -294,7 +294,7 @@ def test_operational_warning_headline_is_translated_at_render_time() -> None:
                 "max_errors": 10,
             },
             "shop.example — 2 products: checks failing (5/10)",
-            "shop.example — 2 prodotti: controlli in errore (5/10)",
+            "shop.example — 2 prodotti: controlli non riusciti (5/10)",
             id="warning",
         ),
         pytest.param(

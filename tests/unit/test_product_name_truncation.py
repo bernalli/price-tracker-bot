@@ -25,6 +25,7 @@ from price_tracker.bot.handlers import history, monitoring, product
 from price_tracker.bot.handlers.callbacks import _actions, _menu, _ops, _product
 from price_tracker.bot.handlers.debug import cmd_errori
 from price_tracker.bot.ui.width import display_width, truncate_to_width
+from price_tracker.core.scraper_base import ProductInfo
 from price_tracker.core.textlimits import NAME_BUDGET
 from price_tracker.db.models import ProductErrorRow
 
@@ -219,7 +220,14 @@ async def _drive_ops_reactivate(name: str) -> Surfaces:
 
     surfaces, _update, context, query = _env(name)
     db = context.bot_data["db"]
-    db.list_auto_suspended_products.return_value = [Suspended(_row(name))]
+    suspended = {
+        **_row(name),
+        "is_active": 0,
+        "suspension_kind": "automatic",
+        "suspension_reason": "parse_error",
+    }
+    db.get_product_for_user.return_value = suspended
+    db.list_auto_suspended_products.return_value = [Suspended(suspended)]
     await _ops._handle_reactivate(query, context, db, USER_ID, Action("ops.reactivate", (1,)))
     return surfaces
 
@@ -230,9 +238,7 @@ async def _drive_add_product(name: str) -> Surfaces:
     db.get_product_by_url_for_user.return_value = None
     db.add_product.return_value = PRODUCT_ID
     scraper = AsyncMock()
-    scraper.scrape.return_value = SimpleNamespace(
-        price=Decimal("10.00"), name=name, currency="EUR", error=None, image_url=None
-    )
+    scraper.scrape.return_value = ProductInfo(price=Decimal("10.00"), name=name, currency="EUR")
     context.bot_data["scraper"] = MagicMock()
     context.bot_data["scraper"].resolve.return_value = scraper
     context.bot_data["http_client"] = MagicMock()

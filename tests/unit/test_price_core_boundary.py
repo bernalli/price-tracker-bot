@@ -1,9 +1,8 @@
 """Boundary tests for the price-core port.
 
-The port adds eight modules under ``price_tracker.core`` without wiring them
-into anything: no caller changes, nothing imports them yet. These tests
-guard that boundary so a later change cannot cross it by accident, before
-crossing it is a deliberate, reviewed decision.
+The eight price-core modules remain free of application and I/O dependencies.
+Their callers are explicitly inventoried so new dependencies on this nucleus
+require a deliberate, reviewed decision.
 """
 
 from __future__ import annotations
@@ -89,6 +88,8 @@ def test_price_core_has_documented_callers_only() -> None:
     fallback: a JSON API 404 on a headless storefront falls back to the JSON-LD
     ``ProductGroup``/``hasVariant`` structure via ``identity``, ``pricegrammar``
     and ``structured_data.decode_json_strict`` instead of duplicating them.
+    Money, identity and evidence validation now also have reviewed callers in
+    scheduler, scraper and product-input paths, documented individually below.
     """
     core_dir = SRC_ROOT / "core"
     exempt = {
@@ -114,6 +115,16 @@ def test_price_core_has_documented_callers_only() -> None:
         SRC_ROOT / "core" / "scraper_base.py",
         # Image provenance shares strict JSON decoding and requested identity.
         SRC_ROOT / "core" / "page_image.py",
+        # Reject invalid amounts and incompatible units before updating prices.
+        SRC_ROOT / "core" / "scheduler_products.py",
+        # Bind structured product evidence to the requested product identity.
+        SRC_ROOT / "scrapers" / "secondary_evidence.py",
+        # Parse and validate price, currency and offer evidence together.
+        SRC_ROOT / "scrapers" / "evidence.py",
+        # Validate scraped amount and currency before product creation.
+        SRC_ROOT / "bot" / "handlers" / "product.py",
+        # Bound the scraped amount before saving an imported product.
+        SRC_ROOT / "bot" / "handlers" / "product_io.py",
     }
     module_names = (
         "money|pricegrammar|anchoring|identity|structured_data"

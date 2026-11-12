@@ -22,6 +22,7 @@
 ~ products id=1 is_active: 1 -> 0
 ~ products id=1 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
 ~ products id=1 suspension_kind: NULL -> "manual"
+~ products id=1 notice_version: 0 -> 1
 ## step 3: command "/pause abc" user=10
 -> sendMessage chat=10
    text:
@@ -44,3 +45,4 @@
 ~ products id=3 is_active: 1 -> 0
 ~ products id=3 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
 ~ products id=3 suspension_kind: NULL -> "manual"
+~ products id=3 notice_version: 0 -> 1

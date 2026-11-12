@@ -8,7 +8,7 @@
    | 🔍 Analizzo il prodotto...
 -> editMessageText chat=10 message_id=1000
    text:
-   | 🛡 Questo sito blocca le richieste automatiche (protezione anti-bot), quindi non riesco a leggere il prezzo.
-   | Di solito il blocco è permanente: per ora questo prodotto non si può monitorare.
+   | 🛡 Il sito ha bloccato questo controllo automatico: non sono riuscito a leggere il prezzo.
+   | Riprova più tardi.
 ## db after step 1
 ~ users user_id=10 display_name: NULL -> "U10"

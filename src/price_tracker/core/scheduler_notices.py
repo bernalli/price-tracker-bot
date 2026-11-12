@@ -14,6 +14,7 @@ from price_tracker.bot.messages import reset_locale, set_locale, user_locale
 from price_tracker.core.alert import (
     _why,
     format_quarantine_notification,
+    format_stock_notice,
     format_warning_notice,
     operational_buttons,
 )
@@ -33,6 +34,8 @@ logger = logging.getLogger("price_tracker.core.scheduler")
 # breaker closes after a good probe, the next blocks lock it again). The user
 # hears about it once a day; /errors shows the quarantine all along.
 QUARANTINE_NOTICE_INTERVAL = timedelta(hours=24)
+WARNING_NOTICE_INTERVAL = timedelta(hours=24)
+STATUS_RETRY_INTERVAL = timedelta(minutes=15)
 _QUARANTINE_NOTICE_KEY_PREFIX = "quarantine_notice:"
 
 
@@ -62,6 +65,7 @@ class NoticeDeliveryMixin:
     """Operational notices and notifier delivery responsibility."""
 
     deps: SchedulerDeps
+    _notice_lock: asyncio.Lock
 
     async def _notify_quarantine_entry(
         self, product: ProductRecord, domain: str, *, reason: str
@@ -170,7 +174,9 @@ class NoticeDeliveryMixin:
             if 1 <= half < max_errors and updated.consecutive_errors == half:
                 collector.add(self._event("warning", updated, reason=reason, detail=detail))
             return False
-        if not await self.deps.repo.suspend_product(product.id, reason=reason):
+        if reason == "listing_gone" and updated.gone_streak < self.deps.listing_gone_confirmations:
+            reason = "listing_unconfirmed"
+        if not await self.deps.repo.suspend_product(product.id, reason=reason, queue_notice=True):
             # Another check suspended it first, or the user paused it: that
             # check (or the user) owns the outcome, this one stays silent.
             return False
@@ -184,6 +190,7 @@ class NoticeDeliveryMixin:
             domain,
             reason,
         )
+        updated = await self.deps.repo.get_product(product.id) or updated
         collector.add(self._event("suspended", updated, reason=reason, detail=detail))
         return True
 
@@ -211,6 +218,7 @@ class NoticeDeliveryMixin:
             last_price=record.current_price,
             currency=record.currency,
             last_checked_at=record.last_checked_at,
+            notice_version=record.notice_version if event != "warning" else 0,
         )
 
     def _operational_payload(
@@ -222,16 +230,25 @@ class NoticeDeliveryMixin:
                 "id": event.product_id,
                 "name": truncate_visible(event.product_name or event.url, NAME_BUDGET),
                 "why": truncate_visible(_why(event.reason, event.detail), WHY_BUDGET),
+                "reason": event.reason,
+                "error_count": event.error_count,
+                "max_errors": event.max_errors,
+                "notice_version": event.notice_version,
             }
             for event in group.events
         ]
         first = group.events[0]
+        durable = all(event.notice_version > 0 for event in group.events)
+        identity = ",".join(
+            f"{event.product_id}.{event.notice_version}.{event.reason}" for event in group.events
+        )
         return {
             "kind": "operational",
             "event": group.event,
+            "status_versioned": durable,
             "event_id": (
-                f"ops:{group.event}:{group.user_id}:{group.group_key}:"
-                f"{sweep_started_at.isoformat()}"
+                f"ops:{group.event}:{group.user_id}:{group.group_key}:{group.primary_reason}:"
+                f"{identity if durable else f'{identity}:{sweep_started_at.isoformat()}'}"
             ),
             "user_id": group.user_id,
             "domain": group.group_key,
@@ -255,19 +272,127 @@ class NoticeDeliveryMixin:
 
     async def _flush_notices(self, collector: NoticeCollector) -> None:
         """Render and send every group, isolating failures per group."""
+        async with self._notice_lock:
+            await self._flush_notices_unlocked(collector)
+
+    async def _claim_notice_group(
+        self, group: NoticeGroup, *, attempted_at: str
+    ) -> NoticeGroup | None:
+        """Filter stale members immediately before rendering the delivery attempt.
+
+        The version CAS orders durable attempts against product transitions.
+        Warnings carry no version, so refresh their current owner, state and cause.
+        A transition after this claim cannot revoke an in-flight external send;
+        the acknowledgement still applies only to the claimed version.
+        """
+        events = []
+        for event in group.events:
+            if event.event == "warning":
+                if not await self.deps.repo.is_user_allowed(event.user_id):
+                    continue
+                record = await self.deps.repo.get_product_for_user(event.product_id, event.user_id)
+                if (
+                    record is None
+                    or not record.is_active
+                    or record.consecutive_errors <= 0
+                    or record.last_check_outcome != event.reason
+                ):
+                    continue
+                event = self._event(
+                    "warning", record, reason=event.reason or "unknown", detail=record.last_error
+                )
+            elif event.notice_version and not await self.deps.repo.mark_status_notice_attempt(
+                event.product_id, event.notice_version, attempted_at=attempted_at
+            ):
+                continue
+            events.append(event)
+        if not events:
+            return None
+        return NoticeGroup(group.event, group.user_id, group.group_key, tuple(events))
+
+    async def _flush_notices_unlocked(self, collector: NoticeCollector) -> None:
+        """Merge ephemeral warnings with durable, due status transitions.
+
+        The product UPDATE that changes status also queues its notice. Therefore
+        a crash before this flush, or a rejected Telegram send, cannot silently
+        lose a suspension. Newer stock transitions supersede obsolete notices.
+        """
         sweep_started_at = datetime.now(UTC)
+        pending = NoticeCollector()
         for group in collector.groups():
+            for event in group.events:
+                if event.event == "warning":
+                    key = (
+                        f"warning_notice:{event.user_id}:{event.group_key}:"
+                        f"{event.reason or 'unknown'}"
+                    )
+                    last = _stored_notice_time(
+                        await self.deps.repo.get_config(key), now=sweep_started_at
+                    )
+                    if last is not None and sweep_started_at - last < WARNING_NOTICE_INTERVAL:
+                        continue
+                if event.event == "warning" or event.notice_version == 0:
+                    pending.add(event)
+        for record in await self.deps.repo.list_pending_status_notices():
+            attempted = _stored_notice_time(record.notice_attempted_at, now=sweep_started_at)
+            if attempted is not None and sweep_started_at - attempted < STATUS_RETRY_INTERVAL:
+                continue
+            event_kind = record.pending_notice_kind
+            if event_kind not in {"suspended", "unavailable", "restocked"}:
+                continue
+            pending.add(
+                self._event(
+                    event_kind,
+                    record,
+                    reason=(record.suspension_reason or "unknown")
+                    if event_kind == "suspended"
+                    else event_kind,
+                    detail=record.last_error,
+                )
+            )
+        for group in pending.groups():
             try:
                 async with self._recipient_locale(group.user_id):
-                    text = (
-                        format_operational_notice(group)
-                        if group.event == "suspended"
-                        else format_warning_notice(group)
+                    claimed = await self._claim_notice_group(
+                        group, attempted_at=sweep_started_at.isoformat()
                     )
+                    if claimed is None:
+                        continue
+                    group = claimed
+                    if group.event == "suspended":
+                        text = format_operational_notice(group)
+                    elif group.event == "warning":
+                        text = format_warning_notice(group)
+                    else:
+                        text = format_stock_notice(group.events[0])
                     payload = self._operational_payload(group, sweep_started_at)
+                product_id = None
+                if group.event in {"unavailable", "restocked"}:
+                    item = group.events[0]
+                    product_id = item.product_id
+                    payload.update(
+                        kind="availability",
+                        product_name=item.product_name,
+                        last_price=str(item.last_price) if item.last_price is not None else None,
+                        currency=item.currency,
+                    )
                 delivered = await self._notify(
-                    group.user_id, text, product_id=None, payload=payload
+                    group.user_id, text, product_id=product_id, payload=payload
                 )
+                if delivered:
+                    if group.event == "warning":
+                        for reason in {event.reason or "unknown" for event in group.events}:
+                            warning_key = (
+                                f"warning_notice:{group.user_id}:{group.group_key}:{reason}"
+                            )
+                            await self.deps.repo.set_config(
+                                warning_key, sweep_started_at.isoformat()
+                            )
+                    for event in group.events:
+                        if event.notice_version:
+                            await self.deps.repo.acknowledge_status_notice(
+                                event.product_id, event.notice_version
+                            )
                 if not delivered:
                     logger.warning(
                         "Operational notice was not delivered (user_id=%d, group_key=%s, "

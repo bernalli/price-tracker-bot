@@ -11,7 +11,6 @@ import json
 import logging
 import random
 import re
-from contextlib import suppress
 from decimal import Decimal
 from typing import ClassVar
 from urllib.parse import urlparse
@@ -35,13 +34,12 @@ from price_tracker.core.scraper_base import (
     AbstractScraper,
     ProductInfo,
     detect_block_event,
-    detect_currency,
     detect_listing_gone,
     get_headers,
     parse_price,
     retry_after_header,
-    select_jsonld_offer,
 )
+from price_tracker.scrapers.evidence import offer_evidence, offer_urls_match, price_currency
 
 logger = logging.getLogger(__name__)
 
@@ -325,10 +323,32 @@ class AmazonScraper(AbstractScraper):
 
         html = await _fetch_amazon_page(url, client, extra_headers=extra_headers)
         if not html:
-            return ProductInfo(error="Impossibile caricare la pagina Amazon")
+            return ProductInfo(error="Impossibile caricare la pagina Amazon", stock_evidence=False)
 
         soup = BeautifulSoup(html, "lxml")
-        info = ProductInfo()
+        info = ProductInfo(stock_evidence=False)
+
+        requested_asin = _extract_asin(url)
+        if requested_asin:
+            final_url = getattr(html, "final_url", url)
+            final_asin = _extract_asin(final_url)
+            page_urls = [
+                str(t.get("href") or t.get("content") or "")
+                for t in soup.select('link[rel="canonical"], meta[property="og:url"]')
+            ]
+            if final_asin != requested_asin or any(
+                _extract_asin(value) != requested_asin for value in page_urls
+            ):
+                return ProductInfo(error="Identità Amazon non corrispondente", stock_evidence=False)
+            echoes: list[str] = []
+            echoes.extend(
+                str(t.get("value") or "").strip().upper()
+                for t in soup.select('input#ASIN, input[name="ASIN"]')
+            )
+            if (final_asin is not None and final_asin != requested_asin) or any(
+                value and value != requested_asin for value in echoes
+            ):
+                return ProductInfo(error="Identità Amazon non corrispondente", stock_evidence=False)
 
         # Check for captcha page — raise so the scheduler quarantines the domain
         # instead of recording a generic "price not found" error.
@@ -338,11 +358,12 @@ class AmazonScraper(AbstractScraper):
         # A removed ASIN can come back as Amazon's "dogs" not-found page with a
         # 2xx status: that is a gone listing, not a page we failed to read.
         if _is_not_found_page(soup):
-            raise ListingGone(status=404, url=url)
+            raise ListingGone(status=404, url=url, http_status_observed=False)
 
         # Sold-out / "currently unavailable" listing, in any supported locale.
         if _is_unavailable(soup):
             info.available = False
+            info.stock_evidence = True
 
         # Extract price — CSS selectors first (buybox = real price for Amazon).
         # Prices are accepted only if they belong to this product's ASIN, so a
@@ -351,9 +372,18 @@ class AmazonScraper(AbstractScraper):
         document = ImageDocument.parse(soup)
         css_sources: list[Tag] = []
         json_sources: list[str] = []
+        json_currencies: list[str | None] = []
+        json_currency_errors: list[bool] = []
+        json_availability: list[bool | None] = []
         css_price = self._extract_price(soup, target_asin=target_asin, image_sources=css_sources)
         ld_price = self._try_json_ld_price(
-            soup, image_document=document, image_sources=json_sources
+            soup,
+            image_document=document,
+            image_sources=json_sources,
+            target_asin=target_asin,
+            currencies=json_currencies,
+            currency_errors=json_currency_errors,
+            availability=json_availability,
         )
         json_selected = css_price is None
 
@@ -379,8 +409,6 @@ class AmazonScraper(AbstractScraper):
 
         # Extract name
         info.name = self._extract_name(soup)
-
-        info.currency = detect_currency(str(info.price or ""))
 
         # Log coupon presence for debugging
         coupon = self._detect_coupon(soup)
@@ -410,6 +438,27 @@ class AmazonScraper(AbstractScraper):
                 info.seller = None
                 json_selected = False
                 css_sources = new_sources
+
+        ambiguous = False
+        if json_selected:
+            info.currency = json_currencies[0] if json_currencies else None
+            ambiguous = bool(json_currency_errors and json_currency_errors[0])
+            if json_availability and isinstance(json_availability[0], bool):
+                if not info.stock_evidence or json_availability[0] is False:
+                    info.available = json_availability[0]
+                info.stock_evidence = True
+        elif css_sources:
+            source = css_sources[0]
+            price_text = source.get_text(" ", strip=True)
+            if "a-price-whole" in (source.get("class") or []):
+                symbol = source.parent.find(class_="a-price-symbol") if source.parent else None
+                price_text = f"{symbol.get_text(strip=True) if symbol else ''}{info.price}"
+            declared = json_currencies[0] if ld_price == info.price and json_currencies else None
+            info.currency, ambiguous = price_currency(price_text, declared)
+        if ambiguous:
+            info.price = None
+            info.error = "currency_ambiguous"
+            return info
 
         if info.price is None:
             # No buy box at all, only "see all buying choices" from other sellers:
@@ -850,31 +899,79 @@ class AmazonScraper(AbstractScraper):
         *,
         image_document: ImageDocument | None = None,
         image_sources: list[str] | None = None,
+        target_asin: str | None = None,
+        currencies: list[str | None] | None = None,
+        currency_errors: list[bool] | None = None,
+        availability: list[bool | None] | None = None,
     ) -> Decimal | None:
-        scripts = soup.find_all("script", type="application/ld+json")
-        for script in scripts:
-            if not script.string:
+        document = image_document or ImageDocument.parse(soup)
+        choices = []
+        if not document.valid:
+            return None
+        for ref, data in document.nodes.items():
+            kinds = data.get("@type")
+            kinds = kinds if isinstance(kinds, list) else [kinds]
+            if "Product" not in kinds:
                 continue
-            try:
-                ref = None
-                if image_document is not None and image_document.valid:
-                    with suppress(ValueError):
-                        ref = f"jsonld:{image_document.payloads.index(script.string)}"
-                bound = (
-                    image_document.nodes.get(ref) if image_document is not None and ref else None
-                )
-                # The price keeps its historical parse; the strict document only
-                # supplies the provenance reference used for the image.
-                data = json.loads(script.string)
-                if isinstance(data, dict) and data.get("@type") == "Product":
-                    # Shared offer selection: skips financing entries and
-                    # AggregateOffer.lowPrice, returns the representative
-                    # concrete price — never offers[0] blindly (#54).
-                    selected = select_jsonld_offer(data.get("offers", {}))
-                    if selected is not None:
-                        if image_sources is not None and bound is not None and ref is not None:
-                            image_sources.append(ref)
-                        return selected[0]
-            except (json.JSONDecodeError, TypeError, AttributeError):
+            if target_asin and not self._jsonld_owned_by(data, target_asin):
                 continue
-        return None
+            # Keep the established JSON numeric representation for pricing;
+            # strict document parsing remains the admission/provenance boundary.
+            parts = ref.split("/")
+            raw = json.loads(document.payloads[int(parts[0].split(":")[1])])
+            for part in parts[1:]:
+                key = part.replace("~1", "/").replace("~0", "~")
+                raw = raw[int(key)] if isinstance(raw, list) else raw[key]
+            if target_asin and not offer_urls_match(
+                raw.get("offers", {}),
+                lambda value: value.startswith("#") or _extract_asin(value) == target_asin,
+            ):
+                return None
+            selected = offer_evidence(raw.get("offers", {}))
+            if selected is not None:
+                choices.append((ref, selected))
+        if not choices:
+            return None
+        selected = choices[0][1]
+        if any(
+            (item["price"], item["currency"], item["available"], item["currency_ambiguous"])
+            != (
+                selected["price"],
+                selected["currency"],
+                selected["available"],
+                selected["currency_ambiguous"],
+            )
+            for _, item in choices[1:]
+        ):
+            return None
+        if currencies is not None:
+            currencies.append(selected["currency"])
+        if currency_errors is not None:
+            currency_errors.append(selected["currency_ambiguous"])
+        if availability is not None:
+            availability.append(selected["available"])
+        if image_sources is not None and image_document is not None:
+            image_sources.extend(ref for ref, _ in choices)
+        return selected["price"]
+
+    @staticmethod
+    def _jsonld_owned_by(data: dict, target_asin: str) -> bool:
+        identifiers: list[str] = []
+        for key in ("url", "@id", "sku", "asin", "productID"):
+            if key not in data:
+                continue
+            values = data[key] if isinstance(data[key], list) else [data[key]]
+            if not values:
+                return False
+            for value in values:
+                if not isinstance(value, str):
+                    return False
+                asin = _extract_asin(value)
+                match = re.fullmatch(r"(?:asin[:\s]+)?([A-Z0-9]{10})", value.strip(), re.IGNORECASE)
+                if asin is None and match:
+                    asin = match.group(1).upper()
+                if asin:
+                    identifiers.append(asin)
+                elif key in {"url", "asin"} or (key == "@id" and not value.startswith("#")):
+                    return False
+        return bool(identifiers) and all(asin == target_asin for asin in identifiers)

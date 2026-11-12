@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any, cast
 
 import httpx
@@ -13,13 +14,13 @@ from price_tracker.core.alert import (
     PriceAlert,
     ThresholdType,
     format_alert,
-    format_back_in_stock,
     should_alert,
 )
 from price_tracker.core.drop_floor import NO_DROP_FLOOR, DropFloor, floor_for_choice
 from price_tracker.core.exceptions import BlockEvent, ListingGone, ParseError
 from price_tracker.core.health import QuarantineState
 from price_tracker.core.image_url import normalize_image_url
+from price_tracker.core.money import MAX_AMOUNT, normalize_currency_code
 from price_tracker.core.notices import NoticeCollector
 from price_tracker.core.outlier import MAX_HELD_READS, ReadVerdict, classify_read, reads_agree
 from price_tracker.core.scheduler_common import (
@@ -34,8 +35,6 @@ from price_tracker.core.scraper_base import handle_block_in_pipeline
 from price_tracker.core.url_utils import extract_etld_plus_one
 
 if TYPE_CHECKING:
-    from decimal import Decimal
-
     from price_tracker.db.models import ProductRecord
 
 logger = logging.getLogger("price_tracker.core.scheduler")
@@ -46,7 +45,6 @@ class ProductChecksMixin:
 
     deps: SchedulerDeps
     _attempted_at: dict[int, datetime]
-    _sold_out_streaks: dict[int, int]
     _product_locks: dict[int, asyncio.Lock]
 
     if TYPE_CHECKING:
@@ -101,12 +99,46 @@ class ProductChecksMixin:
         """Serialize every check of one product within this scheduler."""
         lock = self._product_locks.setdefault(product_id, asyncio.Lock())
         async with lock:
-            return await self._check_product_core_unlocked(
-                product_id,
-                scraper_name=scraper_name,
-                domain=domain,
-                collector=collector,
-            )
+            try:
+                return await self._check_product_core_unlocked(
+                    product_id,
+                    scraper_name=scraper_name,
+                    domain=domain,
+                    collector=collector,
+                )
+            except Exception as exc:  # noqa: BLE001 — the failed observation owns this lock too
+                product = await self.deps.repo.get_product(product_id)
+                if product is None or not product.is_active:
+                    return None
+                self._defer_on_retry_after(domain, exc)
+                reason, detail = _failure_reason(exc)
+                if isinstance(exc, BlockEvent):
+                    reason = "block"
+                    if domain != "unknown":
+                        previous = self.deps.health_mgr.state(domain)
+                        await handle_block_in_pipeline(
+                            exc, health_mgr=self.deps.health_mgr, domain=domain
+                        )
+                        if previous == QuarantineState.CLOSED and self.deps.health_mgr.is_locked(
+                            domain
+                        ):
+                            await self._notify_quarantine_entry(product, domain, reason="block")
+                if self.deps.metrics is not None:
+                    self.deps.metrics.price_check_total.labels(
+                        scraper=scraper_name,
+                        domain=domain,
+                        status="block" if isinstance(exc, BlockEvent) else "error",
+                    ).inc()
+                logger.warning("Check failed for product %d (%s): %s", product.id, reason, exc)
+                disabled = await self._record_failure_and_maybe_disable(
+                    product,
+                    scraper_name=scraper_name,
+                    domain=domain,
+                    reason=reason,
+                    detail=detail,
+                    collector=collector,
+                )
+                return (product.user_id, None, disabled, reason)
 
     async def _check_product_core_unlocked(
         self,
@@ -150,7 +182,7 @@ class ProductChecksMixin:
                 reason="no_scraper",
                 collector=collector,
             )
-            return (p.user_id, None, disabled, None)
+            return (p.user_id, None, disabled, "no_scraper")
 
         metrics = self.deps.metrics
         if metrics is not None:
@@ -161,7 +193,7 @@ class ProductChecksMixin:
         else:
             info = await scraper.scrape(p.url, self.deps.client)
 
-        if info.available is False:
+        if info.stock_evidence and info.available is False:
             # The scraper positively recognised a sold-out listing: whatever price
             # is left on the page (none, or a placeholder) is not a reading, and
             # "no price" here is the state being observed, not a parsing failure.
@@ -169,10 +201,7 @@ class ProductChecksMixin:
             # max_consecutive_errors and the user would never hear about the
             # restock. Only an explicit False counts: a missing price with the
             # default availability is a layout change and stays a failure below.
-            sold_out_streak = self._sold_out_streaks.get(p.id, 0) + 1
-            self._sold_out_streaks[p.id] = sold_out_streak
-            if sold_out_streak >= 2 and p.is_available is not False:
-                await self.deps.repo.set_availability(p.id, available=False)
+            await self.deps.repo.record_availability(p.id, available=False)
             if p.pending_read_count or p.pending_read_streak:
                 await self.deps.repo.clear_pending_read(p.id)
             await self.deps.repo.reset_errors(p.id)
@@ -185,10 +214,17 @@ class ProductChecksMixin:
                 ).inc()
             return (p.user_id, None, False, "out_of_stock")
 
-        if info.available and info.price is not None:
-            self._sold_out_streaks[p.id] = 0
+        if info.price is not None and (
+            type(info.price) is not Decimal
+            or not info.price.is_finite()
+            or not (0 < info.price <= MAX_AMOUNT)
+        ):
+            raise ParseError("Scraper returned an invalid monetary amount")
 
-        if info.price is None:
+        if info.price is None or info.error is not None:
+            failure_reason = (
+                "currency_unknown" if info.error == "currency_ambiguous" else "price_none"
+            )
             if metrics is not None:
                 metrics.price_check_total.labels(
                     scraper=scraper_name, domain=domain, status="error"
@@ -197,13 +233,25 @@ class ProductChecksMixin:
                 p,
                 scraper_name=scraper_name,
                 domain=domain,
-                reason="price_none",
+                reason=failure_reason,
                 detail=info.error,
                 collector=collector,
             )
-            return (p.user_id, None, disabled, None)
+            return (p.user_id, None, disabled, failure_reason)
 
-        if info.currency is not None and p.currency is not None and info.currency != p.currency:
+        scraped_currency = normalize_currency_code(info.currency)
+        stored_currency = normalize_currency_code(p.currency)
+        if scraped_currency is None or stored_currency is None:
+            disabled = await self._record_failure_and_maybe_disable(
+                p,
+                scraper_name=scraper_name,
+                domain=domain,
+                reason="currency_unknown",
+                collector=collector,
+            )
+            return (p.user_id, None, disabled, "currency_unknown")
+
+        if scraped_currency != stored_currency:
             logger.warning(
                 "Product %d: currency mismatch (scraped=%s, stored=%s) — read skipped, "
                 "no persist/alert",
@@ -219,7 +267,8 @@ class ProductChecksMixin:
             if p.pending_read_count or p.pending_read_streak:
                 await self.deps.repo.clear_pending_read(p.id)
             await self.deps.repo.reset_errors(p.id)
-            return (p.user_id, None, False, None)
+            await self.deps.repo.record_check_outcome(p.id, reason="currency_mismatch")
+            return (p.user_id, None, False, "currency_mismatch")
 
         if not self._condition_matches(p, info.condition):
             logger.info(
@@ -250,7 +299,7 @@ class ProductChecksMixin:
                 detail=f"offer is {info.condition!r}, tracking {p.preferred_condition!r}",
                 collector=collector,
             )
-            return (p.user_id, None, disabled, None)
+            return (p.user_id, None, disabled, "condition_mismatch")
 
         history = [h.price for h in await self.deps.repo.get_price_history(p.id, limit=50)]
         verdict = classify_read(info.price, history)
@@ -280,7 +329,7 @@ class ProductChecksMixin:
                 detail=f"{info.price} against a median of recent readings",
                 collector=collector,
             )
-            return (p.user_id, None, disabled, None)
+            return (p.user_id, None, disabled, "implausible_read")
 
         if verdict is ReadVerdict.CONFIRM and not await self._confirm_read(p, info.price):
             if metrics is not None:
@@ -290,7 +339,8 @@ class ProductChecksMixin:
             if domain != "unknown":
                 await handle_success_in_pipeline(health_mgr=self.deps.health_mgr, domain=domain)
             await self.deps.repo.reset_errors(p.id)
-            return (p.user_id, None, False, None)
+            await self.deps.repo.record_check_outcome(p.id, reason="awaiting_confirmation")
+            return (p.user_id, None, False, "awaiting_confirmation")
 
         old_price = p.current_price or p.initial_price
         image_url = normalize_image_url(info.image_url, base_url=p.url)
@@ -308,39 +358,17 @@ class ProductChecksMixin:
                 scraper=scraper_name, domain=domain, status="success"
             ).inc()
 
-        came_back_in_stock = info.available and not p.is_available
-        if info.available != p.is_available:
-            await self.deps.repo.set_availability(p.id, available=info.available)
-        if came_back_in_stock:
-            # Routed with the product id so a restock obeys the same mute, quiet
-            # hours and digest settings as a price drop — it is the same kind of
-            # message to the user, and a mute that leaked restocks would be a
-            # mute in name only.
-            async with self._recipient_locale(p.user_id):
-                text = format_back_in_stock(
-                    product_name=p.name or p.url,
-                    url=p.url,
-                    price=info.price,
-                    currency=p.currency,
-                )
-            await self._notify(
-                p.user_id,
-                text,
-                product_id=p.id,
-                payload={
-                    "kind": "price",
-                    "product_id": p.id,
-                    "product_name": p.name or p.url,
-                    "url": p.url,
-                    "old_price": str(p.current_price) if p.current_price is not None else "",
-                    "new_price": str(info.price),
-                    "currency": p.currency,
-                    "domain": domain,
-                },
-            )
+        reason = None
+        if info.stock_evidence:
+            await self.deps.repo.record_availability(p.id, available=info.available)
+        else:
+            reason = "availability_unknown"
+            await self.deps.repo.record_check_outcome(p.id, reason=reason)
+            if p.is_available is False:
+                return (p.user_id, None, False, reason)
 
         if old_price is None:
-            return (p.user_id, None, False, None)
+            return (p.user_id, None, False, reason)
         threshold_type = cast("ThresholdType", p.threshold_type)
         rule_hit = should_alert(
             old=old_price,
@@ -351,7 +379,7 @@ class ProductChecksMixin:
             floor=NO_DROP_FLOOR,
         )
         if not rule_hit:
-            return (p.user_id, None, False, None)
+            return (p.user_id, None, False, reason)
         floor = await self._drop_floor(p.user_id)
         if not should_alert(
             old=old_price,
@@ -369,7 +397,7 @@ class ProductChecksMixin:
                 floor.percent,
                 floor.absolute,
             )
-            return (p.user_id, None, False, None)
+            return (p.user_id, None, False, reason)
         alert = PriceAlert(
             product_id=p.id,
             product_name=p.name or p.url,
@@ -380,7 +408,7 @@ class ProductChecksMixin:
             threshold_type=threshold_type,
             threshold_value=p.threshold_value,
         )
-        return (p.user_id, alert, False, None)
+        return (p.user_id, alert, False, reason)
 
     async def _drop_floor(self, user_id: int) -> DropFloor:
         """The minimum drop in effect for ``user_id``: their choice, else the default."""
@@ -532,15 +560,28 @@ class ProductChecksMixin:
             for product_id in product_ids:
                 product = await self.deps.repo.get_product_for_user(product_id, user_id)
                 if product is None or not product.is_active:
+                    results.append(
+                        CheckResult(
+                            product_id,
+                            user_id,
+                            reason="not_found" if product is None else "inactive",
+                        )
+                    )
                     continue
                 domain = extract_etld_plus_one(product.url) or "unknown"
                 if domain != "unknown":
                     if self.deps.health_mgr.is_locked(domain):
                         if self.deps.metrics is not None:
                             self.deps.metrics.quarantine_skip_total.labels(domain=domain).inc()
+                        await self.deps.repo.record_check_outcome(product.id, reason="quarantined")
+                        results.append(CheckResult(product.id, user_id, reason="quarantined"))
                         continue
                     if self.deps.health_mgr.is_half_open(domain):
                         if domain in half_open_seen:
+                            await self.deps.repo.record_check_outcome(
+                                product.id, reason="probe_skipped"
+                            )
+                            results.append(CheckResult(product.id, user_id, reason="probe_skipped"))
                             continue
                         half_open_seen.add(domain)
                 scraper = self.deps.registry.resolve(product.url)
@@ -640,7 +681,14 @@ class ProductChecksMixin:
                     )
                 else:
                     if outcome is None:
-                        results.append(CheckResult(product.id, user_id))
+                        current = await self.deps.repo.get_product_for_user(product.id, user_id)
+                        results.append(
+                            CheckResult(
+                                product.id,
+                                user_id,
+                                reason="not_found" if current is None else "inactive",
+                            )
+                        )
                     else:
                         _outcome_user_id, alert, disabled, outcome_reason = outcome
                         results.append(
@@ -662,7 +710,11 @@ class ProductChecksMixin:
         results = await self.check_products_for_user(
             product_ids=[product_id], user_id=user_id, delay_between_products=0
         )
-        return results[0] if results else CheckResult(product_id=product_id, user_id=user_id)
+        return (
+            results[0]
+            if results
+            else CheckResult(product_id=product_id, user_id=user_id, reason="unexpected")
+        )
 
     async def check_user_products_for_user(
         self, *, user_id: int, delay_between_products: float | None = None

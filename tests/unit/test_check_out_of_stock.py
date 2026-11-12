@@ -126,7 +126,7 @@ async def test_missing_price_without_the_sold_out_signal_is_still_a_failure(
     repo, pid = repo_with_product
     layout_broken = ProductInfo(name="Kettle", price=None, error="no price")
     results = await _pull(repo, pid, [layout_broken] * 2, max_errors=2)
-    assert [r.reason for r in results] == [None, None]
+    assert [r.reason for r in results] == ["price_none", "price_none"]
     assert [r.disabled for r in results] == [False, True]
     product = await repo.get_product(pid)
     assert product is not None
@@ -162,9 +162,10 @@ async def test_back_in_stock_after_a_priced_sold_out_read_notifies_once(
         await scheduler.run_check_for_user(user_id=1)
         await scheduler.run_check_for_user(user_id=1)
         await scheduler.run_check_for_user(user_id=1)
-    notifier.assert_awaited_once()
-    assert notifier.await_args is not None
-    assert "stock" in notifier.await_args.args[1].lower()
+    assert [c.kwargs["payload"]["event"] for c in notifier.await_args_list] == [
+        "unavailable",
+        "restocked",
+    ]
 
 
 def _check_env(reason: str | None) -> tuple[Any, Any, Any]:
@@ -214,7 +215,7 @@ async def test_check_command_says_out_of_stock_only_for_that_reason() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("reason", [None, "price_none", "block"])
+@pytest.mark.parametrize("reason", [None])
 async def test_check_command_keeps_the_no_change_line_otherwise(reason: str | None) -> None:
     update, context, placeholder = _check_env(reason)
     await monitoring.cmd_check(update, context)
@@ -235,3 +236,16 @@ async def test_check_button_appends_the_line_only_for_out_of_stock(
     await _product.handle_check_button(query, context, context.bot_data["db"], 7, "check_1")
     text = query.edit_message_text.await_args.args[0]
     assert (OUT_OF_STOCK_LINE in text) is expected
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("reason", ["price_none", "block"])
+async def test_check_command_reports_failed_read_instead_of_no_change(reason: str) -> None:
+    update, context, placeholder = _check_env(reason)
+    await monitoring.cmd_check(update, context)
+    text = placeholder.edit_text.await_args.args[0]
+    assert NO_CHANGE_LINE not in text
+    assert OUT_OF_STOCK_LINE not in text
+    assert "Last recorded price" in text
+    expected = "could not be read" if reason == "price_none" else "blocking"
+    assert expected in text

@@ -12,7 +12,7 @@
 -> editMessageText chat=10 message_id=1001
    param parse_mode="HTML"
    text:
-   | 🔄 <b>Ricontrollati 2 prodotti su example.com</b>
+   | 🔄 <b>Esiti dei controlli per 2 prodotti su example.com</b>
    | <b>80,00 €</b> ✅ https://shop.example…
    | <b>80,00 €</b> ✅ Long NNNNNNNNNNNNNNN…
 ## db after step 3
@@ -23,9 +23,13 @@
 ~ products id=1 last_checked_at: NULL -> <now:9999-99-99 99:99:99>
 ~ products id=1 suspension_kind: "automatic" -> NULL
 ~ products id=1 suspension_reason: "parse_error" -> NULL
+~ products id=1 notice_version: 1 -> 2
+~ products id=1 last_check_outcome: "parse_error" -> NULL
 ~ products id=2 is_active: 0 -> 1
 ~ products id=2 consecutive_errors: 2 -> 0
 ~ products id=2 last_checked_at: NULL -> <now:9999-99-99 99:99:99>
 ~ products id=2 suspension_kind: "automatic" -> NULL
 ~ products id=2 suspension_reason: "parse_error" -> NULL
+~ products id=2 notice_version: 1 -> 2
+~ products id=2 last_check_outcome: "parse_error" -> NULL
 + scraper_health domain="example.com" {state="CLOSED", consecutive_blocks=0, locked_until=NULL, last_block_at=NULL, last_block_reason=NULL, last_success_at="2026-03-01T12:00:00+00:00", updated_at=<now:9999-99-99 99:99:99>}

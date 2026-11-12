@@ -20,16 +20,18 @@ LISTING_GONE_STATUSES: frozenset[int] = frozenset({404, 410})
 
 
 class ListingGone(ScrapeError):
-    """The product page answered 404/410: the listing no longer exists.
+    """A missing product page, identified by HTTP status or store-specific content.
 
     Not a BlockEvent (the site is not refusing us) and not an httpx error
     (scrapers that swallow ``httpx.HTTPError`` must let this one through).
     """
 
-    def __init__(self, *, status: int, url: str = "") -> None:
+    def __init__(self, *, status: int, url: str = "", http_status_observed: bool = True) -> None:
         self.status = status
         self.url = url
-        super().__init__(f"HTTP {status} listing gone on {url}")
+        self.http_status_observed = http_status_observed
+        evidence = f"HTTP {status}" if http_status_observed else "Product page missing"
+        super().__init__(f"{evidence} listing gone on {url}")
 
 
 class BlockEvent(ScrapeError):

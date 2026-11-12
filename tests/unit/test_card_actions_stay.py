@@ -456,7 +456,7 @@ async def test_check_that_could_not_read_says_why(repo: Repository) -> None:
     pid = await add_product(repo, "Kettle")
     scheduler = FakeScheduler(CheckResult(product_id=pid, user_id=USER, reason="parse_error"))
     query, card = await check(repo, pid, scheduler)
-    assert_shows(query, with_notice(card, "❌ Not updated: price not readable"))
+    assert_shows(query, with_notice(card, "⚠️ The price could not be read."))
 
 
 async def test_a_gone_listing_reports_the_status_the_check_saw(repo: Repository) -> None:
@@ -464,7 +464,13 @@ async def test_a_gone_listing_reports_the_status_the_check_saw(repo: Repository)
     await repo.record_failure(pid, reason="listing_gone", detail="HTTP 410")
     scheduler = FakeScheduler(CheckResult(product_id=pid, user_id=USER, reason="listing_gone"))
     query, card = await check(repo, pid, scheduler)
-    assert_shows(query, with_notice(card, "❌ Not updated: page not found (HTTP 410)"))
+    assert_shows(query, card)
+    text, _ = shown(query)
+    assert text.count("⚠️ The product page could not be found. Check the link.") == 1
+    assert "HTTP 404" not in text
+    record = await repo.get_product(pid)
+    assert record is not None
+    assert record.last_error == "listing_gone: HTTP 410"
 
 
 async def test_a_failing_check_does_not_show_the_error_text(

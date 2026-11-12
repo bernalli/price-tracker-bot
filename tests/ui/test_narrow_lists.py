@@ -25,6 +25,7 @@ from price_tracker.bot.messages import reset_locale, set_locale
 from price_tracker.bot.ui.list_text import list_page
 from price_tracker.bot.ui.product_rows import product_row
 from price_tracker.bot.ui.width import display_width
+from price_tracker.core.scheduler import CheckResult
 from price_tracker.core.textlimits import _is_valid_telegram_markup, paginate
 from price_tracker.db.models import DigestEntry
 from price_tracker.notifier.digest import _digest_blocks
@@ -92,7 +93,11 @@ async def test_every_list_has_one_narrow_row_per_product(
         context = MagicMock()
         context.bot_data = {
             "db": db,
-            "scheduler": MagicMock(check_user_products_for_user=AsyncMock(return_value=[])),
+            "scheduler": MagicMock(
+                check_user_products_for_user=AsyncMock(
+                    return_value=[CheckResult(p["id"], 1) for p in products]
+                )
+            ),
         }
         for menu in ("products", "paused", "prices", "history", "notifications", "check_all"):
             query = MagicMock(edit_message_text=AsyncMock())
@@ -261,14 +266,16 @@ async def test_operational_product_lists_are_narrow(tail: str) -> None:
         )
         error_report = await errors_text(db, None, 1)
         assert error_report is not None
-        rows = error_report.split("\n\n", 1)[1].split("\n\n", 1)[0].splitlines()
+        rows = [line for line in error_report.splitlines() if line.startswith("<b>")]
         assert len(rows) == 3
         assert all(display_width(plain(row)) <= 32 for row in rows)
         assert all(_is_valid_telegram_markup(row) for row in rows)
         context = MagicMock()
         context.bot_data = {
             "scheduler": MagicMock(
-                check_products_for_user=AsyncMock(return_value=[MagicMock(reason=None)] * 3)
+                check_products_for_user=AsyncMock(
+                    return_value=[CheckResult(i, 1) for i in range(1, 4)]
+                )
             )
         }
         db.reactivate_product = AsyncMock()

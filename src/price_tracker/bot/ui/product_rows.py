@@ -89,6 +89,10 @@ def record_row(product: Mapping[str, Any], *, html: bool = True) -> str:
         mark = "⚠️"
     elif not product.get("is_available", True):
         mark = "🚫"
+    elif product.get("last_check_outcome") == "awaiting_confirmation":
+        mark = "⏳"
+    elif product.get("last_check_outcome") is not None:
+        mark = "⚠️"
     return product_row(
         str(product.get("name") or _("Unknown")),
         amount(product.get("current_price")),

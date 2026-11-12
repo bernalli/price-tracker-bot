@@ -363,6 +363,7 @@ class ProductInfo:
     condition: str | None = None
     error: str | None = None
     image_url: str | None = None
+    stock_evidence: bool = True
 
 
 class AbstractScraper(ABC):

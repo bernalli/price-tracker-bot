@@ -312,9 +312,13 @@ async def _fetch_primary(
             decode_error, body, truncated = exc, b"", False
         text = _decode(body, response.encoding)
 
-        # Gone is checked before block: the two status sets are disjoint,
-        # so this only decides the one overlapping case — a 404/410 whose body also
-        # carries a WAF/CAPTCHA marker, which is a removed listing, not a block.
+        # A challenge body is stronger evidence than a 404/410 status alone.
+        detect_block_event(
+            status_code=response.status_code,
+            body=text,
+            url=current,
+            retry_after=retry_after_header(response),
+        )
         detect_listing_gone(status_code=response.status_code, url=current)
 
         if response.has_redirect_location and response.next_request is not None:
@@ -401,8 +405,8 @@ async def _fetch_page(
             continue
         text, truncated = _cap_text(result.text, max_bytes)
         try:
-            detect_listing_gone(status_code=result.status, url=result.url_final)
             detect_block_event(status_code=result.status, body=text, url=result.url_final)
+            detect_listing_gone(status_code=result.status, url=result.url_final)
         except (BlockEvent, ListingGone) as exc:
             if deferred is None:
                 deferred = exc
