@@ -169,14 +169,34 @@ def _offer_scope(price_node: Tag, soup: BeautifulSoup) -> Tag | None:
     With several offers on the page it is the row holding the price: a stock
     statement of the used offer says nothing about the new one. A price outside
     every row cannot be tied to one of them. A page with a single offer keeps
-    the price and the stock statement in different columns, so the page is the scope.
+    the price and the stock statement in different columns, so its buy box is
+    the evidence scope. An unknown layout cannot prove stock from page-wide controls.
     """
     for node in price_node.parents:
         if "accordionrow" in str(node.get("id") or "").lower():
             return node
     if soup.select_one(_OFFER_ROW_SELECTOR) is not None:
         return None
-    return soup
+    return soup.select_one("#desktop_buybox, #buyBoxInner, #buybox, #buybox_feature_div")
+
+
+def _offer_evidence_owned(element: Tag, target_asin: str | None) -> bool:
+    """Exclude other-seller widgets even when they carry no product owner."""
+    if not _owned_by(element, target_asin):
+        return False
+    return not any(
+        marker in str(node.get("id") or "").lower()
+        for node in (element, *element.parents)
+        for marker in ("aod-", "olp-", "other-seller")
+    )
+
+
+def _purchase_control_enabled(element: Tag) -> bool:
+    """A disabled control, including one in a disabled fieldset, cannot buy stock."""
+    return not any(
+        node.has_attr("disabled") or str(node.get("aria-disabled") or "").lower() == "true"
+        for node in (element, *element.parents)
+    )
 
 
 def _offer_in_stock(price_node: Tag, soup: BeautifulSoup, target_asin: str | None) -> bool:
@@ -193,13 +213,16 @@ def _offer_in_stock(price_node: Tag, soup: BeautifulSoup, target_asin: str | Non
         el.get_text(" ", strip=True).lower()
         for selector in _AVAILABILITY_SELECTORS
         for el in scope.select(selector)
-        if _owned_by(el, target_asin)
+        if _offer_evidence_owned(el, target_asin)
     ]
     if any(veto in text for text in statements for veto in _NOT_AVAILABLE_VETOES):
         return False
     if any(phrase in text for text in statements for phrase in _AVAILABLE_PHRASES):
         return True
-    return any(_owned_by(el, target_asin) for el in scope.select(_PURCHASE_CONTROLS))
+    return any(
+        _offer_evidence_owned(el, target_asin) and _purchase_control_enabled(el)
+        for el in scope.select(_PURCHASE_CONTROLS)
+    )
 
 
 def _has_no_buybox_offer(soup: BeautifulSoup) -> bool:
