@@ -60,38 +60,33 @@ The 14 panels (in default order):
 
 ## Structured logs
 
-Logging uses [structlog](https://www.structlog.org/) with a JSON renderer to stdout. Configuration is in `src/price_tracker/observability/logging.py`. Some keys are bound via `structlog.contextvars` for async-stack propagation; others are passed as keyword arguments to individual log calls. The boundary depends on the call site.
+Every log record is one JSON line on stdout. Configuration is in `src/price_tracker/observability/logging.py`.
 
-Set the level via `LOG_LEVEL` (default `INFO`). Other valid values: `DEBUG`, `WARNING`, `ERROR`.
+Set the level via `LOG_LEVEL` (default `INFO`). Other valid values: `DEBUG`, `WARNING`, `ERROR`. The level applies to the whole application. The HTTP client and the job runner are always kept at `WARNING`: the first would log request URLs, the second two lines per job run.
 
-Common bound keys you'll see in logs:
+Two kinds of logger write to the stream:
 
-| Key            | Meaning                                                |
-| -------------- | ------------------------------------------------------ |
-| `event`        | Short identifier for the log event (string)            |
-| `domain`       | URL netloc (e.g. `amazon.com`)                         |
-| `scraper`      | Scraper class name (e.g. `AmazonScraper`)              |
-| `product_id`   | DB row id of the tracked product                       |
-| `user_id`      | Telegram user id                                       |
-| `duration_ms`  | Wall-clock duration of the operation                   |
-| `error`        | Exception class + message (when applicable)            |
-| `level`        | Log level (auto-added by `structlog.processors.add_log_level`) |
-| `timestamp`    | ISO 8601 with timezone (auto-added)                    |
+- Standard-library loggers (`logging.getLogger(__name__)`), used by most modules. Their records carry `event` (the formatted message), `level`, `logger` and `timestamp`, plus `exception` when a traceback is attached.
+- structlog loggers (`structlog.get_logger`), used at startup. Their records carry `event`, `level`, `timestamp` and whatever keyword arguments the call passed.
 
-Example log line (pretty-printed; actual output is single-line JSON):
+The Telegram bot token is redacted from every record, tracebacks included.
+
+What to expect at `INFO`:
+
+| Record                                   | When                                                         |
+| ---------------------------------------- | ------------------------------------------------------------ |
+| `bot.starting` (with `version`)          | Once per process start                                       |
+| `metrics_server.start`                   | Once per process start, when metrics are enabled             |
+| `Sweep done in …`                        | After every scheduler sweep that had at least one product due |
+| `Check failed for product N (reason): …` | `WARNING`, once per failed check                             |
+
+The sweep summary is the line to look for when asking "is it checking anything?". It counts outcomes and names paused stores, and never contains a product name or URL:
 
 ```json
-{
-  "event": "scrape_complete",
-  "domain": "amazon.it",
-  "scraper": "AmazonScraper",
-  "product_id": 42,
-  "duration_ms": 312,
-  "status": "success",
-  "level": "info",
-  "timestamp": "2026-05-15T08:42:11.123456+00:00"
-}
+{"event": "Sweep done in 41.2s: 13 checked (ok=12, price_none=1); 10 skipped (quarantined=10: shop-a.example, shop-b.example)", "level": "info", "logger": "price_tracker.core.scheduler", "timestamp": "2026-11-12T16:24:50.123456Z"}
 ```
+
+`checked` counts the products the sweep requested from their store; `skipped` counts the products it left alone because their store is paused (`quarantined`, `probe_skipped`) or asked to wait (`deferred`). The scheduler ticks every five minutes; a tick with nothing due logs nothing.
 
 ## Suggested Prometheus alerting rules
 

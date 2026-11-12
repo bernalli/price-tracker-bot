@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
+from collections import Counter
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
@@ -41,6 +43,17 @@ class _SweepJob:
     domain: str | None
 
 
+def _tally(counts: Counter[str], stores: list[str] | None = None) -> str:
+    """Render ``" (a=1, b=2: store.example)"`` for the sweep summary; empty when nothing counted.
+
+    Only outcome names and store domains: no product name or URL reaches the log.
+    """
+    if not counts:
+        return ""
+    parts = ", ".join(f"{name}={count}" for name, count in sorted(counts.items()))
+    return f" ({parts}: {', '.join(stores)})" if stores else f" ({parts})"
+
+
 class PeriodicRunsMixin:
     """Periodic and single-user push-mode sweep responsibility."""
 
@@ -56,7 +69,7 @@ class PeriodicRunsMixin:
             scraper_name: str = "unknown",
             domain: str = "unknown",
             collector: NoticeCollector,
-        ) -> None: ...
+        ) -> str: ...
 
         async def _notify_quarantine_entry(
             self, product: ProductRecord, domain: str, *, reason: str
@@ -75,7 +88,7 @@ class PeriodicRunsMixin:
 
         async def _flush_guaranteed(self, collector: NoticeCollector) -> None: ...
 
-    async def _scrape_one(self, product: ProductRecord, *, collector: NoticeCollector) -> None:
+    async def _scrape_one(self, product: ProductRecord, *, collector: NoticeCollector) -> str:
         """Scrape a single product and persist results (delegates to _check_product).
 
         Resolves scraper_name + domain at the top so that block/parse/error
@@ -83,16 +96,20 @@ class PeriodicRunsMixin:
         exception is raised within the scrape pipeline. Failures are routed
         through :meth:`_record_failure_and_maybe_disable` so the product is
         auto-paused once the consecutive-error threshold is crossed.
+
+        Returns the outcome for the sweep summary: ``"ok"`` or the reason.
         """
         domain = extract_etld_plus_one(product.url) or "unknown"
         scraper = self.deps.registry.resolve(product.url)
         scraper_name = scraper.name if scraper is not None else "unknown"
         metrics = self.deps.metrics
+        reason = "unexpected"
         try:
-            await self._check_product(
+            return await self._check_product(
                 product.id, scraper_name=scraper_name, domain=domain, collector=collector
             )
         except BlockEvent as e:
+            reason = "block"
             logger.warning("Block detected for product %d: %s", product.id, e)
             self._defer_on_retry_after(domain, e)
             if metrics is not None:
@@ -130,6 +147,7 @@ class PeriodicRunsMixin:
                 collector=collector,
             )
         except ParseError as e:
+            reason = "parse_error"
             logger.warning("Parse error for product %d: %s", product.id, e)
             if metrics is not None:
                 metrics.price_check_total.labels(
@@ -181,6 +199,7 @@ class PeriodicRunsMixin:
                 logger.exception(
                     "Failed to record failure for product %d after unexpected error", product.id
                 )
+        return reason
 
     def _defer_on_retry_after(self, domain: str, exc: BaseException) -> None:
         """Defer ``domain`` when the failed check's 429/503 carried ``Retry-After``."""
@@ -257,6 +276,10 @@ class PeriodicRunsMixin:
                 await self._flush_guaranteed(unflushed.pop(key))
 
         dropped: list[_SweepJob] = []
+        started = time.monotonic()
+        checked: Counter[str] = Counter()
+        skipped: Counter[str] = Counter()
+        paused_stores: set[str] = set()
 
         async def record_skip(job: _SweepJob) -> None:
             reason = (
@@ -266,6 +289,9 @@ class PeriodicRunsMixin:
                 if job.domain and self.deps.health_mgr.is_half_open(job.domain)
                 else "deferred"
             )
+            skipped[reason] += 1
+            if job.domain and reason != "deferred":
+                paused_stores.add(job.domain)
             await self.deps.repo.record_check_outcome(job.product.id, reason=reason)
 
         def admit(job: _SweepJob, domain: str) -> bool:
@@ -277,13 +303,14 @@ class PeriodicRunsMixin:
             return not (self.deps.health_mgr.is_half_open(domain) and domain in half_open_seen)
 
         async def run(job: _SweepJob) -> None:
-            for skipped in dropped:
-                await record_skip(skipped)
-                await settle(skipped)
+            for waiting in dropped:
+                await record_skip(waiting)
+                await settle(waiting)
             dropped.clear()
             if job.domain is not None and self.deps.health_mgr.is_half_open(job.domain):
                 half_open_seen.add(job.domain)
-            await self._scrape_one(job.product, collector=job.collector)
+            outcome = await self._scrape_one(job.product, collector=job.collector)
+            checked[outcome if isinstance(outcome, str) else "ok"] += 1
             await settle(job)
             await asyncio.sleep(self.deps.delay_between_products)
 
@@ -309,8 +336,17 @@ class PeriodicRunsMixin:
                 drop=drop,
             )
         finally:
-            for skipped in dropped:
-                await record_skip(skipped)
+            for job in dropped:
+                await record_skip(job)
+            if jobs:
+                logger.info(
+                    "Sweep done in %.1fs: %d checked%s; %d skipped%s",
+                    time.monotonic() - started,
+                    sum(checked.values()),
+                    _tally(checked),
+                    sum(skipped.values()),
+                    _tally(skipped, sorted(paused_stores)),
+                )
             if flush:
                 cancelled = False
                 for collector in list(unflushed.values()):

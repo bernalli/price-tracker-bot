@@ -493,21 +493,23 @@ class ProductChecksMixin:
         scraper_name: str = "unknown",
         domain: str = "unknown",
         collector: NoticeCollector,
-    ) -> None:
+    ) -> str:
         """Push-mode check used by the periodic job: scrape and dispatch via notifier.
 
         Operational notices are accumulated by
         :meth:`_record_failure_and_maybe_disable`; this wrapper only handles
-        the price-drop alert path.
+        the price-drop alert path. Returns the outcome for the sweep summary:
+        ``"ok"``, the reason of an unaccepted check, or ``"inactive"``.
         """
         outcome = await self._check_product_core(
             product_id, scraper_name=scraper_name, domain=domain, collector=collector
         )
         if outcome is None:
-            return
-        user_id, alert, _disabled, _reason = outcome
+            return "inactive"
+        user_id, alert, _disabled, reason = outcome
+        label = reason or "ok"
         if alert is None:
-            return
+            return label
         # Anti-flap dedup: an oscillating price re-crosses the threshold on every
         # downswing. Suppress the repeat push so the user is notified once per
         # drop episode (re-notifying only on a new low or after the cooldown).
@@ -515,7 +517,7 @@ class ProductChecksMixin:
         if product is not None and self._is_duplicate_alert(product, new_price=alert.new_price):
             if self.deps.metrics is not None:
                 self.deps.metrics.notification_skipped_total.labels(reason="cooldown").inc()
-            return
+            return label
         async with self._recipient_locale(user_id):
             text = format_alert(alert)
         if await self._notify(
@@ -525,6 +527,7 @@ class ProductChecksMixin:
             payload=_alert_payload(alert, domain=domain),
         ):
             await self.deps.repo.record_alert_sent(alert.product_id, alert.new_price)
+        return label
 
     def _is_duplicate_alert(
         self, product: ProductRecord, *, new_price: Decimal, now: datetime | None = None

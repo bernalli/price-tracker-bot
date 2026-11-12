@@ -12,6 +12,7 @@ import structlog
 from PIL import features
 from telegram.ext import Application, ContextTypes
 
+from price_tracker import __version__
 from price_tracker.bot.command_menus import sync_command_menus
 from price_tracker.bot.handlers import register_handlers
 from price_tracker.bot.list_grid import GridRegistry
@@ -232,7 +233,7 @@ async def bootstrap_database(database_path: str) -> aiosqlite.Connection:
 async def amain() -> None:
     config = Config.from_env()
     configure_logging(level=config.log_level)
-    log.info("bot.starting", log_level=config.log_level)
+    log.info("bot.starting", version=__version__, log_level=config.log_level)
 
     db_conn = await bootstrap_database(config.database_path)
 
