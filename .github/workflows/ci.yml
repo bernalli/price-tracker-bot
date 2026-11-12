@@ -58,6 +58,10 @@ jobs:
       - name: pytest with coverage
         run: pytest --cov=src/price_tracker --cov-report=xml --cov-report=term-missing --cov-fail-under=90
 
+      - name: Install ripgrep for the English-only audit
+        # The audit fails when its search cannot run; the runner image has no rg.
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ripgrep
+
       - name: English-only audit
         run: bash scripts/audit_english.sh
 
