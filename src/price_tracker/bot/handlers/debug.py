@@ -29,10 +29,12 @@ from price_tracker.bot.decorators import (
 from price_tracker.bot.handlers._check_status import check_reason
 from price_tracker.bot.handlers._helpers import _escape_html
 from price_tracker.bot.messages import _
+from price_tracker.bot.ui.check_status import STORE_REFUSAL_OUTCOMES
 from price_tracker.bot.ui.product_rows import product_row
 from price_tracker.bot.ui.width import truncate_to_width
 from price_tracker.core.http_client import build_client, public_request
 from price_tracker.core.textlimits import split_message
+from price_tracker.core.url_utils import extract_etld_plus_one
 
 if TYPE_CHECKING:
     from telegram import Update
@@ -501,11 +503,17 @@ async def errors_text(db: Any, health_mgr: Any, user_id: int) -> str | None:
 
     lines: list[str] = [_("⚠️ <b>Recent errors ({n})</b>").format(n=len(errored)), ""]
     for row in errored:
-        lines.append(product_row(row.name or _("Unknown"), None, mark=f"⚠️{row.consecutive_errors}"))
+        # A store refusal has no counter: "⚠️0" would read as "no error".
+        mark = f"⚠️{row.consecutive_errors}" if row.consecutive_errors > 0 else "🔒"
+        lines.append(product_row(row.name or _("Unknown"), None, mark=mark))
         reason = (row.last_error or "").split(":", 1)[0]
+        if row.last_check_outcome in STORE_REFUSAL_OUTCOMES:
+            reason = row.last_check_outcome
         lines.append(_("#{id}: {reason}").format(id=row.id, reason=check_reason(reason)))
-        if health_mgr is not None and row.domain:
-            state = health_mgr.state(row.domain)
+        # The stored column predates the store key the health manager uses.
+        domain = extract_etld_plus_one(row.url) or row.domain
+        if health_mgr is not None and domain:
+            state = health_mgr.state(domain)
             if state in (
                 QuarantineState.LOCKED_T1,
                 QuarantineState.LOCKED_T2,

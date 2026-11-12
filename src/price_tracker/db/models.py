@@ -107,6 +107,7 @@ class ProductErrorRow:
     consecutive_errors: int
     last_error: str | None
     last_error_at: str | None
+    last_check_outcome: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

@@ -4,6 +4,11 @@ from __future__ import annotations
 
 from price_tracker.bot.messages import N_, _
 
+# Outcomes of a check the store refused or the bot skipped because the store is
+# paused. They are not failures of the product and carry no error counter, but
+# the product is not being read: lists and reports show them with the errors.
+STORE_REFUSAL_OUTCOMES = frozenset({"block", "quarantined", "probe_skipped"})
+
 _REASONS = {
     "block": N_("The site is blocking automated checks."),
     "quarantined": N_("Check postponed while the site is temporarily restricted."),

@@ -138,7 +138,10 @@ class NoticeDeliveryMixin:
     ) -> bool:
         """Increment ``consecutive_errors`` and auto-disable on threshold.
 
-        Always records the error and obtains the updated counters in one
+        A ``"block"`` is the exception: it is recorded as the product's last
+        error and outcome, but it neither counts nor suspends (see below).
+
+        Otherwise records the error and obtains the updated counters in one
         repository operation. When either ``consecutive_errors`` reaches
         ``deps.max_consecutive_errors`` or ``gone_streak`` reaches
         ``deps.listing_gone_confirmations`` it:
@@ -156,7 +159,15 @@ class NoticeDeliveryMixin:
         logging only. ``reason`` (plus optional ``detail``) is persisted as the
         product's ``last_error`` so the /errori command can surface it.
         """
-        updated = await self.deps.repo.record_failure(product.id, reason=reason, detail=detail)
+        if reason == "block":
+            # The store refused the request: the per-store pause owns that
+            # condition. Counting it against the product too suspended, one by
+            # one, the products of a store that was merely blocked, and left
+            # them suspended after the store answered again.
+            await self.deps.repo.record_block(product.id, detail=detail)
+            updated = None
+        else:
+            updated = await self.deps.repo.record_failure(product.id, reason=reason, detail=detail)
         # A check that failed produced no evidence about the price, so it breaks
         # any confirmation run in progress: two sightings either side of an
         # outage are not consecutive readings of the same claim.

@@ -206,6 +206,21 @@ class ProductRepositoryMixin(_RepositoryBase):
         await self._conn.commit()
         return await self.get_product(product_id)
 
+    async def record_block(self, product_id: int, *, detail: str | None = None) -> None:
+        """Note that the store refused this check, without counting a product failure.
+
+        A refusal says nothing about the product: ``consecutive_errors`` is left
+        as it is, so the store-level pause is the only consequence. It does end a
+        run of missing-page observations, which must be consecutive.
+        """
+        text = f"block: {detail}" if detail else "block"
+        await self._conn.execute(
+            "UPDATE products SET gone_streak = 0, last_error = ?, "
+            "last_error_at = datetime('now'), last_check_outcome = 'block' WHERE id = ?",
+            (text[:300], product_id),
+        )
+        await self._conn.commit()
+
     async def suspend_product(
         self, product_id: int, *, reason: str, queue_notice: bool = False
     ) -> bool:
@@ -239,11 +254,16 @@ class ProductRepositoryMixin(_RepositoryBase):
         await self._conn.commit()
 
     async def list_products_with_errors(self, *, user_id: int) -> list[ProductErrorRow]:
-        """Active or paused products of a user that currently carry scrape errors."""
+        """Products of a user that carry read errors or sit behind a refusing store.
+
+        Counted errors list active and paused products alike. A store refusal
+        carries no counter: it lists the active products the store keeps unread.
+        """
         cursor = await self._conn.execute(
-            "SELECT id, name, url, domain, consecutive_errors, last_error, last_error_at "
-            "FROM products WHERE user_id = ? AND consecutive_errors > 0 "
-            "ORDER BY consecutive_errors DESC, id ASC",
+            "SELECT id, name, url, domain, consecutive_errors, last_error, last_error_at, "
+            "last_check_outcome FROM products WHERE user_id = ? AND (consecutive_errors > 0 "
+            "OR (is_active = 1 AND last_check_outcome IN ('block', 'quarantined', "
+            "'probe_skipped'))) ORDER BY consecutive_errors DESC, id ASC",
             (user_id,),
         )
         rows = await cursor.fetchall()
@@ -256,6 +276,7 @@ class ProductRepositoryMixin(_RepositoryBase):
                 consecutive_errors=int(r[4]),
                 last_error=r[5],
                 last_error_at=r[6],
+                last_check_outcome=r[7],
             )
             for r in rows
         ]

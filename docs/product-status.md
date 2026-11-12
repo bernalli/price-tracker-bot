@@ -48,6 +48,13 @@ Amazon's not-found page returned with HTTP 2xx. A redirect alone does not establ
 that the listing is gone. Another failure threshold
 can suspend a product sooner without confirming its removal.
 
+A store that refuses the bot (HTTP 403/429, a challenge page) is a condition of
+the store, not a failure of the product. The refusal pauses the whole store and
+is announced once; it does not count toward a product's failure threshold and
+never suspends a product, so tracking resumes by itself when the store answers
+again. The products the store keeps unread are listed by `/errori` and by the
+list's error filter, marked with a lock instead of an error count.
+
 Warnings are combined per user and domain, with each cause on its own 24-hour
 persisted cooldown. Suspension notices are grouped by user, domain and cause.
 Their actions use the current automatically suspended group for that user,
