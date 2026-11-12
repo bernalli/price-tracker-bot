@@ -8,6 +8,7 @@ from typing import Any
 from price_tracker.db.models import ProductErrorRow, ProductRecord
 from price_tracker.db.repository_common import (
     _PRODUCT_COLS,
+    _dec,
     _dec_str,
     _RepositoryBase,
     _row_to_product,
@@ -278,7 +279,7 @@ class ProductRepositoryMixin(_RepositoryBase):
                 last_error=r[5],
                 last_error_at=r[6],
                 last_check_outcome=r[7],
-                current_price=Decimal(r[8]) if r[8] is not None else None,
+                current_price=_dec(r[8]),
                 currency=r[9],
             )
             for r in rows

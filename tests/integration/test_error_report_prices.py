@@ -114,3 +114,28 @@ async def test_store_refusal_keeps_last_recorded_price_without_product_error(
         assert "⚠️0" not in text
     finally:
         reset_locale(token)
+
+
+@pytest.mark.parametrize("stored", ["abc", "", "12,50", "NaN", "Infinity", "-5", "1E+20"])
+async def test_a_malformed_stored_price_reads_as_missing_and_keeps_the_report(
+    repo: Repository, memory_db: aiosqlite.Connection, stored: str
+) -> None:
+    pid = await repo.add_product(
+        user_id=7,
+        url="https://shop.example/item",
+        name="Legacy row",
+        domain="shop.example",
+        initial_price=Decimal("10"),
+        currency="EUR",
+    )
+    await repo.record_failure(pid, reason="parse_error")
+    await memory_db.execute("UPDATE products SET current_price = ? WHERE id = ?", (stored, pid))
+    await memory_db.commit()
+    token = set_locale("en")
+    try:
+        text = await errors_text(repo, None, 7)
+        assert text is not None
+        assert "<b>N/A</b> ⚠️1 Legacy row" in text
+        assert f"#{pid}:" in text
+    finally:
+        reset_locale(token)
