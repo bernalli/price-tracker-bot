@@ -24,9 +24,11 @@ Availability is separate from a price:
 - That reading is reported as "availability could not be verified" only when
   something casts doubt on the stock: the product is confirmed unavailable, a
   sold-out observation awaits its confirmation, or the store hinted at
-  unavailability without proof. For a product that was purchasable at its last
-  confirmed reading it is an ordinary successful check: most pages never state
-  their stock, and a permanent warning on a working product hides real ones.
+  unavailability without proof. Otherwise it is an ordinary successful check:
+  most pages never state their stock, and a permanent warning on a working
+  product hides real ones. This does not mean the stock was ever confirmed: a
+  product added from a page that never states its stock counts as available
+  until a reading says otherwise.
 - A confirmed in-stock observation with an accepted price restores availability
   in one check. A restock notice includes the recorded price.
 

@@ -370,9 +370,10 @@ class ProductChecksMixin:
             await self.deps.repo.record_check_outcome(p.id, reason=reason)
             if p.is_available is False:
                 return (p.user_id, None, False, reason)
-        # Otherwise the product was purchasable at its last confirmed reading and
-        # nothing contradicts it. Most pages never state their stock, so flagging
-        # every such read put a permanent warning on products that work.
+        # Otherwise nothing contradicts availability. This is not proof that the
+        # stock was ever confirmed: a new product starts as available. Most pages
+        # never state their stock, so flagging every such read put a permanent
+        # warning on products that work.
 
         if old_price is None:
             return (p.user_id, None, False, reason)
