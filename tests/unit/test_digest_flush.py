@@ -58,7 +58,7 @@ async def test_periodic_flush_uses_configured_locale_and_restores_context() -> N
         await svc.flush_due(interval_minutes=60)
         text = bot.send_message.await_args.kwargs["text"]
         assert "Avvisi operativi" in text
-        assert "prodotti" in text
+        assert "Avviso precedente" in text
         assert "dettagli" in text
         assert _("❌ Invalid ID.") == "❌ Invalid ID."
     finally:

@@ -56,7 +56,7 @@ BASE = Decimal("100.00")
 LATER = datetime.now(UTC) + timedelta(days=1)
 
 DROP_EN, DROP_IT = "Price drop!", "Prezzo in calo!"
-STOCK_EN, STOCK_IT = "Back in stock!", "Di nuovo disponibile!"
+STOCK_EN, STOCK_IT = "Product available again", "Prodotto di nuovo disponibile"
 NOTICE_EN, NOTICE_IT = "Price unreadable on", "Prezzo illeggibile su"
 PAUSE_EN, PAUSE_IT = "Site paused automatically", "Sito in pausa automatica"
 DIGEST_EN, DIGEST_IT = "Use /lista for full state.", "Usa /lista per lo stato completo."
@@ -293,12 +293,16 @@ async def test_each_notice_group_is_rendered_in_its_recipients_language(
 async def test_two_concurrent_flushes_in_different_languages_do_not_mix(
     repo: Repository,
 ) -> None:
-    both_rendering = asyncio.Barrier(2)
+    first_send_started = asyncio.Event()
+    second_flush_started = asyncio.Event()
+    release_first_send = asyncio.Event()
 
     @dataclass
     class _Interleaving(_Notifier):
         async def __call__(self, user_id: int, text: str, **kwargs: Any) -> bool:
-            await both_rendering.wait()
+            if user_id == A:
+                first_send_started.set()
+                await release_first_send.wait()
             return await super().__call__(user_id, text, **kwargs)
 
     notifier = _Interleaving()
@@ -306,9 +310,18 @@ async def test_two_concurrent_flushes_in_different_languages_do_not_mix(
         scheduler = _scheduler(repo, client, notifier, {})
         italian = await _suspended_collector(scheduler, repo, A)
         english = await _suspended_collector(scheduler, repo, B)
-        await asyncio.wait_for(
-            asyncio.gather(scheduler._flush_notices(italian), scheduler._flush_notices(english)), 2
-        )
+        first = asyncio.create_task(scheduler._flush_notices(italian))
+        await asyncio.wait_for(first_send_started.wait(), 2)
+
+        async def flush_second() -> None:
+            second_flush_started.set()
+            await scheduler._flush_notices(english)
+
+        second = asyncio.create_task(flush_second())
+        await asyncio.wait_for(second_flush_started.wait(), 2)
+        assert not second.done()
+        release_first_send.set()
+        await asyncio.wait_for(asyncio.gather(first, second), 2)
     assert NOTICE_IT in notifier.texts(A)[0]
     assert NOTICE_EN in notifier.texts(B)[0]
     assert _("Saved.") == "Saved."
@@ -511,7 +524,7 @@ def test_the_english_alert_is_byte_identical_to_the_old_text(
         reset_locale(token)
 
 
-def test_the_italian_quarantine_text_is_the_one_users_already_know() -> None:
+def test_the_italian_quarantine_text_describes_the_block_without_raw_detail() -> None:
     token = set_locale("it")
     try:
         text = format_quarantine_notification(
@@ -523,7 +536,7 @@ def test_the_italian_quarantine_text_is_the_one_users_already_know() -> None:
         reset_locale(token)
     assert text == (
         "🔒 <b>Sito in pausa automatica</b>\n\n"
-        "<b>example.com</b> ha fallito troppi controlli (HTTP 403).\n"
+        "<b>example.com</b> ha fallito troppi controlli (controlli automatici bloccati).\n"
         "Sospendo temporaneamente i check su questo sito per non insistere "
         "contro un blocco.\n🔁 Riprovo da solo dopo: 2026-03-01 12:30 UTC\n\n"
         "Dettagli con /errori."

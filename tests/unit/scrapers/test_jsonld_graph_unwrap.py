@@ -33,7 +33,9 @@ _GRAPH_HTML = (
     ids=lambda c: c.__name__,
 )
 def test_scraper_jsonld_finds_product_inside_graph(scraper_cls) -> None:
-    result = scraper_cls()._try_jsonld(BeautifulSoup(_GRAPH_HTML, "lxml"))
+    result = scraper_cls()._try_jsonld(
+        BeautifulSoup(_GRAPH_HTML, "lxml"), "https://example.com/item"
+    )
     assert result is not None
     assert result["price"] == Decimal("499.00")
     assert result["name"] == "Graph Phone"

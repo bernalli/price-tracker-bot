@@ -56,7 +56,8 @@ _PRODUCT_COLS = (
     "currency, check_interval_minutes, last_checked_at, last_notified_at, "
     "pending_alert_price, pending_alert_at, preferred_condition, preferred_seller, "
     "pending_read_price, pending_read_count, pending_read_streak, last_error, "
-    "last_error_at, gone_streak, suspension_kind, suspension_reason, image_url"
+    "last_error_at, gone_streak, suspension_kind, suspension_reason, image_url, "
+    "sold_out_streak, pending_notice_kind, notice_version, notice_attempted_at, last_check_outcome"
 )
 
 
@@ -99,6 +100,11 @@ def _row_to_product(row: tuple[Any, ...]) -> ProductRecord:
         suspension_kind=row[29],
         suspension_reason=row[30],
         image_url=row[31],
+        sold_out_streak=int(row[32] or 0),
+        pending_notice_kind=row[33],
+        notice_version=int(row[34] or 0),
+        notice_attempted_at=row[35],
+        last_check_outcome=row[36],
     )
 
 

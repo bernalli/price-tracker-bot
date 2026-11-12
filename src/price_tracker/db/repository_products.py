@@ -84,7 +84,7 @@ class ProductRepositoryMixin(_RepositoryBase):
 
     async def update_price(self, product_id: int, price: Decimal) -> None:
         await self._conn.execute(
-            "UPDATE products SET current_price = ?, "
+            "UPDATE products SET current_price = ?, last_check_outcome = NULL, "
             "lowest_price = CASE WHEN lowest_price IS NULL OR "
             "CAST(? AS REAL) < CAST(lowest_price AS REAL) THEN ? ELSE lowest_price END, "
             "highest_price = CASE WHEN highest_price IS NULL OR "
@@ -106,7 +106,7 @@ class ProductRepositoryMixin(_RepositoryBase):
     ) -> None:
         """Store an accepted price and the image URL of the same reading, in one statement."""
         await self._conn.execute(
-            "UPDATE products SET current_price = ?, image_url = ?, "
+            "UPDATE products SET current_price = ?, image_url = ?, last_check_outcome = NULL, "
             "lowest_price = CASE WHEN lowest_price IS NULL OR "
             "CAST(? AS REAL) < CAST(lowest_price AS REAL) THEN ? ELSE lowest_price END, "
             "highest_price = CASE WHEN highest_price IS NULL OR "
@@ -157,7 +157,9 @@ class ProductRepositoryMixin(_RepositoryBase):
     async def pause_product(self, product_id: int) -> None:
         await self._conn.execute(
             "UPDATE products SET is_active = 0, suspension_kind = 'manual', "
-            "suspension_reason = NULL, updated_at = datetime('now') WHERE id = ?",
+            "suspension_reason = NULL, pending_notice_kind = NULL, sold_out_streak = 0, "
+            "notice_version = notice_version + 1, "
+            "updated_at = datetime('now') WHERE id = ?",
             (product_id,),
         )
         await self._conn.commit()
@@ -165,7 +167,9 @@ class ProductRepositoryMixin(_RepositoryBase):
     async def reactivate_product(self, product_id: int) -> None:
         await self._conn.execute(
             "UPDATE products SET is_active = 1, consecutive_errors = 0, gone_streak = 0, "
-            "suspension_kind = NULL, suspension_reason = NULL WHERE id = ?",
+            "suspension_kind = NULL, suspension_reason = NULL, "
+            "pending_notice_kind = NULL, sold_out_streak = 0, "
+            "notice_version = notice_version + 1 WHERE id = ?",
             (product_id,),
         )
         await self._conn.commit()
@@ -196,18 +200,22 @@ class ProductRepositoryMixin(_RepositoryBase):
         await self._conn.execute(
             "UPDATE products SET consecutive_errors = consecutive_errors + 1, "
             "gone_streak = CASE WHEN ? = 'listing_gone' THEN gone_streak + 1 ELSE 0 END, "
-            "last_error = ?, last_error_at = datetime('now') WHERE id = ?",
-            (reason, text[:300], product_id),
+            "last_error = ?, last_error_at = datetime('now'), last_check_outcome = ? WHERE id = ?",
+            (reason, text[:300], reason, product_id),
         )
         await self._conn.commit()
         return await self.get_product(product_id)
 
-    async def suspend_product(self, product_id: int, *, reason: str) -> bool:
+    async def suspend_product(
+        self, product_id: int, *, reason: str, queue_notice: bool = False
+    ) -> bool:
         cursor = await self._conn.execute(
             "UPDATE products SET is_active = 0, suspension_kind = 'automatic', "
-            "suspension_reason = ?, updated_at = datetime('now') "
+            "suspension_reason = ?, updated_at = datetime('now'), "
+            "pending_notice_kind = CASE WHEN ? THEN 'suspended' ELSE NULL END, "
+            "notice_version = notice_version + 1, notice_attempted_at = NULL "
             "WHERE id = ? AND is_active = 1",
-            (reason, product_id),
+            (reason, queue_notice, product_id),
         )
         await self._conn.commit()
         return cursor.rowcount == 1
@@ -287,6 +295,79 @@ class ProductRepositoryMixin(_RepositoryBase):
         await self._conn.execute(
             "UPDATE products SET is_available = ?, updated_at = datetime('now') WHERE id = ?",
             (1 if available else 0, product_id),
+        )
+        await self._conn.commit()
+
+    async def record_availability(self, product_id: int, *, available: bool) -> None:
+        """Confirm stock observations and queue only actual transitions in one write.
+
+        A missing/failed observation does not call this method. Two sold-out
+        observations establish unavailability, including across a restart; an
+        accepted available reading resets the evidence and establishes restock.
+        """
+        await self._conn.execute(
+            "UPDATE products SET "
+            "last_check_outcome = CASE WHEN ? THEN last_check_outcome ELSE 'out_of_stock' END, "
+            "sold_out_streak = CASE WHEN ? THEN 0 ELSE MIN(sold_out_streak + 1, 2) END, "
+            "is_available = CASE WHEN ? THEN 1 WHEN sold_out_streak >= 1 THEN 0 "
+            "ELSE is_available END, "
+            "pending_notice_kind = CASE "
+            "WHEN ? AND is_available = 0 THEN 'restocked' "
+            "WHEN NOT ? AND sold_out_streak >= 1 AND is_available = 1 THEN 'unavailable' "
+            "ELSE pending_notice_kind END, "
+            "notice_version = notice_version + CASE WHEN "
+            "(? AND is_available = 0) OR (NOT ? AND sold_out_streak >= 1 AND is_available = 1) "
+            "THEN 1 ELSE 0 END, "
+            "notice_attempted_at = CASE WHEN "
+            "(? AND is_available = 0) OR (NOT ? AND sold_out_streak >= 1 AND is_available = 1) "
+            "THEN NULL ELSE notice_attempted_at END "
+            "WHERE id = ? AND is_active = 1",
+            (*([available] * 9), product_id),
+        )
+        await self._conn.commit()
+
+    async def record_check_outcome(self, product_id: int, *, reason: str) -> None:
+        """Persist a skipped or held observation without changing the accepted price time."""
+        await self._conn.execute(
+            "UPDATE products SET last_check_outcome = ? WHERE id = ?",
+            (reason, product_id),
+        )
+        await self._conn.commit()
+
+    async def list_pending_status_notices(self) -> list[ProductRecord]:
+        """Latest undelivered status per product, including automatic suspensions."""
+        cursor = await self._conn.execute(
+            f"SELECT {_PRODUCT_COLS} FROM products WHERE pending_notice_kind IS NOT NULL "
+            "AND user_id IN (SELECT user_id FROM users WHERE is_active = 1) ORDER BY id"
+        )
+        return [_row_to_product(tuple(row)) for row in await cursor.fetchall()]
+
+    async def mark_status_notice_attempt(
+        self, product_id: int, version: int, *, attempted_at: str
+    ) -> bool:
+        """Claim only a still-pending, current transition for an active recipient.
+
+        A false result means the caller's snapshot was superseded or withdrawn;
+        it must not send or acknowledge that event.
+        """
+        cursor = await self._conn.execute(
+            "UPDATE products SET notice_attempted_at = ? WHERE id = ? AND notice_version = ? "
+            "AND user_id IN (SELECT user_id FROM users WHERE is_active = 1) AND ("
+            "(pending_notice_kind = 'suspended' AND is_active = 0 "
+            "AND suspension_kind = 'automatic') OR "
+            "(pending_notice_kind = 'unavailable' AND is_active = 1 AND is_available = 0) OR "
+            "(pending_notice_kind = 'restocked' AND is_active = 1 AND is_available = 1))",
+            (attempted_at, product_id, version),
+        )
+        await self._conn.commit()
+        return cursor.rowcount == 1
+
+    async def acknowledge_status_notice(self, product_id: int, version: int) -> None:
+        """A delivery may acknowledge only the transition it actually sent."""
+        await self._conn.execute(
+            "UPDATE products SET pending_notice_kind = NULL, notice_attempted_at = NULL "
+            "WHERE id = ? AND notice_version = ?",
+            (product_id, version),
         )
         await self._conn.commit()
 

@@ -18,7 +18,7 @@ from telegram.ext import Application, CommandHandler
 
 from price_tracker.bot.decorators import _config, _db, admin_only, restricted, with_locale
 from price_tracker.bot.handlers._helpers import _parse_id
-from price_tracker.bot.messages import _
+from price_tracker.bot.messages import _, ngettext
 from price_tracker.db.models import NotificationPrefs
 from price_tracker.notifier.preferences import clear_mute, update_prefs
 
@@ -343,7 +343,25 @@ async def digest_now_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
     digest_svc = context.bot_data["digest_service"]
     user_id = update.effective_user.id
     flushed = await digest_svc.flush_user(user_id=user_id)
-    await update.message.reply_text(f"Flushed {flushed} pending digest entries.")
+    pending = await digest_svc.pending_count(user_id=user_id)
+    if pending:
+        text = ngettext(
+            "{count} notification remains queued because of your notification settings.",
+            "{count} notifications remain queued because of your notification settings.",
+            pending,
+        ).format(count=pending)
+    elif flushed:
+        text = _("No notifications remain queued.")
+    else:
+        text = _("No notifications are waiting in the digest.")
+    if flushed:
+        processed = ngettext(
+            "Processed {count} digest notification.",
+            "Processed {count} digest notifications.",
+            flushed,
+        ).format(count=flushed)
+        text = processed + "\n" + text
+    await update.message.reply_text(text)
 
 
 def register(app: Application) -> None:

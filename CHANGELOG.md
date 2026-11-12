@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-11-12
+
+### Added
+
+- Confirmed unavailability and restock notifications, with stock confirmation and pending delivery
+  persisted across restarts. Unavailable products keep being monitored.
+- A managed Nove25 scraper uses the same validated product, price and stock pipeline as the other built-ins.
+
+### Fixed
+
+- Manual checks, product cards, batch checks and reactivation report failures, deferred checks and
+  unconfirmed prices accurately. Batch results are associated with their product IDs.
+- Repeated partial store outages no longer resend the same warning within 24 hours. Failed final
+  status notices are retried, and concurrent digest flushes cannot send the same entries twice.
+- Missing pages require the configured confirmation count before being classified as confirmed
+  missing. Blocked requests and inconclusive redirects do not prove a product was removed.
+- Built-in scrapers bind product and offer identity, amount, currency and stock to the same eligible
+  observation. Recommendations, financing prices, reference prices and unrelated variant data cannot
+  supply a tracked quote.
+- A price alone no longer proves restock. Unknown stock preserves the last confirmed state; positive
+  automatic quotes require a verified currency and a finite, positive amount.
+- Failure bookkeeping is serialized with each product check, and delivery claims reject obsolete
+  status snapshots. Queued digests also respect later recovery and preference changes.
+- CSV import distinguishes pending verification, conflicting currencies and invalid targets. Direct
+  target commands reject nonfinite and invalid amounts.
+- User-facing failure messages explain the outcome and available action without raw exceptions.
+- Timezone validation is case sensitive on both Linux and macOS.
+
 ## [1.10.1] - 2026-11-06
 
 ### Fixed

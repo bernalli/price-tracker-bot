@@ -40,8 +40,11 @@
    | ⚠️ <b>Errori recenti (2)</b>
    |
    | <b>N/D</b> ⚠️2 Amazon Widget
-   | <b>N/D</b> 🔒1 Kettle
+   | #2: Non sono riuscito a completare il controllo.
+   | <b>N/D</b> ⚠️1 Kettle
+   | #1: Non sono riuscito a leggere il prezzo.
+   | ⏳ Il sito sarà verificato di nuovo.
    |
-   | ℹ️ I siti in 🔒 quarantena riprendono da soli; usa /reactivate per riattivare un prodotto sospeso.
+   | Usa /reactivate per riprendere il monitoraggio di un prodotto sospeso.
 ## db after step 12
 ~ users user_id=10 display_name: NULL -> "U10"

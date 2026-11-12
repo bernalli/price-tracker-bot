@@ -12,12 +12,25 @@ if TYPE_CHECKING:
 
 
 class DigestRepositoryMixin(_RepositoryBase):
-    async def enqueue_digest(self, *, user_id: int, product_id: int | None, payload: str) -> int:
+    async def enqueue_digest(
+        self, *, user_id: int, product_id: int | None, payload: str, event_id: str | None = None
+    ) -> int:
         cursor = await self._conn.execute(
-            "INSERT INTO digest_queue (user_id, product_id, alert_payload_json) VALUES (?, ?, ?)",
-            (user_id, product_id, payload),
+            "INSERT INTO digest_queue (user_id, product_id, alert_payload_json, event_id) "
+            "VALUES (?, ?, ?, ?) ON CONFLICT(user_id, event_id) "
+            "WHERE event_id IS NOT NULL DO NOTHING",
+            (user_id, product_id, payload, event_id),
         )
         await self._conn.commit()
+        if event_id is not None:
+            row = await (
+                await self._conn.execute(
+                    "SELECT id FROM digest_queue WHERE user_id = ? AND event_id = ?",
+                    (user_id, event_id),
+                )
+            ).fetchone()
+            assert row is not None
+            return int(row[0])
         rid = cursor.lastrowid
         assert rid is not None  # AUTOINCREMENT PK always returns a row id
         return int(rid)

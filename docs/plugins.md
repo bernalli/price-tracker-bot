@@ -15,63 +15,50 @@ Every scraper subclasses `AbstractScraper` and provides:
 - `priority: ClassVar[int]` — resolution priority. Higher wins. Site-specific scrapers use 50; the Shopify generic uses 80; Amazon and eBay use 100. Pick a value that fits your scraper's specificity.
 - `domain_patterns: ClassVar[list[re.Pattern[str]]]` — list of compiled regexes against URL netloc (`urlparse(url).netloc`).
 - `def can_handle(self, url: str) -> bool` — required abstract method. For typical domain-based matching, just `return self.matches_domain(url)` (the helper in the base class checks each `domain_patterns` regex against the URL netloc).
-- `async def scrape(self, url: str, client: httpx.AsyncClient) -> ProductInfo` — fetch the URL with the injected `httpx.AsyncClient` (configured with public-address validation and timeouts; environment proxies are disabled) and return a populated `ProductInfo`. Never raise on network or parse errors — return `ProductInfo(error="...")` instead. Two failures are the exception and MUST be raised: `BlockEvent` when the site refuses the request (403/429, WAF, CAPTCHA), and `ListingGone` when the product is gone from the catalogue (404/410, or a redirect away from the product path). The scheduler routes those two differently — a block quarantines the whole domain, a gone listing suspends that single product with a reason — and a returned `ProductInfo` cannot carry the distinction.
+- `async def scrape(self, url: str, client: httpx.AsyncClient) -> ProductInfo` — fetch the URL with the injected `httpx.AsyncClient` (configured with public-address validation and timeouts; environment proxies are disabled) and return a populated `ProductInfo`. Never raise on network or parse errors — return `ProductInfo(error="...")` instead. Two failures are the exception and MUST be raised: `BlockEvent` when the site refuses the request (403/429, WAF, CAPTCHA), and `ListingGone` for a confirmed missing-page response (404/410, or an identified store-specific not-found document). An inconclusive redirect does not prove a missing product. When only the document identifies a missing page, use `http_status_observed=False` so no unobserved HTTP status is reported. The scheduler routes those two differently — a block quarantines the whole domain, a gone listing suspends that single product with a reason — and a returned `ProductInfo` cannot carry the distinction.
 
-`ProductInfo` is a dataclass with these fields (see `scraper_base.py:159`):
+`ProductInfo` is a dataclass (see [scraper_base.py](../src/price_tracker/core/scraper_base.py)):
+
 - `name: str | None` — product title/name
-- `price: Decimal | None` — always `Decimal`, never `float`
+- `price: Decimal | None` — a finite, positive `Decimal` with a verified currency; never `float`
 - `currency: str | None` — ISO 4217 (e.g. `"EUR"`, `"USD"`)
-- `available: bool` — `False` for out-of-stock pages
+- `available: bool` — stock value, meaningful only when `stock_evidence` is true
+- `stock_evidence: bool` — true only for interpretable stock evidence belonging to the selected product and offer. Set false when stock is unknown. The default is true for legacy plugin compatibility; managed scrapers set it explicitly.
 - `seller: str | None` — third-party seller name (optional)
 - `condition: str | None` — `"new"`, `"used"`, etc. (optional)
 - `error: str | None` — human-readable error if the parse failed
 
+Keep the amount, currency and stock attached to the same eligible offer. Exclude financing, reference prices and unrelated recommendations. A readable price does not establish stock; a quote without a known ISO currency is not accepted automatically.
+
 ## Minimal example
+
+When the shared generic parser supports the page, give the store a specific route:
 
 ```python
 import re
 from typing import ClassVar
-import httpx
 
-from price_tracker.core.scraper_base import AbstractScraper, ProductInfo, parse_price
+from price_tracker.scrapers.generic import GenericScraper
 
 
-class MyShopScraper(AbstractScraper):
+class MyShopScraper(GenericScraper):
     name: ClassVar[str] = "myshop"
-    priority: ClassVar[int] = 50
+    priority: ClassVar[int] = 85
     domain_patterns: ClassVar[list[re.Pattern[str]]] = [
-        re.compile(r"^(www\.)?myshop\.(com|eu)$"),
+        re.compile(r"^(www\.)?myshop\.(com|eu)$", re.IGNORECASE),
     ]
 
     def can_handle(self, url: str) -> bool:
         return self.matches_domain(url)
-
-    async def scrape(self, url: str, client: httpx.AsyncClient) -> ProductInfo:
-        try:
-            response = await client.get(url, follow_redirects=True)
-            response.raise_for_status()
-        except httpx.HTTPError as exc:
-            return ProductInfo(error=f"HTTP error: {exc}")
-
-        # Parse the response body. Use BeautifulSoup, lxml, or regex as fits.
-        # Always wrap price string with parse_price() to get Decimal.
-        # Return early with ProductInfo(error=...) on parse failure.
-
-        name = "..."  # extract title/name from HTML
-        price_str = "..."  # raw price text
-        price = parse_price(price_str)
-        currency = "EUR"
-
-        if price is None:
-            return ProductInfo(error="Could not parse price")
-
-        return ProductInfo(
-            name=name,
-            price=price,
-            currency=currency,
-            available=True,
-        )
 ```
+
+The inherited extraction uses the shared product identity, currency, stock and
+validated transport rules. For a custom parser, use `fetch_page(url, client)`
+from `price_tracker.core.fetch`, allow typed `BlockEvent` and `ListingGone` to
+propagate, and construct `ProductInfo` only from the requested product's own
+offer. An explicit unavailable observation may omit its price; an automatic
+priced quote must have a verified currency. Keep `stock_evidence=False` when
+stock is unknown, and keep exception details out of the returned user message.
 
 ## Drop-in installation
 
@@ -101,14 +88,14 @@ Track the implementation status via the project changelog and the `core.registry
 
 ## Auto-discovery order
 
-At startup the registry assembles the scraper pool from three sources, in this order:
+At startup the registry assembles the scraper pool from two sources, in this order:
 
 1. **Built-in** scrapers from `src/price_tracker/scrapers/` (always loaded via `discover_builtin_scrapers`).
 2. **Drop-in** plugins from `plugins/` (loaded via `discover_dropin_scrapers` if the directory exists and contains `.py` files).
 
 Entry-point plugins are documented in the [Pip-installable plugin](#pip-installable-plugin) section above but are not yet wired into startup; they will become a third loading stage when implementation lands.
 
-After all three sources are loaded, the registry sorts by `priority` (descending) and tie-breaks by registration order. There is no namespace conflict check — pick a stable, unique `name` to avoid surprises.
+The registry sorts by `priority` (descending), preserving registration order for ties. Duplicate names are rejected: a drop-in with a built-in name does not override that built-in. Drop-in imports and constructors still run before registration, so keep them free of network and filesystem side effects. A handler for a specific domain should use priority above 80 when it must precede the Shopify-style `/products/` heuristic.
 
 ## Testing
 

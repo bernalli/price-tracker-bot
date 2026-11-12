@@ -274,16 +274,7 @@ async def test_shopify_missing_price_selectors() -> None:
 
 @pytest.mark.asyncio
 async def test_shopify_rejects_redirect_to_home() -> None:
-    """Dead /products/<slug> redirecting to home → ListingGone, never a price.
-
-    Two things are asserted here, and the second one was added once the first
-    was measured against a real store. The scraper must not parse the home
-    page — that bug once saved a storefront's og:title as the product name.
-    And the redirect must be reported as a removed listing rather than as a
-    generic parse failure: a product taken out of the catalogue is redirected
-    to the storefront on a cookieless session and only 404s afterwards, so
-    treating the redirect as "price not found" hides the reason from the user.
-    """
+    """Do not read the home page or claim a 200 response was a 404."""
     scraper = ShopifyScraper()
     url = "https://shop.example.com/products/dead-slug"
     json_url = "https://shop.example.com/products/dead-slug.json"
@@ -300,10 +291,10 @@ async def test_shopify_rejects_redirect_to_home() -> None:
         router.get(url).respond(302, headers={"Location": "https://shop.example.com/"})
         router.get("https://shop.example.com/").respond(200, text=home_html)
         async with httpx.AsyncClient() as client:
-            with pytest.raises(ListingGone) as exc_info:
-                await scraper.scrape(url, client)
+            result = await scraper.scrape(url, client)
 
-    assert exc_info.value.status == 404
+    assert result.price is None
+    assert result.error
 
 
 @pytest.mark.asyncio
@@ -354,7 +345,7 @@ def test_shopify_is_product_path_helper() -> None:
 # A product page whose price the HTML fallback WOULD read: a JSON block that is
 # swallowed instead of raised then yields this price and the test fails on the
 # missing BlockEvent, not on an unmocked route.
-_PRICED_HTML = '<html><body><span class="product__price">$12.00</span></body></html>'
+_PRICED_HTML = '<html><body><span class="product__price">USD 12.00</span></body></html>'
 
 
 @pytest.mark.asyncio

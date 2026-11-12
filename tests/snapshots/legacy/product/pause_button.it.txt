@@ -51,7 +51,7 @@
    | 📦 <b>⁨Kettle⁩</b>
    | ⁨example.com⁩ · #1 · in pausa
    |
-   | 💰 Ora: 80,00 €
+   | 💰 Ultimo prezzo rilevato: 80,00 €
    | 📌 Inizio: 100,00 € · ▼ 20%
    | 📉 Minimo: 80,00 €
    | 🔔 Avviso: ribasso del 10% dall'inizio
@@ -65,3 +65,4 @@
 ~ products id=1 is_active: 1 -> 0
 ~ products id=1 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
 ~ products id=1 suspension_kind: NULL -> "manual"
+~ products id=1 notice_version: 0 -> 1

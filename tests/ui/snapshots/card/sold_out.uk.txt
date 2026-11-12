@@ -6,7 +6,7 @@ text:
    | [📦 <b>⁨Toaster⁩</b> 📦 <b>⁨Toaster⁩</b> 📦 <b>⁨Toaster⁩</b>]
    | [⁨shop.example.com⁩ · #61 · [active active active] ⁨shop.example.com⁩ · #61 · [active active active] ⁨shop.example.com⁩ · #61 · [active active active]]
    | 
-   | [💰 Now: 39,90 EUR 💰 Now: 39,90 EUR 💰 Now: 39,90 EUR]
+   | [💰 Last recorded price: 39,90 EUR 💰 Last recorded price: 39,90 EUR 💰 Last recorded price: 39,90 EUR]
    | [🚫 Sold out 🚫 Sold out 🚫 Sold out]
    | [📌 Start: 44,90 EUR · ▼ 11,1% 📌 Start: 44,90 EUR · ▼ 11,1% 📌 Start: 44,90 EUR · ▼ 11,1%]
    | [📉 Lowest: 39,90 EUR 📉 Lowest: 39,90 EUR 📉 Lowest: 39,90 EUR]

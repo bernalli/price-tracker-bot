@@ -9,36 +9,55 @@
    text:
    | ⏳ <b>Controlli in errore su example.com</b> (6)
    |
-   | 6 prodotti hanno fallito 1/2 controlli di fila. Se continua, verranno sospesi automaticamente.
+   | 6 prodotti richiedono attenzione. Errori ripetuti possono sospendere il monitoraggio.
    |
    | <b>80,00 €</b> ⚠️ Kettle
+   | #1: prezzo non leggibile (1/2)
    | <b>40,00 €</b> ⚠️ No Price
+   | #2: prezzo non leggibile (1/2)
    | <b>40,00 €</b> ⚠️ Used Offer
+   | #4: prezzo non leggibile (1/2)
    | <b>40,00 €</b> ⚠️ Offline
+   | #5: errore di comunicazione o elaborazione (1/2)
    | <b>40,00 €</b> ⚠️ Gone
+   | #6: pagina non trovata (HTTP 404) (1/2)
    | <b>40,00 €</b> ⚠️ Broken
+   | #7: controllo interrotto (1/2)
    |
    | Dettagli con /errori.
    markup: {}
 ## db after step 1
++ bot_config key="warning_notice:10:example.com:condition_mismatch" {value="2026-03-01T12:00:00+00:00"}
++ bot_config key="warning_notice:10:example.com:http_error" {value="2026-03-01T12:00:00+00:00"}
++ bot_config key="warning_notice:10:example.com:implausible_read" {value="2026-03-01T12:00:00+00:00"}
++ bot_config key="warning_notice:10:example.com:listing_gone" {value="2026-03-01T12:00:00+00:00"}
++ bot_config key="warning_notice:10:example.com:price_none" {value="2026-03-01T12:00:00+00:00"}
++ bot_config key="warning_notice:10:example.com:unexpected" {value="2026-03-01T12:00:00+00:00"}
 ~ products id=1 consecutive_errors: 0 -> 1
 ~ products id=1 last_error: NULL -> "implausible_read: 5000.00 against a median of recent readings"
 ~ products id=1 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=1 last_check_outcome: NULL -> "implausible_read"
 ~ products id=2 consecutive_errors: 0 -> 1
 ~ products id=2 last_error: NULL -> "price_none"
 ~ products id=2 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=2 last_check_outcome: NULL -> "price_none"
 ~ products id=3 consecutive_errors: 1 -> 0
+~ products id=3 last_check_outcome: NULL -> "currency_mismatch"
 ~ products id=4 consecutive_errors: 0 -> 1
 ~ products id=4 last_error: NULL -> "condition_mismatch: offer is 'used', tracking 'new'"
 ~ products id=4 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=4 last_check_outcome: NULL -> "condition_mismatch"
 ~ products id=5 consecutive_errors: 0 -> 1
 ~ products id=5 last_error: NULL -> "http_error: connection refused"
 ~ products id=5 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=5 last_check_outcome: NULL -> "http_error"
 ~ products id=6 consecutive_errors: 0 -> 1
 ~ products id=6 last_error: NULL -> "listing_gone: HTTP 404"
 ~ products id=6 last_error_at: NULL -> <now:9999-99-99 99:99:99>
 ~ products id=6 gone_streak: 0 -> 1
+~ products id=6 last_check_outcome: NULL -> "listing_gone"
 ~ products id=7 consecutive_errors: 0 -> 1
 ~ products id=7 last_error: NULL -> "unexpected: scraper crashed"
 ~ products id=7 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=7 last_check_outcome: NULL -> "unexpected"
 + scraper_health domain="example.com" {state="CLOSED", consecutive_blocks=0, locked_until=NULL, last_block_at=NULL, last_block_reason=NULL, last_success_at="2026-03-01T12:00:00+00:00", updated_at=<now:9999-99-99 99:99:99>}

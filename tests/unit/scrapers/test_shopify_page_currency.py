@@ -31,7 +31,7 @@ _URL = "https://store.com/products/widget"
         '<meta property="product:price:currency" content="USD">',
         '<script type="application/ld+json">{"@type":"Product",'
         '"offers":{"priceCurrency":"USD"}}</script>',
-        '<script>var config = {"currency":"USD"};</script>',
+        '<script>Shopify.currency = {"active":"USD"};</script>',
     ],
     ids=["og", "product-meta", "jsonld", "shopify-js"],
 )
@@ -43,5 +43,9 @@ async def test_page_currency_survives_every_fallback(
         router.get(_URL).respond(200, text=currency_html + price_html)
         async with httpx.AsyncClient() as client:
             info = await ShopifyScraper().scrape(_URL, client)
-    assert info.price == Decimal("199.00")
-    assert info.currency == "USD"
+    if '"price_min"' in price_html:
+        # An unbound page-wide amount may be a recommendation, not this product.
+        assert info.price is None
+    else:
+        assert info.price == Decimal("199.00")
+        assert info.currency == "USD"

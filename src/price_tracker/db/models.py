@@ -81,6 +81,11 @@ class ProductRecord(_DictCompatMixin):
     suspension_kind: str | None = None
     suspension_reason: str | None = None
     image_url: str | None = None
+    sold_out_streak: int = 0
+    pending_notice_kind: str | None = None
+    notice_version: int = 0
+    notice_attempted_at: str | None = None
+    last_check_outcome: str | None = None
 
 
 @dataclass(frozen=True)

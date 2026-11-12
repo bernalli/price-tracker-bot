@@ -16,7 +16,7 @@ import re
 from datetime import datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Final, cast
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, available_timezones
 
 from babel.dates import format_datetime, format_timedelta
 from babel.numbers import format_currency, format_percent, get_currency_precision, list_currencies
@@ -29,6 +29,7 @@ _CHANGE_UP: Final = "▲"
 
 _CURRENCY_CODE_RE: Final = re.compile(r"[A-Z]{3}")
 _AMOUNT_CEILING: Final = Decimal(10) ** 15
+_TIMEZONE_KEYS: Final = frozenset(available_timezones())
 
 
 def _check_amount(name: str, value: object, *, allow_none: bool = False) -> Decimal | None:
@@ -143,6 +144,10 @@ def when(instant: datetime, *, tz: str, locale: str) -> str:
         raise ValueError(f"instant: must be an aware datetime, got {instant!r}")
     if not isinstance(tz, str):
         raise TypeError(f"tz: must be a str, got {tz!r}")
+    # ZoneInfo opens files and can accept wrong-case keys on macOS. Validate
+    # against the actual IANA keys so input has the same meaning on Linux.
+    if tz not in _TIMEZONE_KEYS:
+        raise ValueError(f"tz: not a zoneinfo key, got {tz!r}")
     try:
         zone = ZoneInfo(tz)
     except (KeyError, ValueError) as exc:

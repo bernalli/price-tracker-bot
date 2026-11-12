@@ -1,6 +1,6 @@
 # Scrapers
 
-`price-tracker-bot` ships **17 built-in scrapers** including a generic structured-data extractor and a disabled Playwright renderer. All are registered at startup and resolved by URL host via the central registry. Custom scrapers can be added as drop-in plugins or pip packages — see [plugins.md](plugins.md).
+`price-tracker-bot` ships **18 built-in scrapers** including a generic structured-data extractor and a disabled Playwright renderer. All are registered at startup and resolved by URL host via the central registry. Custom scrapers can be added as drop-in plugins or pip packages — see [plugins.md](plugins.md).
 
 ## Built-in inventory
 
@@ -8,6 +8,7 @@
 | ---------------------------------------------------------------------- | --------------------------- | -------- | ---------------------------------------------------- |
 | `amazon.{com,it,de,co.uk,fr,es,nl,pl,se,ca,com.au,co.jp}`, `amzn.{eu,to}` | `AmazonScraper`            | 100      | High priority; CAPTCHA detection                      |
 | `ebay.{com,it,de,co.uk,fr,es,nl,pl,com.au,ca}`                          | `EbayScraper`              | 90       | Auction & buy-it-now formats                          |
+| `nove25.{net,com}` (incl. subdomains)                                   | `Nove25Scraper`            | 85       | Uses the generic extraction pipeline                 |
 | `*.myshopify.com` and Shopify-powered storefronts                        | `ShopifyScraper`           | 80       | Generic Shopify `/products/<slug>.json` endpoint      |
 | `aliexpress.{com,it,fr,de,es,ru,nl}`                                    | `AliexpressScraper`        | 50       | Parses inline `window.runParams` JSON                 |
 | `apple.com` (incl. subdomains)                                          | `AppleStoreScraper`        | 50       | Locale → currency mapping                             |
@@ -24,7 +25,7 @@
 | (any URL not matched by a site-specific scraper)                         | `PlaywrightFallbackScraper`| 10       | Disabled: browser connections cannot use the public-address transport |
 | (any URL not matched by a site-specific scraper)              | `GenericScraper`           | 0        | Last-resort structured-data extractor; runs the 9-strategy chain |
 
-> Total: **17** (15 site-specific + `GenericScraper` + `PlaywrightFallbackScraper`).
+> Total: **18** (16 site-specific + `GenericScraper` + `PlaywrightFallbackScraper`).
 
 All scrapers return prices as `Decimal` (never `float`). Outlier detection via median ratio rejects bogus parses without polluting price history.
 
@@ -36,6 +37,7 @@ The registry sorts scrapers by `priority` (descending). On each URL lookup (`reg
 resolution order:
   AmazonScraper (100)
   EbayScraper (90)
+  Nove25Scraper (85)
   ShopifyScraper (80)
   AliexpressScraper, AppleStoreScraper, BestbuyScraper,
   EtsyScraper, GoogleStoreScraper, MediamarktScraper,
@@ -44,6 +46,8 @@ resolution order:
   PlaywrightFallbackScraper (10, disabled)
   GenericScraper (0, last resort)
 ```
+
+Nove25 has priority over the Shopify `/products/<slug>` path heuristic on Nove25 hosts.
 
 The first match wins; lower-priority scrapers are not tried even on parse failure (the failure is recorded in `scraper_health` and the domain is quarantined per the HealthManager policy).
 

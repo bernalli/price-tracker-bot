@@ -9,6 +9,7 @@
 ~ products id=1 last_error: NULL -> "listing_gone: HTTP 404"
 ~ products id=1 last_error_at: NULL -> <now:9999-99-99 99:99:99>
 ~ products id=1 gone_streak: 0 -> 1
+~ products id=1 last_check_outcome: NULL -> "listing_gone"
 ## step 2: job run_check_all
 (no calls)
 ## db after step 2
@@ -19,16 +20,17 @@
    param link_preview_options={"is_disabled": true}
    param parse_mode="HTML"
    text:
-   | ⚠️ <b>Prodotti rimossi da example.com</b> (1)
+   | ⚠️ <b>Pagine dei prodotti non disponibili su example.com</b> (1)
    |
-   | Le pagine rispondono HTTP 404/410: lo store li ha tolti dal catalogo.
+   | Il negozio ha segnalato più volte pagine non trovate. I prodotti potrebbero essere stati spostati o rimossi.
    |
    | <b>80,00 €</b> ⚠️ Kettle
+   | #1: pagina non trovata (HTTP 404)
    |
-   | Eliminarli tiene pulita la lista. Riattivali solo se lo store li rimette in vendita.
+   | Monitoraggio sospeso. Controlla i link prima di riattivare o eliminare questi prodotti.
    keyboard:
-   | [🗑 Elimina tutti (1) → o:1:rm]
    | [▶️ Riattiva e ricontrolla (1) → o:1:ra]
+   | [🗑 Elimina tutti (1) → o:1:rm]
 ## db after step 3
 ~ products id=1 is_active: 1 -> 0
 ~ products id=1 consecutive_errors: 2 -> 3
@@ -36,3 +38,4 @@
 ~ products id=1 gone_streak: 2 -> 3
 ~ products id=1 suspension_kind: NULL -> "automatic"
 ~ products id=1 suspension_reason: NULL -> "listing_gone"
+~ products id=1 notice_version: 0 -> 1

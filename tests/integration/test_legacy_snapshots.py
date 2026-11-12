@@ -2277,7 +2277,9 @@ async def scenario_add_success_generic(w: LegacyWorld) -> None:
 
 @scenario("add.success_amazon")
 async def scenario_add_success_amazon(w: LegacyWorld) -> None:
-    w.scraper.script(AMAZON_URL, ProductInfo(name="Amazon Widget", price=Decimal("25.00")))
+    w.scraper.script(
+        AMAZON_URL, ProductInfo(name="Amazon Widget", price=Decimal("25.00"), currency="EUR")
+    )
     await w.recorder.command(OWNER, f"/aggiungi {AMAZON_URL}")
 
 
@@ -2384,7 +2386,7 @@ async def scenario_data_import_help(w: LegacyWorld) -> None:
 async def scenario_data_import_csv(w: LegacyWorld) -> None:
     await seed_p1(w)
     new_url = "https://shop.example.com/item/20"
-    w.scraper.script(new_url, ProductInfo(name="Imported", price=Decimal("12.00")))
+    w.scraper.script(new_url, ProductInfo(name="Imported", price=Decimal("12.00"), currency="EUR"))
     content = csv_document(
         (new_url, "9.5", "absolute:2"),
         (KETTLE_URL, "", "percentage:10"),
@@ -2400,19 +2402,21 @@ async def scenario_data_import_csv_malformed(w: LegacyWorld) -> None:
 
 @scenario("data.import_csv_semicolon")
 async def scenario_data_import_csv_semicolon(w: LegacyWorld) -> None:
-    w.scraper.script(item_url(21), ProductInfo(name="X", price=Decimal("3.00")))
+    w.scraper.script(item_url(21), ProductInfo(name="X", price=Decimal("3.00"), currency="EUR"))
     content = b"ID;Nome;URL\r\n1;X;https://shop.example.com/item/21\r\n"
     await w.recorder.document(OWNER, "excel.csv", content)
 
 
 @scenario("data.import_csv_bad_fields")
 async def scenario_data_import_csv_bad_fields(w: LegacyWorld) -> None:
-    # One bad field per row: a bad Target alone is ignored (the row imports without
-    # a target), a bad threshold alone is an error, a row without URL is skipped.
+    # One bad field per row: invalid target and threshold rows are rejected;
+    # a row without URL is skipped.
     bad_target_url = "https://shop.example.com/item/22"
     bad_threshold_url = "https://shop.example.com/item/24"
-    w.scraper.script(bad_target_url, ProductInfo(name="Bad", price=Decimal("5.00")))
-    w.scraper.script(bad_threshold_url, ProductInfo(name="Worse", price=Decimal("6.00")))
+    w.scraper.script(bad_target_url, ProductInfo(name="Bad", price=Decimal("5.00"), currency="EUR"))
+    w.scraper.script(
+        bad_threshold_url, ProductInfo(name="Worse", price=Decimal("6.00"), currency="EUR")
+    )
     content = b"\xef\xbb\xbf" + csv_document(
         (bad_target_url, "abc", "percentage:10"),
         (bad_threshold_url, "", "absolute:abc"),
@@ -2425,7 +2429,7 @@ async def scenario_data_import_csv_bad_fields(w: LegacyWorld) -> None:
 async def scenario_data_import_csv_threshold_colon(w: LegacyWorld) -> None:
     # A threshold with two colons: its value "15:5" is not a number.
     url = item_url(25)
-    w.scraper.script(url, ProductInfo(name="Colon", price=Decimal("7.00")))
+    w.scraper.script(url, ProductInfo(name="Colon", price=Decimal("7.00"), currency="EUR"))
     content = b"\xef\xbb\xbf" + csv_document((url, "", "percentage:15:5"))
     await w.recorder.document(OWNER, "colon.csv", content)
 
@@ -2448,7 +2452,7 @@ async def scenario_data_import_uppercase_extension(w: LegacyWorld) -> None:
 @scenario("data.import_csv_edge_rows")
 async def scenario_data_import_csv_edge_rows(w: LegacyWorld) -> None:
     new_url = "https://shop.example.com/item/23"
-    w.scraper.script(new_url, ProductInfo(name="Plain", price=Decimal("7.00")))
+    w.scraper.script(new_url, ProductInfo(name="Plain", price=Decimal("7.00"), currency="EUR"))
     content = csv_document(
         ("https://unknown.example.org/p", "", "percentage:10"), (new_url, "", "absolute")
     )
@@ -3046,7 +3050,7 @@ async def scenario_admin_interval_prompt(w: LegacyWorld) -> None:
 
 @scenario("admin.debug_prompt")
 async def scenario_admin_debug_prompt(w: LegacyWorld) -> None:
-    w.scraper.script(KETTLE_URL, ProductInfo(name="Kettle", price=Decimal("80.00")))
+    w.scraper.script(KETTLE_URL, ProductInfo(name="Kettle", price=Decimal("80.00"), currency="EUR"))
     await w.recorder.press(ADMIN, "menu_admin_debug")
     await w.recorder.text(ADMIN, "notaurl")
     await w.recorder.press(ADMIN, "menu_admin_debug")
@@ -3056,14 +3060,14 @@ async def scenario_admin_debug_prompt(w: LegacyWorld) -> None:
 
 @scenario("admin.cmd_debug")
 async def scenario_admin_cmd_debug(w: LegacyWorld) -> None:
-    w.scraper.script(KETTLE_URL, ProductInfo(name="Kettle", price=Decimal("80.00")))
+    w.scraper.script(KETTLE_URL, ProductInfo(name="Kettle", price=Decimal("80.00"), currency="EUR"))
     await w.recorder.command(ADMIN, "/debug")
     await w.recorder.command(ADMIN, f"/debug {KETTLE_URL}")
     await w.recorder.command(ADMIN, "/debug https://unknown.example.org/p")
     # A long URL cut in the header and in the error line, and a long scraped name.
     await w.recorder.command(ADMIN, "/debug http:/" + "x" * 90)
     long_url = "https://shop.example.com/item/44"
-    w.scraper.script(long_url, ProductInfo(name=LN81, price=Decimal("80.00")))
+    w.scraper.script(long_url, ProductInfo(name=LN81, price=Decimal("80.00"), currency="EUR"))
     await w.recorder.command(ADMIN, f"/debug {long_url}")
 
 
@@ -3288,7 +3292,9 @@ async def scenario_alert_target_crossing(w: LegacyWorld) -> None:
 @scenario("alert.back_in_stock")
 async def scenario_alert_back_in_stock(w: LegacyWorld) -> None:
     await seed_p1(w, available=False)
-    w.scraper.script(KETTLE_URL, ProductInfo(price=Decimal("80.00"), available=True))
+    w.scraper.script(
+        KETTLE_URL, ProductInfo(price=Decimal("80.00"), available=True, currency="EUR")
+    )
     await w.recorder.job("run_check_all")
     # Back in stock again with digest mode on: the queued payload keeps the old price.
     await seed_command(w, OWNER, "/digest_mode on")
@@ -3457,7 +3463,11 @@ async def scenario_alert_read_failures(w: LegacyWorld) -> None:
     outcomes: tuple[tuple[str, str, ProductInfo | BaseException], ...] = (
         (ITEM4_URL, "No Price", ProductInfo(name="No Price", price=None)),
         (ITEM5_URL, "Dollar", info("50.00", name="Dollar", currency="USD")),
-        (item6, "Used Offer", ProductInfo(price=Decimal("40.00"), condition="used")),
+        (
+            item6,
+            "Used Offer",
+            ProductInfo(price=Decimal("40.00"), condition="used", currency="EUR"),
+        ),
         (ITEM7_URL, "Offline", httpx.ConnectError("connection refused")),
         (
             item10,
@@ -3562,14 +3572,14 @@ async def scenario_alert_threshold_kinds(w: LegacyWorld) -> None:
             "Pinned New",
             ("percentage", "10"),
             "60.00",
-            ProductInfo(price=Decimal("59.00"), condition="new"),
+            ProductInfo(price=Decimal("59.00"), condition="new", currency="EUR"),
         ),
         (
             item_url(34),
             "Unpinned",
             ("percentage", "10"),
             "60.00",
-            ProductInfo(price=Decimal("59.00"), condition="new"),
+            ProductInfo(price=Decimal("59.00"), condition="new", currency="EUR"),
         ),
     )
     for url, name, threshold, price, page in edges:
@@ -3701,7 +3711,9 @@ async def scenario_alert_read_failures_domains(w: LegacyWorld) -> None:
     await seed_product(w, OWNER, ITEM5_URL, "Dollar", initial="40.00", errors=0)
     w.scraper.script(ITEM5_URL, info("50.00", name="Dollar", currency="USD"))
     used = await seed_product(w, OWNER, AMAZON_URLS[2], "Used Offer", initial="40.00")
-    w.scraper.script(AMAZON_URLS[2], ProductInfo(price=Decimal("40.00"), condition="used"))
+    w.scraper.script(
+        AMAZON_URLS[2], ProductInfo(price=Decimal("40.00"), condition="used", currency="EUR")
+    )
     await reanchor(w, "products", {"id": used}, "preferred_condition", "new")
     await w.recorder.job("run_check_all")
 
@@ -3720,8 +3732,8 @@ async def seed_suspended(w: LegacyWorld, *, recovered: bool = True) -> tuple[int
     await seed_job(w)
     await seed_job(w)
     if recovered:
-        w.scraper.script(KETTLE_URL, ProductInfo(price=Decimal("80.00")))
-        w.scraper.script(ITEM4_URL, ProductInfo(price=Decimal("80.00")))
+        w.scraper.script(KETTLE_URL, ProductInfo(price=Decimal("80.00"), currency="EUR"))
+        w.scraper.script(ITEM4_URL, ProductInfo(price=Decimal("80.00"), currency="EUR"))
     return p1, w.request.calls_of("sendMessage")[-1]
 
 
@@ -3801,7 +3813,7 @@ async def scenario_ops_reactivate_name_edges(w: LegacyWorld) -> None:
     await seed_job(w)
     await seed_job(w)
     for n in (75, 76):
-        w.scraper.script(item_url(n), ProductInfo(price=Decimal("80.00")))
+        w.scraper.script(item_url(n), ProductInfo(price=Decimal("80.00"), currency="EUR"))
     await w.recorder.press(OWNER, f"ops_react_{nameless}")
 
 

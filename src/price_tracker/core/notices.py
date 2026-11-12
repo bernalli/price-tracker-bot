@@ -18,7 +18,7 @@ OPS_DELETE_PREFIX = "ops_del_"
 OPS_DELETE_CONFIRM_PREFIX = "ops_delok_"
 MAX_LISTED_PRODUCTS = 10
 
-EventKind = Literal["suspended", "warning"]
+EventKind = Literal["suspended", "warning", "unavailable", "restocked"]
 
 
 def group_key_for(url: object) -> str:
@@ -53,6 +53,7 @@ class OperationalEvent:
     last_price: Decimal | None
     currency: str | None
     last_checked_at: str | None
+    notice_version: int = 0
 
 
 @dataclass(frozen=True)
@@ -95,9 +96,18 @@ class NoticeCollector:
 
     def groups(self) -> list[NoticeGroup]:
         """Return deterministically sorted groups with product-sorted event tuples."""
-        grouped: dict[tuple[int, EventKind, str], list[OperationalEvent]] = {}
+        grouped: dict[tuple[int, EventKind, str, str, int], list[OperationalEvent]] = {}
         for event in self._events.values():
-            key = (event.user_id, event.event, event.group_key)
+            # A shared heading must describe every product truthfully. Stock
+            # notices stay individual so each product's notification preferences apply.
+            individual = event.product_id if event.event in {"unavailable", "restocked"} else 0
+            key = (
+                event.user_id,
+                event.event,
+                event.group_key,
+                "warning" if event.event == "warning" else event.reason or "unknown",
+                individual,
+            )
             grouped.setdefault(key, []).append(event)
         return [
             NoticeGroup(
@@ -106,7 +116,9 @@ class NoticeCollector:
                 group_key=group_key,
                 events=tuple(sorted(events, key=lambda item: item.product_id)),
             )
-            for (user_id, event_kind, group_key), events in sorted(grouped.items())
+            for (user_id, event_kind, group_key, _reason, _individual), events in sorted(
+                grouped.items()
+            )
         ]
 
     def __len__(self) -> int:

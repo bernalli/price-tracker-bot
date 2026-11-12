@@ -12,28 +12,25 @@ repos:
       - id: detect-private-key
       - id: check-merge-conflict
 
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.12
+  - repo: local
     hooks:
       - id: ruff
-        args: [--fix, --exit-non-zero-on-fix]
+        name: ruff
+        entry: uv run --frozen --extra dev ruff check --fix --exit-non-zero-on-fix
+        language: system
+        types_or: [python, pyi, jupyter]
       - id: ruff-format
-
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.11.0
-    hooks:
+        name: ruff-format
+        entry: uv run --frozen --extra dev ruff format
+        language: system
+        types_or: [python, pyi, jupyter]
       - id: mypy
-        files: ^src/price_tracker/
-        additional_dependencies:
-          - types-requests
-          - types-beautifulsoup4
-          - types-python-dateutil
-          - tenacity
-          - httpx
-          - structlog
-          - aiosqlite
-          - python-telegram-bot
-          - prometheus-client
+        name: mypy
+        entry: uv run --frozen --extra dev mypy --strict src/price_tracker tests
+        language: system
+        files: ^(src/price_tracker/|tests/)
+        types_or: [python, pyi]
+        pass_filenames: false
 
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.30.0

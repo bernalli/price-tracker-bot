@@ -6,7 +6,7 @@ text:
    | 📦 <b>⁨Toaster⁩</b>
    | ⁨shop.example.com⁩ · #61 · attivo
    | 
-   | 💰 Ora: 39,90 €
+   | 💰 Ultimo prezzo rilevato: 39,90 €
    | 🚫 Esaurito
    | 📌 Inizio: 44,90 € · ▼ 11,1%
    | 📉 Minimo: 39,90 €

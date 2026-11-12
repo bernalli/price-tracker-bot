@@ -258,6 +258,16 @@ class PeriodicRunsMixin:
 
         dropped: list[_SweepJob] = []
 
+        async def record_skip(job: _SweepJob) -> None:
+            reason = (
+                "quarantined"
+                if job.domain and self.deps.health_mgr.is_locked(job.domain)
+                else "probe_skipped"
+                if job.domain and self.deps.health_mgr.is_half_open(job.domain)
+                else "deferred"
+            )
+            await self.deps.repo.record_check_outcome(job.product.id, reason=reason)
+
         def admit(job: _SweepJob, domain: str) -> bool:
             if self.deps.health_mgr.is_locked(domain):
                 if metrics is not None:
@@ -268,6 +278,7 @@ class PeriodicRunsMixin:
 
         async def run(job: _SweepJob) -> None:
             for skipped in dropped:
+                await record_skip(skipped)
                 await settle(skipped)
             dropped.clear()
             if job.domain is not None and self.deps.health_mgr.is_half_open(job.domain):
@@ -298,6 +309,8 @@ class PeriodicRunsMixin:
                 drop=drop,
             )
         finally:
+            for skipped in dropped:
+                await record_skip(skipped)
             if flush:
                 cancelled = False
                 for collector in list(unflushed.values()):
@@ -329,6 +342,8 @@ class PeriodicRunsMixin:
             )
             batches.append((products, NoticeCollector()))
         await self._run_sweep(batches)
+        if not batches:
+            await self._flush_guaranteed(NoticeCollector())
 
     def _last_attempt(self, product: ProductRecord) -> datetime | None:
         """The latest known attempt: this process's own, else the stored read or failure.
@@ -392,3 +407,5 @@ class PeriodicRunsMixin:
             if due:
                 batches.append((due, NoticeCollector()))
         await self._run_sweep(batches)
+        if not batches:
+            await self._flush_guaranteed(NoticeCollector())

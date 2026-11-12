@@ -32,6 +32,9 @@ def _context(csv_body: str) -> tuple[MagicMock, MagicMock, AsyncMock]:
     result = MagicMock()
     result.price = Decimal("19.99")
     result.name = "Widget"
+    result.currency = "EUR"
+    result.available = True
+    result.error = None
     product_scraper = MagicMock()
     product_scraper.scrape = AsyncMock(return_value=result)
     scraper = MagicMock()

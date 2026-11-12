@@ -8,6 +8,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 
 from price_tracker.bot.callbacks import Action, encode
+from price_tracker.bot.handlers._check_status import check_reason
 from price_tracker.bot.handlers._helpers import (
     _escape_html,
     _get_user_product,
@@ -16,7 +17,6 @@ from price_tracker.bot.handlers._helpers import (
 from price_tracker.bot.handlers.callbacks._legacy import resolve_callback
 from price_tracker.bot.messages import _
 from price_tracker.bot.ui.product_rows import amount, product_row
-from price_tracker.core.alert import _why
 from price_tracker.core.notices import group_key_for
 from price_tracker.core.textlimits import split_message
 
@@ -42,8 +42,16 @@ async def _automatic_group(
     if anchor is None:
         return None, "", []
     domain = group_key_for(anchor.get("url", ""))
+    if anchor.get("suspension_kind") != "automatic":
+        return anchor, domain, []
     suspended = await db.list_auto_suspended_products(user_id=user_id)
-    group = [product for product in suspended if group_key_for(product.get("url", "")) == domain]
+    reason = anchor.get("suspension_reason")
+    group = [
+        product
+        for product in suspended
+        if group_key_for(product.get("url", "")) == domain
+        and product.get("suspension_reason") == reason
+    ]
     return anchor, domain, group
 
 
@@ -94,15 +102,16 @@ async def _handle_reactivate(
         delay_between_products=0.5,
     )
     lines = [
-        _("🔄 <b>Rechecked {n} products on {domain}</b>").format(
+        _("🔄 <b>Check results for {n} products on {domain}</b>").format(
             n=len(group), domain=_escape_html(domain)
         )
     ]
-    for index, original in enumerate(group):
+    results_by_id = {result.product_id: result for result in results}
+    for original in group:
         product = await db.get_product(original.id)
         name_source = product.get("name") if product is not None else original.get("name")
         url_source = product.get("url") if product is not None else original.get("url")
-        result = results[index] if index < len(results) else None
+        result = results_by_id.get(original.id)
         reason = getattr(result, "reason", None)
         current_price = amount(product.get("current_price")) if product is not None else None
         lines.append(
@@ -112,10 +121,14 @@ async def _handle_reactivate(
                 initial=amount(product.get("initial_price")) if product is not None else None,
                 currency=str(product.get("currency", "EUR")) if product is not None else "EUR",
                 mark="✅"
-                if reason is None and current_price is not None
-                else "❌ " + _why(reason, None).split(" (", 1)[0],
+                if result is not None and reason is None and current_price is not None
+                else "⚠️",
             )
         )
+        if result is None or reason is not None:
+            lines.append(_("   {reason}").format(reason=check_reason(reason)))
+        if result is not None and result.disabled:
+            lines.append(_("   Tracking suspended; use /reactivate to resume."))
     await _reply_chunked(query, "\n".join(lines))
     return True
 

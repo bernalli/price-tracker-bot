@@ -6,27 +6,27 @@ Strategy: JSON-LD Product/offers (primary) with DOM data-buy-box-listing-price
 
 from __future__ import annotations
 
-import json
 import logging
 import re
-from typing import TYPE_CHECKING, ClassVar, TypedDict
+from typing import ClassVar
 
 import httpx
 from bs4 import BeautifulSoup, Tag
 
 from price_tracker.core.fetch import fetch_page
+from price_tracker.core.page_image import ImagePageHTML
 from price_tracker.core.retry_policy import RetryConfig, with_retry
 from price_tracker.core.scraper_base import (
     AbstractScraper,
     ProductInfo,
-    detect_currency,
     get_headers,
-    parse_price,
-    select_jsonld_offer,
 )
-
-if TYPE_CHECKING:
-    from decimal import Decimal
+from price_tracker.scrapers.secondary_evidence import (
+    EvidenceResult,
+    dom_evidence,
+    page_matches,
+    product_evidence,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -63,17 +63,14 @@ def _is_struck_through(el: Tag, container: Tag) -> bool:
     return False
 
 
-class StrategyResult(TypedDict, total=False):
-    price: Decimal
-    currency: str
-    name: str
+StrategyResult = EvidenceResult
 
 
 @with_retry(RetryConfig(max_attempts=3, base_wait=2.0, max_wait=10.0))
 async def _fetch_etsy_html(url: str, client: httpx.AsyncClient) -> str:
     headers = get_headers()
     page = await fetch_page(url, client, headers=headers)
-    return page.text
+    return ImagePageHTML(page.text, page.url_final)
 
 
 class EtsyScraper(AbstractScraper):
@@ -93,19 +90,32 @@ class EtsyScraper(AbstractScraper):
             html = await _fetch_etsy_html(url, client)
         except (httpx.HTTPError, ValueError) as e:
             logger.debug("Etsy fetch failed for %s: %s", url[:80], e)
-            return ProductInfo(error=f"HTTP error: {e}")
+            return ProductInfo(error=f"HTTP error: {e}", stock_evidence=False)
 
         soup = BeautifulSoup(html, "lxml")
-        info = ProductInfo()
+        if not page_matches(soup, url, getattr(html, "final_url", url)):
+            return ProductInfo(error="identity_mismatch", stock_evidence=False)
+        info = ProductInfo(stock_evidence=False)
 
         for strategy_name, strategy_fn in (
-            ("jsonld", self._try_jsonld),
+            ("jsonld", lambda page: self._try_jsonld(page, url)),
             ("dom", self._try_dom),
         ):
             try:
                 result = strategy_fn(soup)
+                if result and result.get("identity_mismatch"):
+                    return ProductInfo(error="identity_mismatch", stock_evidence=False)
+                if result and result.get("currency_ambiguous"):
+                    return ProductInfo(error="currency_ambiguous", stock_evidence=False)
+                if result and result.get("available") is False:
+                    return ProductInfo(
+                        name=result.get("name"), currency=result.get("currency"), available=False
+                    )
                 if result and result.get("price") is not None and info.price is None:
                     info.price = result["price"]
+                    if isinstance(result.get("available"), bool):
+                        info.available = result["available"]
+                        info.stock_evidence = True
                     if result.get("currency") and info.currency is None:
                         info.currency = result["currency"]
                     if result.get("name") and info.name is None:
@@ -124,45 +134,16 @@ class EtsyScraper(AbstractScraper):
                 if title_text:
                     info.name = title_text[:200]
 
-        if info.currency is None:
-            info.currency = detect_currency(str(info.price or "")) or "USD"
+        if info.price is not None and info.currency is None:
+            return ProductInfo(name=info.name, error="currency_ambiguous", stock_evidence=False)
 
         if info.price is None:
             info.error = "Price not found in page"
 
         return info
 
-    def _try_jsonld(self, soup: BeautifulSoup) -> StrategyResult | None:
-        scripts = soup.find_all("script", type="application/ld+json")
-        for script in scripts:
-            raw = script.string or script.get_text(strip=True)
-            if not raw:
-                continue
-            try:
-                data = json.loads(raw)
-            except (json.JSONDecodeError, ValueError):
-                continue
-            items = data if isinstance(data, list) else [data]
-            for item in items:
-                if not isinstance(item, dict):
-                    continue
-                type_val = item.get("@type", "")
-                type_str = " ".join(type_val) if isinstance(type_val, list) else str(type_val)
-                if "Product" not in type_str:
-                    continue
-                selected = select_jsonld_offer(item.get("offers"))
-                if selected is None:
-                    continue
-                parsed, currency = selected
-                result: StrategyResult = {
-                    "price": parsed,
-                    "currency": currency or "USD",
-                }
-                name = item.get("name")
-                if isinstance(name, str) and name:
-                    result["name"] = name[:200]
-                return result
-        return None
+    def _try_jsonld(self, soup: BeautifulSoup, url: str) -> StrategyResult | None:
+        return product_evidence(soup, url)
 
     def _try_dom(self, soup: BeautifulSoup) -> StrategyResult | None:
         container = soup.select_one("[data-buy-box-listing-price]")
@@ -178,21 +159,7 @@ class EtsyScraper(AbstractScraper):
         value_el = next(
             (el for el in candidates if not _is_struck_through(el, container)), candidates[0]
         )
-        parsed = parse_price(value_el.get_text(strip=True))
-        if parsed is None:
-            return None
-        result: StrategyResult = {"price": parsed}
-
-        # Symbol adjacent to the chosen value (same parent), not the container's
-        # first — that may belong to the struck-through price (#40).
-        symbol_el = None
         parent = value_el.parent
-        if isinstance(parent, Tag):
-            symbol_el = parent.select_one(".currency-symbol")
-        if symbol_el is None:
-            symbol_el = container.select_one(".currency-symbol")
-        if isinstance(symbol_el, Tag):
-            symbol = symbol_el.get_text(strip=True)
-            if symbol:
-                result["currency"] = _symbol_to_iso(symbol)
-        return result
+        symbol_el = parent.select_one(".currency-symbol") if isinstance(parent, Tag) else None
+        declared = symbol_el.get_text(strip=True) if isinstance(symbol_el, Tag) else None
+        return dom_evidence(value_el.get_text(strip=True), declared)

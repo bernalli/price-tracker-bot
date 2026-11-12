@@ -11,10 +11,14 @@
    text:
    | ⚠️ <b>Errori recenti (2)</b>
    |
-   | <b>N/D</b> 🔒3 Kettle
-   | <b>N/D</b> 🔒1 Fan
+   | <b>N/D</b> ⚠️3 Kettle
+   | #1: Non sono riuscito a leggere il prezzo.
+   | 🔒 I controlli su questo sito sono temporaneamente in pausa.
+   | <b>N/D</b> ⚠️1 Fan
+   | #2: Non sono riuscito a completare il controllo per un errore di comunicazione o elaborazione.
+   | 🔒 I controlli su questo sito sono temporaneamente in pausa.
    |
-   | ℹ️ I siti in 🔒 quarantena riprendono da soli; usa /reactivate per riattivare un prodotto sospeso.
+   | Usa /reactivate per riprendere il monitoraggio di un prodotto sospeso.
 ## db after step 4
 ~ users user_id=10 display_name: NULL -> "U10"
 ## step 5: command "/errors" user=10
@@ -23,10 +27,14 @@
    text:
    | ⚠️ <b>Errori recenti (2)</b>
    |
-   | <b>N/D</b> 🔒3 Kettle
-   | <b>N/D</b> 🔒1 Fan
+   | <b>N/D</b> ⚠️3 Kettle
+   | #1: Non sono riuscito a leggere il prezzo.
+   | 🔒 I controlli su questo sito sono temporaneamente in pausa.
+   | <b>N/D</b> ⚠️1 Fan
+   | #2: Non sono riuscito a completare il controllo per un errore di comunicazione o elaborazione.
+   | 🔒 I controlli su questo sito sono temporaneamente in pausa.
    |
-   | ℹ️ I siti in 🔒 quarantena riprendono da soli; usa /reactivate per riattivare un prodotto sospeso.
+   | Usa /reactivate per riprendere il monitoraggio di un prodotto sospeso.
 ## db after step 5
 (no changes)
 ## step 6: command "/errori" user=10
@@ -35,11 +43,19 @@
    text:
    | ⚠️ <b>Errori recenti (4)</b>
    |
-   | <b>N/D</b> 🔒3 Kettle
-   | <b>N/D</b> 🔒1 Fan
-   | <b>N/D</b> 🔒1 Long NNNNNNNNNNNNNNNNNN…
-   | <b>N/D</b> 🔒1 P4
+   | <b>N/D</b> ⚠️3 Kettle
+   | #1: Non sono riuscito a leggere il prezzo.
+   | 🔒 I controlli su questo sito sono temporaneamente in pausa.
+   | <b>N/D</b> ⚠️1 Fan
+   | #2: Non sono riuscito a completare il controllo per un errore di comunicazione o elaborazione.
+   | 🔒 I controlli su questo sito sono temporaneamente in pausa.
+   | <b>N/D</b> ⚠️1 Long NNNNNNNNNNNNNNNNNN…
+   | #3: Non sono riuscito a leggere il prezzo.
+   | 🔒 I controlli su questo sito sono temporaneamente in pausa.
+   | <b>N/D</b> ⚠️1 P4
+   | #4: Non sono riuscito a completare il controllo.
+   | 🔒 I controlli su questo sito sono temporaneamente in pausa.
    |
-   | ℹ️ I siti in 🔒 quarantena riprendono da soli; usa /reactivate per riattivare un prodotto sospeso.
+   | Usa /reactivate per riprendere il monitoraggio di un prodotto sospeso.
 ## db after step 6
 (no changes)

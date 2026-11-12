@@ -9,16 +9,19 @@
    text:
    | ⏳ <b>Controlli in errore su 93.184.216.34</b> (1)
    |
-   | 1 prodotti hanno fallito 1/2 controlli di fila. Se continua, verranno sospesi automaticamente.
+   | 1 prodotto richiede attenzione. Errori ripetuti possono sospendere il monitoraggio.
    |
    | <b>10,00 €</b> ⚠️ Bare IP
+   | #1: prezzo non leggibile (1/2)
    |
    | Dettagli con /errori.
    markup: {}
 ## db after step 1
++ bot_config key="warning_notice:10:93.184.216.34:no_scraper" {value="2026-03-01T12:00:00+00:00"}
 ~ products id=1 consecutive_errors: 0 -> 1
 ~ products id=1 last_error: NULL -> "no_scraper"
 ~ products id=1 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=1 last_check_outcome: NULL -> "no_scraper"
 ## step 2: command "/check 1" user=10
 -> sendMessage chat=10
    text:
@@ -29,9 +32,10 @@
    text:
    | ⚠️ <b>Prezzo illeggibile su 93.184.216.34</b> (1)
    |
-   | Le pagine si aprono, ma il prezzo non si legge più (layout cambiato o offerta diversa).
+   | Non è stato possibile ottenere un prezzo affidabile. La pagina o l’offerta potrebbero essere cambiate.
    |
    | <b>10,00 €</b> ⚠️ Bare IP
+   | #1: prezzo non leggibile
    |
    | Riattiva per fare subito un nuovo controllo.
    keyboard:
@@ -40,13 +44,14 @@
 -> editMessageText chat=10 message_id=1001
    param parse_mode="HTML"
    text:
-   | ✅ <b>Bare IP</b>
-   | 💰 Prezzo: €10.00
-   | 📊 Nessuna variazione significativa.
+   | ⚠️ <b>Bare IP</b>
+   | 💰 Ultimo prezzo rilevato: 10,00 €
+   | Al momento non riesco a controllare questo sito.
 ## db after step 2
 ~ products id=1 is_active: 1 -> 0
 ~ products id=1 consecutive_errors: 1 -> 2
 ~ products id=1 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
 ~ products id=1 suspension_kind: NULL -> "automatic"
 ~ products id=1 suspension_reason: NULL -> "no_scraper"
+~ products id=1 notice_version: 0 -> 1
 ~ users user_id=10 display_name: NULL -> "U10"

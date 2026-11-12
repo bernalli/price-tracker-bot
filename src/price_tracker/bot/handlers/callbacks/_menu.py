@@ -22,6 +22,7 @@ from telegram.constants import ParseMode
 from price_tracker.bot.callbacks import Action, encode
 from price_tracker.bot.decorators import _config
 from price_tracker.bot.handlers._cards import home_view
+from price_tracker.bot.handlers._check_status import check_summary
 from price_tracker.bot.handlers.callbacks._legacy import resolve_callback
 from price_tracker.bot.handlers.callbacks._nav import _edit
 from price_tracker.bot.keyboards import menu_back_button
@@ -297,12 +298,7 @@ async def _handle_menu_checkall(
     )
     alerts = [r.alert for r in results if r.alert is not None]
     updated = await db.get_active_products(user_id)
-    txt_lines = [
-        _("✅ <b>Complete</b> — {count} products").format(count=len(updated)).replace(" — ", "\n")
-        + chr(10)
-    ]
-    for p in updated:
-        txt_lines.append(record_row(p))
+    txt_lines = check_summary(products, updated, results)
     if alerts:
         txt_lines.append(chr(10) + _("🔔 <b>{count} changes!</b>").format(count=len(alerts)))
     pages = split_message(chr(10).join(txt_lines))

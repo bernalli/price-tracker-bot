@@ -7,7 +7,6 @@ budget.
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import csv
 import io
 import logging
@@ -24,10 +23,22 @@ from telegram.ext import (
     filters,
 )
 
-from price_tracker.app.inputs import Absolute, Percentage, parse_threshold
+from price_tracker.app.inputs import (
+    Absolute,
+    ClearTarget,
+    InputError,
+    Percentage,
+    SetTarget,
+    parse_currency_code,
+    parse_target,
+    parse_threshold,
+)
 from price_tracker.bot.decorators import _client, _db, _scraper, restricted, with_locale
 from price_tracker.bot.handlers._helpers import _record_manual_start
 from price_tracker.bot.messages import _
+from price_tracker.core.exceptions import BlockEvent
+from price_tracker.core.money import MAX_AMOUNT
+from price_tracker.core.scraper_base import ProductInfo
 
 logger = logging.getLogger(__name__)
 
@@ -147,8 +158,10 @@ async def cmd_import(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         text = buf.read().decode("utf-8")
         reader = csv.DictReader(io.StringIO(text), dialect=_csv_dialect(text))
         fieldnames = reader.fieldnames or []
-    except Exception as e:  # noqa: BLE001 — surface parse error to user
-        await update.message.reply_text(_("❌ Error parsing the CSV: {error}").format(error=e))
+    except (UnicodeDecodeError, csv.Error):
+        await update.message.reply_text(
+            _("❌ I couldn't read the CSV. Save it as UTF-8 and try again.")
+        )
         return
     if "URL" not in fieldnames:
         await update.message.reply_text(
@@ -167,6 +180,10 @@ async def cmd_import(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     skipped = 0
     errors = 0
     invalid_thresholds = 0
+    invalid_targets = 0
+    currency_errors = 0
+    unknown_currencies = 0
+    pending = 0
 
     msg = await update.message.reply_text(_("⏳ Import in progress..."))
 
@@ -196,6 +213,18 @@ async def cmd_import(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             invalid_thresholds += 1
             continue
 
+        target_cell = (row.get("Target") or "").strip()
+        target_input = parse_target(target_cell) if target_cell else ClearTarget()
+        if not isinstance(target_input, (SetTarget, ClearTarget)):
+            invalid_targets += 1
+            continue
+        target = target_input.amount if isinstance(target_input, SetTarget) else None
+        currency_cell = (row.get("Valuta") or "").strip()
+        csv_currency = parse_currency_code(currency_cell) if currency_cell else None
+        if isinstance(csv_currency, InputError):
+            currency_errors += 1
+            continue
+
         # Skip duplicates
         existing = await db.get_product_by_url_for_user(url, user_id)
         if existing:
@@ -209,18 +238,33 @@ async def cmd_import(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
                 errors += 1
                 continue
             _record_manual_start(context, url)
-            result = await scraper_for_url.scrape(url, client)
+            try:
+                result = await scraper_for_url.scrape(url, client)
+            except BlockEvent:
+                result = ProductInfo(error="blocked")
+            scraped_currency = (
+                parse_currency_code(result.currency) if isinstance(result.currency, str) else None
+            )
+            if isinstance(scraped_currency, InputError) or result.error:
+                scraped_currency = None
+            if csv_currency and scraped_currency and csv_currency != scraped_currency:
+                currency_errors += 1
+                continue
+            currency = scraped_currency or csv_currency
+            if currency is None:
+                unknown_currencies += 1
+                continue
             price = result.price
-            name = result.name or row.get("Nome", _("Imported"))
-
-            # Use CSV target if available
-            target_str = row.get("Target", "").strip()
-            target = None
-            if target_str:
-                with contextlib.suppress(ValueError, ArithmeticError):
-                    target = Decimal(target_str)
-
-            currency = row.get("Valuta", "EUR").strip() or "EUR"
+            if (
+                (result.stock_evidence and result.available is False)
+                or result.error
+                or scraped_currency is None
+                or type(price) is not Decimal
+                or not price.is_finite()
+                or not (0 < price <= MAX_AMOUNT)
+            ):
+                price = None
+            name = result.name or row.get("Nome") or _("Imported")
 
             new_pid = await db.add_product(
                 user_id=user_id,
@@ -234,7 +278,10 @@ async def cmd_import(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             )
             if target is not None:
                 await db.set_target_price(new_pid, target)
-            imported += 1
+            if price is None:
+                pending += 1
+            else:
+                imported += 1
         except Exception as e:  # noqa: BLE001 — log + count and keep going
             logger.error("Import error for %s: %s", url[:60], e)
             errors += 1
@@ -245,6 +292,21 @@ async def cmd_import(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         lines.append(_("⏭️ Duplicates skipped: {count}").format(count=skipped))
     if errors:
         lines.append(_("❌ Errors: {count}").format(count=errors))
+    if pending:
+        lines.append(_("⏳ Awaiting price verification: {count}").format(count=pending))
+    if currency_errors:
+        lines.append(
+            _("❌ Rows with invalid or conflicting currency: {count}").format(count=currency_errors)
+        )
+    if unknown_currencies:
+        lines.append(
+            _(
+                "❌ Currency could not be verified for {count} rows. "
+                "Add an explicit currency in the Valuta column and import again."
+            ).format(count=unknown_currencies)
+        )
+    if invalid_targets:
+        lines.append(_("❌ Rows with an invalid target: {count}").format(count=invalid_targets))
     if invalid_thresholds:
         lines.append(_("❌ Rows with an invalid threshold: {n}").format(n=invalid_thresholds))
     await msg.edit_text(chr(10).join(lines), parse_mode=ParseMode.HTML)

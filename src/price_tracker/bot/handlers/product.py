@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 
 from telegram import (
     InlineKeyboardButton,
@@ -27,7 +27,10 @@ from price_tracker.app.inputs import (
     SCALAR_MAX_CHARS,
     Absolute,
     AnyDrop,
+    ClearTarget,
     Percentage,
+    SetTarget,
+    parse_target,
     parse_threshold,
 )
 from price_tracker.bot import list_media
@@ -224,9 +227,8 @@ async def cmd_target(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     if product_id is None:
         await update.message.reply_text(_("❌ Invalid ID."))
         return
-    try:
-        target = Decimal(context.args[1].replace(",", ".").replace("€", ""))
-    except (InvalidOperation, ValueError):
+    parsed = parse_target(context.args[1].replace("€", ""))
+    if not isinstance(parsed, (SetTarget, ClearTarget)):
         await update.message.reply_text(_("❌ Invalid price."))
         return
 
@@ -236,13 +238,14 @@ async def cmd_target(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         return
 
     db = _db(context)
-    if target <= 0:
+    if isinstance(parsed, ClearTarget):
         await db.set_target_price(product_id, None)
         await update.message.reply_text(
             _("🎯 Target removed for #{product_id}.").format(product_id=product_id)
         )
         return
 
+    target = parsed.amount
     await db.set_target_price(product_id, target)
     name = product.get("name") or _("Unknown")
     current = _safe_dec(product.get("current_price"))
@@ -342,7 +345,7 @@ async def _add_product(
     scraper = _scraper(context)
     user_id = update.effective_user.id
 
-    from price_tracker.core.scraper_base import detect_currency  # noqa: PLC0415
+    from price_tracker.core.money import MAX_AMOUNT, normalize_currency_code  # noqa: PLC0415
     from price_tracker.core.url_utils import (  # noqa: PLC0415
         UnsafeURLError,
         UnsupportedSchemeError,
@@ -405,11 +408,17 @@ async def _add_product(
         BlockEvent,
         CaptchaDetected,
         HTTPBlockStatus,
+        ListingGone,
     )
 
     _record_manual_start(context, url)
     try:
         result = await scraper_for_url.scrape(url, client)
+    except ListingGone:
+        await msg.edit_text(
+            _("❌ The product page could not be found. Check the link and try again.")
+        )
+        return
     except BlockEvent as exc:
         logger.info("Add blocked by site protection for %s: %s", url[:60], exc)
         # A rate limit (429) or a CAPTCHA wears off: retrying later can work.
@@ -425,25 +434,45 @@ async def _add_product(
             )
         else:
             text = _(
-                "🛡 This site blocks automated requests (bot protection), "
-                "so I can't read the price.\n"
-                "The block is usually permanent: this product can't be tracked for now."
+                "🛡 The site blocked this automated check, so I couldn't read the price.\n"
+                "Please try again later."
             )
         await msg.edit_text(text)
         return
 
-    if result.price is None:
-        error_msg = result.error or _("Price not found")
+    if result.stock_evidence and result.available is False:
         await msg.edit_text(
-            _(
-                "❌ I could not find the price.\n"
-                "Reason: {reason}\n\n"
-                "💡 Check that the link is correct and the product is available."
-            ).format(reason=error_msg)
+            _("📦 This product is currently unavailable. Try adding it again later.")
         )
         return
 
-    currency = result.currency or detect_currency(url) or "EUR"
+    if result.price is None and result.error == "currency_ambiguous":
+        await msg.edit_text(
+            _(
+                "❌ The price currency could not be determined. "
+                "Check the product page and try again."
+            )
+        )
+        return
+
+    if (
+        result.error is not None
+        or type(result.price) is not Decimal
+        or not result.price.is_finite()
+        or not (0 < result.price <= MAX_AMOUNT)
+    ):
+        await msg.edit_text(_("❌ I couldn't read the price. Check the link and try again later."))
+        return
+
+    currency = normalize_currency_code(result.currency)
+    if currency is None:
+        await msg.edit_text(
+            _(
+                "❌ The price currency could not be determined. "
+                "Check the product page and try again."
+            )
+        )
+        return
 
     image_url = normalize_image_url(result.image_url, base_url=url)
     product_id = await db.add_product(

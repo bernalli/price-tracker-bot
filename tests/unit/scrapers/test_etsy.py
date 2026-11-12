@@ -96,7 +96,7 @@ async def test_etsy_dom_skips_strikethrough_original_price(original_block: str) 
     <html><head><title>Discounted Listing - Etsy</title></head><body>
     <div data-buy-box-listing-price>
       {original_block}
-      <p><span class="currency-symbol">$</span><span class="currency-value">49.00</span></p>
+      <p><span class="currency-symbol">US$</span><span class="currency-value">49.00</span></p>
     </div>
     </body></html>
     """
@@ -117,7 +117,8 @@ async def test_etsy_dom_keeps_struck_value_when_it_is_the_only_one() -> None:
     html = """
     <html><head><title>Odd Listing - Etsy</title></head><body>
     <div data-buy-box-listing-price>
-      <p><s><span class="currency-symbol">$</span><span class="currency-value">99.00</span></s></p>
+      <p><s><span class="currency-symbol">US$</span>
+      <span class="currency-value">99.00</span></s></p>
     </div>
     </body></html>
     """
@@ -163,7 +164,7 @@ async def test_etsy_handles_malformed_jsonld_falls_back_to_dom() -> None:
     </head><body>
     <h1>Etsy Sample</h1>
     <div data-buy-box-listing-price>
-      <p><span class="currency-symbol">$</span><span class="currency-value">7.50</span></p>
+      <p><span class="currency-symbol">US$</span><span class="currency-value">7.50</span></p>
     </div>
     </body></html>
     """

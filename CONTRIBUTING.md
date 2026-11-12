@@ -25,13 +25,16 @@ Open a GitHub Issue using the **Feature request** template. Describe the problem
 git clone https://github.com/bernalli/price-tracker-bot.git
 cd price-tracker-bot
 
-# Recommended: uv venv
-python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
+# Install uv and make it available on PATH, then sync the locked development tools.
+uv sync --frozen --extra dev
+source .venv/bin/activate
 
 # Install pre-commit hooks (runs ruff, mypy, gitleaks, bandit on every commit)
-pre-commit install
+uv run --frozen --extra dev pre-commit install
 ```
+
+The Ruff and MyPy hooks require `uv` on PATH and use the project lockfile and
+development dependencies. MyPy checks both `src/price_tracker` and `tests`.
 
 ## Running tests
 

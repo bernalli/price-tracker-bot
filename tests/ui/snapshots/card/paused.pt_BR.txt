@@ -6,7 +6,7 @@ text:
    | [📦 <b>⁨Coffee Grinder G5⁩</b> 📦 <b>⁨Coffee Grinder G5⁩</b> 📦 <b>⁨Coffee Grinder G5⁩</b>]
    | [⁨shop.example.com⁩ · #43 · [paused paused paused] ⁨shop.example.com⁩ · #43 · [paused paused paused] ⁨shop.example.com⁩ · #43 · [paused paused paused]]
    | 
-   | [💰 Now: € 89,90 💰 Now: € 89,90 💰 Now: € 89,90]
+   | [💰 Last recorded price: € 89,90 💰 Last recorded price: € 89,90 💰 Last recorded price: € 89,90]
    | [📌 Start: € 88,05 · ▲ 2,1% 📌 Start: € 88,05 · ▲ 2,1% 📌 Start: € 88,05 · ▲ 2,1%]
    | [🔔 Alert: any drop 🔔 Alert: any drop 🔔 Alert: any drop]
    | [⏱ Checks: every 6 h · last há 3 horas ⏱ Checks: every 6 h · last há 3 horas ⏱ Checks: every 6 h · last há 3 horas]

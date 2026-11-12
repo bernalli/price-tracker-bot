@@ -6,7 +6,7 @@ text:
    | 📦 <b>⁨Coffee Grinder G5⁩</b>
    | ⁨shop.example.com⁩ · #43 · paused
    | 
-   | 💰 Now: €89.90
+   | 💰 Last recorded price: €89.90
    | 📌 Start: €88.05 · ▲ 2.1%
    | 🔔 Alert: any drop
    | ⏱ Checks: every 6 hr · last 3 hours ago

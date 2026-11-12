@@ -20,6 +20,7 @@ from telegram.constants import ParseMode
 
 from price_tracker.bot.callbacks import Action, encode
 from price_tracker.bot.handlers._cards import _currency
+from price_tracker.bot.handlers._check_status import check_reason
 from price_tracker.bot.handlers._helpers import (
     _escape_html,
     _get_user_product,
@@ -32,7 +33,6 @@ from price_tracker.bot.handlers.history import _generate_chart
 from price_tracker.bot.keyboards import build_threshold_keyboard
 from price_tracker.bot.messages import N_, _, current_locale, ngettext
 from price_tracker.bot.ui.width import truncate_to_width
-from price_tracker.core.alert import _why
 from price_tracker.i18n.format import money
 
 if TYPE_CHECKING:
@@ -182,8 +182,11 @@ async def handle_check_button(
     elif result.reason == "out_of_stock":
         notice = out_of_stock_line()
     elif result.reason is not None:
-        why = _why(result.reason, record.get("last_error"))
-        notice = _("❌ Not updated: {why}").format(why=why)
+        notice = (
+            None
+            if record.get("last_check_outcome") == result.reason
+            else _("⚠️ {reason}").format(reason=check_reason(result.reason))
+        )
     else:
         notice = _("✅ Checked: no significant change.")
     await show_card(query, context, record, notice=notice)

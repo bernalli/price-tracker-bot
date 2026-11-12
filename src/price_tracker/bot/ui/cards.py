@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from price_tracker.bot.messages import _, current_locale, ngettext
+from price_tracker.bot.ui.check_status import check_reason
 from price_tracker.bot.ui.escape import escape_html
 from price_tracker.bot.ui.labels import button, layout_rows
 from price_tracker.bot.ui.screens import Button, Screen
@@ -68,6 +69,13 @@ def _now_line(view: ProductView, *, loc: str) -> str:
     if view.current is None:
         return _("💰 Now: —")
     price = money(view.current, view.currency, locale=loc)
+    if (
+        view.consecutive_errors > 0
+        or view.status != "active"
+        or view.out_of_stock
+        or view.last_check_outcome is not None
+    ):
+        return _("💰 Last recorded price: {price}").format(price=price)
     estimate_value = view.reference_estimate
     if estimate_value is None or view.currency == view.reference_currency:
         return _("💰 Now: {price}").format(price=price)
@@ -153,7 +161,10 @@ def product_card(view: ProductView, actions: CardActions, *, now: datetime) -> S
         _now_line(view, loc=loc),
     ]
     if view.out_of_stock:
-        lines.append(_("🚫 Sold out"))
+        if view.last_check_outcome == "availability_unknown":
+            lines.append(_("🚫 Last confirmed: sold out"))
+        else:
+            lines.append(_("🚫 Sold out"))
     start_line = _start_line(view, loc=loc)
     if start_line is not None:
         lines.append(start_line)
@@ -170,6 +181,10 @@ def product_card(view: ProductView, actions: CardActions, *, now: datetime) -> S
     errors_line = _errors_line(view)
     if errors_line is not None:
         lines.append(errors_line)
+    if view.last_check_outcome is not None and not (
+        view.out_of_stock and view.last_check_outcome in {"out_of_stock", "unavailable"}
+    ):
+        lines.append(_("⚠️ {reason}").format(reason=check_reason(view.last_check_outcome)))
 
     return Screen(text="\n".join(lines), rows=_keyboard(view, actions))
 
@@ -189,6 +204,10 @@ def list_mark(view: ProductView) -> str:
         return "⚠️"
     if view.out_of_stock:
         return "🚫"
+    if view.last_check_outcome == "awaiting_confirmation":
+        return "⏳"
+    if view.last_check_outcome is not None:
+        return "⚠️"
     return ""
 
 

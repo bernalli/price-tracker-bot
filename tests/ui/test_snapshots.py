@@ -6,13 +6,14 @@ import string
 from pathlib import Path
 
 import pytest
+from babel.messages.extract import extract_from_file
 
 from price_tracker.bot.callbacks import InvalidCallback, decode
 from price_tracker.bot.messages import current_locale, set_locale
 from price_tracker.bot.ui.cards import product_card
 from price_tracker.bot.ui.width import display_width
 from price_tracker.core.textlimits import SAFE_LIMIT, _is_valid_telegram_markup, visible_length
-from tests.support.card_msgids import CARD_PLURAL, CARD_SINGULAR
+from tests.support.card_msgids import CARD_PLURAL, CARD_SINGULAR, STATUS_SINGULAR
 from tests.support.card_variants import NOW, VARIANTS, actions_for
 from tests.support.panel_msgids import PANEL_PLURAL, PANEL_SINGULAR
 from tests.support.pseudo_locale import extract_messages, write_pseudo_catalog
@@ -128,7 +129,17 @@ def _placeholders(text: str) -> set[str]:
     return {field for _, field, _, _ in string.Formatter().parse(text) if field}
 
 
-def test_pseudo_catalog_contains_exactly_the_29_card_msgids() -> None:
+def _status_msgids(root: Path) -> set[str]:
+    return {
+        msgid
+        for _lineno, msgid, _comments, _context in extract_from_file(
+            "python", root / "check_status.py", keywords={"_": None, "N_": None}
+        )
+        if isinstance(msgid, str)
+    }
+
+
+def test_pseudo_catalog_contains_card_and_status_msgids() -> None:
     root = Path(__file__).resolve().parents[2] / "src/price_tracker/bot/ui"
     messages = extract_messages(root)
     singular_ids = {m.id for m in messages if isinstance(m.id, str)}
@@ -136,9 +147,10 @@ def test_pseudo_catalog_contains_exactly_the_29_card_msgids() -> None:
     # "Product #{product_id}" is the pre-existing empty-name fallback msgid
     # (already in the catalog, shared with notifier/digest.py): it is a real
     # _() call site under bot/ui/, so extraction finds it, but it is not one
-    # of the 29 msgids the card adds.
+    # of the card-specific msgids.
     singular_ids -= {"Product #{product_id}", "N/A", "Unknown", *PANEL_SINGULAR}
-    assert singular_ids == set(CARD_SINGULAR)
+    assert _status_msgids(root) == set(STATUS_SINGULAR)
+    assert singular_ids == set(CARD_SINGULAR) | set(STATUS_SINGULAR)
     assert plural_ids == {CARD_PLURAL, PANEL_PLURAL}
 
 
@@ -153,8 +165,9 @@ def test_pseudo_catalog_msgstr_keeps_the_same_placeholders(tmp_path: Path) -> No
     translation = gettext.translation(
         "messages", localedir=tmp_path, languages=["zh_Hans"], class_=gettext.GNUTranslations
     )
-    for msgid in CARD_SINGULAR:
+    for msgid in set(CARD_SINGULAR) | _status_msgids(root):
         rendered = translation.gettext(msgid)
+        assert rendered != msgid, msgid
         assert _placeholders(rendered) == _placeholders(msgid), msgid
     singular, plural = CARD_PLURAL
     for n in (1, 2, 5, 12, 21):

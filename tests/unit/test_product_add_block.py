@@ -95,8 +95,9 @@ async def test_transient_block_suggests_retrying(exc: Exception) -> None:
         WAFBlocked(provider="akamai", url="u"),
     ],
 )
-async def test_bot_protection_block_does_not_promise_a_retry(exc: Exception) -> None:
-    """403/WAF pages (e.g. clarks.com, 2026-11-01) refuse every automated client."""
+async def test_bot_protection_block_does_not_claim_permanence(exc: Exception) -> None:
+    """The observed block cannot establish that every future request will be refused."""
     text = await _add_with_block(exc)
-    assert "try again in a few minutes" not in text
-    assert "bot protection" in text
+    assert "blocked this automated check" in text
+    assert "permanent" not in text.lower()
+    assert "try again in a few minutes" not in text.lower()

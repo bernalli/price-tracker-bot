@@ -44,10 +44,10 @@ def _msgids() -> set[str]:
 
 
 def test_the_pinned_panel_list_is_what_the_source_uses() -> None:
-    from tests.support.card_msgids import CARD_SINGULAR
+    from tests.support.card_msgids import CARD_SINGULAR, STATUS_SINGULAR
 
     used = _msgids() - {"Product #{product_id}"}
-    assert used == set(CARD_SINGULAR) | set(PANEL_SINGULAR)
+    assert used == set(CARD_SINGULAR) | set(PANEL_SINGULAR) | set(STATUS_SINGULAR)
 
 
 def test_every_msgid_is_in_en_and_translated_in_it_with_the_same_placeholders() -> None:

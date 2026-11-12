@@ -7,6 +7,6 @@
    param file_id="doc1"
 -> sendMessage chat=10
    text:
-   | ❌ Errore nel parsing del CSV: 'utf-8' codec can't decode byte 0xff in position 0: invalid start byte
+   | ❌ Non sono riuscito a leggere il CSV. Salvalo in UTF-8 e riprova.
 ## db after step 1
 ~ users user_id=10 display_name: NULL -> "U10"

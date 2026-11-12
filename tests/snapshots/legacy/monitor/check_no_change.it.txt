@@ -10,7 +10,7 @@
    param parse_mode="HTML"
    text:
    | ✅ <b>Kettle</b>
-   | 💰 Prezzo: €80.00
+   | 💰 Prezzo: 80,00 €
    | 📊 Nessuna variazione significativa.
 ## db after step 1
 + price_history id=6 {product_id=1, price="80.00", checked_at=<now:9999-99-99 99:99:99>}
@@ -26,7 +26,7 @@
    param parse_mode="HTML"
    text:
    | ✅ <b>Long NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN…</b>
-   | 💰 Prezzo: €85.00
+   | 💰 Prezzo: 85,00 €
    | 📊 Nessuna variazione significativa.
 ## db after step 2
 + price_history id=7 {product_id=2, price="85.00", checked_at=<now:9999-99-99 99:99:99>}

@@ -109,7 +109,7 @@ async def test_target_handles_malformed_jsonld_gracefully() -> None:
     html = """
     <html><head><title>Sample</title></head><body>
     <script type="application/ld+json">{not valid json</script>
-    <span data-test="product-price">$8.50</span>
+    <span data-test="product-price">US$8.50</span>
     </body></html>
     """
     with respx.mock(assert_all_called=False) as router:

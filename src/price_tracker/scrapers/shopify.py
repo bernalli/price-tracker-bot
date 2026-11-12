@@ -18,7 +18,7 @@ from bs4 import BeautifulSoup
 
 from price_tracker.core.exceptions import BlockEvent, HTTPBlockStatus, ListingGone
 from price_tracker.core.http_client import public_request
-from price_tracker.core.identity import RequestedIdentity
+from price_tracker.core.identity import RequestedIdentity, check_echoes, normalize_url
 from price_tracker.core.image_url import normalize_image_url
 from price_tracker.core.money import MAX_AMOUNT, Money, normalize_currency_code
 from price_tracker.core.page_image import (
@@ -27,7 +27,6 @@ from price_tracker.core.page_image import (
     PriceImageBinding,
     extract_page_image,
 )
-from price_tracker.core.pricegrammar import Unreadable, select_offer
 from price_tracker.core.retry_policy import RetryConfig, with_retry
 from price_tracker.core.scraper_base import (
     AbstractScraper,
@@ -36,13 +35,19 @@ from price_tracker.core.scraper_base import (
     detect_currency,
     detect_listing_gone,
     get_headers,
+    in_carousel_context,
     parse_price,
     retry_after_header,
     unwrap_jsonld_graph,
 )
 from price_tracker.core.structured_data import StructureError, decode_json_strict
+from price_tracker.scrapers.evidence import offer_evidence, price_currency
 
 logger = logging.getLogger(__name__)
+
+
+class _CurrencyAmbiguous(ValueError):
+    """The selected page's explicit currency declarations cannot be reconciled."""
 
 
 def _image_id(value: object) -> str | None:
@@ -161,8 +166,7 @@ def _url_matches_requested(value: object, requested: RequestedIdentity) -> bool:
     if isinstance(value, str):
         return requested.resolve(value) == requested.url
     if isinstance(value, list) and value:
-        resolved = {requested.resolve(v) for v in value if isinstance(v, str)}
-        return resolved == {requested.url}
+        return all(isinstance(v, str) and requested.resolve(v) == requested.url for v in value)
     return False
 
 
@@ -172,6 +176,13 @@ def _requested_variant_id(url: str) -> str | None:
         if key == "variant" and value:
             return value
     return None
+
+
+def _invalid_variant_selector(url: str) -> bool:
+    selectors = [
+        v for k, v in parse_qsl(urlparse(url).query, keep_blank_values=True) if k == "variant"
+    ]
+    return bool(selectors) and (len(selectors) != 1 or _embedded_id(selectors[0]) is None)
 
 
 def _without_variant_param(url: str) -> str:
@@ -334,6 +345,8 @@ class ShopifyScraper(AbstractScraper):
         return bool(re.search(r"/products/[a-z0-9\-]+", parsed.path))
 
     async def scrape(self, url: str, client: httpx.AsyncClient) -> ProductInfo:
+        if _invalid_variant_selector(url):
+            return ProductInfo(error="Variante Shopify non trovata o ambigua", stock_evidence=False)
         # Try JSON API first (most reliable)
         json_url = self._build_json_url(url)
         if json_url:
@@ -343,6 +356,8 @@ class ShopifyScraper(AbstractScraper):
                 if json_block.status != 429:
                     raise
                 return await self._scrape_page_after_json_429(url, client, json_block)
+            if result and (result.error or result.available is False) and result.price is None:
+                return result
             if result and result.price is not None:
                 if result.currency:
                     # The variant carried its own currency: the price and its
@@ -359,9 +374,7 @@ class ShopifyScraper(AbstractScraper):
                 except (BlockEvent, ListingGone):
                     html = None
                 if html:
-                    detected = self._detect_currency_from_html(html)
-                    if detected:
-                        result.currency = detected
+                    self._enrich_currency(result, html, url)
                 if not result.currency:
                     result.currency = detect_currency("")
                 return result
@@ -373,7 +386,7 @@ class ShopifyScraper(AbstractScraper):
             if page_result is not None:
                 return page_result
 
-        return ProductInfo(error="Prezzo non trovato (Shopify)")
+        return ProductInfo(error="Prezzo non trovato (Shopify)", stock_evidence=False)
 
     async def _scrape_page_after_json_429(
         self, url: str, client: httpx.AsyncClient, json_block: HTTPBlockStatus
@@ -395,11 +408,18 @@ class ShopifyScraper(AbstractScraper):
         page_result = self._read_product_page(html, url)
         if page_result is not None:
             return page_result
-        return ProductInfo(error="Prezzo non trovato (Shopify)")
+        return ProductInfo(error="Prezzo non trovato (Shopify)", stock_evidence=False)
 
     def _read_product_page(self, html: str, url: str) -> ProductInfo | None:
         """Price from a product page's HTML, or ``None`` when nothing was found."""
+        if _invalid_variant_selector(url):
+            return ProductInfo(error="Variante Shopify non trovata o ambigua", stock_evidence=False)
         if html:
+            soup = BeautifulSoup(html, "lxml")
+            if not self._page_identity_matches(soup, html, url):
+                return ProductInfo(
+                    error="Identità Shopify non corrispondente", stock_evidence=False
+                )
             # A headless (Next.js/Hydrogen) storefront has no legacy embedded Shopify
             # JSON at all: its JSON-LD carries a ProductGroup/hasVariant instead. Once
             # a matching ProductGroup is found, it is authoritative for this page — it
@@ -414,21 +434,42 @@ class ShopifyScraper(AbstractScraper):
 
             embedded = self._try_embedded_product_json(html, url)
             if embedded is not None:
-                embedded.currency = normalize_currency_code(self._detect_currency_from_html(html))
+                if not embedded.currency and not embedded.error:
+                    self._enrich_currency(embedded, html, url)
                 return embedded
 
-            result = self._try_cents_price(html)
-            if result is not None:
-                result.currency = normalize_currency_code(self._detect_currency_from_html(html))
-                return result
-
-            soup = BeautifulSoup(html, "lxml")
+            if _requested_variant_id(url) is not None:
+                return ProductInfo(
+                    error="Variante Shopify non verificabile nella pagina", stock_evidence=False
+                )
             css_result = self._try_shopify_selectors(soup)
             if css_result:
-                css_result.currency = normalize_currency_code(self._detect_currency_from_html(html))
+                if not css_result.currency and not css_result.error:
+                    self._enrich_currency(css_result, html, url)
                 return css_result
 
         return None
+
+    @staticmethod
+    def _page_identity_matches(soup: BeautifulSoup, html: str, url: str) -> bool:
+        try:
+            requested = RequestedIdentity.from_url(_without_variant_param(url))
+        except ValueError:
+            return False
+        final = _without_variant_param(getattr(html, "final_url", url))
+        tags = soup.select('link[rel="canonical"], meta[property="og:url"]')
+        canonical = next((str(tag.get("href")) for tag in tags if tag.name == "link"), None)
+        if canonical is not None:
+            canonical = _without_variant_param(canonical)
+        if not check_echoes(requested, final_url=final, canonical=canonical).ok:
+            return False
+        return all(
+            requested.resolve(
+                _without_variant_param(str(tag.get("href") or tag.get("content") or "")), final
+            )
+            == requested.url
+            for tag in tags
+        )
 
     @staticmethod
     async def _fetch_html(url: str, client: httpx.AsyncClient) -> str | None:
@@ -459,10 +500,6 @@ class ShopifyScraper(AbstractScraper):
                 url[:80],
                 str(response.url)[:80],
             )
-            if _is_product_path(url):
-                raise ListingGone(status=404, url=url)
-            # The tracked URL was not a product page to begin with (a collection,
-            # say): landing elsewhere says nothing about a listing being removed.
             return None
         return ImagePageHTML(response.text, str(response.url))
 
@@ -502,6 +539,18 @@ class ShopifyScraper(AbstractScraper):
             response = await _fetch_shopify_json(json_url, client)
             logger.debug("Shopify JSON API: status %s", response.status_code)
 
+            if normalize_url(str(response.url)) != normalize_url(json_url):
+                return ProductInfo(
+                    error="Identità Shopify non corrispondente", stock_evidence=False
+                )
+
+            if response.status_code == 404:
+                detect_block_event(
+                    status_code=404,
+                    body=response.text,
+                    url=json_url,
+                    retry_after=retry_after_header(response),
+                )
             if response.status_code == 403:
                 # Try curl_cffi fallback before conceding the block: it can bypass
                 # some WAFs the primary client can't. Only when it ALSO fails do we
@@ -565,7 +614,23 @@ class ShopifyScraper(AbstractScraper):
             name = product.get("title")
 
             variants = product.get("variants", [])
-            logger.debug("Shopify JSON API: %s, %d variants", name, len(variants))
+            if not isinstance(variants, list) or any(not isinstance(v, dict) for v in variants):
+                return ProductInfo(error="Varianti Shopify illeggibili", stock_evidence=False)
+            selectors = [
+                v
+                for k, v in parse_qsl(
+                    urlparse(requested_url or json_url).query, keep_blank_values=True
+                )
+                if k == "variant"
+            ]
+            if selectors:
+                requested_id = _embedded_id(selectors[0]) if len(selectors) == 1 else None
+                matches = [v for v in variants if _embedded_id(v.get("id")) == requested_id]
+                if requested_id is None or len(matches) != 1:
+                    return ProductInfo(
+                        error="Variante Shopify non trovata o ambigua", stock_evidence=False
+                    )
+                variants = matches
             declares_availability = any(isinstance(v, dict) and "available" in v for v in variants)
             price: Decimal | None = None
             currency: str | None = None
@@ -583,11 +648,17 @@ class ShopifyScraper(AbstractScraper):
                     logger.debug("Shopify variant price: %s -> %s", variant_price, parsed)
                     if parsed:
                         price = parsed
-                        currency = normalize_currency_code(variant.get("price_currency"))
+                        currency, ambiguous = price_currency(
+                            str(variant_price),
+                            variant.get("price_currency"),
+                            optional_declaration=True,
+                        )
+                        if ambiguous:
+                            return ProductInfo(error="currency_ambiguous", stock_evidence=False)
                         selected_variant = variant
                         break
 
-            if price is None and declares_availability:
+            if price is None and variants and all(v.get("available") is False for v in variants):
                 # No purchasable variant: report the first priced one, but
                 # flag the product as unavailable.
                 for variant in variants:
@@ -596,12 +667,27 @@ class ShopifyScraper(AbstractScraper):
                         parsed = parse_price(str(variant_price))
                         if parsed:
                             price = parsed
-                            currency = normalize_currency_code(variant.get("price_currency"))
+                            currency, ambiguous = price_currency(
+                                str(variant_price),
+                                variant.get("price_currency"),
+                                optional_declaration=True,
+                            )
+                            if ambiguous:
+                                return ProductInfo(
+                                    name=name, available=False, error="currency_ambiguous"
+                                )
                             available = False
                             selected_variant = variant
                             break
 
+                if price is None:
+                    return ProductInfo(name=name, available=False)
+
             if price is None:
+                if selectors:
+                    return ProductInfo(
+                        error="Prezzo della variante Shopify illeggibile", stock_evidence=False
+                    )
                 return None
 
             return ProductInfo(
@@ -611,6 +697,9 @@ class ShopifyScraper(AbstractScraper):
                 # usable ``price_currency``: the caller then reads it from the HTML.
                 currency=currency,
                 available=available,
+                stock_evidence=isinstance(selected_variant.get("available"), bool)
+                if selected_variant is not None
+                else False,
                 image_url=(
                     _api_image(
                         product, selected_variant, requested_url or json_url.removesuffix(".json")
@@ -687,8 +776,15 @@ class ShopifyScraper(AbstractScraper):
         first = results[0]
         if any((r.price, r.currency) != (first.price, first.currency) for r in results[1:]):
             return ProductInfo(
-                error="Prezzo ambiguo (Shopify): ProductGroup discordanti per lo stesso prodotto"
+                error="Prezzo ambiguo (Shopify): ProductGroup discordanti per lo stesso prodotto",
+                stock_evidence=False,
             )
+        if any(
+            r.stock_evidence != first.stock_evidence
+            or (r.stock_evidence and r.available != first.available)
+            for r in results[1:]
+        ):
+            first.stock_evidence = False
         if first.price is not None and document.valid:
             variant_id = _requested_variant_id(url)
             variant_refs: list[str] = []
@@ -738,7 +834,10 @@ class ShopifyScraper(AbstractScraper):
         variants_list = variants_raw if isinstance(variants_raw, list) else [variants_raw]
         variants = [v for v in variants_list if isinstance(v, Mapping)]
         if not variants:
-            return ProductInfo(error="Prezzo non trovato (Shopify): ProductGroup senza varianti")
+            return ProductInfo(
+                error="Prezzo non trovato (Shopify): ProductGroup senza varianti",
+                stock_evidence=False,
+            )
 
         requested_variant_id = _requested_variant_id(url)
         if requested_variant_id is not None:
@@ -748,44 +847,93 @@ class ShopifyScraper(AbstractScraper):
                     error=(
                         "Prezzo ambiguo (Shopify): variante "
                         f"{requested_variant_id!r} presente più volte"
-                    )
+                    ),
+                    stock_evidence=False,
                 )
             if not matches:
                 return ProductInfo(
                     error=(
                         "Prezzo non trovato (Shopify): variante "
                         f"{requested_variant_id!r} non trovata"
-                    )
+                    ),
+                    stock_evidence=False,
                 )
-            selected = select_offer(matches[0].get("offers"))
-            if isinstance(selected, Unreadable):
+            offers = matches[0].get("offers")
+            entries = offers if isinstance(offers, list) else [offers]
+            requested = RequestedIdentity.from_url(_without_variant_param(url))
+            for entry in entries:
+                if isinstance(entry, dict) and "url" in entry:
+                    offer_url = entry["url"]
+                    if not isinstance(offer_url, str) or _invalid_variant_selector(offer_url):
+                        return ProductInfo(
+                            error="Identità della variante Shopify non corrispondente",
+                            stock_evidence=False,
+                        )
+                    resolved = requested.resolve(_without_variant_param(offer_url))
+                    requested_pairs = parse_qsl(
+                        urlparse(requested.url).query, keep_blank_values=True
+                    )
+                    offer_pairs = parse_qsl(urlparse(resolved or "").query, keep_blank_values=True)
+                    if (
+                        resolved is None
+                        or resolved.split("?", 1)[0] != requested.url.split("?", 1)[0]
+                        or any(pair not in requested_pairs for pair in offer_pairs)
+                        or _requested_variant_id(offer_url) != requested_variant_id
+                    ):
+                        return ProductInfo(
+                            error="Identità della variante Shopify non corrispondente",
+                            stock_evidence=False,
+                        )
+            evidence = offer_evidence(offers, strict=True)
+            if evidence and evidence.get("currency_ambiguous"):
+                return ProductInfo(error="currency_ambiguous", stock_evidence=False)
+            if evidence is None or evidence["price"] is None:
+                if evidence and evidence.get("available") is False:
+                    return ProductInfo(name=name, available=False)
                 return ProductInfo(
-                    error=(
-                        "Prezzo non trovato (Shopify): prezzo variante illeggibile "
-                        f"({selected.reason})"
-                    )
+                    error="Prezzo non trovato (Shopify): prezzo variante illeggibile",
+                    stock_evidence=False,
                 )
-            return ProductInfo(name=name, price=selected.amount, currency=selected.currency)
-
-        readable: list[Money] = []
-        for variant in variants:
-            selected = select_offer(variant.get("offers"))
-            if isinstance(selected, Money):
-                readable.append(selected)
-        if not readable:
             return ProductInfo(
-                error="Prezzo non trovato (Shopify): nessuna variante con prezzo leggibile"
+                name=name,
+                price=evidence["price"],
+                currency=evidence["currency"],
+                available=evidence["available"] is not False,
+                stock_evidence=isinstance(evidence["available"], bool),
+            )
+
+        observations = [offer_evidence(v.get("offers"), strict=True) for v in variants]
+        if any(item and item.get("currency_ambiguous") for item in observations):
+            return ProductInfo(error="currency_ambiguous", stock_evidence=False)
+        evidence = [item for item in observations if item and item["price"] is not None]
+        readable = [Money(item["price"], item["currency"]) for item in evidence]
+        if not readable:
+            if all(item and item.get("available") is False for item in observations):
+                return ProductInfo(name=name, available=False)
+            return ProductInfo(
+                error="Prezzo non trovato (Shopify): nessuna variante con prezzo leggibile",
+                stock_evidence=False,
             )
         if len(set(readable)) > 1:
             return ProductInfo(
-                error=("Prezzo ambiguo (Shopify): varianti a prezzi diversi, nessuna selezionata")
+                error=("Prezzo ambiguo (Shopify): varianti a prezzi diversi, nessuna selezionata"),
+                stock_evidence=False,
             )
         chosen = readable[0]
-        return ProductInfo(name=name, price=chosen.amount, currency=chosen.currency)
+        available = not all(item and item.get("available") is False for item in evidence)
+        return ProductInfo(
+            name=name,
+            price=chosen.amount,
+            currency=chosen.currency,
+            available=available,
+            stock_evidence=all(item.get("available") is available for item in evidence),
+        )
 
     def _try_embedded_product_json(self, html: str, url: str) -> ProductInfo | None:
         """Select one complete, identity-bound product; rejection is terminal."""
-        rejected = ProductInfo(error="Unreadable or ambiguous embedded Shopify product")
+        rejected = ProductInfo(
+            error="Unreadable or ambiguous embedded Shopify product", stock_evidence=False
+        )
         try:
             requested = RequestedIdentity.from_url(_without_variant_param(url))
         except ValueError:
@@ -849,22 +997,45 @@ class ShopifyScraper(AbstractScraper):
         if selected_id is not None:
             if selected_id not in by_id:
                 return rejected
+            chosen_variants = [by_id[selected_id]]
             price = _embedded_variant_price(by_id[selected_id].get("price"))
         else:
-            prices = {_embedded_variant_price(v.get("price")) for v in by_id.values()}
-            prices.discard(None)
+            chosen_variants = [
+                v for v in by_id.values() if _embedded_variant_price(v.get("price")) is not None
+            ]
+            prices = {_embedded_variant_price(v.get("price")) for v in chosen_variants}
+            if not prices and all(v.get("available") is False for v in by_id.values()):
+                return ProductInfo(available=False)
             if len(prices) != 1:
                 return rejected
             price = prices.pop()
+        available = not all(v.get("available") is False for v in chosen_variants)
         if price is None:
-            return rejected
+            if available is False:
+                return ProductInfo(available=False)
+            return ProductInfo(available=available, error=rejected.error, stock_evidence=False)
         name = product.get("title")
-        return ProductInfo(name=name if isinstance(name, str) else None, price=price)
+        codes = [
+            price_currency(str(v.get("price", "")), v.get("price_currency"))
+            for v in chosen_variants
+        ]
+        known = {code for code, _ in codes if code is not None}
+        if any(ambiguous for _, ambiguous in codes) or len(known) > 1:
+            return ProductInfo(
+                available=available, error="currency_ambiguous", stock_evidence=False
+            )
+        return ProductInfo(
+            name=name if isinstance(name, str) else None,
+            price=price,
+            currency=next(iter(known), None),
+            available=available,
+            stock_evidence=all(v.get("available") is available for v in chosen_variants),
+        )
 
     @staticmethod
     def _try_cents_price(html: str) -> ProductInfo | None:
         """Last-resort Shopify-style price in cents anywhere in the page (2999 = 29.99)."""
-        info = ProductInfo()
+        info = ProductInfo(stock_evidence=False)
         cents_patterns = [
             r'"price"\s*:\s*(\d{3,7})(?=\s*[,}\]])',
             r'"price_min"\s*:\s*(\d{3,7})(?=\s*[,}\]])',
@@ -882,58 +1053,77 @@ class ShopifyScraper(AbstractScraper):
 
         return None
 
-    def _detect_currency_from_html(self, html: str) -> str | None:
-        """Detect currency from HTML page using JSON-LD, OG tags, and Shopify JS."""
+    def _enrich_currency(self, info: ProductInfo, html: str, url: str) -> None:
+        try:
+            info.currency = self._detect_currency_from_html(html, url=url, price=info.price)
+        except _CurrencyAmbiguous:
+            info.price = None
+            info.currency = None
+            info.error = "currency_ambiguous"
+
+    def _detect_currency_from_html(
+        self, html: str, *, url: str | None = None, price: Decimal | None = None
+    ) -> str | None:
+        """Currency declared by this page or a price-compatible owned product."""
         soup = BeautifulSoup(html, "lxml")
-
-        # 1. OG tag: og:price:currency
-        og_currency = soup.find("meta", property="og:price:currency")
-        if og_currency:
-            curr = og_currency.get("content", "").strip().upper()
-            if len(curr) == 3:
-                return curr
-
-        # 2. product:price:currency
-        prod_currency = soup.find("meta", property="product:price:currency")
-        if prod_currency:
-            curr = prod_currency.get("content", "").strip().upper()
-            if len(curr) == 3:
-                return curr
-
-        # 3. JSON-LD priceCurrency
-        for script in soup.find_all("script", type="application/ld+json"):
-            raw = script.string or script.get_text(strip=True)
-            if not raw:
-                continue
-            try:
-                data = json.loads(raw)
-                if isinstance(data, list):
-                    for item in data:
-                        if isinstance(item, dict) and item.get("@type") == "Product":
-                            data = item
-                            break
-                if isinstance(data, dict):
-                    offers = data.get("offers", {})
-                    if isinstance(offers, list) and offers:
-                        offers = offers[0]
-                    if isinstance(offers, dict):
-                        curr = offers.get("priceCurrency", "").strip().upper()
-                        if len(curr) == 3:
-                            return curr
-            except (json.JSONDecodeError, TypeError, AttributeError):
-                continue
-
-        # 4. Shopify JS: Shopify.currency.active
-        m = re.search(r'"currency"\s*:\s*"([A-Z]{3})"', html)
-        if m:
-            return m.group(1)
-
-        return None
+        if url and not self._page_identity_matches(soup, html, url):
+            return None
+        codes: set[str] = set()
+        declarations: list[object] = []
+        for tag in soup.select(
+            'meta[property="og:price:currency"], meta[property="product:price:currency"]'
+        ):
+            declarations.append(tag.get("content"))
+            code = normalize_currency_code(tag.get("content"))
+            if code:
+                codes.add(code)
+        requested = RequestedIdentity.from_url(_without_variant_param(url)) if url else None
+        document = ImageDocument.parse(soup)
+        if document.valid:
+            for node in document.nodes.values():
+                if "product" not in _schema_type_names(node):
+                    continue
+                identifiers = [node[key] for key in ("url", "@id") if key in node]
+                if (
+                    requested
+                    and identifiers
+                    and not all(_url_matches_requested(value, requested) for value in identifiers)
+                ):
+                    continue
+                # Variant enrichment cannot borrow a product-level or anonymous offer.
+                if url and _requested_variant_id(url) is not None:
+                    continue
+                offers = node.get("offers")
+                offers = offers if isinstance(offers, list) else [offers]
+                for offer in offers:
+                    if not isinstance(offer, dict):
+                        continue
+                    if (
+                        offer.get("price") is not None
+                        and price is not None
+                        and parse_price(str(offer["price"])) != price
+                    ):
+                        continue
+                    declarations.append(offer.get("priceCurrency"))
+                    code = normalize_currency_code(offer.get("priceCurrency"))
+                    if code:
+                        codes.add(code)
+        for match in re.finditer(
+            r'Shopify\.currency\s*=\s*\{[^{}]*["\']active["\']\s*:\s*["\']([A-Z]{3})["\']|Shopify\.currency\.active\s*=\s*["\']([A-Z]{3})["\']',
+            html,
+        ):
+            code = normalize_currency_code(match.group(1) or match.group(2))
+            if code:
+                codes.add(code)
+        code = next(iter(codes)) if len(codes) == 1 else None
+        if len(codes) > 1 or any(price_currency(value, code)[1] for value in declarations):
+            raise _CurrencyAmbiguous
+        return code
 
     @staticmethod
     def _try_shopify_selectors(soup: BeautifulSoup) -> ProductInfo | None:
         """Try Shopify-specific CSS selectors."""
-        info = ProductInfo()
+        info = ProductInfo(stock_evidence=False)
 
         selectors = [
             ".product-single__price",
@@ -950,11 +1140,16 @@ class ShopifyScraper(AbstractScraper):
 
         for sel in selectors:
             el = soup.select_one(sel)
-            if el:
+            if el and not in_carousel_context(el):
                 val = el.get("data-product-price") or el.get("content") or el.get_text(strip=True)
                 if val:
                     price = parse_price(str(val))
                     if price:
+                        visible = el.get_text(strip=True)
+                        currency_text = visible if parse_price(visible) == price else str(val)
+                        info.currency, ambiguous = price_currency(currency_text)
+                        if ambiguous:
+                            return ProductInfo(error="currency_ambiguous", stock_evidence=False)
                         info.price = price
                         break
 

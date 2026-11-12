@@ -9,24 +9,31 @@
    text:
    | ⏳ <b>Controlli in errore su example.com</b> (3)
    |
-   | 3 prodotti hanno fallito 1/2 controlli di fila. Se continua, verranno sospesi automaticamente.
+   | 3 prodotti richiedono attenzione. Errori ripetuti possono sospendere il monitoraggio.
    |
    | <b>80,00 €</b> ⚠️ Kettle
+   | #1: prezzo non leggibile (1/2)
    | <b>40,00 €</b> ⚠️ Speaker
+   | #2: prezzo non leggibile (1/2)
    | <b>N/D</b> ⚠️ Vault
+   | #3: prezzo non leggibile (1/2)
    |
    | Dettagli con /errori.
    markup: {}
 ## db after step 1
++ bot_config key="warning_notice:10:example.com:parse_error" {value="2026-03-01T12:00:00+00:00"}
 ~ products id=1 consecutive_errors: 0 -> 1
 ~ products id=1 last_error: NULL -> "parse_error: no price"
 ~ products id=1 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=1 last_check_outcome: NULL -> "parse_error"
 ~ products id=2 consecutive_errors: 0 -> 1
 ~ products id=2 last_error: NULL -> "parse_error: no price"
 ~ products id=2 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=2 last_check_outcome: NULL -> "parse_error"
 ~ products id=3 consecutive_errors: 0 -> 1
 ~ products id=3 last_error: NULL -> "parse_error: no price"
 ~ products id=3 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=3 last_check_outcome: NULL -> "parse_error"
 ## step 2: job run_check_all
 -> sendMessage chat=10
    param link_preview_options={"is_disabled": true}
@@ -34,11 +41,14 @@
    text:
    | ⚠️ <b>Prezzo illeggibile su example.com</b> (3)
    |
-   | Le pagine si aprono, ma il prezzo non si legge più (layout cambiato o offerta diversa).
+   | Non è stato possibile ottenere un prezzo affidabile. La pagina o l’offerta potrebbero essere cambiate.
    |
    | <b>80,00 €</b> ⚠️ Kettle
+   | #1: prezzo non leggibile
    | <b>40,00 €</b> ⚠️ Speaker
+   | #2: prezzo non leggibile
    | <b>N/D</b> ⚠️ Vault
+   | #3: prezzo non leggibile
    |
    | Riattiva per fare subito un nuovo controllo.
    keyboard:
@@ -50,13 +60,16 @@
 ~ products id=1 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
 ~ products id=1 suspension_kind: NULL -> "automatic"
 ~ products id=1 suspension_reason: NULL -> "parse_error"
+~ products id=1 notice_version: 0 -> 1
 ~ products id=2 is_active: 1 -> 0
 ~ products id=2 consecutive_errors: 1 -> 2
 ~ products id=2 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
 ~ products id=2 suspension_kind: NULL -> "automatic"
 ~ products id=2 suspension_reason: NULL -> "parse_error"
+~ products id=2 notice_version: 0 -> 1
 ~ products id=3 is_active: 1 -> 0
 ~ products id=3 consecutive_errors: 1 -> 2
 ~ products id=3 updated_at: "2026-02-28 09:00:00" -> <now:9999-99-99 99:99:99>
 ~ products id=3 suspension_kind: NULL -> "automatic"
 ~ products id=3 suspension_reason: NULL -> "parse_error"
+~ products id=3 notice_version: 0 -> 1

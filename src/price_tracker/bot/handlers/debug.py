@@ -26,6 +26,7 @@ from price_tracker.bot.decorators import (
     restricted,
     with_locale,
 )
+from price_tracker.bot.handlers._check_status import check_reason
 from price_tracker.bot.handlers._helpers import _escape_html
 from price_tracker.bot.messages import _
 from price_tracker.bot.ui.product_rows import product_row
@@ -500,24 +501,24 @@ async def errors_text(db: Any, health_mgr: Any, user_id: int) -> str | None:
 
     lines: list[str] = [_("⚠️ <b>Recent errors ({n})</b>").format(n=len(errored)), ""]
     for row in errored:
-        mark = "⚠️"
-        if (
-            health_mgr is not None
-            and row.domain
-            and health_mgr.state(row.domain) != QuarantineState.CLOSED
-        ):
-            mark = "🔒"
-        lines.append(
-            product_row(row.name or _("Unknown"), None, mark=f"{mark}{row.consecutive_errors}")
-        )
-    lines.append("")
-
-    lines.append(
-        _(
-            "ℹ️ Sites in 🔒 quarantine resume on their own; "
-            "use /reactivate to reactivate a suspended product."
-        )
-    )
+        lines.append(product_row(row.name or _("Unknown"), None, mark=f"⚠️{row.consecutive_errors}"))
+        reason = (row.last_error or "").split(":", 1)[0]
+        lines.append(_("#{id}: {reason}").format(id=row.id, reason=check_reason(reason)))
+        if health_mgr is not None and row.domain:
+            state = health_mgr.state(row.domain)
+            if state in (
+                QuarantineState.LOCKED_T1,
+                QuarantineState.LOCKED_T2,
+                QuarantineState.LOCKED_T3,
+            ):
+                lines.append(_("🔒 Checks for this site are temporarily paused."))
+            elif state in (
+                QuarantineState.HALF_OPEN_T1,
+                QuarantineState.HALF_OPEN_T2,
+                QuarantineState.HALF_OPEN_T3,
+            ):
+                lines.append(_("⏳ The site will be tested again."))
+    lines.extend(("", _("Use /reactivate to resume a suspended product.")))
     return "\n".join(lines)
 
 

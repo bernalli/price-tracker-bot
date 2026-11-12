@@ -2749,3 +2749,260 @@ msgstr "📉 <b>Calo minimo</b>"
 #, python-brace-format
 msgid "A price drop is announced only when it is at least this share of the old price and at least {amount} in the product's currency."
 msgstr "Un calo di prezzo viene segnalato solo se vale almeno questa quota del prezzo precedente e almeno {amount} nella valuta del prodotto."
+
+msgid "The site is blocking automated checks."
+msgstr "Il sito sta bloccando i controlli automatici."
+
+msgid "Check postponed while the site is temporarily restricted."
+msgstr "Controllo rinviato: le richieste al sito sono temporaneamente limitate."
+
+msgid "The product was not found."
+msgstr "Prodotto non trovato."
+
+msgid "Check postponed while the site is being tested."
+msgstr "Controllo rinviato: è in corso una verifica del sito."
+
+msgid "Not checked: tracking is paused or the product is no longer available."
+msgstr "Controllo non eseguito: il monitoraggio è in pausa o il prodotto non è più presente."
+
+msgid "This site cannot be checked right now."
+msgstr "Al momento non riesco a controllare questo sito."
+
+msgid "The price could not be read."
+msgstr "Non sono riuscito a leggere il prezzo."
+
+msgid "No offer matched the selected condition."
+msgstr "Nessuna offerta corrisponde alla condizione selezionata."
+
+msgid "The price currency could not be determined."
+msgstr "Non sono riuscito a determinare la valuta del prezzo."
+
+msgid "The price uses a different currency and was not saved."
+msgstr "Il prezzo usa una valuta diversa e non è stato salvato."
+
+msgid "The price reading could not be accepted."
+msgstr "Il prezzo rilevato non è stato accettato."
+
+msgid "A price was found and needs another check before it is saved."
+msgstr "Ho rilevato un prezzo: serve un altro controllo prima di salvarlo."
+
+msgid "The product page could not be found. Check the link."
+msgstr "Non trovo la pagina del prodotto. Controlla il link."
+
+msgid "The site could not be reached."
+msgstr "Non sono riuscito a raggiungere il sito."
+
+msgid "The check could not be completed."
+msgstr "Non sono riuscito a completare il controllo."
+
+msgid "The product is currently unavailable."
+msgstr "Il prodotto risulta al momento non disponibile."
+
+msgid "⚠️ <b>Check finished</b> — {n} products"
+msgstr "⚠️ <b>Controllo terminato</b> — {n} prodotti"
+
+msgid "   {reason}"
+msgstr "   {reason}"
+
+msgid "   Tracking suspended; use /reactivate to resume."
+msgstr "   Monitoraggio sospeso; usa /reactivate per riprenderlo."
+
+msgid "⚠️ <b>{name}</b>\n💰 Last recorded price: {price}\n{reason}"
+msgstr "⚠️ <b>{name}</b>\n💰 Ultimo prezzo rilevato: {price}\n{reason}"
+
+msgid "⚠️ {reason}"
+msgstr "⚠️ {reason}"
+
+msgid "#{id}: {reason}"
+msgstr "#{id}: {reason}"
+
+msgid "🔒 Checks for this site are temporarily paused."
+msgstr "🔒 I controlli su questo sito sono temporaneamente in pausa."
+
+msgid "⏳ The site will be tested again."
+msgstr "⏳ Il sito sarà verificato di nuovo."
+
+msgid "Use /reactivate to resume a suspended product."
+msgstr "Usa /reactivate per riprendere il monitoraggio di un prodotto sospeso."
+
+msgid "❌ The product page could not be found. Check the link and try again."
+msgstr "❌ Non trovo la pagina del prodotto. Controlla il link e riprova."
+
+msgid "🛡 The site blocked this automated check, so I couldn't read the price.\nPlease try again later."
+msgstr "🛡 Il sito ha bloccato questo controllo automatico: non sono riuscito a leggere il prezzo.\nRiprova più tardi."
+
+msgid "📦 This product is currently unavailable. Try adding it again later."
+msgstr "📦 Il prodotto risulta al momento non disponibile. Prova ad aggiungerlo più tardi."
+
+msgid "❌ The price currency could not be determined. Check the product page and try again."
+msgstr "❌ Non sono riuscito a determinare la valuta del prezzo. Controlla la pagina e riprova."
+
+msgid "❌ I couldn't read the price. Check the link and try again later."
+msgstr "❌ Non sono riuscito a leggere il prezzo. Controlla il link e riprova più tardi."
+
+msgid "❌ I couldn't read the CSV. Save it as UTF-8 and try again."
+msgstr "❌ Non sono riuscito a leggere il CSV. Salvalo in UTF-8 e riprova."
+
+msgid "💰 Last recorded price: {price}"
+msgstr "💰 Ultimo prezzo rilevato: {price}"
+
+msgid "🔄 <b>Check results for {n} products on {domain}</b>"
+msgstr "🔄 <b>Esiti dei controlli per {n} prodotti su {domain}</b>"
+
+msgid "Clear product availability"
+msgstr "Disponibilità dei prodotti"
+
+msgid "Accurate check results"
+msgstr "Esiti dei controlli corretti"
+
+msgid "Fewer repeated warnings"
+msgstr "Meno avvisi ripetuti"
+
+msgid "✅ <b>{name}</b>\n💰 Last recorded price: {price}\n{status}"
+msgstr "✅ <b>{name}</b>\n💰 Ultimo prezzo rilevato: {price}\n{status}"
+
+msgid "A reliable price could not be obtained. The page layout or offer may have changed."
+msgstr "Non è stato possibile ottenere un prezzo affidabile. La pagina o l’offerta potrebbero essere cambiate."
+
+msgid "Product pages unavailable on {domain}"
+msgstr "Pagine dei prodotti non disponibili su {domain}"
+
+msgid "The store repeatedly returned a missing-page response. The listings may have been removed or moved."
+msgstr "Il negozio ha segnalato più volte pagine non trovate. I prodotti potrebbero essere stati spostati o rimossi."
+
+msgid "Tracking is paused. Check the links before reactivating or deleting these products."
+msgstr "Monitoraggio sospeso. Controlla i link prima di riattivare o eliminare questi prodotti."
+
+msgid "Product pages could not be verified on {domain}"
+msgstr "Impossibile verificare le pagine dei prodotti su {domain}"
+
+msgid "Checks kept failing. The latest response suggests a missing page, but its status is unconfirmed."
+msgstr "I controlli continuano a fallire. L’ultima risposta suggerisce una pagina non trovata, ma lo stato non è confermato."
+
+msgid "Tracking is paused. Check the links and reactivate to try again."
+msgstr "Monitoraggio sospeso. Controlla i link e riattiva per riprovare."
+
+msgid "Price currency unclear on {domain}"
+msgstr "Valuta del prezzo non verificata su {domain}"
+
+msgid "The currency could not be verified. The last confirmed price has been preserved."
+msgstr "Non è stato possibile verificare la valuta. Ho conservato l’ultimo prezzo confermato."
+
+msgid "Check the store's currency and reactivate to try again."
+msgstr "Controlla la valuta del negozio e riattiva per riprovare."
+
+msgid "The checks could not be completed because of connection or HTTP errors."
+msgstr "I controlli non sono riusciti per errori di connessione o HTTP."
+
+msgid "Checks interrupted on {domain}"
+msgstr "Controlli interrotti su {domain}"
+
+msgid "An internal error prevented the checks from completing. The last confirmed price has been preserved."
+msgstr "Un errore interno ha interrotto i controlli. Ho conservato l’ultimo prezzo confermato."
+
+msgid "product page unavailable"
+msgstr "pagina del prodotto non disponibile"
+
+msgid "page status unconfirmed"
+msgstr "stato della pagina non confermato"
+
+msgid "currency not verified"
+msgstr "valuta non verificata"
+
+msgid "check interrupted"
+msgstr "controllo interrotto"
+
+msgid "Product currently unavailable"
+msgstr "Prodotto al momento non disponibile"
+
+msgid "The store reported this product unavailable in repeated checks. Monitoring continues; you will be notified when it is available again."
+msgstr "Il negozio ha segnalato il prodotto non disponibile in più controlli. Continuerò a monitorarlo e ti avviserò quando tornerà disponibile."
+
+msgid "Product available again"
+msgstr "Prodotto di nuovo disponibile"
+
+msgid "The store reports this product available again with a verified price."
+msgstr "Il negozio segnala il prodotto di nuovo disponibile, con un prezzo verificato."
+
+msgid "{name} — currently unavailable; monitoring continues"
+msgstr "{name} — al momento non disponibile; monitoraggio attivo"
+
+msgid "{name} — available again"
+msgstr "{name} — di nuovo disponibile"
+
+msgid "The check could not be completed because of a communication or processing error."
+msgstr "Non sono riuscito a completare il controllo per un errore di comunicazione o elaborazione."
+
+msgid "Not checked: tracking is paused."
+msgstr "Controllo non eseguito: il monitoraggio è in pausa."
+
+msgid "The site asked to wait before checking again."
+msgstr "Il sito ha chiesto di attendere prima del prossimo controllo."
+
+msgid "Previous notice for {domain}: use /lista for the current status."
+msgstr "Avviso precedente per {domain}: usa /lista per vedere lo stato attuale."
+
+msgid "communication or processing error"
+msgstr "errore di comunicazione o elaborazione"
+
+msgid "automated checks blocked"
+msgstr "controlli automatici bloccati"
+
+msgid "{n} product needs attention. Repeated failures may suspend tracking."
+msgid_plural "{n} products need attention. Repeated failures may suspend tracking."
+msgstr[0] "{n} prodotto richiede attenzione. Errori ripetuti possono sospendere il monitoraggio."
+msgstr[1] "{n} prodotti richiedono attenzione. Errori ripetuti possono sospendere il monitoraggio."
+
+msgid "{domain} — {n} product: checks failing"
+msgid_plural "{domain} — {n} products: checks failing"
+msgstr[0] "{domain} — {n} prodotto: controlli non riusciti"
+msgstr[1] "{domain} — {n} prodotti: controlli non riusciti"
+
+msgid "{domain} — {n} product: tracking suspended ({why})"
+msgid_plural "{domain} — {n} products: tracking suspended ({why})"
+msgstr[0] "{domain} — {n} prodotto: monitoraggio sospeso ({why})"
+msgstr[1] "{domain} — {n} prodotti: monitoraggio sospeso ({why})"
+
+msgid "Last recorded price: {price}"
+msgstr "Ultimo prezzo registrato: {price}"
+
+msgid "{count} notification remains queued because of your notification settings."
+msgid_plural "{count} notifications remain queued because of your notification settings."
+msgstr[0] "{count} notifica resta in coda in base alle impostazioni delle notifiche."
+msgstr[1] "{count} notifiche restano in coda in base alle impostazioni delle notifiche."
+
+msgid "Processed {count} digest notification."
+msgid_plural "Processed {count} digest notifications."
+msgstr[0] "Elaborata {count} notifica del riepilogo."
+msgstr[1] "Elaborate {count} notifiche del riepilogo."
+
+msgid "No notifications remain queued."
+msgstr "Non restano notifiche in coda."
+
+msgid "Digest updated."
+msgstr "Riepilogo aggiornato."
+
+msgid "Digest updated. No notifications remain queued."
+msgstr "Riepilogo aggiornato. Non restano notifiche in coda."
+
+msgid "No notifications are waiting in the digest."
+msgstr "Non ci sono notifiche in attesa nel riepilogo."
+
+msgid "⏳ Awaiting price verification: {count}"
+msgstr "⏳ In attesa di verifica del prezzo: {count}"
+
+msgid "❌ Rows with invalid or conflicting currency: {count}"
+msgstr "❌ Righe con valuta non valida o diversa: {count}"
+
+msgid "❌ Rows with an invalid target: {count}"
+msgstr "❌ Righe con prezzo obiettivo non valido: {count}"
+
+#: src/price_tracker/bot/handlers/product_io.py
+msgid "❌ Currency could not be verified for {count} rows. Add an explicit currency in the Valuta column and import again."
+msgstr "❌ Non ho potuto verificare la valuta di {count} righe. Indica una valuta nella colonna Valuta e importa di nuovo."
+
+msgid "Price updated; availability could not be verified."
+msgstr "Prezzo aggiornato, disponibilità non verificata."
+
+msgid "🚫 Last confirmed: sold out"
+msgstr "🚫 Ultima disponibilità confermata: esaurito"

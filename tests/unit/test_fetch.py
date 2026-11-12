@@ -245,13 +245,12 @@ async def test_gone_is_terminal_without_fallbacks(client):
 
 
 @pytest.mark.parametrize("status", [404, 410])
-async def test_gone_status_wins_over_waf_or_captcha_body(client, status):
+async def test_waf_or_captcha_body_wins_over_gone_status(client, status):
     url = "https://f.example/p/A"
     with respx.mock(assert_all_called=False) as router:
         router.get(url).mock(return_value=httpx.Response(status, text="Access Denied"))
-        with pytest.raises(ListingGone) as exc_info:
+        with pytest.raises(WAFBlocked):
             await fetch_page(url, client)
-    assert not isinstance(exc_info.value, BlockEvent)
 
     with respx.mock(assert_all_called=False) as router:
         router.get(url).mock(
@@ -259,9 +258,8 @@ async def test_gone_status_wins_over_waf_or_captcha_body(client, status):
                 status, text='<div class="g-recaptcha" data-sitekey="x"></div>'
             )
         )
-        with pytest.raises(ListingGone) as exc_info:
+        with pytest.raises(BlockEvent):
             await fetch_page(url, client)
-    assert not isinstance(exc_info.value, BlockEvent)
 
 
 # ── Redirects followed one hop at a time and revalidated ─────────────────────

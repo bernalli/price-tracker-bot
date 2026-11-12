@@ -139,6 +139,7 @@ def product_view(record: _Record, *, default_interval_minutes: int) -> ProductVi
         reference_currency=REFERENCE_CURRENCY,
         out_of_stock=_out_of_stock(record),
         image_url=image_url,
+        last_check_outcome=record.get("last_check_outcome"),
     )
 
 

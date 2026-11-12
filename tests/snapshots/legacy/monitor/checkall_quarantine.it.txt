@@ -20,23 +20,31 @@
    text:
    | ⏳ <b>Controlli in errore su amazon.com</b> (1)
    |
-   | 1 prodotti hanno fallito 1/2 controlli di fila. Se continua, verranno sospesi automaticamente.
+   | 1 prodotto richiede attenzione. Errori ripetuti possono sospendere il monitoraggio.
    |
    | <b>25,00 €</b> ⚠️ Amazon 1
+   | #2: prezzo non leggibile (1/2)
    |
    | Dettagli con /errori.
    markup: {}
 -> editMessageText chat=10 message_id=1000
    param parse_mode="HTML"
    text:
-   | ✅ <b>Controllo completato</b>
+   | ⚠️ <b>Controllo terminato</b>
    | 3 prodotti
    |
-   | <b>80,00 €</b> ▼20% Kettle
+   | <b>80,00 €</b> ▼20% ⚠️ Kettle
+   |    Controllo rinviato: le richieste al sito sono temporaneamente limitate.
    | <b>25,00 €</b> ⚠️ Amazon 1
-   | <b>25,00 €</b> Amazon 2
+   |    Non sono riuscito a leggere il prezzo.
+   | <b>25,00 €</b> ⚠️ Amazon 2
+   |    Controllo rinviato: è in corso una verifica del sito.
 ## db after step 9
++ bot_config key="warning_notice:10:amazon.com:parse_error" {value="2026-03-01T12:00:00+00:00"}
+~ products id=1 last_check_outcome: NULL -> "quarantined"
 ~ products id=2 consecutive_errors: 0 -> 1
 ~ products id=2 last_error: NULL -> "parse_error: no price"
 ~ products id=2 last_error_at: NULL -> <now:9999-99-99 99:99:99>
+~ products id=2 last_check_outcome: NULL -> "parse_error"
+~ products id=3 last_check_outcome: NULL -> "probe_skipped"
 ~ users user_id=10 display_name: NULL -> "U10"

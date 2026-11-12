@@ -269,7 +269,7 @@ def test_the_sold_out_row_is_only_for_an_active_unavailable_product(
     lines = product_card(view, actions_for(view), now=NOW).text.split("\n")
     assert ("🚫 Sold out" in lines) is shown
     if shown:
-        assert lines[lines.index("🚫 Sold out") - 1].startswith("💰 Now")
+        assert lines[lines.index("🚫 Sold out") - 1].startswith("💰 Last recorded price")
 
 
 def test_the_sold_out_row_is_translated(ui_locales) -> None:

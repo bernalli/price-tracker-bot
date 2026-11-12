@@ -73,9 +73,8 @@ def fake_catalog(monkeypatch: pytest.MonkeyPatch) -> None:
 
     class _FakeTranslations(gettext.NullTranslations):
         def gettext(self, message: str) -> str:
-            return {"Listings removed on {domain}": "Prodotti rimossi da {domain}"}.get(
-                message, message
-            )
+            title = "Pagine dei prodotti non disponibili su {domain}"
+            return {"Product pages unavailable on {domain}": title}.get(message, message)
 
     monkeypatch.setattr(
         messages,
@@ -235,12 +234,12 @@ def test_operational_notice_listing_gone_copy_and_buttons() -> None:
     text = format_operational_notice(group)
     buttons = operational_buttons(group)
 
-    assert "Listings removed on example.com" in text
+    assert "Product pages unavailable on example.com" in text
     assert "(5)" in text
     assert all(f"Widget {index}" in text for index in range(1, 6))
-    assert "HTTP 404" in text
-    assert "Delete" in buttons[0][0]["text"]
-    assert buttons[0][0]["callback_data"] == "o:1:rm"
+    assert "may have been removed or moved" in text
+    assert "Reactivate" in buttons[0][0]["text"]
+    assert buttons[0][0]["callback_data"] == "o:1:ra"
 
 
 def test_operational_notice_parse_error_puts_reactivate_first() -> None:
@@ -365,14 +364,14 @@ def test_warning_notice_format_and_has_no_buttons() -> None:
 @pytest.mark.parametrize(
     ("reason", "title", "callbacks"),
     [
-        ("listing_gone", "Listings removed on", ["o:1:rm", "o:1:ra"]),
+        ("listing_gone", "Product pages unavailable on", ["o:1:ra", "o:1:rm"]),
         ("parse_error", "Price unreadable on", ["o:1:ra", "o:1:rm"]),
         ("price_none", "Price unreadable on", ["o:1:ra", "o:1:rm"]),
         ("no_scraper", "Price unreadable on", ["o:1:ra", "o:1:rm"]),
         ("condition_mismatch", "Price unreadable on", ["o:1:ra", "o:1:rm"]),
         ("implausible_read", "Price unreadable on", ["o:1:ra", "o:1:rm"]),
         ("http_error", "Site unreachable:", ["o:1:ra", "o:1:rm"]),
-        ("unexpected", "Site unreachable:", ["o:1:ra", "o:1:rm"]),
+        ("unexpected", "Checks interrupted on", ["o:1:ra", "o:1:rm"]),
         ("block", "Blocked by", ["o:1:ra", "o:1:rm"]),
         ("unknown_reason", "Tracking suspended on", ["o:1:ra", "o:1:rm"]),
     ],
@@ -389,9 +388,9 @@ def test_closed_reason_copy_and_exact_callback_contract(
 @pytest.mark.parametrize(
     ("reason", "headline_fragment", "hint_fragment"),
     [
-        ("listing_gone", "took them off the catalog", "Deleting keeps your list clean"),
-        ("parse_error", "price could not be read anymore", "run a fresh check right now"),
-        ("http_error", "did not answer", "Reactivate once the site is back"),
+        ("listing_gone", "may have been removed or moved", "Check the links"),
+        ("parse_error", "reliable price could not be obtained", "run a fresh check right now"),
+        ("http_error", "connection or HTTP errors", "Reactivate once the site is back"),
         ("block", "refusing automated checks", "Domain quarantine already paces retries"),
         ("unknown_reason", "Checks kept failing", "Reactivate to retry"),
     ],
@@ -467,4 +466,4 @@ def test_operational_notice_it_locale(fake_catalog: None) -> None:
 
     set_locale("it")
     text = format_operational_notice(_group(_operational_event()))
-    assert "Prodotti rimossi da example.com" in text
+    assert "Pagine dei prodotti non disponibili su example.com" in text

@@ -182,7 +182,8 @@ async def test_aliexpress_jsonld_out_of_stock_marks_unavailable() -> None:
             info = await AliexpressScraper().scrape(
                 "https://it.aliexpress.com/item/100500.html", client
             )
-    assert info.price == Decimal("15.99")
+    assert info.price is None
+    assert info.currency == "EUR"
     assert info.available is False
 
 

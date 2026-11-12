@@ -180,9 +180,12 @@ async def test_two_consecutive_sold_out_readings_trigger_one_restock_alert(
 
     await _run(repo, scraper, notifier, times=3)
 
-    notifier.assert_awaited_once()
+    assert [c.kwargs["payload"]["event"] for c in notifier.await_args_list] == [
+        "unavailable",
+        "restocked",
+    ]
     assert notifier.await_args is not None
-    assert "stock" in notifier.await_args.args[1].lower()
+    assert notifier.await_args.kwargs["payload"]["event"] == "restocked"
     product = await repo.get_product(pid)
     assert product is not None
     assert product.is_available is True

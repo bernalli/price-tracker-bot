@@ -9,34 +9,69 @@
 -> editMessageText chat=10 message_id=1001
    text:
    | ⏳ Riattivo 4 prodotti e li ricontrollo...
+-> sendMessage chat=10
+   param link_preview_options={"is_disabled": true}
+   param parse_mode="HTML"
+   text:
+   | ⏳ <b>Controlli in errore su example.com</b> (4)
+   |
+   | 4 prodotti richiedono attenzione. Errori ripetuti possono sospendere il monitoraggio.
+   |
+   | <b>80,00 €</b> ⚠️ Kettle
+   | #1: bloccato (1/2)
+   | <b>40,00 €</b> ⚠️ Speaker
+   | #2: pagina non trovata (HTTP 404) (1/2)
+   | <b>60,00 €</b> ⚠️ Mixer
+   | #3: errore di comunicazione o elaborazione (1/2)
+   | <b>40,00 €</b> ⚠️ Heater
+   | #4: controllo interrotto (1/2)
+   |
+   | Dettagli con /errori.
+   markup: {}
 -> editMessageText chat=10 message_id=1001
    param parse_mode="HTML"
    text:
-   | 🔄 <b>Ricontrollati 4 prodotti su example.com</b>
-   | <b>80,00 €</b> ▼20% ❌ bloccato Kettle
-   | <b>40,00 €</b> ❌ pagina non trov… Spe…
-   | <b>60,00 €</b> ❌ sito irraggiung… Mix…
-   | <b>40,00 €</b> ❌ sito irraggiung… Hea…
+   | 🔄 <b>Esiti dei controlli per 4 prodotti su example.com</b>
+   | <b>80,00 €</b> ▼20% ⚠️ Kettle
+   |    Il sito sta bloccando i controlli automatici.
+   | <b>40,00 €</b> ⚠️ Speaker
+   |    Non trovo la pagina del prodotto. Controlla il link.
+   | <b>60,00 €</b> ⚠️ Mixer
+   |    Non sono riuscito a completare il controllo per un errore di comunicazione o elaborazione.
+   | <b>40,00 €</b> ⚠️ Heater
+   |    Non sono riuscito a completare il controllo.
 ## db after step 3
++ bot_config key="warning_notice:10:example.com:block" {value="2026-03-01T12:00:00+00:00"}
++ bot_config key="warning_notice:10:example.com:http_error" {value="2026-03-01T12:00:00+00:00"}
++ bot_config key="warning_notice:10:example.com:listing_gone" {value="2026-03-01T12:00:00+00:00"}
++ bot_config key="warning_notice:10:example.com:unexpected" {value="2026-03-01T12:00:00+00:00"}
 ~ products id=1 is_active: 0 -> 1
 ~ products id=1 consecutive_errors: 2 -> 1
 ~ products id=1 last_error: "parse_error: no price" -> "block: HTTP 403 block on https://shop.example.com/item/1"
 ~ products id=1 suspension_kind: "automatic" -> NULL
 ~ products id=1 suspension_reason: "parse_error" -> NULL
+~ products id=1 notice_version: 1 -> 2
+~ products id=1 last_check_outcome: "parse_error" -> "block"
 ~ products id=2 is_active: 0 -> 1
 ~ products id=2 consecutive_errors: 2 -> 1
 ~ products id=2 last_error: "parse_error: no price" -> "listing_gone: HTTP 404"
 ~ products id=2 gone_streak: 0 -> 1
 ~ products id=2 suspension_kind: "automatic" -> NULL
 ~ products id=2 suspension_reason: "parse_error" -> NULL
+~ products id=2 notice_version: 1 -> 2
+~ products id=2 last_check_outcome: "parse_error" -> "listing_gone"
 ~ products id=3 is_active: 0 -> 1
 ~ products id=3 consecutive_errors: 2 -> 1
 ~ products id=3 last_error: "parse_error: no price" -> "http_error: connection refused"
 ~ products id=3 suspension_kind: "automatic" -> NULL
 ~ products id=3 suspension_reason: "parse_error" -> NULL
+~ products id=3 notice_version: 1 -> 2
+~ products id=3 last_check_outcome: "parse_error" -> "http_error"
 ~ products id=4 is_active: 0 -> 1
 ~ products id=4 consecutive_errors: 2 -> 1
 ~ products id=4 last_error: "parse_error: no price" -> "unexpected: scraper crashed"
 ~ products id=4 suspension_kind: "automatic" -> NULL
 ~ products id=4 suspension_reason: "parse_error" -> NULL
+~ products id=4 notice_version: 1 -> 2
+~ products id=4 last_check_outcome: "parse_error" -> "unexpected"
 + scraper_health domain="example.com" {state="CLOSED", consecutive_blocks=1, locked_until=NULL, last_block_at="2026-03-01T12:00:00+00:00", last_block_reason="HTTP 403", last_success_at=NULL, updated_at=<now:9999-99-99 99:99:99>}
