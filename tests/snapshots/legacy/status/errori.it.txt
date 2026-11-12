@@ -11,7 +11,8 @@
    text:
    | ⚠️ <b>Errori recenti (2)</b>
    |
-   | <b>N/D</b> ⚠️3 Kettle
+   | Ultimo prezzo registrato:
+   | <b>80,00 €</b> ⚠️3 Kettle
    | #1: Non sono riuscito a leggere il prezzo.
    | 🔒 I controlli su questo sito sono temporaneamente in pausa.
    | <b>N/D</b> ⚠️1 Fan
@@ -27,7 +28,8 @@
    text:
    | ⚠️ <b>Errori recenti (2)</b>
    |
-   | <b>N/D</b> ⚠️3 Kettle
+   | Ultimo prezzo registrato:
+   | <b>80,00 €</b> ⚠️3 Kettle
    | #1: Non sono riuscito a leggere il prezzo.
    | 🔒 I controlli su questo sito sono temporaneamente in pausa.
    | <b>N/D</b> ⚠️1 Fan
@@ -43,16 +45,17 @@
    text:
    | ⚠️ <b>Errori recenti (4)</b>
    |
-   | <b>N/D</b> ⚠️3 Kettle
+   | Ultimo prezzo registrato:
+   | <b>80,00 €</b> ⚠️3 Kettle
    | #1: Non sono riuscito a leggere il prezzo.
    | 🔒 I controlli su questo sito sono temporaneamente in pausa.
    | <b>N/D</b> ⚠️1 Fan
    | #2: Non sono riuscito a completare il controllo per un errore di comunicazione o elaborazione.
    | 🔒 I controlli su questo sito sono temporaneamente in pausa.
-   | <b>N/D</b> ⚠️1 Long NNNNNNNNNNNNNNNNNN…
+   | <b>80,00 €</b> ⚠️1 Long NNNNNNNNNNNNNN…
    | #3: Non sono riuscito a leggere il prezzo.
    | 🔒 I controlli su questo sito sono temporaneamente in pausa.
-   | <b>N/D</b> ⚠️1 P4
+   | <b>50,00 €</b> ⚠️1 P4
    | #4: Non sono riuscito a completare il controllo.
    | 🔒 I controlli su questo sito sono temporaneamente in pausa.
    |

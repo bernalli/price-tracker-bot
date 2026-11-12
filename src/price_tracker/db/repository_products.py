@@ -261,7 +261,8 @@ class ProductRepositoryMixin(_RepositoryBase):
         """
         cursor = await self._conn.execute(
             "SELECT id, name, url, domain, consecutive_errors, last_error, last_error_at, "
-            "last_check_outcome FROM products WHERE user_id = ? AND (consecutive_errors > 0 "
+            "last_check_outcome, current_price, currency FROM products "
+            "WHERE user_id = ? AND (consecutive_errors > 0 "
             "OR (is_active = 1 AND last_check_outcome IN ('block', 'quarantined', "
             "'probe_skipped'))) ORDER BY consecutive_errors DESC, id ASC",
             (user_id,),
@@ -277,6 +278,8 @@ class ProductRepositoryMixin(_RepositoryBase):
                 last_error=r[5],
                 last_error_at=r[6],
                 last_check_outcome=r[7],
+                current_price=Decimal(r[8]) if r[8] is not None else None,
+                currency=r[9],
             )
             for r in rows
         ]

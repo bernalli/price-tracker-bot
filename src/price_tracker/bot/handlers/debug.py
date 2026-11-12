@@ -501,11 +501,19 @@ async def errors_text(db: Any, health_mgr: Any, user_id: int) -> str | None:
     if not errored:
         return None
 
-    lines: list[str] = [_("⚠️ <b>Recent errors ({n})</b>").format(n=len(errored)), ""]
+    lines: list[str] = [
+        _("⚠️ <b>Recent errors ({n})</b>").format(n=len(errored)),
+        "",
+        _("Last recorded price: {price}").format(price="").strip(),
+    ]
     for row in errored:
         # A store refusal has no counter: "⚠️0" would read as "no error".
         mark = f"⚠️{row.consecutive_errors}" if row.consecutive_errors > 0 else "🔒"
-        lines.append(product_row(row.name or _("Unknown"), None, mark=mark))
+        lines.append(
+            product_row(
+                row.name or _("Unknown"), row.current_price, currency=row.currency, mark=mark
+            )
+        )
         reason = (row.last_error or "").split(":", 1)[0]
         if row.last_check_outcome in STORE_REFUSAL_OUTCOMES:
             reason = row.last_check_outcome
