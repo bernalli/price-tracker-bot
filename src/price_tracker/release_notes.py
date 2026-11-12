@@ -72,6 +72,7 @@ RELEASE_NOTES: dict[str, tuple[str, ...]] = {
         N_("Accurate check results"),
         N_("Fewer repeated warnings"),
     ),
+    "1.11.1": (),
 }
 
 MESSAGE_LIMIT = 1200

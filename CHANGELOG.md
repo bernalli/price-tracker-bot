@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.1] - 2026-11-12
+
+### Fixed
+
+- A store that refuses the bot no longer spends a product's error budget or suspends it; blocked stores are listed
+  in the error report and their products carry a lock mark.
+- An updated price with unstated stock is an ordinary successful check unless something casts doubt on the stock.
+- Amazon stock evidence comes only from the selected offer: other sellers, used offers, disabled or hidden purchase
+  controls and foreign structured data no longer confirm or deny it. Negated, future or incomplete stock wording is
+  never read as in stock, and a sold-out statement on a single-offer page is recognised again.
+- The error report shows the last recorded price and currency of each product, and survives a malformed stored price.
+- Standard-library log records reach the JSON log stream, with bot credentials redacted before encoding.
+- Each scheduler sweep logs a summary, and the running version is logged at startup.
+
 ## [1.11.0] - 2026-11-12
 
 ### Added
