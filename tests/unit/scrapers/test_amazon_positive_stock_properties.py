@@ -86,6 +86,38 @@ def test_real_affirmative_stock_statement_is_evidence(statement, cart):
     assert offer_in_stock(accordion_page(availability(statement) + cart)) is True
 
 
+@pytest.mark.parametrize(
+    "statement",
+    [
+        "Only 1 left in stock (not in stock yet).",
+        "Only 1 left in stock (will be in stock on December 20).",
+        "Only 1 left in stock (not available yet).",
+        "Only 1 left in stock (more on the way, not available yet).",
+        "Disponibilità: solo 2 (non ancora disponibile).",
+        "Disponibilità: solo 2 (a partire dal 20 dicembre).",
+        "Nur noch 3 auf Lager (ab 20. Dezember).",
+        "Only 1 left in stock (unknown status).",
+        "Only 1 left in stock ().",
+    ],
+)
+@pytest.mark.parametrize("cart", [CART, ""])
+def test_unapproved_parenthetical_stock_suffix_is_not_evidence(statement, cart):
+    assert offer_in_stock(accordion_page(availability(statement) + cart)) is False
+
+
+@pytest.mark.parametrize(
+    "statement",
+    [
+        "Only 1 left in stock (more on the way).",
+        "Only 3 left in stock (MORE ON THE WAY).",
+        "Only 2 left in stock (more   on the way).",
+    ],
+)
+@pytest.mark.parametrize("cart", [CART, ""])
+def test_allowed_parenthetical_stock_suffix_remains_evidence(statement, cart):
+    assert offer_in_stock(accordion_page(availability(statement) + cart)) is True
+
+
 NON_STOCK = "Usually dispatched within 2 to 3 days."
 
 

@@ -168,7 +168,7 @@ _STOCK_QUANTITY = r"[1-9][0-9]*"
 # Complete affirmative stock statements, matched against the whole lower-case
 # statement with collapsed whitespace. The bare phrases take no suffix, so
 # "in stock on <date>" stays unresolved. Only the forms with a quantity accept
-# a hurry-up suffix or a parenthetical ("(more on the way)").
+# a hurry-up suffix or the explicitly allowed "(more on the way)" suffix.
 _AFFIRMATIVE_STOCK = re.compile(
     "(?:(?:"
     + "|".join(
@@ -184,7 +184,7 @@ _AFFIRMATIVE_STOCK = re.compile(
     + rf"|endast {_STOCK_QUANTITY} kvar i lager)"
     + r"(?:\s*[-–—]\s*"
     + r"(?:order soon|ordina subito|jetzt bestellen|commandez vite|haz tu pedido pronto)"
-    + r"|\s*\([^()]*\))?)[.!。]?"
+    + r"|\s*\(more on the way\))?)[.!。]?"
 )
 
 # Sold-out wording that contains one of the phrases above or is absent from
