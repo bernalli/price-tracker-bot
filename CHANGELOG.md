@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.12.0] - 2026-11-13
+
+### Security
+
+- `soupsieve` 4.1 replaces 2.9.2, which is affected by four published advisories. The minimum Python version
+  moves from 3.11 to 3.11.5, the first release that `soupsieve` 4 supports.
+
 ### Changed
 
 - Shopify stores are asked with one declared, stable identity: every request names the bot, its version
