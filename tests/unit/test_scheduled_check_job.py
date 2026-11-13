@@ -21,9 +21,39 @@ from price_tracker.main import scheduled_check_job
         ("-60", 360),
         ("abc", 360),
         ("1.5", 360),
+        ("²", 360),
+        ("٣٦٠", 360),
+        (" 60 ", 360),
+        ("9" * 5000, 10080),
+        ("0" * 5000 + "7", 7),
+        (True, 360),
+        (60, 360),
+        (b"60", 360),
+        ([], 360),
+        ({}, 360),
+    ],
+    ids=[
+        "none",
+        "empty",
+        "ninety",
+        "zero",
+        "three",
+        "negative",
+        "text",
+        "fraction",
+        "superscript",
+        "arabic-digits",
+        "padded",
+        "huge",
+        "leading-zeros",
+        "true",
+        "int",
+        "bytes",
+        "list",
+        "mapping",
     ],
 )
-async def test_the_job_passes_the_stored_global_interval(saved: str | None, expected: int) -> None:
+async def test_the_job_passes_the_stored_global_interval(saved: object, expected: int) -> None:
     scheduler = MagicMock()
     scheduler.deps.repo.get_config = AsyncMock(return_value=saved)
     scheduler.run_check_due = AsyncMock()

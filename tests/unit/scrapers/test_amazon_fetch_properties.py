@@ -78,8 +78,6 @@ async def test_scrape_gone_skips_every_fallback(
     status: int, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(amazon_module, "_fetch_with_fresh_client", _must_not_run)
-    monkeypatch.setattr(amazon_module, "_fetch_via_curl_cffi", _must_not_run)
-    monkeypatch.setattr(amazon_module, "_fetch_via_scrapling", _must_not_run)
     with respx.mock(assert_all_called=False) as router:
         router.get(_URL).respond(status)
         async with httpx.AsyncClient() as client:
@@ -107,8 +105,6 @@ async def test_scrape_keeps_primary_html_when_fresh_retry_is_blocked(
         raise boom
 
     monkeypatch.setattr(amazon_module, "_fetch_with_fresh_client", _raise)
-    monkeypatch.setattr(amazon_module, "_fetch_via_curl_cffi", _must_not_run)
-    monkeypatch.setattr(amazon_module, "_fetch_via_scrapling", _must_not_run)
     with respx.mock(assert_all_called=False) as router:
         router.get(_URL).respond(200, text=_STUB_OK)
         async with httpx.AsyncClient() as client:
@@ -153,8 +149,6 @@ async def test_scrape_5xx_after_retries_is_error_not_exception(
 
     monkeypatch.setattr(amazon_module, "_fetch_amazon_html", _boom)
     monkeypatch.setattr(amazon_module, "_fetch_with_fresh_client", _must_not_run)
-    monkeypatch.setattr(amazon_module, "_fetch_via_curl_cffi", _must_not_run)
-    monkeypatch.setattr(amazon_module, "_fetch_via_scrapling", _must_not_run)
     async with httpx.AsyncClient() as client:
         info = await AmazonScraper().scrape(_URL, client)
     assert info.price is None

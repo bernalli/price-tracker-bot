@@ -59,7 +59,7 @@ async def test_amazon_parses_fixture_html(
     html = load_fixture("amazon/sample_product.html")
     scraper = AmazonScraper()
 
-    # Disable curl_cffi/scrapling fallbacks (they're triggered only on 403)
+    # Disable the fresh-client retry
     async def _no_fresh(url: str) -> str | None:
         return None
 

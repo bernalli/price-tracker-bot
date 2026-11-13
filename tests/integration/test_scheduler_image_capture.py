@@ -27,11 +27,13 @@ class Requests:
     def __init__(self, connection: Any) -> None:
         self.connection = connection
         self.calls: list[str | None] = []
+        self.stores: list[str | None] = []
         self.queued: list[str] = []
 
-    def request(self, url: str | None) -> bool:
+    def request(self, url: str | None, *, store: str | None = None) -> bool:
         assert not self.connection.in_transaction
         self.calls.append(url)
+        self.stores.append(store)
         if url is not None:
             self.queued.append(url)
         return url is not None
@@ -134,6 +136,19 @@ async def test_bad_or_missing_images_are_cleared_with_an_accepted_price(image):
         assert saved.current_price == Decimal(90)
         assert saved.image_url == normalize_image_url(image, base_url=saved.url)
         assert result.requests.queued == ([saved.image_url] if saved.image_url else [])
+
+
+@pytest.mark.parametrize(
+    ("product_url", "store"),
+    [("https://shop.example.com/p/1", "example.com"), ("https://shop.example/x", None)],
+)
+async def test_an_accepted_read_queues_the_image_with_its_store(product_url, store):
+    async with _wired() as w:
+        await w.conn.execute("UPDATE products SET url=? WHERE id=?", (product_url, w.product))
+        await w.conn.commit()
+        result = await check(w, ProductInfo(price=Decimal(90), currency="EUR", image_url=NEW))
+        assert result.requests.calls == [NEW]
+        assert result.requests.stores == [store]
 
 
 async def test_a_scheduler_without_thumbnail_services_still_persists_the_image():

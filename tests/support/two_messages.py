@@ -35,7 +35,12 @@ def wire_two_messages(w: Wired, tmp_path: Path, *, clock: Callable[[], float]) -
     cache.ensure_dir()
     spacing = DomainSpacing(clock=clock)
     service = ThumbnailService(
-        cache, client=client, job_pacing=spacing, referenced_urls=referenced, clock=clock
+        cache,
+        client=client,
+        job_pacing=spacing,
+        referenced_urls=referenced,
+        store_paused=lambda _domain: False,
+        clock=clock,
     )
     grids = GridRegistry(clock=clock)
     w.app.bot_data.update(thumbnails=service, list_grids=grids)

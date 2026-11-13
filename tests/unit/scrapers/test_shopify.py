@@ -9,7 +9,7 @@ import httpx
 import pytest
 import respx
 
-from price_tracker.core.exceptions import BlockEvent, ListingGone
+from price_tracker.core.exceptions import BlockEvent, HTTPBlockStatus, ListingGone
 from price_tracker.scrapers import shopify as shopify_module
 from price_tracker.scrapers.shopify import ShopifyScraper
 
@@ -349,30 +349,24 @@ _PRICED_HTML = '<html><body><span class="product__price">USD 12.00</span></body>
 
 
 @pytest.mark.asyncio
-async def test_shopify_json_403_raises_block_event_when_curl_cffi_unavailable() -> None:
-    """A 403 on the .json endpoint whose curl_cffi bypass fails must raise BlockEvent.
-
-    curl_cffi is not installed in the test environment, so `_fetch_json_via_curl_cffi`
-    returns None (ImportError path) and the block must surface, never become a silent
-    ProductInfo(error=...).
-    """
+async def test_shopify_json_403_raises_block_event_without_reading_the_page() -> None:
+    """A 403 on the .json endpoint raises BlockEvent and the product page is never requested."""
     scraper = ShopifyScraper()
     url = "https://shop.example.com/products/blocked-json"
     json_url = "https://shop.example.com/products/blocked-json.json"
 
     with respx.mock(assert_all_called=False) as router:
         router.get(json_url).respond(403, text="forbidden")
-        router.get(url).respond(200, text=_PRICED_HTML)
+        page = router.get(url).respond(200, text=_PRICED_HTML)
         async with httpx.AsyncClient() as client:
             with pytest.raises(BlockEvent):
                 await scraper.scrape(url, client)
+    assert page.call_count == 0
 
 
 @pytest.mark.asyncio
-async def test_shopify_json_429_falls_back_to_the_product_page() -> None:
-    """A 429 on the .json endpoint is never a swallowed None (#16): the product
-    page is read instead, and only a page that is refused too raises the block
-    (``test_shopify_json_429_fallback.py``)."""
+async def test_shopify_json_429_is_a_block_without_reading_the_page() -> None:
+    """A 429 on the .json endpoint is a block (#16): the product page is not requested."""
     scraper = ShopifyScraper()
     url = "https://shop.example.com/products/rate-limited"
     json_url = "https://shop.example.com/products/rate-limited.json"
@@ -381,11 +375,11 @@ async def test_shopify_json_429_falls_back_to_the_product_page() -> None:
         router.get(json_url).respond(429, text="too many requests")
         page = router.get(url).respond(200, text=_PRICED_HTML)
         async with httpx.AsyncClient() as client:
-            info = await scraper.scrape(url, client)
+            with pytest.raises(HTTPBlockStatus) as exc_info:
+                await scraper.scrape(url, client)
 
-    assert page.call_count == 1
-    assert info.price == Decimal("12.00")
-    assert info.error is None
+    assert exc_info.value.status == 429
+    assert page.call_count == 0
 
 
 @pytest.mark.asyncio

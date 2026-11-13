@@ -6,6 +6,7 @@ import asyncio
 import logging
 import math
 import time
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Final
 
 from price_tracker.core.image_url import normalize_image_url
@@ -25,8 +26,18 @@ logger = logging.getLogger(__name__)
 MAX_TRACKED_URLS: Final = 2048
 
 
+@dataclass(frozen=True, slots=True)
+class _Job:
+    """What the queued download of one image URL carries."""
+
+    stores: frozenset[str] = frozenset()
+
+
 class ThumbnailService:
-    """Fetches, shrinks and caches product images in the background, one at a time."""
+    """Fetches, shrinks and caches product images in the background, one at a time.
+
+    It reads, never writes, the stores' quarantine state through ``store_paused``.
+    """
 
     def __init__(
         self,
@@ -35,6 +46,7 @@ class ThumbnailService:
         client: httpx.AsyncClient,
         job_pacing: DomainSpacing,
         referenced_urls: Callable[[], Awaitable[Iterable[str]]],
+        store_paused: Callable[[str], bool],
         clock: Callable[[], float] = time.monotonic,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         retry_after_failure: float = 86_400.0,
@@ -59,12 +71,13 @@ class ThumbnailService:
         self._client = client
         self._spacing = job_pacing
         self._referenced_urls = referenced_urls
+        self._store_paused = store_paused
         self._clock = clock
         self._sleep = sleep
         self._retry_after_failure = retry_after_failure
         self._prune_every = prune_every
         self._queue_size = queue_size
-        self._pending: dict[str, None] = {}
+        self._pending: dict[str, _Job] = {}
         self._in_progress: set[str] = set()
         self._failed: dict[str, float] = {}
         self._wake = asyncio.Event()
@@ -76,7 +89,7 @@ class ThumbnailService:
             if now - failed_at >= self._retry_after_failure:
                 del self._failed[url]
 
-    def request(self, url: str | None) -> bool:
+    def request(self, url: str | None, *, store: str | None = None) -> bool:
         if not isinstance(url, str) or normalize_image_url(url, base_url=url) != url:
             return False
         self._expire_failures()
@@ -86,7 +99,12 @@ class ThumbnailService:
         except OSError:
             logger.info("thumbnail cache lookup failed for %s", extract_etld_plus_one(url))
             return False
-        if url in self._pending or url in self._in_progress or url in self._failed:
+        stores = frozenset({store}) if isinstance(store, str) and store else frozenset()
+        if url in self._pending:
+            queued = self._pending[url]
+            self._pending[url] = _Job(queued.stores | stores)
+            return False
+        if url in self._in_progress or url in self._failed:
             return False
         if len(self._pending) >= self._queue_size:
             logger.debug("thumbnail queue full")
@@ -94,7 +112,7 @@ class ThumbnailService:
         if len(self._pending.keys() | self._in_progress | self._failed.keys()) >= MAX_TRACKED_URLS:
             logger.debug("thumbnail tracking limit reached")
             return False
-        self._pending[url] = None
+        self._pending[url] = _Job(stores)
         self._wake.set()
         return True
 
@@ -126,6 +144,12 @@ class ThumbnailService:
             logger.info("thumbnail cache lookup failed for %s", extract_etld_plus_one(url))
             return
         domain = extract_etld_plus_one(url)
+        job = self._pending.get(url, _Job())
+        if any(self._store_paused(name) for name in sorted({domain, *job.stores}) if name):
+            self._pending.pop(url, None)
+            self._failed[url] = self._clock()
+            logger.info("thumbnail skipped for %s: store paused", domain)
+            return
         if self._delay(domain) > 0:
             return
         self._pending.pop(url, None)

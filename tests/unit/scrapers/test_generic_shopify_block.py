@@ -19,14 +19,13 @@ from price_tracker.scrapers.shopify import ShopifyScraper
 _WAF_BODY = "<html><head><title>Just a moment...</title></head><body>x</body></html>" + ("x" * 6000)
 
 
-async def test_generic_raises_waf_on_challenge_body(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def _waf(url: str) -> str:  # noqa: ARG001
-        return _WAF_BODY
-
-    monkeypatch.setattr(generic_module, "_fetch_with_curl_cffi", _waf)
-    async with httpx.AsyncClient() as client:
-        with pytest.raises(WAFBlocked):
-            await GenericScraper().scrape("https://shop.example/p/1", client)
+async def test_generic_raises_waf_on_challenge_body() -> None:
+    url = "https://shop.example/p/1"
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url).respond(200, text=_WAF_BODY)
+        async with httpx.AsyncClient() as client:
+            with pytest.raises(WAFBlocked):
+                await GenericScraper().scrape(url, client)
 
 
 async def test_shopify_fetch_html_raises_waf_on_challenge_body() -> None:
@@ -39,10 +38,6 @@ async def test_shopify_fetch_html_raises_waf_on_challenge_body() -> None:
 
 
 # ── #16: HTTP 403/429 must surface as BlockEvent, not generic error ──
-
-
-async def _no_curl(url: str) -> str | None:  # noqa: ARG001
-    return None
 
 
 async def test_fetch_generic_html_raises_block_on_403_cloudflare() -> None:
@@ -70,7 +65,6 @@ async def test_generic_scrape_propagates_block_on_httpx_403(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """scrape() must let the BlockEvent out so the scheduler quarantines the domain."""
-    monkeypatch.setattr(generic_module, "_fetch_with_curl_cffi", _no_curl)
     url = "https://shop.example/p/blocked"
     with respx.mock(assert_all_called=False) as router:
         router.get(url).respond(403, text="<html>blocked</html>")
@@ -82,7 +76,6 @@ async def test_generic_scrape_propagates_block_on_httpx_403(
 async def test_generic_httpx_404_raises_listing_gone(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(generic_module, "_fetch_with_curl_cffi", _no_curl)
     url = "https://shop.example/p/missing"
     with respx.mock(assert_all_called=False) as router:
         router.get(url).respond(404)
@@ -91,93 +84,6 @@ async def test_generic_httpx_404_raises_listing_gone(
                 await GenericScraper().scrape(url, client)
 
     assert exc_info.value.status == 404
-
-
-async def test_generic_long_curl_html_skips_httpx(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    url = "https://shop.example/p/curl-long"
-    html = (
-        '<script type="application/ld+json">'
-        '{"@type":"Product","name":"Widget","offers":{"price":"29.99",'
-        '"priceCurrency":"EUR"}}</script>' + ("x" * 5000)
-    )
-
-    async def _long_html(request_url: str) -> str:  # noqa: ARG001
-        return html
-
-    monkeypatch.setattr(generic_module, "_fetch_with_curl_cffi", _long_html)
-    with respx.mock(assert_all_called=False) as router:
-        route = router.get(url).respond(500)
-        async with httpx.AsyncClient() as client:
-            info = await GenericScraper().scrape(url, client)
-
-    assert route.called is False
-    assert info.price is not None
-    assert info.error is None
-
-
-async def test_generic_short_curl_html_survives_httpx_404(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    url = "https://shop.example/p/curl-short"
-    html = (
-        '<script type="application/ld+json">'
-        '{"@type":"Product","name":"Widget","offers":{"price":"19.99",'
-        '"priceCurrency":"EUR"}}</script>'
-    )
-
-    async def _short_html(request_url: str) -> str:  # noqa: ARG001
-        return html
-
-    monkeypatch.setattr(generic_module, "_fetch_with_curl_cffi", _short_html)
-    with respx.mock(assert_all_called=False) as router:
-        route = router.get(url).respond(404)
-        async with httpx.AsyncClient() as client:
-            info = await GenericScraper().scrape(url, client)
-
-    assert route.called is True
-    assert info.price is not None
-    assert info.error is None
-
-
-async def _blocked_fallback(url: str) -> str | None:
-    raise HTTPBlockStatus(status=403, url=url)
-
-
-async def test_generic_deferred_block_surfaces_when_httpx_also_fails(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """A deferred block must survive failure of the following HTTP request."""
-    monkeypatch.setattr(generic_module, "_fetch_with_curl_cffi", _blocked_fallback)
-
-    async def _httpx_down(url: str, client: httpx.AsyncClient) -> str:  # noqa: ARG001
-        raise httpx.ConnectError("connection refused")
-
-    monkeypatch.setattr(generic_module, "_fetch_generic_html", _httpx_down)
-    async with httpx.AsyncClient() as client:
-        with pytest.raises(HTTPBlockStatus):
-            await GenericScraper().scrape("https://shop.example/p/curl403", client)
-
-
-async def test_generic_deferred_block_allows_httpx_success(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """A successful HTTP request supersedes a deferred block."""
-    monkeypatch.setattr(generic_module, "_fetch_with_curl_cffi", _blocked_fallback)
-    url = "https://shop.example/p/curl403-ok"
-    html = (
-        '<html><head><script type="application/ld+json">'
-        '{"@type": "Product", "name": "Widget",'
-        ' "offers": {"@type": "Offer", "price": "29.99", "priceCurrency": "EUR"}}'
-        "</script></head><body>Widget</body></html>"
-    )
-    with respx.mock(assert_all_called=False) as router:
-        router.get(url).respond(200, text=html)
-        async with httpx.AsyncClient() as client:
-            info = await GenericScraper().scrape(url, client)
-    assert info.error is None
-    assert info.price is not None
 
 
 # ── #16 follow-up: Shopify was left behind when Generic got the fix ──

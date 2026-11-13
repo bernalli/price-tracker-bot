@@ -1,6 +1,7 @@
 """Shopify scraper — uses the public /products/{handle}.json API.
 
-Works on any Shopify-powered store without needing JS rendering.
+Works on Shopify-powered stores without JS rendering. A refusal ends the
+check; product identity is checked before reading product data.
 """
 
 from __future__ import annotations
@@ -10,13 +11,13 @@ import logging
 import re
 from collections.abc import Iterator, Mapping
 from decimal import Decimal
-from typing import ClassVar
+from typing import ClassVar, Final
 from urllib.parse import parse_qsl, unquote, urlencode, urlparse
 
 import httpx
 from bs4 import BeautifulSoup
 
-from price_tracker.core.exceptions import BlockEvent, HTTPBlockStatus, ListingGone
+from price_tracker.core.exceptions import BlockEvent, ListingGone
 from price_tracker.core.http_client import public_request
 from price_tracker.core.identity import RequestedIdentity, check_echoes, normalize_url
 from price_tracker.core.image_url import normalize_image_url
@@ -29,12 +30,12 @@ from price_tracker.core.page_image import (
 )
 from price_tracker.core.retry_policy import RetryConfig, with_retry
 from price_tracker.core.scraper_base import (
+    DECLARED_USER_AGENT,
     AbstractScraper,
     ProductInfo,
     detect_block_event,
     detect_currency,
     detect_listing_gone,
-    get_headers,
     in_carousel_context,
     parse_price,
     retry_after_header,
@@ -44,6 +45,34 @@ from price_tracker.core.structured_data import StructureError, decode_json_stric
 from price_tracker.scrapers.evidence import offer_evidence, price_currency
 
 logger = logging.getLogger(__name__)
+
+# Shopify stores are asked at most once every six hours by the scheduler.
+SHOPIFY_MIN_CHECK_INTERVAL_MINUTES: Final = 360
+
+_JSON_ACCEPT_LANGUAGE: Final = "it-IT,it;q=0.9,en;q=0.8"
+_PAGE_ACCEPT: Final = (
+    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
+)
+_PAGE_ACCEPT_LANGUAGE: Final = "en-US,en;q=0.9,it-IT;q=0.8,it;q=0.7"
+
+
+def _json_headers() -> dict[str, str]:
+    """Headers of the .json request: the declared identity, nothing browser-like."""
+    return {
+        "User-Agent": DECLARED_USER_AGENT,
+        "Accept": "application/json",
+        "Accept-Language": _JSON_ACCEPT_LANGUAGE,
+    }
+
+
+def _page_headers() -> dict[str, str]:
+    """Headers of a product-page request: the same declared identity as the .json."""
+    return {
+        "User-Agent": DECLARED_USER_AGENT,
+        "Accept": _PAGE_ACCEPT,
+        "Accept-Language": _PAGE_ACCEPT_LANGUAGE,
+        "Accept-Encoding": "gzip, deflate, br",
+    }
 
 
 class _CurrencyAmbiguous(ValueError):
@@ -108,8 +137,8 @@ _SHOPIFY_PRODUCT_PATH_RE = re.compile(r"(?:^|/)products/[a-z0-9\-_]+", re.IGNORE
 
 @with_retry(RetryConfig(max_attempts=3, base_wait=2.0, max_wait=10.0))
 async def _fetch_shopify_response(url: str, client: httpx.AsyncClient) -> httpx.Response:
-    """Single GET attempt with browser headers. Tenacity handles retries."""
-    headers = get_headers()
+    """Single GET attempt with the declared headers. Tenacity handles retries."""
+    headers = _page_headers()
     response = await public_request(client, "GET", url, headers=headers)
     # Surface 403/429 (and WAF/CAPTCHA bodies) as a BlockEvent BEFORE
     # raise_for_status, so the scheduler quarantines the domain instead of
@@ -294,15 +323,7 @@ def _variant_offer_id(variant: Mapping[str, object]) -> str | None:
 @with_retry(RetryConfig(max_attempts=3, base_wait=2.0, max_wait=10.0))
 async def _fetch_shopify_json(json_url: str, client: httpx.AsyncClient) -> httpx.Response:
     """Single GET attempt against the /products/{handle}.json endpoint."""
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/131.0.0.0 Safari/537.36"
-        ),
-        "Accept": "application/json",
-        "Accept-Language": "it-IT,it;q=0.9,en;q=0.8",
-    }
+    headers = _json_headers()
     response = await public_request(client, "GET", json_url, headers=headers)
     # Don't raise_for_status here — caller handles 403 specially.
     return response
@@ -315,6 +336,7 @@ class ShopifyScraper(AbstractScraper):
     priority: ClassVar[int] = 80
     # Shopify uses content/path-based detection, not domain regex
     domain_patterns: ClassVar[list[re.Pattern[str]]] = []
+    min_check_interval_minutes: ClassVar[int] = SHOPIFY_MIN_CHECK_INTERVAL_MINUTES
 
     # Known Shopify domains (extend as discovered)
     # Seeded with well-known Shopify storefronts. It is a shortcut, not the
@@ -350,12 +372,7 @@ class ShopifyScraper(AbstractScraper):
         # Try JSON API first (most reliable)
         json_url = self._build_json_url(url)
         if json_url:
-            try:
-                result = await self._try_json_api(json_url, client, requested_url=url)
-            except HTTPBlockStatus as json_block:
-                if json_block.status != 429:
-                    raise
-                return await self._scrape_page_after_json_429(url, client, json_block)
+            result = await self._try_json_api(json_url, client, requested_url=url)
             if result and (result.error or result.available is False) and result.price is None:
                 return result
             if result and result.price is not None:
@@ -386,28 +403,6 @@ class ShopifyScraper(AbstractScraper):
             if page_result is not None:
                 return page_result
 
-        return ProductInfo(error="Prezzo non trovato (Shopify)", stock_evidence=False)
-
-    async def _scrape_page_after_json_429(
-        self, url: str, client: httpx.AsyncClient, json_block: HTTPBlockStatus
-    ) -> ProductInfo:
-        """Read the product page after the ``.json`` endpoint answered 429.
-
-        Some stores rate-limit the ``.json`` API per address and path while the
-        product page of the same product still answers. The page goes through the
-        same validated client and the same HTML chain as the 404 fallback. A
-        page that is refused too (403/429, WAF, CAPTCHA) raises its own block,
-        naming the page URL: that is the request that was refused last. A page
-        that cannot be fetched at all leaves nothing that contradicts the JSON
-        block, so that block is raised as it happened.
-        """
-        logger.info("Shopify JSON answered 429 for %s; reading the product page", url[:80])
-        html = await self._fetch_html(url, client)
-        if html is None:
-            raise json_block
-        page_result = self._read_product_page(html, url)
-        if page_result is not None:
-            return page_result
         return ProductInfo(error="Prezzo non trovato (Shopify)", stock_evidence=False)
 
     def _read_product_page(self, html: str, url: str) -> ProductInfo | None:
@@ -539,55 +534,19 @@ class ShopifyScraper(AbstractScraper):
             response = await _fetch_shopify_json(json_url, client)
             logger.debug("Shopify JSON API: status %s", response.status_code)
 
+            detect_block_event(
+                status_code=response.status_code,
+                body=response.text,
+                url=str(response.url),
+                retry_after=retry_after_header(response),
+            )
             if normalize_url(str(response.url)) != normalize_url(json_url):
                 return ProductInfo(
                     error="Identità Shopify non corrispondente", stock_evidence=False
                 )
-
-            if response.status_code == 404:
-                detect_block_event(
-                    status_code=404,
-                    body=response.text,
-                    url=json_url,
-                    retry_after=retry_after_header(response),
-                )
-            if response.status_code == 403:
-                # Try curl_cffi fallback before conceding the block: it can bypass
-                # some WAFs the primary client can't. Only when it ALSO fails do we
-                # surface the block — until then this must never become a silent
-                # "no data": block detection precedes parsing (#16).
-                data = await self._fetch_json_via_curl_cffi(json_url)
-                if data is None:
-                    detect_block_event(
-                        status_code=response.status_code,
-                        body=response.text,
-                        url=json_url,
-                        retry_after=retry_after_header(response),
-                    )
-                    return None  # pragma: no cover - detect_block_event always raises here
-            elif response.status_code == 404:
-                # Not a block: a headless (Next.js/Hydrogen) storefront has no static
-                # .json endpoint at all. Fall through to the HTML fallback.
+            if response.status_code != 200:
                 return None
-            elif response.status_code != 200:
-                # 429 and any other non-200 status (a WAF/CAPTCHA body can also ride
-                # on a 200) must surface as a BlockEvent when it is one, never as a
-                # swallowed None (#16, JSON branch never checked this before).
-                detect_block_event(
-                    status_code=response.status_code,
-                    body=response.text,
-                    url=json_url,
-                    retry_after=retry_after_header(response),
-                )
-                return None
-            else:
-                detect_block_event(
-                    status_code=response.status_code,
-                    body=response.text,
-                    url=json_url,
-                    retry_after=retry_after_header(response),
-                )
-                data = response.json()
+            data = response.json()
 
             product = data.get("product", {})
             if not product:
@@ -715,11 +674,6 @@ class ShopifyScraper(AbstractScraper):
         except (json.JSONDecodeError, httpx.HTTPError, ValueError, KeyError, AttributeError) as e:
             logger.debug("Shopify JSON API error for %s: %s", json_url, e)
             return None
-
-    @staticmethod
-    async def _fetch_json_via_curl_cffi(json_url: str) -> dict | None:
-        """Disabled: this backend cannot bind connections to validated addresses."""
-        return None
 
     @staticmethod
     def _try_product_group(html: str, url: str) -> ProductInfo | None:

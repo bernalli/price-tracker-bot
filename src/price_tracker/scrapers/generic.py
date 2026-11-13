@@ -26,7 +26,6 @@ from urllib.parse import urljoin, urlparse
 import httpx
 from bs4 import BeautifulSoup, Tag
 
-from price_tracker.core.exceptions import BlockEvent, ListingGone
 from price_tracker.core.http_client import public_request
 from price_tracker.core.identity import RequestedIdentity, check_echoes, normalize_url
 from price_tracker.core.page_image import (
@@ -104,11 +103,6 @@ async def _fetch_generic_html(url: str, client: httpx.AsyncClient) -> str:
     detect_listing_gone(status_code=response.status_code, url=url)
     response.raise_for_status()
     return ImagePageHTML(response.text, str(response.url))
-
-
-async def _fetch_with_curl_cffi(url: str) -> str | None:
-    """Disabled: this backend cannot bind connections to validated addresses."""
-    return None
 
 
 class GenericScraper(AbstractScraper):
@@ -199,37 +193,12 @@ class GenericScraper(AbstractScraper):
         return True  # Fallback — handles everything
 
     async def scrape(self, url: str, client: httpx.AsyncClient) -> ProductInfo:
-        # Keep the legacy fallback contract; its unbound backend is disabled.
-        html: str | None = None
-        curl_block: BlockEvent | None = None
         try:
-            html = await _fetch_with_curl_cffi(url)
-        except BlockEvent as e:
-            # Defer: give httpx a chance before signalling quarantine (#16).
-            curl_block = e
-        if not html or len(html) < 5000:
-            try:
-                fetched = await _fetch_generic_html(url, client)
-                if fetched:
-                    html = fetched
-            except ListingGone:
-                if not html:
-                    raise
-                logger.debug(
-                    "Generic httpx fetch found a removed listing for %s; "
-                    "keeping the curl_cffi HTML",
-                    _log_host(url),
-                )
-            except (httpx.HTTPError, ValueError) as e:
-                logger.debug(
-                    "Generic httpx fetch failed for %s: %s", _log_host(url), type(e).__name__
-                )
-                # Keep curl_cffi result (if any)
+            html = await _fetch_generic_html(url, client)
+        except (httpx.HTTPError, ValueError) as e:
+            logger.debug("Generic httpx fetch failed for %s: %s", _log_host(url), type(e).__name__)
+            html = None
         if not html:
-            if curl_block is not None:
-                # Both paths failed and curl_cffi saw a hard block (403/429):
-                # surface it so the scheduler quarantines the domain (#16).
-                raise curl_block
             return ProductInfo(error="Impossibile caricare la pagina", stock_evidence=False)
 
         # Surface WAF/CAPTCHA challenge bodies (often served with HTTP 200) as a

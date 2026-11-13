@@ -1,6 +1,6 @@
 # Scrapers
 
-`price-tracker-bot` ships **18 built-in scrapers** including a generic structured-data extractor and a disabled Playwright renderer. All are registered at startup and resolved by URL host via the central registry. Custom scrapers can be added as drop-in plugins or pip packages — see [plugins.md](plugins.md).
+`price-tracker-bot` ships **17 built-in scrapers** including a generic structured-data extractor. All are registered at startup and resolved by URL host via the central registry. Custom scrapers can be added as drop-in plugins or pip packages — see [plugins.md](plugins.md).
 
 ## Built-in inventory
 
@@ -9,7 +9,7 @@
 | `amazon.{com,it,de,co.uk,fr,es,nl,pl,se,ca,com.au,co.jp}`, `amzn.{eu,to}` | `AmazonScraper`            | 100      | High priority; CAPTCHA detection                      |
 | `ebay.{com,it,de,co.uk,fr,es,nl,pl,com.au,ca}`                          | `EbayScraper`              | 90       | Auction & buy-it-now formats                          |
 | `nove25.{net,com}` (incl. subdomains)                                   | `Nove25Scraper`            | 85       | Uses the generic extraction pipeline                 |
-| `*.myshopify.com` and Shopify-powered storefronts                        | `ShopifyScraper`           | 80       | Generic Shopify `/products/<slug>.json` endpoint      |
+| `*.myshopify.com` and Shopify-powered storefronts                        | `ShopifyScraper`           | 80       | Generic Shopify `/products/<slug>.json` endpoint; declared User-Agent; see [Shopify conduct](#shopify-conduct) |
 | `aliexpress.{com,it,fr,de,es,ru,nl}`                                    | `AliexpressScraper`        | 50       | Parses inline `window.runParams` JSON                 |
 | `apple.com` (incl. subdomains)                                          | `AppleStoreScraper`        | 50       | Locale → currency mapping                             |
 | `bestbuy.{com,ca}`                                                       | `BestbuyScraper`           | 50       | JSON-LD primary path                                  |
@@ -22,16 +22,15 @@
 | `walmart.com`                                                            | `WalmartScraper`           | 50       | NextData JSON parsing                                 |
 | `wayfair.{com,co.uk,ca,de}`                                              | `WayfairScraper`           | 50       | Furniture/home goods                                  |
 | `zalando.{it,de,fr,es,nl,co.uk,pl,...}`                                  | `ZalandoScraper`           | 50       | EU fashion locales                                    |
-| (any URL not matched by a site-specific scraper)                         | `PlaywrightFallbackScraper`| 10       | Disabled: browser connections cannot use the public-address transport |
 | (any URL not matched by a site-specific scraper)              | `GenericScraper`           | 0        | Last-resort structured-data extractor; runs the 9-strategy chain |
 
-> Total: **18** (16 site-specific + `GenericScraper` + `PlaywrightFallbackScraper`).
+> Total: **17** (16 site-specific + `GenericScraper`).
 
 All scrapers return prices as `Decimal` (never `float`). Outlier detection via median ratio rejects bogus parses without polluting price history.
 
 ## Resolution algorithm
 
-The registry sorts scrapers by `priority` (descending). On each URL lookup (`registry.resolve(url)`), the registry walks the sorted list and returns the first scraper whose `can_handle(url)` returns `True`. Site-specific scrapers implement `can_handle` as a regex match against `domain_patterns`. Both fallbacks (`PlaywrightFallbackScraper`, `GenericScraper`) override `can_handle` to broaden their reach: `PlaywrightFallbackScraper` currently returns `False` because browser rendering is disabled, so unmatched URLs reach `GenericScraper`.
+The registry sorts scrapers by `priority` (descending). On each URL lookup (`registry.resolve(url)`), the registry walks the sorted list and returns the first scraper whose `can_handle(url)` returns `True`. Site-specific scrapers implement `can_handle` as a regex match against `domain_patterns`. `GenericScraper` overrides `can_handle` to accept every URL, so unmatched URLs reach it.
 
 ```
 resolution order:
@@ -43,13 +42,28 @@ resolution order:
   EtsyScraper, GoogleStoreScraper, MediamarktScraper,
   NeweggScraper, OttoScraper, TargetScraper, WalmartScraper,
   WayfairScraper, ZalandoScraper (50, alphabetical tie-break)
-  PlaywrightFallbackScraper (10, disabled)
   GenericScraper (0, last resort)
 ```
 
 Nove25 has priority over the Shopify `/products/<slug>` path heuristic on Nove25 hosts.
 
 The first match wins; lower-priority scrapers are not tried even on parse failure (the failure is recorded in `scraper_health` and the domain is quarantined per the HealthManager policy).
+
+## Shopify conduct
+
+- Every request of a Shopify check carries the same declared User-Agent,
+  `price-tracker-bot/<version> (+https://github.com/bernalli/price-tracker-bot)`, and no browser
+  navigation headers.
+- A refusal ends the check. Refusals propagated from the JSON endpoint or fallback
+  page count toward the existing quarantine thresholds; a 429's Retry-After is
+  handled by the scheduler with its existing parser and cap. Currency-only
+  enrichment preserves the price already read and does not record the refusal.
+- The HTML fallback remains available when the JSON endpoint gives no usable
+  result without refusing the check, including a plain 404. HTML is also read
+  for currency-only enrichment when the JSON price has no currency.
+- The scheduler checks a Shopify product at most once every 360 minutes
+  (`min_check_interval_minutes`), counted from its latest check of any kind or from its addition.
+  Manual checks are not limited.
 
 ## Generic scraper extraction chain
 

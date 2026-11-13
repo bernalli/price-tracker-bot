@@ -18,10 +18,12 @@ from price_tracker.core.health import QuarantineState
 from price_tracker.core.notices import NoticeCollector
 from price_tracker.core.scheduler_common import (
     CHECK_TICK_MINUTES,
-    MAX_INTERVAL_MINUTES,
     SchedulerDeps,
     _failure_reason,
     _parse_db_timestamp,
+    effective_interval_minutes,
+    floor_holds,
+    interval_floor_minutes,
 )
 from price_tracker.core.scraper_base import handle_block_in_pipeline
 from price_tracker.core.url_utils import extract_etld_plus_one
@@ -399,24 +401,32 @@ class PeriodicRunsMixin:
                 logger.warning("Unreadable stored timestamp for product %s: %r", product.id, value)
         return max(stored) if stored else None
 
-    @staticmethod
-    def _interval_minutes(product: ProductRecord, *, global_minutes: int) -> int:
-        """The product's own interval if it is a usable one, else the global interval."""
-        own = product.check_interval_minutes
-        if isinstance(own, int) and not isinstance(own, bool) and 1 <= own <= MAX_INTERVAL_MINUTES:
-            return own
-        return min(max(global_minutes, CHECK_TICK_MINUTES), MAX_INTERVAL_MINUTES)
-
     def _is_due(self, product: ProductRecord, *, global_minutes: int, now: datetime) -> bool:
-        """Whether the product's interval (its own, else the global one) has elapsed.
+        """Whether the product's interval has elapsed, and its scraper's floor too.
 
-        Half a tick of slack keeps a product from slipping a whole tick late on
-        every cycle when its interval is a multiple of the tick.
+        Half a tick of slack keeps a product from slipping a whole tick late on every
+        cycle when its interval is a multiple of the tick. The scraper's floor
+        (``min_check_interval_minutes``) gets no slack and counts from the latest
+        readable attempt of any kind or the product's creation.
         """
+        floor = interval_floor_minutes(self.deps.registry.resolve(product.url))
+        if floor_holds(
+            product,
+            floor_minutes=floor,
+            attempted_at=self._attempted_at.get(product.id),
+            now=now,
+        ):
+            return False
         last = self._last_attempt(product)
         if last is None:
             return True
-        interval = timedelta(minutes=self._interval_minutes(product, global_minutes=global_minutes))
+        interval = timedelta(
+            minutes=effective_interval_minutes(
+                product.check_interval_minutes,
+                global_minutes=global_minutes,
+                floor_minutes=floor,
+            )
+        )
         return now - last + timedelta(minutes=CHECK_TICK_MINUTES / 2) >= interval
 
     async def run_check_due(
@@ -427,6 +437,7 @@ class PeriodicRunsMixin:
         The periodic job calls this every ``CHECK_TICK_MINUTES``. A product's own
         ``check_interval_minutes`` overrides ``global_interval_minutes``; a failed
         read counts as an attempt, so a failing product is not retried every tick.
+        A scraper's ``min_check_interval_minutes`` is a floor no product interval lowers.
         """
         moment = now or datetime.now(UTC)
         users = await self.deps.repo.list_active_users()

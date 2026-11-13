@@ -75,6 +75,7 @@ async def rig(tmp_path, monkeypatch):
             client=client,
             job_pacing=DomainSpacing(clock=lambda: clock[0]),
             referenced_urls=refs,
+            store_paused=lambda _domain: False,
         )
         mode = media.TwoMessageMode(service, GridRegistry(clock=lambda: clock[0]))
         request = FakeRequest()

@@ -44,6 +44,7 @@ async def test_a_failed_download_does_not_erase_the_committed_url(tmp_path, monk
             client=client,
             job_pacing=DomainSpacing(min_gap=0),
             referenced_urls=w.repo.list_image_urls,
+            store_paused=lambda _domain: False,
         )
         await check(
             w, ProductInfo(price=Decimal(90), currency="EUR", image_url=NEW), requester=service

@@ -84,6 +84,7 @@ async def rig(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
                 client=client,
                 job_pacing=spacing,
                 referenced_urls=referenced,
+                store_paused=lambda _domain: False,
                 clock=clock,
                 sleep=clock.sleep,
                 **kwargs,
@@ -124,6 +125,9 @@ async def test_constructor_accepts_queue_boundaries_and_has_no_health_dependency
     service = rig.make(queue_size=size, prune_every=0.1, retry_after_failure=0.1)
     assert service.request(A1)
     assert "health" not in str(inspect.signature(ThumbnailService)).lower()
+    store_paused = inspect.signature(ThumbnailService).parameters["store_paused"]
+    assert store_paused.kind is inspect.Parameter.KEYWORD_ONLY
+    assert store_paused.default is inspect.Parameter.empty
 
 
 @pytest.mark.parametrize(
@@ -422,6 +426,7 @@ async def test_zero_gap_keeps_retry_after_deferrals(
         client=rig.client,
         job_pacing=rig.spacing,
         referenced_urls=refs,
+        store_paused=lambda _domain: False,
         clock=rig.clock,
         sleep=rig.clock.sleep,
     )
@@ -670,6 +675,7 @@ def test_random_job_sequences_respect_domain_spacing_and_retention(
                 client=client,
                 job_pacing=spacing,
                 referenced_urls=referenced,
+                store_paused=lambda _domain: False,
                 clock=clock,
                 sleep=clock.sleep,
             )
@@ -747,6 +753,7 @@ async def test_worker_and_both_scheduler_sweeps_share_job_pacing(
             client=scheduler.deps.client,
             job_pacing=scheduler.deps.domain_spacing,
             referenced_urls=referenced,
+            store_paused=lambda _domain: False,
             clock=clock,
             sleep=clock.sleep,
         )
@@ -804,6 +811,7 @@ async def test_redirect_chain_is_one_download_job(rig: Any, cross_domain: bool) 
                 client=client,
                 job_pacing=rig.spacing,
                 referenced_urls=referenced,
+                store_paused=lambda _domain: False,
                 clock=rig.clock,
                 sleep=rig.clock.sleep,
             )

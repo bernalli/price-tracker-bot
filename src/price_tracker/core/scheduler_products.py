@@ -346,7 +346,7 @@ class ProductChecksMixin:
         image_url = normalize_image_url(info.image_url, base_url=p.url)
         await self.deps.repo.update_price_and_image(p.id, info.price, image_url)
         if self.deps.thumbnails is not None:
-            self.deps.thumbnails.request(image_url)
+            self.deps.thumbnails.request(image_url, store=domain if domain != "unknown" else None)
         await self.deps.repo.add_price_history(p.id, info.price)
         if p.pending_read_count or p.pending_read_streak:
             await self.deps.repo.clear_pending_read(p.id)

@@ -196,6 +196,47 @@ async def test_thumbnails_share_scheduler_spacing_and_repository(
         assert service._client is client
         assert service._referenced_urls == application.bot_data["repo"].list_image_urls
         assert list(await service._referenced_urls()) == []
+        assert service._store_paused == application.bot_data["health_manager"].is_quarantined
+        assert scheduler.deps.health_mgr is application.bot_data["health_manager"]
+    finally:
+        await client.aclose()
+
+
+async def test_quarantine_is_loaded_before_the_image_service_is_built(
+    fake_config, memory_db, monkeypatch, tmp_path
+):
+    import httpx
+
+    from price_tracker import main
+    from price_tracker.media.thumbnails import ThumbnailService
+
+    events: list[str] = []
+    original_load = HealthManager.load
+    original_service = ThumbnailService
+
+    async def load(self: HealthManager) -> None:
+        await original_load(self)
+        events.append("loaded")
+
+    def service(*args: Any, **kwargs: Any) -> Any:
+        events.append("service")
+        return original_service(*args, **kwargs)
+
+    monkeypatch.setattr(HealthManager, "load", load)
+    monkeypatch.setattr(main, "ThumbnailService", service)
+    application = make_application(FakeRequest())
+    application.bot_data.update(config=fake_config, db_conn=memory_db, registry=ScraperRegistry())
+    client = httpx.AsyncClient(
+        transport=httpx.MockTransport(lambda request: pytest.fail("unexpected network"))
+    )
+    monkeypatch.setattr(main, "build_client", lambda **kwargs: client)
+    monkeypatch.setattr(main, "sync_command_menus", AsyncMock())
+    try:
+        await main._combined_post_init(application)
+        health = application.bot_data["health_manager"]
+        assert events == ["loaded", "service"]
+        assert application.bot_data["thumbnails"]._store_paused == health.is_quarantined
+        assert application.bot_data["scheduler"].deps.health_mgr is health
     finally:
         await client.aclose()
 
@@ -272,6 +313,7 @@ async def test_thumbnail_worker_is_cancelled_before_updater_stop(
         client=Mock(),
         job_pacing=DomainSpacing(),
         referenced_urls=AsyncMock(return_value=[]),
+        store_paused=lambda _domain: False,
     )
 
     async def work():

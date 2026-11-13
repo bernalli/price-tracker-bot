@@ -28,6 +28,7 @@ from price_tracker.core.registry import (
     discover_dropin_scrapers,
 )
 from price_tracker.core.scheduler import CHECK_TICK_MINUTES, Scheduler, SchedulerDeps
+from price_tracker.core.scheduler_common import configured_interval_minutes
 from price_tracker.db import apply_runtime_pragmas
 from price_tracker.db.migrator import apply_migrations
 from price_tracker.db.repository import Repository
@@ -102,6 +103,15 @@ async def post_init(application: Application[Any, Any, Any, Any, Any, Any]) -> N
     await sync_command_menus(application.bot, repo)
 
 
+async def _setup_health(application: Application[Any, Any, Any, Any, Any, Any]) -> None:
+    """Load the per-store quarantine state before any service that reads it."""
+    repo: Repository = application.bot_data["repo"]
+    metrics: MetricsRegistry | None = application.bot_data.get("metrics")
+    health_mgr = HealthManager(repo, metrics=metrics)
+    await health_mgr.load()
+    application.bot_data["health_manager"] = health_mgr
+
+
 async def _setup_scheduler(application: Application[Any, Any, Any, Any, Any, Any]) -> None:
     config: Config = application.bot_data["config"]
     repo: Repository = application.bot_data["repo"]
@@ -109,9 +119,7 @@ async def _setup_scheduler(application: Application[Any, Any, Any, Any, Any, Any
     registry: ScraperRegistry = application.bot_data["registry"]
 
     metrics: MetricsRegistry | None = application.bot_data.get("metrics")
-    health_mgr = HealthManager(repo, metrics=metrics)
-    await health_mgr.load()
-    application.bot_data["health_manager"] = health_mgr
+    health_mgr: HealthManager = application.bot_data["health_manager"]
 
     # Prefs and digest must be wired here, not just on the bot_data service:
     # the periodic job is precisely the sender that mute, quiet hours and digest
@@ -164,11 +172,13 @@ async def _setup_thumbnails(application: Application[Any, Any, Any, Any, Any, An
         log.warning("thumbnails.disabled", reason=type(exc).__name__)
         return
     repo: Repository = application.bot_data["repo"]
+    health_mgr: HealthManager = application.bot_data["health_manager"]
     service = ThumbnailService(
         cache,
         client=application.bot_data["http_client"],
         job_pacing=application.bot_data["domain_spacing"],
         referenced_urls=repo.list_image_urls,
+        store_paused=health_mgr.is_quarantined,
     )
     application.bot_data.update(thumbnails=service, list_grids=GridRegistry())
 
@@ -177,6 +187,7 @@ async def _combined_post_init(application: Application[Any, Any, Any, Any, Any, 
     await post_init(application)
     config: Config = application.bot_data["config"]
     application.bot_data["domain_spacing"] = DomainSpacing(min_gap=config.domain_min_gap_seconds)
+    await _setup_health(application)
     await _setup_thumbnails(application)
     await _setup_scheduler(application)
 
@@ -189,8 +200,8 @@ async def scheduled_check_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     scheduler: Scheduler = context.application.bot_data["scheduler"]
     config: Config = context.application.bot_data["config"]
     saved = await scheduler.deps.repo.get_config("check_interval_minutes")
-    interval = int(saved) if saved and saved.isdigit() else config.check_interval_minutes
-    await scheduler.run_check_due(global_interval_minutes=max(5, interval))
+    interval = configured_interval_minutes(saved, configured=config.check_interval_minutes)
+    await scheduler.run_check_due(global_interval_minutes=interval)
 
 
 # How often the digest-flush job runs, and the fallback cadence for users with no

@@ -243,26 +243,6 @@ async def test_overall_deadline_bounds_redirect_chain(network: Network) -> None:
     assert len(network.targets) < 6
 
 
-async def test_browser_cannot_start_even_if_installed(monkeypatch: pytest.MonkeyPatch) -> None:
-    import sys
-    import types
-
-    from price_tracker.scrapers import playwright_fallback
-
-    module = types.ModuleType("playwright.async_api")
-
-    def forbidden() -> None:
-        pytest.fail("browser startup permits uncontrolled subrequests")
-
-    module.async_playwright = forbidden  # type: ignore[attr-defined]
-    monkeypatch.setitem(sys.modules, "playwright.async_api", module)
-    monkeypatch.setattr(playwright_fallback, "available", lambda: True)
-    result = await playwright_fallback.PlaywrightFallbackScraper().scrape("https://shop.example/")
-    assert result.price is None
-    assert result.error is not None
-    assert "disabled" in result.error
-
-
 @pytest.mark.parametrize("scheme", ["file", "ftp", "ws", "wss", "data"])
 async def test_non_http_schemes_fail_closed(network: Network, scheme: str) -> None:
     async with build_client() as client:
@@ -305,36 +285,6 @@ async def test_scraper_cannot_bypass_guard_with_plain_client(
         with pytest.raises(UnsafeURLError):
             await fetch("http://100.100.100.100/product", client)
     assert network.targets == []
-
-
-@pytest.mark.parametrize(
-    ("module", "helper"),
-    [
-        ("amazon", "_fetch_via_curl_cffi"),
-        ("amazon", "_fetch_via_scrapling"),
-        ("generic", "_fetch_with_curl_cffi"),
-        ("shopify", "_fetch_json_via_curl_cffi"),
-    ],
-)
-async def test_unbound_backend_is_disabled(
-    monkeypatch: pytest.MonkeyPatch,
-    module: str,
-    helper: str,
-) -> None:
-    import importlib
-    import sys
-    import types
-
-    def forbidden(*args: Any, **kwargs: Any) -> Any:
-        pytest.fail("unbound backend was invoked")
-
-    monkeypatch.setattr("curl_cffi.requests.AsyncSession", forbidden)
-    fake = types.ModuleType("scrapling")
-    fake.Fetcher = types.SimpleNamespace(get=forbidden)  # type: ignore[attr-defined]
-    monkeypatch.setitem(sys.modules, "scrapling", fake)
-    target = importlib.import_module(f"price_tracker.scrapers.{module}")
-    owner = target.ShopifyScraper if module == "shopify" else target
-    assert await getattr(owner, helper)("https://shop.example/product") is None
 
 
 async def test_fetch_page_cannot_bypass_guard_with_plain_client(network: Network) -> None:

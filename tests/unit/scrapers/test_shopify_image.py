@@ -111,7 +111,7 @@ async def test_an_attributed_product_group_can_supply_an_image() -> None:
 JSONLD_PRODUCT = owner(name="Kettle JSON", offers={"price": "25.00", "priceCurrency": "USD"})
 
 
-@pytest.mark.parametrize("json_status", [404, 429])
+@pytest.mark.parametrize("json_status", [404, 500])
 @pytest.mark.parametrize(
     ("page", "expected"),
     [

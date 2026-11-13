@@ -488,7 +488,7 @@ async def _add_product(
     )
     mode = list_media.two_message_mode(context)
     if mode is not None:
-        mode.thumbnails.request(image_url)
+        mode.thumbnails.request(image_url, store=domain)
 
     name = result.name or _("Product")
     name_short = truncate_to_width(name, 80)

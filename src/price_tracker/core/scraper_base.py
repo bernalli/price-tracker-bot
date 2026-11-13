@@ -7,7 +7,7 @@ import random
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, ClassVar, Final
 from urllib.parse import urlparse
 
 if TYPE_CHECKING:
@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 
     from price_tracker.core.health import HealthManager
 
+from price_tracker import __version__
 from price_tracker.core.exceptions import (
     LISTING_GONE_STATUSES,
     BlockEvent,
@@ -64,6 +65,12 @@ def get_headers(extra: dict[str, str] | None = None) -> dict[str, str]:
     if extra:
         headers.update(extra)
     return headers
+
+
+PROJECT_URL: Final = "https://github.com/bernalli/price-tracker-bot"
+# A stable identity that names the bot: stores that refuse automated clients can
+# recognise it, and nothing pretends to be a browser.
+DECLARED_USER_AGENT: Final = f"price-tracker-bot/{__version__} (+{PROJECT_URL})"
 
 
 # ── Price parsing (returns Decimal, never float) ──────────────────
@@ -372,6 +379,9 @@ class AbstractScraper(ABC):
     name: ClassVar[str] = ""
     priority: ClassVar[int] = 0
     domain_patterns: ClassVar[list[re.Pattern[str]]] = []
+    # Minimum minutes between two scheduled checks of one product; 0 = no floor.
+    # Manual checks ignore it.
+    min_check_interval_minutes: ClassVar[int] = 0
 
     @abstractmethod
     def can_handle(self, url: str) -> bool:

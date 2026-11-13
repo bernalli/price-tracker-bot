@@ -37,10 +37,10 @@ def test_requested_variant_is_selected_independently_of_order(variants) -> None:
     assert _price(_page({**_PRODUCT, "variants": variants}), f"{_URL}?variant=2") == Decimal(20)
 
 
-async def test_json_429_selects_requested_embedded_variant() -> None:
+async def test_json_404_selects_requested_embedded_variant() -> None:
     url = f"{_URL}?variant=2"
     with respx.mock(assert_all_called=True) as router:
-        router.get(f"{_URL}.json").respond(429)
+        router.get(f"{_URL}.json").respond(404)
         router.get(url).respond(200, text=_page(_PRODUCT))
         async with httpx.AsyncClient() as client:
             info = await ShopifyScraper().scrape(url, client)

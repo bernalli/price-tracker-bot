@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any, Protocol
 
 import httpx
@@ -17,6 +17,7 @@ from price_tracker.core.outlier import REQUIRED_CONFIRMATIONS
 if TYPE_CHECKING:
     from price_tracker.core.alert import PriceAlert
     from price_tracker.core.registry import ScraperRegistry
+    from price_tracker.db.models import ProductRecord
     from price_tracker.db.repository import Repository
     from price_tracker.observability.metrics import MetricsRegistry
 
@@ -24,10 +25,49 @@ CHECK_TICK_MINUTES = 5
 MAX_INTERVAL_MINUTES = 7 * 24 * 60
 
 
+def interval_floor_minutes(scraper: object) -> int:
+    """Minimum minutes between two scheduled checks that ``scraper`` declares.
+
+    ``0`` for ``None``, for an object without ``min_check_interval_minutes`` and for a
+    value that is not a plain ``int`` (``bool`` included) or is negative; capped at
+    ``MAX_INTERVAL_MINUTES``.
+    """
+    value = getattr(scraper, "min_check_interval_minutes", 0)
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        return 0
+    return min(value, MAX_INTERVAL_MINUTES)
+
+
+def effective_interval_minutes(own: object, *, global_minutes: int, floor_minutes: int = 0) -> int:
+    """The interval the scheduler applies to one product, in minutes.
+
+    The product's own interval when it is a plain ``int`` in ``1..MAX_INTERVAL_MINUTES``,
+    else ``global_minutes`` clamped to ``CHECK_TICK_MINUTES..MAX_INTERVAL_MINUTES``;
+    never below ``floor_minutes``, which callers take from ``interval_floor_minutes``.
+    """
+    if isinstance(own, int) and not isinstance(own, bool) and 1 <= own <= MAX_INTERVAL_MINUTES:
+        base = own
+    else:
+        base = min(max(global_minutes, CHECK_TICK_MINUTES), MAX_INTERVAL_MINUTES)
+    return max(base, floor_minutes)
+
+
+def configured_interval_minutes(saved: object, *, configured: int) -> int:
+    """Read the stored global interval without unbounded integer conversion."""
+    fallback = min(max(configured, CHECK_TICK_MINUTES), MAX_INTERVAL_MINUTES)
+    if not isinstance(saved, str) or not saved or not saved.isascii() or not saved.isdigit():
+        return fallback
+    digits = saved.lstrip("0") or "0"
+    cap = str(MAX_INTERVAL_MINUTES)
+    if len(digits) > len(cap) or (len(digits) == len(cap) and digits > cap):
+        return MAX_INTERVAL_MINUTES
+    return max(CHECK_TICK_MINUTES, int(digits))
+
+
 class ThumbnailRequester(Protocol):
     """Anything that can be asked, without waiting, to fetch a product image later."""
 
-    def request(self, url: str | None) -> bool: ...
+    def request(self, url: str | None, *, store: str | None = None) -> bool: ...
 
 
 class NotifierFn(Protocol):
@@ -67,6 +107,38 @@ def _parse_db_timestamp(value: str) -> datetime:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=UTC)
     return parsed
+
+
+def floor_anchor(product: ProductRecord, *, attempted_at: object) -> datetime | None:
+    """The latest readable moment the store was asked about ``product``.
+
+    The newest of this process's own attempt, the stored read, the stored failure
+    and the product's creation. A missing or unreadable value is skipped.
+    """
+    anchors: list[datetime] = []
+    if isinstance(attempted_at, datetime) and attempted_at.utcoffset() is not None:
+        anchors.append(attempted_at)
+    for value in (product.last_checked_at, product.last_error_at, product.created_at):
+        if not isinstance(value, str) or not value:
+            continue
+        try:
+            anchors.append(_parse_db_timestamp(value))
+        except (ValueError, TypeError, AttributeError, OverflowError):
+            continue
+    return max(anchors) if anchors else None
+
+
+def floor_holds(
+    product: ProductRecord, *, floor_minutes: int, attempted_at: object, now: datetime
+) -> bool:
+    """Whether a scheduled check of ``product`` must still wait for its scraper's floor.
+
+    ``False`` without a floor and when no anchor is readable: the wait cannot be shown.
+    """
+    if floor_minutes <= 0:
+        return False
+    anchor = floor_anchor(product, attempted_at=attempted_at)
+    return anchor is not None and now - anchor < timedelta(minutes=floor_minutes)
 
 
 def _failure_reason(exc: BaseException) -> tuple[str, str]:

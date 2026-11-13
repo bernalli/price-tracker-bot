@@ -11,12 +11,14 @@ HTTP Host, TLS SNI and certificate verification. Environment proxies are ignored
 Redirect chains are limited to five hops and one total request deadline, including
 DNS and response reading. Connections are not reused across requests.
 
-The curl impersonation, Scrapling and Playwright backends are disabled. Chromium is
-never started, so page scripts, subresources, service workers and WebSockets cannot
-open separate connections. Products requiring browser rendering or impersonation may
-no longer yield prices; ordinary HTTP extraction remains available.
+No curl impersonation, Scrapling or browser backend is installed. Chromium is never
+started, so page scripts, subresources, service workers and WebSockets cannot open
+separate connections. Products requiring browser rendering or impersonation may not
+yield prices; ordinary HTTP extraction remains available.
 
 Product images use the same validated transport, HTTPS only, with an 8 MiB body cap and accepted image content types. Downloads run in the background after an accepted price check or product addition, never when opening `/list`. The product card uses Telegram's link preview: Telegram's servers fetch the image URL from the store, rather than the bot.
+
+No image is downloaded while the image host or the product's store is paused for refusing the bot (locked, or waiting for its probe): the image is retried after the usual 24-hour failure backoff.
 
 `DOMAIN_MIN_GAP_SECONDS` spaces the starts of background jobs, including image downloads, by eTLD+1 (default 30 seconds; `0` disables the gap). Manual checks never wait, but their images are still queued for background download. A redirect chain is one job. The HTTP transport does no pacing.
 
@@ -66,7 +68,7 @@ All configuration is via environment variables, loaded from `.env` (or the host 
 | `LOCALE`                      | `en`                    | Default locale fallback when Telegram `language_code` missing (`en`, `it`)                                             |
 | `LOG_LEVEL`                   | `INFO`                  | structlog log level (`DEBUG`, `INFO`, `WARNING`, `ERROR`)                                                              |
 | `PROMETHEUS_BIND`             | `127.0.0.1:9090`        | Prometheus exporter bind address (host:port)                                                                           |
-| `CHECK_INTERVAL_MINUTES`      | `360`                   | Default polling interval (per-product overridable via `/set_interval`)                                                 |
+| `CHECK_INTERVAL_MINUTES`      | `360`                   | Default polling interval (per-product overridable via `/set_interval`); products read by the Shopify scraper are scheduled at most every 360 minutes |
 | `MAX_CONSECUTIVE_ERRORS`      | `10`                    | Failed checks before a product is auto-suspended (domain-wide quarantine uses the fixed tiers in `core/health.py`, not this variable) |
 | `LISTING_GONE_CONFIRMATIONS`  | `3`                     | Consecutive HTTP 404/410 answers before a removed listing is suspended                                                 |
 | `REQUEST_TIMEOUT`             | `30`                    | HTTP timeout in seconds for scraper requests                                                                           |
