@@ -11,10 +11,10 @@ HTTP Host, TLS SNI and certificate verification. Environment proxies are ignored
 Redirect chains are limited to five hops and one total request deadline, including
 DNS and response reading. Connections are not reused across requests.
 
-The curl impersonation, Scrapling and Playwright backends are disabled. Chromium is
-never started, so page scripts, subresources, service workers and WebSockets cannot
-open separate connections. Products requiring browser rendering or impersonation may
-no longer yield prices; ordinary HTTP extraction remains available.
+No curl impersonation, Scrapling or browser backend is installed. Chromium is never
+started, so page scripts, subresources, service workers and WebSockets cannot open
+separate connections. Products requiring browser rendering or impersonation may not
+yield prices; ordinary HTTP extraction remains available.
 
 Product images use the same validated transport, HTTPS only, with an 8 MiB body cap and accepted image content types. Downloads run in the background after an accepted price check or product addition, never when opening `/list`. The product card uses Telegram's link preview: Telegram's servers fetch the image URL from the store, rather than the bot.
 

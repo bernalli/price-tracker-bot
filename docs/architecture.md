@@ -13,7 +13,7 @@ src/price_tracker/
 ├── bot/             # Telegram interface — handlers, decorators, message templates
 │   └── handlers/    # auth, monitoring, settings, product, history, debug, ...
 ├── core/            # scheduler, alert, outlier, health, currency, retry, http_client
-├── scrapers/        # 17 site-specific scrapers + generic chain + playwright fallback
+├── scrapers/        # 16 site-specific scrapers + generic chain
 ├── db/              # repository, models, versioned migrations (001-010)
 ├── notifier/        # telegram delivery, preferences, digest queue
 ├── observability/   # Prometheus metrics + structured JSON logging

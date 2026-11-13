@@ -349,23 +349,19 @@ _PRICED_HTML = '<html><body><span class="product__price">USD 12.00</span></body>
 
 
 @pytest.mark.asyncio
-async def test_shopify_json_403_raises_block_event_when_curl_cffi_unavailable() -> None:
-    """A 403 on the .json endpoint whose curl_cffi bypass fails must raise BlockEvent.
-
-    curl_cffi is not installed in the test environment, so `_fetch_json_via_curl_cffi`
-    returns None (ImportError path) and the block must surface, never become a silent
-    ProductInfo(error=...).
-    """
+async def test_shopify_json_403_raises_block_event_without_reading_the_page() -> None:
+    """A 403 on the .json endpoint raises BlockEvent and the product page is never requested."""
     scraper = ShopifyScraper()
     url = "https://shop.example.com/products/blocked-json"
     json_url = "https://shop.example.com/products/blocked-json.json"
 
     with respx.mock(assert_all_called=False) as router:
         router.get(json_url).respond(403, text="forbidden")
-        router.get(url).respond(200, text=_PRICED_HTML)
+        page = router.get(url).respond(200, text=_PRICED_HTML)
         async with httpx.AsyncClient() as client:
             with pytest.raises(BlockEvent):
                 await scraper.scrape(url, client)
+    assert page.call_count == 0
 
 
 @pytest.mark.asyncio

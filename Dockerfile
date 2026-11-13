@@ -5,7 +5,7 @@ FROM python:3.12-slim AS builder
 WORKDIR /build
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        gcc g++ libcurl4-openssl-dev \
+        gcc g++ \
     && rm -rf /var/lib/apt/lists/*
 
 # Dependencies come from uv.lock, not from a fresh resolution. Before this, the
@@ -39,7 +39,7 @@ WORKDIR /app
 # because Chromium cannot use the validated-address transport, so neither
 # Chromium nor its system libraries and fonts are installed.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        libcurl4 ca-certificates \
+        ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # Non-root user

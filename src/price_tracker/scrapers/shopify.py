@@ -552,19 +552,12 @@ class ShopifyScraper(AbstractScraper):
                     retry_after=retry_after_header(response),
                 )
             if response.status_code == 403:
-                # Try curl_cffi fallback before conceding the block: it can bypass
-                # some WAFs the primary client can't. Only when it ALSO fails do we
-                # surface the block — until then this must never become a silent
-                # "no data": block detection precedes parsing (#16).
-                data = await self._fetch_json_via_curl_cffi(json_url)
-                if data is None:
-                    detect_block_event(
-                        status_code=response.status_code,
-                        body=response.text,
-                        url=json_url,
-                        retry_after=retry_after_header(response),
-                    )
-                    return None  # pragma: no cover - detect_block_event always raises here
+                detect_block_event(
+                    status_code=response.status_code,
+                    body=response.text,
+                    url=json_url,
+                    retry_after=retry_after_header(response),
+                )
             elif response.status_code == 404:
                 # Not a block: a headless (Next.js/Hydrogen) storefront has no static
                 # .json endpoint at all. Fall through to the HTML fallback.
@@ -715,11 +708,6 @@ class ShopifyScraper(AbstractScraper):
         except (json.JSONDecodeError, httpx.HTTPError, ValueError, KeyError, AttributeError) as e:
             logger.debug("Shopify JSON API error for %s: %s", json_url, e)
             return None
-
-    @staticmethod
-    async def _fetch_json_via_curl_cffi(json_url: str) -> dict | None:
-        """Disabled: this backend cannot bind connections to validated addresses."""
-        return None
 
     @staticmethod
     def _try_product_group(html: str, url: str) -> ProductInfo | None:

@@ -149,14 +149,13 @@ and the [configuration template](.env.example) for more settings.
 
 ## Supported sites
 
-The bot includes 18 built-in scrapers:
+The bot includes 17 built-in scrapers:
 
 - Site scrapers: Amazon, eBay, Walmart, Target, BestBuy, Etsy, Newegg, Wayfair,
   MediaMarkt, Otto, Zalando, Apple Store, Google Store, AliExpress and Nove25.
 - Shopify scraper for Shopify product pages.
 - Generic scraper: tries JSON-LD, microdata, OpenGraph and RDFa, then other
   page-extraction strategies. Success depends on the page's available data.
-- Playwright fallback: retained in the registry, but browser rendering is disabled.
 
 Each link is tracked on its own site. Browser-only pages may not yield a price.
 See [scrapers](docs/scrapers.md) and the [current fetch restrictions](docs/operations.md#outbound-destination-policy).

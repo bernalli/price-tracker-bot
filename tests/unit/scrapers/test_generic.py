@@ -28,16 +28,6 @@ def _jsonld_soup(payload: object) -> BeautifulSoup:
     return BeautifulSoup(html, "lxml")
 
 
-@pytest.fixture(autouse=True)
-def _disable_curl_cffi(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Force GenericScraper to use httpx (so respx can intercept)."""
-
-    async def _no_curl(url: str) -> str | None:
-        return None
-
-    monkeypatch.setattr(generic_module, "_fetch_with_curl_cffi", _no_curl)
-
-
 # ── can_handle ────────────────────────────────────────────────────
 
 
@@ -249,7 +239,7 @@ def test_data_attributes_accepts_schema_org_product_scope() -> None:
 
 @pytest.mark.asyncio
 async def test_generic_handles_404(monkeypatch: pytest.MonkeyPatch) -> None:
-    """404 → curl_cffi None → httpx 404 → ProductInfo with error."""
+    """httpx 404 → ProductInfo with error."""
     scraper = GenericScraper()
 
     async def _fast_fetch(url: str, client: httpx.AsyncClient) -> str:

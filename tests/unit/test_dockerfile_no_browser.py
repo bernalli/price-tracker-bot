@@ -1,7 +1,7 @@
 """The runtime image installs no browser.
 
 Browser rendering is disabled because Chromium cannot use the validated-address
-transport (``scrapers/playwright_fallback.py``), and no dependency installs
+transport, and no dependency installs
 Playwright. The Dockerfile still tried to download Chromium and installed its
 system libraries: dead weight and attack surface in every image.
 """

@@ -395,24 +395,14 @@ async def _fetch_with_fresh_client(url: str) -> str | None:
         return None
 
 
-async def _fetch_via_curl_cffi(url: str) -> str | None:
-    """Disabled: this backend cannot bind connections to validated addresses."""
-    return None
-
-
-async def _fetch_via_scrapling(url: str) -> str | None:
-    """Disabled: this backend cannot bind connections to validated addresses."""
-    return None
-
-
 async def _fetch_amazon_page(
     url: str, client: httpx.AsyncClient, extra_headers: dict[str, str] | None = None
 ) -> str | None:
     """Fetch Amazon page with retry + fallback chain.
 
     Returns the page HTML, or None on a non-block, non-gone failure (e.g. a
-    5xx or a network error). On a hard block (403/429/WAF/CAPTCHA) that
-    survives every fallback, re-raises the :class:`BlockEvent` subclass the
+    5xx or a network error). On a hard block (403/429/WAF/CAPTCHA) on the
+    primary fetch, re-raises the :class:`BlockEvent` subclass the
     primary fetch produced, so the scheduler quarantines the domain instead of
     recording a generic error. On 404/410 raises :class:`ListingGone`
     immediately: the listing is gone, not blocked, and no fallback fetch
@@ -450,13 +440,7 @@ async def _fetch_amazon_page(
         return html
 
     if block_exc is not None:
-        html = await _fetch_via_curl_cffi(url)
-        if html:
-            return html
-        html = await _fetch_via_scrapling(url)
-        if html:
-            return html
-        # Hard block survived every fallback → signal quarantine to the scheduler.
+        # A hard block on the primary fetch: signal quarantine to the scheduler.
         raise block_exc
 
     return None
