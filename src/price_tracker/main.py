@@ -28,6 +28,7 @@ from price_tracker.core.registry import (
     discover_dropin_scrapers,
 )
 from price_tracker.core.scheduler import CHECK_TICK_MINUTES, Scheduler, SchedulerDeps
+from price_tracker.core.scheduler_common import configured_interval_minutes
 from price_tracker.db import apply_runtime_pragmas
 from price_tracker.db.migrator import apply_migrations
 from price_tracker.db.repository import Repository
@@ -199,8 +200,8 @@ async def scheduled_check_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     scheduler: Scheduler = context.application.bot_data["scheduler"]
     config: Config = context.application.bot_data["config"]
     saved = await scheduler.deps.repo.get_config("check_interval_minutes")
-    interval = int(saved) if saved and saved.isdigit() else config.check_interval_minutes
-    await scheduler.run_check_due(global_interval_minutes=max(5, interval))
+    interval = configured_interval_minutes(saved, configured=config.check_interval_minutes)
+    await scheduler.run_check_due(global_interval_minutes=interval)
 
 
 # How often the digest-flush job runs, and the fallback cadence for users with no

@@ -10,7 +10,7 @@ import logging
 import re
 from collections.abc import Iterator, Mapping
 from decimal import Decimal
-from typing import ClassVar
+from typing import ClassVar, Final
 from urllib.parse import parse_qsl, unquote, urlencode, urlparse
 
 import httpx
@@ -44,6 +44,9 @@ from price_tracker.core.structured_data import StructureError, decode_json_stric
 from price_tracker.scrapers.evidence import offer_evidence, price_currency
 
 logger = logging.getLogger(__name__)
+
+# Shopify stores are asked at most once every six hours by the scheduler.
+SHOPIFY_MIN_CHECK_INTERVAL_MINUTES: Final = 360
 
 
 class _CurrencyAmbiguous(ValueError):
@@ -315,6 +318,7 @@ class ShopifyScraper(AbstractScraper):
     priority: ClassVar[int] = 80
     # Shopify uses content/path-based detection, not domain regex
     domain_patterns: ClassVar[list[re.Pattern[str]]] = []
+    min_check_interval_minutes: ClassVar[int] = SHOPIFY_MIN_CHECK_INTERVAL_MINUTES
 
     # Known Shopify domains (extend as discovered)
     # Seeded with well-known Shopify storefronts. It is a shortcut, not the

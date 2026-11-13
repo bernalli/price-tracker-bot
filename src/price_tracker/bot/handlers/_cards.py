@@ -32,6 +32,7 @@ from price_tracker.bot.messages import _
 from price_tracker.bot.ui.cards import CardActions
 from price_tracker.bot.ui.check_status import STORE_REFUSAL_OUTCOMES
 from price_tracker.core.image_url import normalize_image_url
+from price_tracker.core.scheduler_common import configured_interval_minutes
 from price_tracker.core.url_utils import extract_etld_plus_one
 
 if TYPE_CHECKING:
@@ -160,9 +161,9 @@ def card_actions(view: ProductView, *, back: str) -> CardActions:
 
 
 async def default_interval(context: ContextTypes.DEFAULT_TYPE) -> int:
-    """The global check interval in minutes: the saved setting, else the configured one."""
+    """The normalized global interval shared with the periodic job."""
     saved = await _db(context).get_config("check_interval_minutes")
-    return int(saved) if saved and saved.isdigit() else _config(context).check_interval_minutes
+    return configured_interval_minutes(saved, configured=_config(context).check_interval_minutes)
 
 
 def empty_list_text() -> str:

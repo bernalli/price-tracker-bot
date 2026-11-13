@@ -372,6 +372,9 @@ class AbstractScraper(ABC):
     name: ClassVar[str] = ""
     priority: ClassVar[int] = 0
     domain_patterns: ClassVar[list[re.Pattern[str]]] = []
+    # Minimum minutes between two scheduled checks of one product; 0 = no floor.
+    # Manual checks ignore it.
+    min_check_interval_minutes: ClassVar[int] = 0
 
     @abstractmethod
     def can_handle(self, url: str) -> bool:
