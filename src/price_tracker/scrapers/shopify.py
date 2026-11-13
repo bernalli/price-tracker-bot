@@ -30,12 +30,12 @@ from price_tracker.core.page_image import (
 )
 from price_tracker.core.retry_policy import RetryConfig, with_retry
 from price_tracker.core.scraper_base import (
+    DECLARED_USER_AGENT,
     AbstractScraper,
     ProductInfo,
     detect_block_event,
     detect_currency,
     detect_listing_gone,
-    get_headers,
     in_carousel_context,
     parse_price,
     retry_after_header,
@@ -48,6 +48,31 @@ logger = logging.getLogger(__name__)
 
 # Shopify stores are asked at most once every six hours by the scheduler.
 SHOPIFY_MIN_CHECK_INTERVAL_MINUTES: Final = 360
+
+_JSON_ACCEPT_LANGUAGE: Final = "it-IT,it;q=0.9,en;q=0.8"
+_PAGE_ACCEPT: Final = (
+    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
+)
+_PAGE_ACCEPT_LANGUAGE: Final = "en-US,en;q=0.9,it-IT;q=0.8,it;q=0.7"
+
+
+def _json_headers() -> dict[str, str]:
+    """Headers of the .json request: the declared identity, nothing browser-like."""
+    return {
+        "User-Agent": DECLARED_USER_AGENT,
+        "Accept": "application/json",
+        "Accept-Language": _JSON_ACCEPT_LANGUAGE,
+    }
+
+
+def _page_headers() -> dict[str, str]:
+    """Headers of a product-page request: the same declared identity as the .json."""
+    return {
+        "User-Agent": DECLARED_USER_AGENT,
+        "Accept": _PAGE_ACCEPT,
+        "Accept-Language": _PAGE_ACCEPT_LANGUAGE,
+        "Accept-Encoding": "gzip, deflate, br",
+    }
 
 
 class _CurrencyAmbiguous(ValueError):
@@ -112,8 +137,8 @@ _SHOPIFY_PRODUCT_PATH_RE = re.compile(r"(?:^|/)products/[a-z0-9\-_]+", re.IGNORE
 
 @with_retry(RetryConfig(max_attempts=3, base_wait=2.0, max_wait=10.0))
 async def _fetch_shopify_response(url: str, client: httpx.AsyncClient) -> httpx.Response:
-    """Single GET attempt with browser headers. Tenacity handles retries."""
-    headers = get_headers()
+    """Single GET attempt with the declared headers. Tenacity handles retries."""
+    headers = _page_headers()
     response = await public_request(client, "GET", url, headers=headers)
     # Surface 403/429 (and WAF/CAPTCHA bodies) as a BlockEvent BEFORE
     # raise_for_status, so the scheduler quarantines the domain instead of
@@ -298,15 +323,7 @@ def _variant_offer_id(variant: Mapping[str, object]) -> str | None:
 @with_retry(RetryConfig(max_attempts=3, base_wait=2.0, max_wait=10.0))
 async def _fetch_shopify_json(json_url: str, client: httpx.AsyncClient) -> httpx.Response:
     """Single GET attempt against the /products/{handle}.json endpoint."""
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/131.0.0.0 Safari/537.36"
-        ),
-        "Accept": "application/json",
-        "Accept-Language": "it-IT,it;q=0.9,en;q=0.8",
-    }
+    headers = _json_headers()
     response = await public_request(client, "GET", json_url, headers=headers)
     # Don't raise_for_status here — caller handles 403 specially.
     return response
