@@ -86,6 +86,7 @@ class ProductRecord(_DictCompatMixin):
     notice_version: int = 0
     notice_attempted_at: str | None = None
     last_check_outcome: str | None = None
+    created_at: str | None = None
 
 
 @dataclass(frozen=True)
