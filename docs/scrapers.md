@@ -9,7 +9,7 @@
 | `amazon.{com,it,de,co.uk,fr,es,nl,pl,se,ca,com.au,co.jp}`, `amzn.{eu,to}` | `AmazonScraper`            | 100      | High priority; CAPTCHA detection                      |
 | `ebay.{com,it,de,co.uk,fr,es,nl,pl,com.au,ca}`                          | `EbayScraper`              | 90       | Auction & buy-it-now formats                          |
 | `nove25.{net,com}` (incl. subdomains)                                   | `Nove25Scraper`            | 85       | Uses the generic extraction pipeline                 |
-| `*.myshopify.com` and Shopify-powered storefronts                        | `ShopifyScraper`           | 80       | Generic Shopify `/products/<slug>.json` endpoint      |
+| `*.myshopify.com` and Shopify-powered storefronts                        | `ShopifyScraper`           | 80       | Generic Shopify `/products/<slug>.json` endpoint; declared User-Agent; see [Shopify conduct](#shopify-conduct) |
 | `aliexpress.{com,it,fr,de,es,ru,nl}`                                    | `AliexpressScraper`        | 50       | Parses inline `window.runParams` JSON                 |
 | `apple.com` (incl. subdomains)                                          | `AppleStoreScraper`        | 50       | Locale → currency mapping                             |
 | `bestbuy.{com,ca}`                                                       | `BestbuyScraper`           | 50       | JSON-LD primary path                                  |
@@ -48,6 +48,22 @@ resolution order:
 Nove25 has priority over the Shopify `/products/<slug>` path heuristic on Nove25 hosts.
 
 The first match wins; lower-priority scrapers are not tried even on parse failure (the failure is recorded in `scraper_health` and the domain is quarantined per the HealthManager policy).
+
+## Shopify conduct
+
+- Every request of a Shopify check carries the same declared User-Agent,
+  `price-tracker-bot/<version> (+https://github.com/bernalli/price-tracker-bot)`, and no browser
+  navigation headers.
+- A refusal ends the check. Refusals propagated from the JSON endpoint or fallback
+  page count toward the existing quarantine thresholds; a 429's Retry-After is
+  handled by the scheduler with its existing parser and cap. Currency-only
+  enrichment preserves the price already read and does not record the refusal.
+- The HTML fallback remains available when the JSON endpoint gives no usable
+  result without refusing the check, including a plain 404. HTML is also read
+  for currency-only enrichment when the JSON price has no currency.
+- The scheduler checks a Shopify product at most once every 360 minutes
+  (`min_check_interval_minutes`), counted from its latest check of any kind or from its addition.
+  Manual checks are not limited.
 
 ## Generic scraper extraction chain
 

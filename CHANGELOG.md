@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Shopify stores are asked with one declared, stable identity: every request names the bot, its version
+  and its public repository in the User-Agent, and no browser navigation headers are sent.
+- A Shopify check stops at the first refusal: no further request follows in
+  that check. Refusals from the JSON endpoint or fallback page count toward the
+  existing quarantine thresholds; a 429 carries its Retry-After to the scheduler.
+  Currency-only enrichment keeps its existing behavior: a refusal preserves
+  the price already read and is not recorded as a quarantine event.
+- Products read by the Shopify scraper are checked by the scheduler at most once every 6 hours, whatever
+  their own or the global interval. Manual checks are not limited.
+- No product image is downloaded while its store, or the image host, is paused for refusing the bot.
+
+### Fixed
+
+- A saved global check interval that is not a plain number no longer stops the periodic job or the
+  product card.
+
+### Removed
+
+- The unused `curl_cffi`, `scrapling` and `browserforge` dependencies, the disabled curl, Scrapling and
+  browser fallbacks, and the curl system libraries in the Docker image.
+
 ## [1.11.1] - 2026-11-12
 
 ### Fixed
