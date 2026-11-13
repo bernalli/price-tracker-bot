@@ -197,3 +197,20 @@ class TestHealthManagerStateMachine:
         assert len(samples) == 1, f"expected one series for x.com, got {samples}"
         assert samples[0].labels == {"domain": "x.com"}
         assert samples[0].value == 0.0
+
+
+async def test_is_quarantined_follows_every_state(repo_mock: AsyncMock) -> None:
+    with freeze_time("2026-05-09 12:00:00") as frozen:
+        mgr = HealthManager(repo=repo_mock)
+        await mgr.load()
+        assert mgr.is_quarantined("x.com") is False
+        for _ in range(3):
+            await mgr.record_block("x.com", reason="HTTP 429")
+        assert mgr.state("x.com") == QuarantineState.LOCKED_T1
+        assert mgr.is_quarantined("x.com") is True
+        frozen.move_to("2026-05-09 13:01:00")
+        assert mgr.state("x.com") == QuarantineState.HALF_OPEN_T1
+        assert mgr.is_quarantined("x.com") is True
+        await mgr.record_success("x.com")
+        assert mgr.state("x.com") == QuarantineState.CLOSED
+        assert mgr.is_quarantined("x.com") is False

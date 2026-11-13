@@ -27,7 +27,7 @@ MAX_INTERVAL_MINUTES = 7 * 24 * 60
 class ThumbnailRequester(Protocol):
     """Anything that can be asked, without waiting, to fetch a product image later."""
 
-    def request(self, url: str | None) -> bool: ...
+    def request(self, url: str | None, *, store: str | None = None) -> bool: ...
 
 
 class NotifierFn(Protocol):

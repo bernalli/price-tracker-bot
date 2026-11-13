@@ -9,6 +9,7 @@ import pytest
 from price_tracker.bot.handlers.product import _add_product
 from price_tracker.core.registry import ScraperRegistry
 from price_tracker.core.scraper_base import ProductInfo
+from price_tracker.core.url_utils import extract_etld_plus_one
 from tests.integration.test_guided_flow_wired import OWNER, PRIVATE, _wired
 from tests.integration.test_scheduler import _StubScraper
 from tests.support.fake_telegram import message_update
@@ -37,12 +38,14 @@ async def test_the_added_price_and_image_share_one_reading(
         )
         w.app.bot_data["scraper"] = registry
         calls = []
+        stores = []
         if enabled:
             mode = wire_two_messages(w, tmp_path, clock=lambda: 0)
 
-            def requested(url):
+            def requested(url, *, store=None):
                 assert not w.conn.in_transaction
                 calls.append(url)
+                stores.append(store)
                 return False
 
             monkeypatch.setattr(mode.thumbnails, "request", requested)
@@ -56,5 +59,7 @@ async def test_the_added_price_and_image_share_one_reading(
         assert saved.image_url == expected
         assert saved.current_price == Decimal(12)
         assert calls == ([expected] if enabled else [])
+        if enabled:
+            assert stores == [extract_etld_plus_one("https://shop.example/new-item")]
         if enabled:
             await w.app.bot_data["http_client"].aclose()

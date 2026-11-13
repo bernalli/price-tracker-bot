@@ -96,6 +96,10 @@ class HealthManager:
             QuarantineState.HALF_OPEN_T3,
         )
 
+    def is_quarantined(self, domain: str) -> bool:
+        """Whether the store is paused for refusing the bot: locked or awaiting its probe."""
+        return self.state(domain) is not QuarantineState.CLOSED
+
     def locked_until(self, domain: str) -> datetime | None:
         record = self._records.get(domain)
         return record.locked_until if record else None
