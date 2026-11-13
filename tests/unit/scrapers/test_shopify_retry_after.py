@@ -13,35 +13,38 @@ from price_tracker.scrapers.shopify import ShopifyScraper
 _URL = "https://store.com/products/widget"
 
 
+async def test_a_json_429_raises_with_its_retry_after_without_reading_the_page() -> None:
+    with respx.mock(assert_all_called=False) as router:
+        router.get(f"{_URL}.json").respond(429, headers={"Retry-After": "60"})
+        page = router.get(_URL).respond(200)
+        async with httpx.AsyncClient() as client:
+            with pytest.raises(HTTPBlockStatus) as caught:
+                await ShopifyScraper().scrape(_URL, client)
+    assert caught.value.status == 429
+    assert caught.value.retry_after == "60"
+    assert page.call_count == 0
+
+
+async def test_a_json_429_without_retry_after_carries_none() -> None:
+    with respx.mock(assert_all_called=False) as router:
+        router.get(f"{_URL}.json").respond(429)
+        page = router.get(_URL).respond(200)
+        async with httpx.AsyncClient() as client:
+            with pytest.raises(HTTPBlockStatus) as caught:
+                await ShopifyScraper().scrape(_URL, client)
+    assert caught.value.retry_after is None
+    assert page.call_count == 0
+
+
 async def test_a_refused_page_raises_with_its_own_retry_after() -> None:
     with respx.mock(assert_all_called=True) as router:
-        router.get(f"{_URL}.json").respond(429, headers={"Retry-After": "60"})
+        router.get(f"{_URL}.json").respond(404)
         router.get(_URL).respond(429, headers={"Retry-After": "120"})
         async with httpx.AsyncClient() as client:
             with pytest.raises(HTTPBlockStatus) as caught:
                 await ShopifyScraper().scrape(_URL, client)
     assert caught.value.status == 429
     assert caught.value.retry_after == "120"
-
-
-async def test_an_unreachable_page_keeps_the_json_retry_after() -> None:
-    with respx.mock(assert_all_called=True) as router:
-        router.get(f"{_URL}.json").respond(429, headers={"Retry-After": "60"})
-        router.get(_URL).mock(side_effect=httpx.ConnectError("down"))
-        async with httpx.AsyncClient() as client:
-            with pytest.raises(HTTPBlockStatus) as caught:
-                await ShopifyScraper().scrape(_URL, client)
-    assert caught.value.retry_after == "60"
-
-
-async def test_a_block_without_retry_after_carries_none() -> None:
-    with respx.mock(assert_all_called=True) as router:
-        router.get(f"{_URL}.json").respond(429)
-        router.get(_URL).respond(429)
-        async with httpx.AsyncClient() as client:
-            with pytest.raises(HTTPBlockStatus) as caught:
-                await ShopifyScraper().scrape(_URL, client)
-    assert caught.value.retry_after is None
 
 
 def test_which_responses_count_as_blocks_is_unchanged() -> None:

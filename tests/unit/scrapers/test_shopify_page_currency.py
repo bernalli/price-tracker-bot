@@ -13,7 +13,7 @@ from price_tracker.scrapers.shopify import ShopifyScraper
 _URL = "https://store.com/products/widget"
 
 
-@pytest.mark.parametrize("status", [404, 429])
+@pytest.mark.parametrize("status", [404, 500])
 @pytest.mark.parametrize(
     "price_html",
     [

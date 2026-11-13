@@ -1,6 +1,7 @@
 """Shopify scraper — uses the public /products/{handle}.json API.
 
-Works on any Shopify-powered store without needing JS rendering.
+Works on Shopify-powered stores without JS rendering. A refusal ends the
+check; product identity is checked before reading product data.
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ from urllib.parse import parse_qsl, unquote, urlencode, urlparse
 import httpx
 from bs4 import BeautifulSoup
 
-from price_tracker.core.exceptions import BlockEvent, HTTPBlockStatus, ListingGone
+from price_tracker.core.exceptions import BlockEvent, ListingGone
 from price_tracker.core.http_client import public_request
 from price_tracker.core.identity import RequestedIdentity, check_echoes, normalize_url
 from price_tracker.core.image_url import normalize_image_url
@@ -354,12 +355,7 @@ class ShopifyScraper(AbstractScraper):
         # Try JSON API first (most reliable)
         json_url = self._build_json_url(url)
         if json_url:
-            try:
-                result = await self._try_json_api(json_url, client, requested_url=url)
-            except HTTPBlockStatus as json_block:
-                if json_block.status != 429:
-                    raise
-                return await self._scrape_page_after_json_429(url, client, json_block)
+            result = await self._try_json_api(json_url, client, requested_url=url)
             if result and (result.error or result.available is False) and result.price is None:
                 return result
             if result and result.price is not None:
@@ -390,28 +386,6 @@ class ShopifyScraper(AbstractScraper):
             if page_result is not None:
                 return page_result
 
-        return ProductInfo(error="Prezzo non trovato (Shopify)", stock_evidence=False)
-
-    async def _scrape_page_after_json_429(
-        self, url: str, client: httpx.AsyncClient, json_block: HTTPBlockStatus
-    ) -> ProductInfo:
-        """Read the product page after the ``.json`` endpoint answered 429.
-
-        Some stores rate-limit the ``.json`` API per address and path while the
-        product page of the same product still answers. The page goes through the
-        same validated client and the same HTML chain as the 404 fallback. A
-        page that is refused too (403/429, WAF, CAPTCHA) raises its own block,
-        naming the page URL: that is the request that was refused last. A page
-        that cannot be fetched at all leaves nothing that contradicts the JSON
-        block, so that block is raised as it happened.
-        """
-        logger.info("Shopify JSON answered 429 for %s; reading the product page", url[:80])
-        html = await self._fetch_html(url, client)
-        if html is None:
-            raise json_block
-        page_result = self._read_product_page(html, url)
-        if page_result is not None:
-            return page_result
         return ProductInfo(error="Prezzo non trovato (Shopify)", stock_evidence=False)
 
     def _read_product_page(self, html: str, url: str) -> ProductInfo | None:
@@ -543,48 +517,19 @@ class ShopifyScraper(AbstractScraper):
             response = await _fetch_shopify_json(json_url, client)
             logger.debug("Shopify JSON API: status %s", response.status_code)
 
+            detect_block_event(
+                status_code=response.status_code,
+                body=response.text,
+                url=str(response.url),
+                retry_after=retry_after_header(response),
+            )
             if normalize_url(str(response.url)) != normalize_url(json_url):
                 return ProductInfo(
                     error="Identità Shopify non corrispondente", stock_evidence=False
                 )
-
-            if response.status_code == 404:
-                detect_block_event(
-                    status_code=404,
-                    body=response.text,
-                    url=json_url,
-                    retry_after=retry_after_header(response),
-                )
-            if response.status_code == 403:
-                detect_block_event(
-                    status_code=response.status_code,
-                    body=response.text,
-                    url=json_url,
-                    retry_after=retry_after_header(response),
-                )
-            elif response.status_code == 404:
-                # Not a block: a headless (Next.js/Hydrogen) storefront has no static
-                # .json endpoint at all. Fall through to the HTML fallback.
+            if response.status_code != 200:
                 return None
-            elif response.status_code != 200:
-                # 429 and any other non-200 status (a WAF/CAPTCHA body can also ride
-                # on a 200) must surface as a BlockEvent when it is one, never as a
-                # swallowed None (#16, JSON branch never checked this before).
-                detect_block_event(
-                    status_code=response.status_code,
-                    body=response.text,
-                    url=json_url,
-                    retry_after=retry_after_header(response),
-                )
-                return None
-            else:
-                detect_block_event(
-                    status_code=response.status_code,
-                    body=response.text,
-                    url=json_url,
-                    retry_after=retry_after_header(response),
-                )
-                data = response.json()
+            data = response.json()
 
             product = data.get("product", {})
             if not product:
