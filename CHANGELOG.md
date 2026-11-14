@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   redirect by itself and ignores proxy variables. Wire bodies and decoded
   bodies have separate 16 MiB limits. Shared Python decoders check compressed
   stream completion before delivering a store body.
+- Complete gzip members are decoded in order; trailing gzip or deflate data and incomplete streams are
+  rejected. Raw response header bytes are preserved. A refusal keeps its status and Retry-After when its
+  compressed body cannot be decoded, so it still stops the check.
 
 ### Added
 
