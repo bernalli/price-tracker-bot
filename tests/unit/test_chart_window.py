@@ -28,7 +28,8 @@ def _history_rows(
 
     `price_by_day` maps a day offset (0 = oldest) to the price from that day on.
     """
-    now = datetime(2026, 9, 4, 12, 0, tzinfo=UTC)
+    # The chart window is relative to the real clock: a fixed date ages out of it.
+    now = datetime.now(UTC) - timedelta(days=1)
     rows: list[dict[str, Any]] = []
     price = 0.0
     for day in range(days):
