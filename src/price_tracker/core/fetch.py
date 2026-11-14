@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING, Final, Protocol
 
 import brotli  # type: ignore[import-untyped]
 import httpx
+import zstandard
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -114,14 +115,18 @@ class _ZlibDecoder:
     """gzip decoding, chunked so no single call inflates more than the step."""
 
     def __init__(self, wbits: int, request: httpx.Request) -> None:
+        self._wbits = wbits
         self._dec = zlib.decompressobj(wbits)
         self._request = request
 
     def feed(self, data: bytes) -> Iterator[bytes]:
         try:
-            yield self._dec.decompress(data, _DECODE_STEP)
-            while self._dec.unconsumed_tail:
-                yield self._dec.decompress(self._dec.unconsumed_tail, _DECODE_STEP)
+            pending = data
+            while pending:
+                if self._dec.eof:
+                    self._dec = zlib.decompressobj(self._wbits)
+                yield self._dec.decompress(pending, _DECODE_STEP)
+                pending = self._dec.unused_data if self._dec.eof else self._dec.unconsumed_tail
         except zlib.error as exc:
             raise httpx.DecodingError(str(exc), request=self._request) from exc
 
@@ -153,6 +158,10 @@ class _DeflateDecoder:
             yield self._decompress(data)
             while self._dec.unconsumed_tail:
                 yield self._dec.decompress(self._dec.unconsumed_tail, _DECODE_STEP)
+            if self._dec.unused_data:
+                raise httpx.DecodingError(
+                    "trailing data after deflate stream", request=self._request
+                )
         except zlib.error as exc:
             raise httpx.DecodingError(str(exc), request=self._request) from exc
 
@@ -184,6 +193,29 @@ class _BrotliDecoder:
         return bool(self._dec.is_finished())
 
 
+class _ZstdDecoder:
+    """Decode one native block at a time and require complete zstd frames."""
+
+    def __init__(self, request: httpx.Request) -> None:
+        self._ctx = zstandard.ZstdDecompressor(max_window_size=16 * 1024 * 1024)
+        self._dec = self._ctx.decompressobj()
+        self._request = request
+
+    def feed(self, data: bytes) -> Iterator[bytes]:
+        try:
+            for offset in range(len(data)):
+                if self._dec.eof:
+                    self._dec = self._ctx.decompressobj()
+                piece = self._dec.decompress(data[offset : offset + 1])
+                for start in range(0, len(piece), _DECODE_STEP):
+                    yield piece[start : start + _DECODE_STEP]
+        except zstandard.ZstdError as exc:
+            raise httpx.DecodingError(str(exc), request=self._request) from exc
+
+    def complete(self) -> bool:
+        return bool(self._dec.eof)
+
+
 def _decoder_for(content_encoding: str, request: httpx.Request) -> _StepDecoder:
     value = (content_encoding or "identity").strip().lower()
     if value in ("", "identity"):
@@ -194,6 +226,8 @@ def _decoder_for(content_encoding: str, request: httpx.Request) -> _StepDecoder:
         return _DeflateDecoder(request)
     if value == "br":
         return _BrotliDecoder(request)
+    if value == "zstd":
+        return _ZstdDecoder(request)
     raise httpx.DecodingError(f"unsupported content-encoding {value!r}", request=request)
 
 
@@ -318,6 +352,7 @@ async def _fetch_primary(
             body=text,
             url=current,
             retry_after=retry_after_header(response),
+            headers=response.headers,
         )
         detect_listing_gone(status_code=response.status_code, url=current)
 
@@ -347,6 +382,7 @@ async def _fetch_primary(
             body=text,
             url=current,
             retry_after=retry_after_header(response),
+            headers=response.headers,
         )
         if decode_error is not None:
             raise decode_error

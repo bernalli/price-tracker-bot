@@ -9,7 +9,6 @@ import pytest
 import respx
 
 from price_tracker.core.http_client import build_client
-from price_tracker.core.scraper_base import USER_AGENTS
 from price_tracker.media import fetch
 from price_tracker.media.decode import MAX_IMAGE_BYTES
 from price_tracker.media.fetch import ImageFetchError, download_image
@@ -37,7 +36,7 @@ async def test_supported_image_types_and_request_headers(content_type: str) -> N
         async with build_client() as client:
             assert await download_image(URL, client) == b"photo"
         request = route.calls[0].request
-        assert request.headers["User-Agent"] in USER_AGENTS
+        assert request.headers["User-Agent"].startswith("python-httpx/")
         assert request.headers["Accept"] == "image/webp,image/jpeg,image/png,image/gif;q=0.8"
         assert request.headers["Accept-Encoding"] == "identity"
         assert request.headers["Accept-Language"] == "en-US,en;q=0.9"

@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import logging
-import random
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, ClassVar, Final
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlsplit
 
 if TYPE_CHECKING:
     from decimal import Decimal
@@ -18,7 +17,6 @@ if TYPE_CHECKING:
 
     from price_tracker.core.health import HealthManager
 
-from price_tracker import __version__
 from price_tracker.core.exceptions import (
     LISTING_GONE_STATUSES,
     BlockEvent,
@@ -31,46 +29,13 @@ from price_tracker.core.exceptions import (
 logger = logging.getLogger(__name__)
 
 
-# ── User-agent pool (rotate per request) ─────────────────────────
-
-# User-Agent strings are intentionally not wrapped (must match real browser headers verbatim).
-USER_AGENTS: list[str] = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",  # noqa: E501
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",  # noqa: E501
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15",  # noqa: E501
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",  # noqa: E501
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",  # noqa: E501
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",  # noqa: E501
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",  # noqa: E501
-]
-
-
 def get_headers(extra: dict[str, str] | None = None) -> dict[str, str]:
-    """Return browser-like headers with a random User-Agent."""
-    headers: dict[str, str] = {
-        "User-Agent": random.choice(USER_AGENTS),
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",  # noqa: E501
-        "Accept-Language": "en-US,en;q=0.9,it-IT;q=0.8,it;q=0.7",
-        "Accept-Encoding": "gzip, deflate, br",
-        "DNT": "1",
-        "Connection": "keep-alive",
-        "Upgrade-Insecure-Requests": "1",
-        "Sec-Fetch-Dest": "document",
-        "Sec-Fetch-Mode": "navigate",
-        "Sec-Fetch-Site": "none",
-        "Sec-Fetch-User": "?1",
-        "Cache-Control": "max-age=0",
-    }
-    if extra:
-        headers.update(extra)
-    return headers
+    """Return a copy of the caller's extra headers, and nothing else.
 
-
-PROJECT_URL: Final = "https://github.com/bernalli/price-tracker-bot"
-# A stable identity that names the bot: stores that refuse automated clients can
-# recognise it, and nothing pretends to be a browser.
-DECLARED_USER_AGENT: Final = f"price-tracker-bot/{__version__} (+{PROJECT_URL})"
+    The bot's identity belongs to the store client: its Chrome wire supplies the
+    User-Agent, client hints and Accept-Language. Scraper code sets none of them.
+    """
+    return dict(extra) if extra else {}
 
 
 # ── Price parsing (returns Decimal, never float) ──────────────────
@@ -441,6 +406,19 @@ _CAPTCHA_FINGERPRINTS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("captcha-form", _CAPTCHA_CHALLENGE_RE),
 )
 
+_MARKER_WINDOW: Final = 65_536  # characters of the decoded body scanned for a marker
+_REFUSAL_MARKERS: Final[tuple[tuple[str, re.Pattern[str]], ...]] = (
+    ("local_rate_limited", re.compile(r"local_rate_limited", re.IGNORECASE)),
+    (
+        "verify_connection",
+        re.compile(r"connection needs to be verified|verify your connection", re.IGNORECASE),
+    ),
+    ("blocked", re.compile(r"you have been blocked", re.IGNORECASE)),
+    ("cf_challenge", re.compile(r"just a moment\.\.\.|cf-chl-|challenge-platform", re.IGNORECASE)),
+    ("captcha_amazon", re.compile(r"validatecaptcha", re.IGNORECASE)),
+    ("captcha_widget", re.compile(r"g-recaptcha|h-captcha|cf-turnstile", re.IGNORECASE)),
+)
+
 
 def retry_after_header(response: httpx.Response) -> str | None:
     """The response's ``Retry-After`` header, when it carries a textual one."""
@@ -448,8 +426,61 @@ def retry_after_header(response: httpx.Response) -> str | None:
     return value if isinstance(value, str) else None
 
 
+def _diag_value(value: object, limit: int = 64) -> str:
+    """One log-safe token: printable ASCII without spaces, at most ``limit`` characters."""
+    if not isinstance(value, str) or not value:
+        return "-"
+    cleaned = "".join(char if "!" <= char <= "~" else "_" for char in value)
+    return cleaned[:limit]
+
+
+def _diag_url(url: str) -> str:
+    """Scheme, host, port and path of ``url``; never userinfo, query or fragment."""
+    try:
+        parts = urlsplit(url)
+        port = parts.port
+    except ValueError:
+        return "-"
+    scheme, hostname = parts.scheme, parts.hostname
+    if scheme not in {"http", "https"} or not hostname:
+        return "-"
+    return _diag_value(
+        f"{scheme}://{hostname}{':' + str(port) if port else ''}{parts.path}", limit=120
+    )
+
+
+def refusal_summary(
+    exc: BlockEvent, *, status: int, body: str, headers: httpx.Headers | None
+) -> str:
+    """One log line describing a refusal: closed fields, sanitized values, never the body or cookies."""  # noqa: E501
+    status_text = str(status) if isinstance(status, int) and not isinstance(status, bool) else "-"
+
+    def header(name: str) -> str:
+        return _diag_value(headers.get(name) if headers is not None else None)
+
+    window = body[:_MARKER_WINDOW]
+    marker = next((label for label, pattern in _REFUSAL_MARKERS if pattern.search(window)), "none")
+    return " ".join(
+        (
+            f"reason={_diag_value(_block_reason(exc))}",
+            f"status={status_text}",
+            f"url={_diag_url(exc.url)}",
+            f"server={header('server')}",
+            f"cf_ray={header('cf-ray')}",
+            f"request_id={header('x-request-id')}",
+            f"retry_after={header('retry-after')}",
+            f"marker={marker}",
+        )
+    )
+
+
 def detect_block_event(
-    *, status_code: int, body: str, url: str, retry_after: str | None = None
+    *,
+    status_code: int,
+    body: str,
+    url: str,
+    retry_after: str | None = None,
+    headers: httpx.Headers | None = None,
 ) -> None:
     """Inspect HTTP response for block markers; raise BlockEvent subclass if blocked.
 
@@ -466,18 +497,35 @@ def detect_block_event(
 
     Caller (scraper) must invoke this AFTER httpx call and BEFORE parsing, and
     pass the response's ``Retry-After`` (``retry_after_header``) so a status
-    block carries it to the scheduler.
+    block carries it to the scheduler. Pass ``response.headers`` so a refusal
+    logs its diagnostics.
     """
+    exc: BlockEvent
     if status_code in (403, 429):
-        raise HTTPBlockStatus(status=status_code, url=url, retry_after=retry_after)
+        exc = HTTPBlockStatus(status=status_code, url=url, retry_after=retry_after)
+        logger.warning(
+            "store refusal %s",
+            refusal_summary(exc, status=status_code, body=body, headers=headers),
+        )
+        raise exc
 
     for provider, pattern in _WAF_FINGERPRINTS:
         if pattern.search(body):
-            raise WAFBlocked(provider=provider, url=url)
+            exc = WAFBlocked(provider=provider, url=url)
+            logger.warning(
+                "store refusal %s",
+                refusal_summary(exc, status=status_code, body=body, headers=headers),
+            )
+            raise exc
 
     for marker, pattern in _CAPTCHA_FINGERPRINTS:
         if pattern.search(body):
-            raise CaptchaDetected(marker=marker, url=url)
+            exc = CaptchaDetected(marker=marker, url=url)
+            logger.warning(
+                "store refusal %s",
+                refusal_summary(exc, status=status_code, body=body, headers=headers),
+            )
+            raise exc
 
     return None
 

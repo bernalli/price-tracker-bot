@@ -10,7 +10,6 @@ import pytest
 import respx
 
 from price_tracker.core.exceptions import ListingGone
-from price_tracker.scrapers import amazon as amazon_module
 from price_tracker.scrapers.amazon import AmazonScraper
 
 if TYPE_CHECKING:
@@ -58,12 +57,6 @@ async def test_amazon_parses_fixture_html(
     """Fixture HTML should yield price=29.99 EUR, name='Sample Product'."""
     html = load_fixture("amazon/sample_product.html")
     scraper = AmazonScraper()
-
-    # Disable the fresh-client retry
-    async def _no_fresh(url: str) -> str | None:
-        return None
-
-    monkeypatch.setattr(amazon_module, "_fetch_with_fresh_client", _no_fresh)
 
     with respx.mock(assert_all_called=False) as router:
         router.get("https://www.amazon.it/dp/SAMPLE001").respond(200, text=html)
@@ -140,11 +133,6 @@ async def test_amazon_multi_offer_jsonld_does_not_override_correct_css_price(
     """
     scraper = AmazonScraper()
 
-    async def _no_fresh(url: str) -> str | None:
-        return None
-
-    monkeypatch.setattr(amazon_module, "_fetch_with_fresh_client", _no_fresh)
-
     with respx.mock(assert_all_called=False) as router:
         router.get("https://www.amazon.it/dp/MULTIOFFER").respond(200, text=_MULTI_OFFER_HTML)
         async with httpx.AsyncClient() as client:
@@ -177,11 +165,6 @@ async def test_amazon_missing_price_selectors(monkeypatch: pytest.MonkeyPatch) -
     <div id="dp"></div>
     </body></html>
     """
-
-    async def _no_fresh(url: str) -> str | None:
-        return None
-
-    monkeypatch.setattr(amazon_module, "_fetch_with_fresh_client", _no_fresh)
 
     with respx.mock(assert_all_called=False) as router:
         router.get("https://www.amazon.it/dp/NOPRICE").respond(200, text=html_no_price)

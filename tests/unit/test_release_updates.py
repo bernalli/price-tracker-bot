@@ -287,7 +287,7 @@ async def test_post_init_leaves_release_announcement_for_background_task(memory_
 
     bot = Mock(send_message=AsyncMock())
     client = Mock()
-    monkeypatch.setattr(main, "build_client", Mock(return_value=client))
+    monkeypatch.setattr(main, "build_store_client", Mock(return_value=client))
     monkeypatch.setattr(main, "sync_command_menus", AsyncMock())
     application = Mock(
         bot=bot,

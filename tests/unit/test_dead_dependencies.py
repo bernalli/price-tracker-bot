@@ -1,8 +1,7 @@
-"""No dependency, module or system library of the removed fetch backends remains.
-
-The curl impersonation, Scrapling, browserforge and Playwright backends were
-disabled stubs that returned ``None``. They are gone from the project metadata,
-the lock file, the source tree, the runtime image and the scraper registry.
+"""No dependency, module or system library of the removed Scrapling, browserforge
+and Playwright backends remains. `curl_cffi` is a dependency again, as the Chrome
+store wire; its wheels link libcurl statically, so the image still installs no curl
+library.
 """
 
 from __future__ import annotations
@@ -21,11 +20,11 @@ from price_tracker.core.registry import ScraperRegistry, discover_builtin_scrape
 _ROOT = Path(__file__).resolve().parents[2]
 _THIS_FILE = Path(__file__).resolve()
 
-_DEAD_DISTRIBUTIONS = frozenset({"curl-cffi", "scrapling", "browserforge", "playwright"})
+_DEAD_DISTRIBUTIONS = frozenset({"scrapling", "browserforge", "playwright"})
 _DEAD_LOCKED = frozenset(
-    {"curl-cffi", "scrapling", "browserforge", "apify-fingerprint-datapoints", "playwright"}
+    {"scrapling", "browserforge", "apify-fingerprint-datapoints", "playwright"}
 )
-_DEAD_MODULES = frozenset({"curl_cffi", "scrapling", "browserforge", "playwright"})
+_DEAD_MODULES = frozenset({"scrapling", "browserforge", "playwright"})
 
 
 def _requirement_name(requirement: str) -> str:

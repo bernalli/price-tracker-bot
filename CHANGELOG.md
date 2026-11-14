@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.13.0] - 2026-11-14
+
+### Changed
+
+- Store requests use one stable Chrome identity: the TLS and HTTP/2 fingerprint, the User-Agent and the
+  client hints come from the same Chrome release, with an Italian Accept-Language, and nothing rotates.
+  The declared bot User-Agent of 1.12.0 and the rotating browser User-Agents are gone.
+- Store cookies are kept for the life of the process and sent back only to the store that set them.
+- An Amazon check makes one request: the immediate retry with a new, cookieless client is gone.
+- The Chrome connection keeps the public-address guard: every hop is resolved
+  and validated first, connects only to the validated addresses, follows no
+  redirect by itself and ignores proxy variables. Wire bodies and decoded
+  bodies have separate 16 MiB limits. Shared Python decoders check compressed
+  stream completion before delivering a store body.
+- Complete gzip members are decoded in order; trailing gzip or deflate data and incomplete streams are
+  rejected. Raw response header bytes are preserved. A refusal keeps its status and Retry-After when its
+  compressed body cannot be decoded, so it still stops the check.
+
+### Added
+
+- Each refusal (HTTP 403 or 429, a WAF page, a CAPTCHA) logs one line with the status, the `Server`,
+  `CF-Ray`, `X-Request-ID` and `Retry-After` headers and a label for the refusal page, never its body or
+  cookies.
+
 ## [1.12.0] - 2026-11-13
 
 ### Security

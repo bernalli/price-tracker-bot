@@ -2848,3 +2848,9 @@ msgstr "Price updated; availability could not be verified."
 
 msgid "🚫 Last confirmed: sold out"
 msgstr "🚫 Last confirmed: sold out"
+
+msgid "Fewer store blocks"
+msgstr "Fewer store blocks"
+
+msgid "Steadier Amazon checks"
+msgstr "Steadier Amazon checks"

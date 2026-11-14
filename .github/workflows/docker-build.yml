@@ -92,6 +92,6 @@ jobs:
           # Asserting agreement, not merely a non-empty string: an image built
           # from stale sources would still print something.
           test "${declared}" = "${reported}"
-          docker run --rm price-tracker:smoke python -c 'import price_tracker.main'
+          docker run --rm price-tracker:smoke python -c 'import price_tracker.main; import price_tracker.core.fetch; import zstandard; assert zstandard.__version__ == "0.25.0"'
           docker run --rm price-tracker:smoke python -c "import sys; from PIL import features; sys.exit(0 if all(features.check(f) for f in ('jpg', 'zlib', 'freetype2', 'webp')) else 1)"
           docker run --rm price-tracker:smoke python -c "import pathlib, matplotlib; assert (pathlib.Path(matplotlib.get_data_path()) / 'fonts/ttf/DejaVuSans-Bold.ttf').is_file()"

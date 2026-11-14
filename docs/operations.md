@@ -11,14 +11,27 @@ HTTP Host, TLS SNI and certificate verification. Environment proxies are ignored
 Redirect chains are limited to five hops and one total request deadline, including
 DNS and response reading. Connections are not reused across requests.
 
-No curl impersonation, Scrapling or browser backend is installed. Chromium is never
-started, so page scripts, subresources, service workers and WebSockets cannot open
-separate connections. Products requiring browser rendering or impersonation may not
-yield prices; ordinary HTTP extraction remains available.
+Store requests go through a Chrome connection (`curl_cffi`, target `chrome152`): the TLS
+and HTTP/2 fingerprint, the User-Agent and the client hints are those of one Chrome
+release, with an Italian `Accept-Language`, and nothing rotates. The connection opens only
+after the address check above, only to the validated addresses, and follows no redirect by
+itself: the bot follows each redirect after validating it again. It ignores proxy variables
+and keeps no cookies of its own. Curl leaves content decoding disabled while advertising
+the Chrome profile's encodings. The callback caps wire bytes at 16 MiB. The shared Python
+fetch reader decodes gzip, deflate, br and zstd in bounded steps and checks stream
+completion before delivering a store body. Decoded bodies above 16 MiB are refused. The
+page reader retains its separate 5 MiB truncation limit. Store cookies live in the bot's
+HTTP client for the life of the process. Currency rates use the plain HTTPX connection. No
+browser is installed or started, so page scripts, subresources, service workers and
+WebSockets cannot open separate connections.
 
 Product images use the same validated transport, HTTPS only, with an 8 MiB body cap and accepted image content types. Downloads run in the background after an accepted price check or product addition, never when opening `/list`. The product card uses Telegram's link preview: Telegram's servers fetch the image URL from the store, rather than the bot.
 
 No image is downloaded while the image host or the product's store is paused for refusing the bot (locked, or waiting for its probe): the image is retried after the usual 24-hour failure backoff.
+
+Each refusal (HTTP 403 or 429, a WAF page, a CAPTCHA) logs one `store refusal` line with
+the status, the `Server`, `CF-Ray`, `X-Request-ID` and `Retry-After` headers and a label for
+the refusal page. The line never carries the body, cookies, credentials or the query string.
 
 `DOMAIN_MIN_GAP_SECONDS` spaces the starts of background jobs, including image downloads, by eTLD+1 (default 30 seconds; `0` disables the gap). Manual checks never wait, but their images are still queued for background download. A redirect chain is one job. The HTTP transport does no pacing.
 

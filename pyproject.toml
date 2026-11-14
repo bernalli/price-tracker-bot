@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "price-tracker"
-version = "1.12.0"
+version = "1.13.0"
 description = "Self-hosted Telegram bot for multi-site price tracking"
 authors = [{name = "Samuele Martinalli", email = "254686239+bernalli@users.noreply.github.com"}]
 license = {text = "MIT"}
@@ -14,7 +14,9 @@ dependencies = [
     "python-telegram-bot[job-queue]>=22.8",
     "httpx>=0.27.0",
     "httpcore>=1.0.9,<2",
+    "curl_cffi>=0.17.0",  # Chrome TLS/HTTP2 fingerprint of store requests (core/store_wire.py)
     "brotli>=1.2.1",  # httpx needs this to decompress br-encoded responses (some sites serve brotli by default)
+    "zstandard==0.25.0",  # Bounded zstd decoding and frame completion checks (core/fetch.py)
     "beautifulsoup4>=4.15.0",
     "lxml>=6.1.3",
     "aiosqlite>=0.20.0",

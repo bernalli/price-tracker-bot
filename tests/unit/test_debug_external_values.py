@@ -112,7 +112,7 @@ class _Run:
 
         with (
             patch("price_tracker.bot.handlers.debug.public_request", fake_request),
-            patch("price_tracker.bot.handlers.debug.build_client", return_value=fresh),
+            patch("price_tracker.bot.handlers.debug.build_store_client", return_value=fresh),
             patch("price_tracker.bot.handlers.debug._json.loads", fake_loads),
         ):
             await cmd_debug(update, context)

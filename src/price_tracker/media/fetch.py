@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-import random
 from typing import Final
 
 import httpx
 
 from price_tracker.core.http_client import BodyLimitError, public_request
 from price_tracker.core.image_url import normalize_image_url
-from price_tracker.core.scraper_base import USER_AGENTS
 from price_tracker.core.url_utils import UnsafeURLError, extract_etld_plus_one
 from price_tracker.media.decode import MAX_IMAGE_BYTES
 
@@ -44,7 +42,6 @@ async def download_image(url: str, client: httpx.AsyncClient) -> bytes:
             "GET",
             url,
             headers={
-                "User-Agent": random.choice(USER_AGENTS),
                 "Accept": "image/webp,image/jpeg,image/png,image/gif;q=0.8",
                 "Accept-Encoding": "identity",
                 "Accept-Language": "en-US,en;q=0.9",

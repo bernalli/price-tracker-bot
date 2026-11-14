@@ -7,7 +7,7 @@ import ipaddress
 import math
 import socket
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Final, Literal
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Iterable
@@ -15,7 +15,11 @@ if TYPE_CHECKING:
 import httpcore
 import httpx
 
+from price_tracker.core.store_wire import ChromeConnection
 from price_tracker.core.url_utils import UnsafeURLError, _is_blocked_ip
+
+Wire = Literal["httpx", "chrome"]
+_WIRES: Final = frozenset({"httpx", "chrome"})
 
 
 def _origin(url: httpx.URL) -> tuple[str, bytes, int]:
@@ -131,8 +135,9 @@ class _OwnedStream(httpx.AsyncByteStream):
 
 
 class _PublicTransport(httpx.AsyncBaseTransport):
-    def __init__(self, max_connections: int) -> None:
+    def __init__(self, max_connections: int, wire: Wire = "httpx") -> None:
         self._slots = asyncio.Semaphore(max_connections)
+        self._wire = wire
         self._active: set[_OwnedStream] = set()
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
@@ -144,7 +149,11 @@ class _PublicTransport(httpx.AsyncBaseTransport):
         request.headers["Host"] = httpx.Request(request.method, request.url).headers["Host"]
         request.extensions["sni_hostname"] = request.url.raw_host.decode("ascii")
         await self._slots.acquire()
-        transport = _ConnectionTransport(addresses)
+        transport: httpx.AsyncBaseTransport = (
+            ChromeConnection(addresses)
+            if self._wire == "chrome"
+            else _ConnectionTransport(addresses)
+        )
         try:
             response = await transport.handle_async_request(request)
         except BaseException:
@@ -194,16 +203,25 @@ class _DeadlineStream(httpx.AsyncByteStream):
 class PublicAsyncClient(httpx.AsyncClient):
     """HTTPX client with manual redirects and one deadline per request chain."""
 
-    def __init__(self, *, deadline: float = 30.0, max_connections: int = 10, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        *,
+        deadline: float = 30.0,
+        max_connections: int = 10,
+        wire: Wire = "httpx",
+        **kwargs: Any,
+    ) -> None:
         alternate_transports = {"app", "mounts", "proxy", "transport", "trust_env"}.intersection(
             kwargs
         )
         if alternate_transports:
             names = ", ".join(sorted(alternate_transports))
             raise TypeError(f"PublicAsyncClient does not allow alternate transports: {names}")
+        if wire not in _WIRES:
+            raise ValueError(f"unknown wire: {wire!r}")
         self._deadline_seconds = deadline
         super().__init__(
-            transport=_PublicTransport(max_connections),
+            transport=_PublicTransport(max_connections, wire),
             trust_env=False,
             follow_redirects=False,
             max_redirects=5,
@@ -271,6 +289,20 @@ def build_client(
         max_connections=max_connections,
         timeout=httpx.Timeout(timeout, connect=connect_timeout),
     )
+
+
+def build_store_client(
+    *, timeout: float = 30.0, connect_timeout: float = 10.0, max_connections: int = 10
+) -> PublicAsyncClient:
+    """Build the public-only Chrome client; close it after use."""
+    client = PublicAsyncClient(
+        deadline=timeout,
+        max_connections=max_connections,
+        timeout=httpx.Timeout(timeout, connect=connect_timeout),
+        wire="chrome",
+    )
+    client.headers.pop("Accept", None)
+    return client
 
 
 @asynccontextmanager

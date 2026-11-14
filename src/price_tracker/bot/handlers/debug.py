@@ -32,7 +32,7 @@ from price_tracker.bot.messages import _
 from price_tracker.bot.ui.check_status import STORE_REFUSAL_OUTCOMES
 from price_tracker.bot.ui.product_rows import product_row
 from price_tracker.bot.ui.width import truncate_to_width
-from price_tracker.core.http_client import build_client, public_request
+from price_tracker.core.http_client import build_store_client, public_request
 from price_tracker.core.textlimits import split_message
 from price_tracker.core.url_utils import extract_etld_plus_one
 
@@ -144,15 +144,13 @@ async def debug_url(update: Update, context: ContextTypes.DEFAULT_TYPE, url: str
 
     from bs4 import BeautifulSoup  # noqa: PLC0415 — heavy import deferred
 
-    from price_tracker.core.scraper_base import get_headers  # noqa: PLC0415
-
     client = _client(context)
     lines = [f"🔍 <b>Debug scraping</b>\n🔗 {_escape_html(url[:80])}\n"]
 
     # Step 1: Fetch with httpx
     html = None
     try:
-        resp = await public_request(client, "GET", url, headers=get_headers())
+        resp = await public_request(client, "GET", url)
         lines.append(f"📡 httpx shared: <b>HTTP {resp.status_code}</b> ({len(resp.text)} chars)")
         if resp.status_code == 200:
             html = resp.text
@@ -162,23 +160,8 @@ async def debug_url(update: Update, context: ContextTypes.DEFAULT_TYPE, url: str
                     _("⚠️ Small response without structured data; trying a fresh client...")
                 )
                 try:
-                    async with build_client(timeout=30) as fresh:
-                        r2 = await public_request(
-                            fresh,
-                            "GET",
-                            url,
-                            headers={
-                                "User-Agent": (
-                                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                                    "AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36"
-                                ),
-                                "Accept": (
-                                    "text/html,application/xhtml+xml,"
-                                    "application/xml;q=0.9,*/*;q=0.8"
-                                ),
-                                "Accept-Language": "it-IT,it;q=0.9,en;q=0.8",
-                            },
-                        )
+                    async with build_store_client(timeout=30) as fresh:
+                        r2 = await public_request(fresh, "GET", url)
                         lines.append(
                             f"📡 httpx fresh: <b>HTTP {r2.status_code}</b> ({len(r2.text)} chars)"
                         )

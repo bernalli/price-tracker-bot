@@ -74,6 +74,7 @@ RELEASE_NOTES: dict[str, tuple[str, ...]] = {
     ),
     "1.11.1": (),
     "1.12.0": (),
+    "1.13.0": (N_("Fewer store blocks"), N_("Steadier Amazon checks")),
 }
 
 MESSAGE_LIMIT = 1200

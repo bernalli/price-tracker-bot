@@ -721,8 +721,9 @@ async def test_scraper_base_invokes_health_on_success():
 
 
 def test_brotli_available_for_httpx_decompression() -> None:
-    """`get_headers()` advertises ``Accept-Encoding: gzip, deflate, br`` and
-    httpx silently delivers garbage when a server responds with brotli and
+    """HTTPX and the fetch decoders advertise and decode br.
+
+    HTTPX silently delivers garbage when a server responds with brotli and
     neither ``brotli`` nor ``brotlicffi`` is installed.
 
     Regression: a store served brotli by default; without this package,
@@ -738,7 +739,7 @@ def test_brotli_available_for_httpx_decompression() -> None:
     ):
         pytest.fail(
             "brotli/brotlicffi not installed — httpx cannot decode "
-            "br-encoded responses (which get_headers() advertises)"
+            "br-encoded responses (which HTTPX and the fetch decoders advertise)"
         )
 
 

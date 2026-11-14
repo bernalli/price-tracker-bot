@@ -99,6 +99,7 @@ async def _fetch_generic_html(url: str, client: httpx.AsyncClient) -> str:
         body=response.text,
         url=url,
         retry_after=retry_after_header(response),
+        headers=response.headers,
     )
     detect_listing_gone(status_code=response.status_code, url=url)
     response.raise_for_status()
