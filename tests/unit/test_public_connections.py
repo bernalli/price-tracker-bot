@@ -544,14 +544,6 @@ async def test_decoding_failure_immediately_closes_response(network: Network) ->
         assert (await client.get("https://shop.example/next")).text == "ok"
 
 
-async def test_amazon_fresh_retry_cannot_reach_a_blocked_address(network: Network) -> None:
-    from price_tracker.scrapers.amazon import _fetch_with_fresh_client
-
-    shared_address = BLOCKED[4]  # RFC 6598 shared address space
-    assert await _fetch_with_fresh_client(f"http://{shared_address}/product") is None
-    assert network.targets == []
-
-
 async def test_amazon_short_link_resolution_cannot_reach_a_blocked_address(
     network: Network,
 ) -> None:

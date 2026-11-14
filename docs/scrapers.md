@@ -9,7 +9,7 @@
 | `amazon.{com,it,de,co.uk,fr,es,nl,pl,se,ca,com.au,co.jp}`, `amzn.{eu,to}` | `AmazonScraper`            | 100      | High priority; CAPTCHA detection                      |
 | `ebay.{com,it,de,co.uk,fr,es,nl,pl,com.au,ca}`                          | `EbayScraper`              | 90       | Auction & buy-it-now formats                          |
 | `nove25.{net,com}` (incl. subdomains)                                   | `Nove25Scraper`            | 85       | Uses the generic extraction pipeline                 |
-| `*.myshopify.com` and Shopify-powered storefronts                        | `ShopifyScraper`           | 80       | Generic Shopify `/products/<slug>.json` endpoint; declared User-Agent; see [Shopify conduct](#shopify-conduct) |
+| `*.myshopify.com` and Shopify-powered storefronts                        | `ShopifyScraper`           | 80       | Generic Shopify `/products/<slug>.json` endpoint; see [Shopify conduct](#shopify-conduct) |
 | `aliexpress.{com,it,fr,de,es,ru,nl}`                                    | `AliexpressScraper`        | 50       | Parses inline `window.runParams` JSON                 |
 | `apple.com` (incl. subdomains)                                          | `AppleStoreScraper`        | 50       | Locale → currency mapping                             |
 | `bestbuy.{com,ca}`                                                       | `BestbuyScraper`           | 50       | JSON-LD primary path                                  |
@@ -51,9 +51,8 @@ The first match wins; lower-priority scrapers are not tried even on parse failur
 
 ## Shopify conduct
 
-- Every request of a Shopify check carries the same declared User-Agent,
-  `price-tracker-bot/<version> (+https://github.com/bernalli/price-tracker-bot)`, and no browser
-  navigation headers.
+- Every request of a Shopify check uses the bot's single Chrome identity (see
+  [operations.md](operations.md)); nothing rotates.
 - A refusal ends the check. Refusals propagated from the JSON endpoint or fallback
   page count toward the existing quarantine thresholds; a 429's Retry-After is
   handled by the scheduler with its existing parser and cap. Currency-only

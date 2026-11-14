@@ -50,7 +50,6 @@ from price_tracker.core.fetch import (
     fetch_page,
 )
 from price_tracker.core.identity import RequestedIdentity, check_echoes
-from price_tracker.core.scraper_base import USER_AGENTS
 from price_tracker.core.url_utils import UnsafeURLError
 
 if TYPE_CHECKING:
@@ -843,7 +842,7 @@ async def test_fallback_receives_the_same_headers_as_the_primary(client):
         router.get(url).mock(return_value=httpx.Response(403, text="blocked"))
         await fetch_page(url, client, fallbacks=(fb,), headers={"Accept-Language": "de-DE"})
     assert fb.seen_headers is not None
-    assert fb.seen_headers["User-Agent"] in USER_AGENTS
+    assert "User-Agent" not in fb.seen_headers
     assert fb.seen_headers["Accept-Language"] == "de-DE"
 
 
@@ -878,20 +877,20 @@ async def test_fallback_redirects_field(client):
 # ── Headers ────────────────────────────────────────────────────────────────────
 
 
-async def test_default_headers_rotate_user_agent_and_extra_headers_merge(client):
+async def test_scraper_headers_set_no_user_agent_and_extra_headers_merge(client):
     url_a = "https://f.example/p/A"
     with respx.mock(assert_all_called=False) as router:
         route = router.get(url_a).mock(return_value=httpx.Response(200, text="ok"))
         await fetch_page(url_a, client)
     ua = route.calls.last.request.headers["user-agent"]
-    assert ua in USER_AGENTS
+    assert ua.startswith("python-httpx/")
 
     with respx.mock(assert_all_called=False) as router:
         route = router.get(url_a).mock(return_value=httpx.Response(200, text="ok"))
         await fetch_page(url_a, client, headers={"Accept-Language": "de-DE"})
     req_headers = route.calls.last.request.headers
     assert req_headers["accept-language"] == "de-DE"
-    assert req_headers["user-agent"] in USER_AGENTS
+    assert req_headers["user-agent"].startswith("python-httpx/")
 
     url_b = "https://f.example/p/B"
     url_c = "https://f.example/p/C"

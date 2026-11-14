@@ -21,7 +21,7 @@ from price_tracker.config import Config, parse_bind
 from price_tracker.core.domain_spacing import DomainSpacing
 from price_tracker.core.drop_floor import DropFloor
 from price_tracker.core.health import HealthManager
-from price_tracker.core.http_client import build_client
+from price_tracker.core.http_client import build_store_client
 from price_tracker.core.registry import (
     ScraperRegistry,
     discover_builtin_scrapers,
@@ -88,7 +88,7 @@ async def post_init(application: Application[Any, Any, Any, Any, Any, Any]) -> N
 
     await reconcile_admins(repo, config.admin_users)
 
-    application.bot_data["http_client"] = build_client(timeout=float(config.request_timeout))
+    application.bot_data["http_client"] = build_store_client(timeout=float(config.request_timeout))
 
     # Wire DigestService so /digest_now and other digest-driven flows can
     # reach it via context.bot_data.

@@ -1,15 +1,11 @@
-"""Amazon-specific scraper.
-
-Amazon has aggressive anti-bot measures — this scraper uses targeted
-selectors, careful header management, and a fresh validated HTTP client for
-suspiciously small responses. Independent network backends are disabled.
+"""Amazon-specific scraper. One request per check, through the store client: a second,
+cookieless request right after the first is what an automated client looks like.
 """
 
 from __future__ import annotations
 
 import json
 import logging
-import random
 import re
 from decimal import Decimal
 from typing import ClassVar
@@ -19,7 +15,7 @@ import httpx
 from bs4 import BeautifulSoup, Tag
 
 from price_tracker.core.exceptions import BlockEvent, CaptchaDetected, ListingGone
-from price_tracker.core.http_client import build_client, public_request
+from price_tracker.core.http_client import public_request
 from price_tracker.core.identity import normalize_url
 from price_tracker.core.image_url import normalize_image_url
 from price_tracker.core.page_image import (
@@ -30,7 +26,6 @@ from price_tracker.core.page_image import (
 )
 from price_tracker.core.retry_policy import RetryConfig, with_retry
 from price_tracker.core.scraper_base import (
-    USER_AGENTS,
     AbstractScraper,
     ProductInfo,
     detect_block_event,
@@ -370,46 +365,16 @@ async def _fetch_amazon_html(
     return ImagePageHTML(response.text, str(response.url))
 
 
-async def _fetch_with_fresh_client(url: str) -> str | None:
-    """Fetch with a brand-new httpx client and minimal headers."""
-    ua = random.choice(USER_AGENTS)  # noqa: S311 — non-cryptographic UA rotation
-    headers = {
-        "User-Agent": ua,
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7",
-    }
-    try:
-        async with build_client(timeout=30.0) as fresh:
-            response = await public_request(fresh, "GET", url, headers=headers)
-            # Same schema as the primary fetch: block/gone detection precedes
-            # raise_for_status on this path too (#16).
-            detect_block_event(
-                status_code=response.status_code,
-                body=response.text,
-                url=url,
-                retry_after=retry_after_header(response),
-                headers=response.headers,
-            )
-            detect_listing_gone(status_code=response.status_code, url=url)
-            response.raise_for_status()
-            return ImagePageHTML(response.text, str(response.url))
-    except (httpx.HTTPError, ValueError) as e:
-        logger.debug("Fresh client retry failed: %s", e)
-        return None
-
-
 async def _fetch_amazon_page(
     url: str, client: httpx.AsyncClient, extra_headers: dict[str, str] | None = None
 ) -> str | None:
-    """Fetch Amazon page with retry + fallback chain.
+    """Fetch the Amazon page with one request (Tenacity retries transient errors).
 
     Returns the page HTML, or None on a non-block, non-gone failure (e.g. a
-    5xx or a network error). On a hard block (403/429/WAF/CAPTCHA) on the
-    primary fetch, re-raises the :class:`BlockEvent` subclass the
-    primary fetch produced, so the scheduler quarantines the domain instead of
-    recording a generic error. On 404/410 raises :class:`ListingGone`
-    immediately: the listing is gone, not blocked, and no fallback fetch
-    changes that, so none is attempted.
+    5xx or a network error). On a hard block (403/429/WAF/CAPTCHA) re-raises
+    the :class:`BlockEvent` subclass the fetch produced, so the scheduler
+    quarantines the domain instead of recording a generic error. On 404/410
+    raises :class:`ListingGone` immediately: the listing is gone, not blocked.
     """
     html: str | None = None
     block_exc: BlockEvent | None = None
@@ -422,22 +387,6 @@ async def _fetch_amazon_page(
         logger.warning("HTTP %s for %s after retries", e.response.status_code, url[:60])
     except (httpx.HTTPError, ValueError) as e:
         logger.warning("Fetch error for %s: %s", url[:60], e)
-
-    # Fresh-client retry on suspiciously small responses. This call is
-    # enrichment only: we already have SOME html from the primary fetch, so a
-    # block/gone on THIS retry says nothing about the page already in hand —
-    # it must never discard it (same principle as shopify.py's HTML-for-
-    # currency-only fetch swallowing BlockEvent/ListingGone).
-    if html and len(html) < 80000 and "application/ld+json" not in html:
-        logger.info("Amazon response is small (%d chars), retrying with fresh client", len(html))
-        try:
-            fresh_html = await _fetch_with_fresh_client(url)
-        except (BlockEvent, ListingGone) as e:
-            logger.debug("Fresh client retry blocked/gone (%s), keeping primary html", e)
-            fresh_html = None
-        if fresh_html and len(fresh_html) > len(html):
-            logger.info("Fresh client got %d chars (vs %d)", len(fresh_html), len(html))
-            html = fresh_html
 
     if html:
         return html
@@ -492,12 +441,7 @@ class AmazonScraper(AbstractScraper):
         # Resolve Amazon short links to full URL
         if "amzn.eu" in url or "amzn.to" in url:
             try:
-                resp = await public_request(
-                    client,
-                    "HEAD",
-                    url,
-                    headers={"User-Agent": "Mozilla/5.0"},
-                )
+                resp = await public_request(client, "HEAD", url)
                 if resp.status_code == 200 and "amazon" in str(resp.url):
                     url = str(resp.url)
                     logger.info("Resolved Amazon short link to: %s", url[:80])
@@ -506,7 +450,6 @@ class AmazonScraper(AbstractScraper):
 
         extra_headers = {
             "Accept-Language": "it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7",
-            "Referer": "https://www.google.com/",
         }
 
         html = await _fetch_amazon_page(url, client, extra_headers=extra_headers)

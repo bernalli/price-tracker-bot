@@ -14,17 +14,7 @@ import pytest
 import respx
 
 from price_tracker.core.exceptions import CaptchaDetected, HTTPBlockStatus
-from price_tracker.scrapers import amazon as amazon_module
 from price_tracker.scrapers.amazon import AmazonScraper
-
-
-async def _none(url: str) -> str | None:  # noqa: ARG001
-    return None
-
-
-@pytest.fixture(autouse=True)
-def _disable_fallbacks(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(amazon_module, "_fetch_with_fresh_client", _none)
 
 
 @pytest.mark.parametrize("status", [403, 429])

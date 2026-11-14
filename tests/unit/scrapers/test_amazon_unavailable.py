@@ -16,7 +16,6 @@ import pytest
 import respx
 
 from price_tracker.core.exceptions import ListingGone
-from price_tracker.scrapers import amazon as amazon_module
 from price_tracker.scrapers.amazon import AmazonScraper
 
 if TYPE_CHECKING:
@@ -28,10 +27,6 @@ _URL = "https://www.amazon.it/dp/B09QFSCWD9"
 
 
 async def _scrape(html: str, monkeypatch: pytest.MonkeyPatch, url: str = _URL) -> ProductInfo:
-    async def _no_fresh(_url: str) -> str | None:
-        return None
-
-    monkeypatch.setattr(amazon_module, "_fetch_with_fresh_client", _no_fresh)
     with respx.mock(assert_all_called=False) as router:
         router.get(url).respond(200, text=html)
         async with httpx.AsyncClient() as client:

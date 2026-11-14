@@ -77,6 +77,7 @@ async def test_post_init_wires_health_manager_into_bot_data(
         scheduler = application.bot_data["scheduler"]
         assert isinstance(scheduler, Scheduler)
         assert scheduler.deps.health_mgr is health_mgr
+        assert application.bot_data["http_client"]._transport._wire == "chrome"
     finally:
         await application.bot_data["http_client"].aclose()
         await db_conn.close()
@@ -132,7 +133,7 @@ async def test_startup_runs_announcement_after_polling_and_cancels_on_shutdown(
     monkeypatch.setattr(main, "discover_builtin_scrapers", Mock())
     monkeypatch.setattr(main, "discover_dropin_scrapers", Mock())
     monkeypatch.setattr(main, "register_handlers", Mock())
-    monkeypatch.setattr(main, "build_client", Mock())
+    monkeypatch.setattr(main, "build_store_client", Mock())
     monkeypatch.setattr(main, "sync_command_menus", AsyncMock())
     setup_scheduler = AsyncMock(side_effect=lambda app: events.append("scheduler"))
     monkeypatch.setattr(main, "_setup_scheduler", setup_scheduler)
@@ -179,7 +180,7 @@ async def test_thumbnails_share_scheduler_spacing_and_repository(
     client = httpx.AsyncClient(
         transport=httpx.MockTransport(lambda request: pytest.fail("unexpected network"))
     )
-    monkeypatch.setattr(main, "build_client", lambda **kwargs: client)
+    monkeypatch.setattr(main, "build_store_client", lambda **kwargs: client)
     monkeypatch.setattr(main, "sync_command_menus", AsyncMock())
     try:
         await main._combined_post_init(application)
@@ -229,7 +230,7 @@ async def test_quarantine_is_loaded_before_the_image_service_is_built(
     client = httpx.AsyncClient(
         transport=httpx.MockTransport(lambda request: pytest.fail("unexpected network"))
     )
-    monkeypatch.setattr(main, "build_client", lambda **kwargs: client)
+    monkeypatch.setattr(main, "build_store_client", lambda **kwargs: client)
     monkeypatch.setattr(main, "sync_command_menus", AsyncMock())
     try:
         await main._combined_post_init(application)

@@ -580,7 +580,7 @@ def test_n19_unresolvable_module_subject_is_rejected(tmp_path: Path, valid: dict
 
 def test_n19_not_callable_subject_is_rejected(tmp_path: Path, valid: dict[str, Any]) -> None:
     bad = copy.deepcopy(valid["manifest"])
-    bad["functions"]["parse_price"]["subject"] = "price_tracker.core.scraper_base:USER_AGENTS"
+    bad["functions"]["parse_price"]["subject"] = "price_tracker.core.scraper_base:_WAF_FINGERPRINTS"
     path = _dump(tmp_path, "manifest.json", bad)
     with pytest.raises(rp.ParityFormatError) as exc_info:
         rp.load_manifest(path)

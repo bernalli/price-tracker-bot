@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import random
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -18,7 +17,6 @@ if TYPE_CHECKING:
 
     from price_tracker.core.health import HealthManager
 
-from price_tracker import __version__
 from price_tracker.core.exceptions import (
     LISTING_GONE_STATUSES,
     BlockEvent,
@@ -31,46 +29,13 @@ from price_tracker.core.exceptions import (
 logger = logging.getLogger(__name__)
 
 
-# ── User-agent pool (rotate per request) ─────────────────────────
-
-# User-Agent strings are intentionally not wrapped (must match real browser headers verbatim).
-USER_AGENTS: list[str] = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",  # noqa: E501
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",  # noqa: E501
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15",  # noqa: E501
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",  # noqa: E501
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",  # noqa: E501
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",  # noqa: E501
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",  # noqa: E501
-]
-
-
 def get_headers(extra: dict[str, str] | None = None) -> dict[str, str]:
-    """Return browser-like headers with a random User-Agent."""
-    headers: dict[str, str] = {
-        "User-Agent": random.choice(USER_AGENTS),
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",  # noqa: E501
-        "Accept-Language": "en-US,en;q=0.9,it-IT;q=0.8,it;q=0.7",
-        "Accept-Encoding": "gzip, deflate, br",
-        "DNT": "1",
-        "Connection": "keep-alive",
-        "Upgrade-Insecure-Requests": "1",
-        "Sec-Fetch-Dest": "document",
-        "Sec-Fetch-Mode": "navigate",
-        "Sec-Fetch-Site": "none",
-        "Sec-Fetch-User": "?1",
-        "Cache-Control": "max-age=0",
-    }
-    if extra:
-        headers.update(extra)
-    return headers
+    """Return a copy of the caller's extra headers, and nothing else.
 
-
-PROJECT_URL: Final = "https://github.com/bernalli/price-tracker-bot"
-# A stable identity that names the bot: stores that refuse automated clients can
-# recognise it, and nothing pretends to be a browser.
-DECLARED_USER_AGENT: Final = f"price-tracker-bot/{__version__} (+{PROJECT_URL})"
+    The bot's identity belongs to the store client: its Chrome wire supplies the
+    User-Agent, client hints and Accept-Language. Scraper code sets none of them.
+    """
+    return dict(extra) if extra else {}
 
 
 # ── Price parsing (returns Decimal, never float) ──────────────────
