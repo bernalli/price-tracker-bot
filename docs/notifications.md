@@ -147,7 +147,7 @@ A blocked notice includes the user's number of active products.
 A reopening is announced only after an accepted blocked notice.
 Failed deliveries are retried on the next periodic sweep, even when
 no product is due. bot_config stores the last accepted notice under
-store_notice:<user_id>:<domain>. Acceptance includes digest enqueue.
+`store_notice:<user_id>:<domain>`. Acceptance includes digest enqueue.
 A store may change state during delivery; the next successful sweep
 reconciles the new state. Deferred notices describe a previous event,
 and inactive users are checked again before delivery. A restart
