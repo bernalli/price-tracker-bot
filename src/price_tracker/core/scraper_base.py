@@ -8,7 +8,7 @@ import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, ClassVar, Final
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlsplit
 
 if TYPE_CHECKING:
     from decimal import Decimal
@@ -441,6 +441,19 @@ _CAPTCHA_FINGERPRINTS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("captcha-form", _CAPTCHA_CHALLENGE_RE),
 )
 
+_MARKER_WINDOW: Final = 65_536  # characters of the decoded body scanned for a marker
+_REFUSAL_MARKERS: Final[tuple[tuple[str, re.Pattern[str]], ...]] = (
+    ("local_rate_limited", re.compile(r"local_rate_limited", re.IGNORECASE)),
+    (
+        "verify_connection",
+        re.compile(r"connection needs to be verified|verify your connection", re.IGNORECASE),
+    ),
+    ("blocked", re.compile(r"you have been blocked", re.IGNORECASE)),
+    ("cf_challenge", re.compile(r"just a moment\.\.\.|cf-chl-|challenge-platform", re.IGNORECASE)),
+    ("captcha_amazon", re.compile(r"validatecaptcha", re.IGNORECASE)),
+    ("captcha_widget", re.compile(r"g-recaptcha|h-captcha|cf-turnstile", re.IGNORECASE)),
+)
+
 
 def retry_after_header(response: httpx.Response) -> str | None:
     """The response's ``Retry-After`` header, when it carries a textual one."""
@@ -448,8 +461,61 @@ def retry_after_header(response: httpx.Response) -> str | None:
     return value if isinstance(value, str) else None
 
 
+def _diag_value(value: object, limit: int = 64) -> str:
+    """One log-safe token: printable ASCII without spaces, at most ``limit`` characters."""
+    if not isinstance(value, str) or not value:
+        return "-"
+    cleaned = "".join(char if "!" <= char <= "~" else "_" for char in value)
+    return cleaned[:limit]
+
+
+def _diag_url(url: str) -> str:
+    """Scheme, host, port and path of ``url``; never userinfo, query or fragment."""
+    try:
+        parts = urlsplit(url)
+        port = parts.port
+    except ValueError:
+        return "-"
+    scheme, hostname = parts.scheme, parts.hostname
+    if scheme not in {"http", "https"} or not hostname:
+        return "-"
+    return _diag_value(
+        f"{scheme}://{hostname}{':' + str(port) if port else ''}{parts.path}", limit=120
+    )
+
+
+def refusal_summary(
+    exc: BlockEvent, *, status: int, body: str, headers: httpx.Headers | None
+) -> str:
+    """One log line describing a refusal: closed fields, sanitized values, never the body or cookies."""  # noqa: E501
+    status_text = str(status) if isinstance(status, int) and not isinstance(status, bool) else "-"
+
+    def header(name: str) -> str:
+        return _diag_value(headers.get(name) if headers is not None else None)
+
+    window = body[:_MARKER_WINDOW]
+    marker = next((label for label, pattern in _REFUSAL_MARKERS if pattern.search(window)), "none")
+    return " ".join(
+        (
+            f"reason={_diag_value(_block_reason(exc))}",
+            f"status={status_text}",
+            f"url={_diag_url(exc.url)}",
+            f"server={header('server')}",
+            f"cf_ray={header('cf-ray')}",
+            f"request_id={header('x-request-id')}",
+            f"retry_after={header('retry-after')}",
+            f"marker={marker}",
+        )
+    )
+
+
 def detect_block_event(
-    *, status_code: int, body: str, url: str, retry_after: str | None = None
+    *,
+    status_code: int,
+    body: str,
+    url: str,
+    retry_after: str | None = None,
+    headers: httpx.Headers | None = None,
 ) -> None:
     """Inspect HTTP response for block markers; raise BlockEvent subclass if blocked.
 
@@ -466,18 +532,35 @@ def detect_block_event(
 
     Caller (scraper) must invoke this AFTER httpx call and BEFORE parsing, and
     pass the response's ``Retry-After`` (``retry_after_header``) so a status
-    block carries it to the scheduler.
+    block carries it to the scheduler. Pass ``response.headers`` so a refusal
+    logs its diagnostics.
     """
+    exc: BlockEvent
     if status_code in (403, 429):
-        raise HTTPBlockStatus(status=status_code, url=url, retry_after=retry_after)
+        exc = HTTPBlockStatus(status=status_code, url=url, retry_after=retry_after)
+        logger.warning(
+            "store refusal %s",
+            refusal_summary(exc, status=status_code, body=body, headers=headers),
+        )
+        raise exc
 
     for provider, pattern in _WAF_FINGERPRINTS:
         if pattern.search(body):
-            raise WAFBlocked(provider=provider, url=url)
+            exc = WAFBlocked(provider=provider, url=url)
+            logger.warning(
+                "store refusal %s",
+                refusal_summary(exc, status=status_code, body=body, headers=headers),
+            )
+            raise exc
 
     for marker, pattern in _CAPTCHA_FINGERPRINTS:
         if pattern.search(body):
-            raise CaptchaDetected(marker=marker, url=url)
+            exc = CaptchaDetected(marker=marker, url=url)
+            logger.warning(
+                "store refusal %s",
+                refusal_summary(exc, status=status_code, body=body, headers=headers),
+            )
+            raise exc
 
     return None
 

@@ -37,6 +37,7 @@ from price_tracker.core.scraper_base import (
     detect_listing_gone,
     get_headers,
     parse_price,
+    refusal_summary,
     retry_after_header,
 )
 from price_tracker.scrapers.evidence import offer_evidence, offer_urls_match, price_currency
@@ -362,6 +363,7 @@ async def _fetch_amazon_html(
         body=response.text,
         url=url,
         retry_after=retry_after_header(response),
+        headers=response.headers,
     )
     detect_listing_gone(status_code=response.status_code, url=url)
     response.raise_for_status()
@@ -386,6 +388,7 @@ async def _fetch_with_fresh_client(url: str) -> str | None:
                 body=response.text,
                 url=url,
                 retry_after=retry_after_header(response),
+                headers=response.headers,
             )
             detect_listing_gone(status_code=response.status_code, url=url)
             response.raise_for_status()
@@ -538,7 +541,11 @@ class AmazonScraper(AbstractScraper):
         # Check for captcha page — raise so the scheduler quarantines the domain
         # instead of recording a generic "price not found" error.
         if soup.find("form", action=re.compile(r"validateCaptcha")):
-            raise CaptchaDetected(marker="amazon-validateCaptcha", url=url)
+            captcha = CaptchaDetected(marker="amazon-validateCaptcha", url=url)
+            logger.warning(
+                "store refusal %s", refusal_summary(captcha, status=200, body=html, headers=None)
+            )
+            raise captcha
 
         # A removed ASIN can come back as Amazon's "dogs" not-found page with a
         # 2xx status: that is a gone listing, not a page we failed to read.

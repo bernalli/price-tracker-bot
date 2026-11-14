@@ -83,6 +83,7 @@ class AliexpressScraper(AbstractScraper):
                 body=response.text,
                 url=url,
                 retry_after=retry_after_header(response),
+                headers=response.headers,
             )
         except httpx.HTTPStatusError as e:
             # raise_for_status() lives inside the retry scope now, so hard
@@ -93,6 +94,7 @@ class AliexpressScraper(AbstractScraper):
                 body=e.response.text,
                 url=url,
                 retry_after=retry_after_header(e.response),
+                headers=e.response.headers,
             )
             logger.debug("AliExpress fetch failed for %s: %s", url[:80], e)
             return ProductInfo(error=f"HTTP error: {e}", stock_evidence=False)

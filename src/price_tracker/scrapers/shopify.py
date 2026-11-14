@@ -148,6 +148,7 @@ async def _fetch_shopify_response(url: str, client: httpx.AsyncClient) -> httpx.
         body=response.text,
         url=url,
         retry_after=retry_after_header(response),
+        headers=response.headers,
     )
     detect_listing_gone(status_code=response.status_code, url=url)
     response.raise_for_status()
@@ -479,6 +480,7 @@ class ShopifyScraper(AbstractScraper):
             body=response.text,
             url=url,
             retry_after=retry_after_header(response),
+            headers=response.headers,
         )
         if not _is_product_path(response.url):
             # A removed product does not always answer 404 straight away: measured
@@ -539,6 +541,7 @@ class ShopifyScraper(AbstractScraper):
                 body=response.text,
                 url=str(response.url),
                 retry_after=retry_after_header(response),
+                headers=response.headers,
             )
             if normalize_url(str(response.url)) != normalize_url(json_url):
                 return ProductInfo(

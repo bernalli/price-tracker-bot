@@ -318,6 +318,7 @@ async def _fetch_primary(
             body=text,
             url=current,
             retry_after=retry_after_header(response),
+            headers=response.headers,
         )
         detect_listing_gone(status_code=response.status_code, url=current)
 
@@ -347,6 +348,7 @@ async def _fetch_primary(
             body=text,
             url=current,
             retry_after=retry_after_header(response),
+            headers=response.headers,
         )
         if decode_error is not None:
             raise decode_error
