@@ -8,6 +8,7 @@ Chrome wire supplies the whole identity.
 from __future__ import annotations
 
 import contextlib
+import gzip
 import json
 import socket
 from typing import TYPE_CHECKING, Any
@@ -17,7 +18,7 @@ import pytest
 import respx
 
 from price_tracker.core import scraper_base, store_wire
-from price_tracker.core.exceptions import BlockEvent
+from price_tracker.core.exceptions import BlockEvent, HTTPBlockStatus
 from price_tracker.core.http_client import build_store_client
 from price_tracker.core.scraper_base import get_headers
 from price_tracker.core.store_wire import STORE_ACCEPT_LANGUAGE, STORE_IMPERSONATE
@@ -148,6 +149,35 @@ async def test_store_client_check_uses_one_chrome_identity(
         else:
             assert headers[: len(expected)] == expected
             assert [name for name, _ in headers[len(expected) :]] == ["Cookie"]
+
+
+@pytest.mark.parametrize("status", [403, 429])
+async def test_damaged_json_refusal_stops_after_one_request(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, status: int
+) -> None:
+    wire = FakeWire()
+    wire.script = [
+        FakeCurlResponse(
+            status_code=status,
+            headers=[("Content-Encoding", "gzip"), ("Retry-After", "60")],
+            body=gzip.compress(b'{"errors":"local_rate_limited"}')[:-1],
+        ),
+        # Any fallback would consume this and fail the refusal assertion below.
+        FakeCurlResponse(body=PAGE.encode()),
+    ]
+    monkeypatch.setattr(store_wire, "_open_session", wire.open)
+    monkeypatch.setattr(socket, "getaddrinfo", Network().resolve)
+    async with build_store_client() as client:
+        with pytest.raises(HTTPBlockStatus) as exc:
+            await ShopifyScraper().scrape(URL, client)
+    assert exc.value.status == status
+    assert exc.value.retry_after == "60"
+    assert exc.value.url == JSON_URL
+    (session,) = wire.sessions
+    (request,) = session.requests
+    assert request["url"] == JSON_URL
+    refusals = [record for record in caplog.records if "store refusal " in record.getMessage()]
+    assert len(refusals) == 1
 
 
 async def test_amazon_requests_carry_no_fake_headers() -> None:

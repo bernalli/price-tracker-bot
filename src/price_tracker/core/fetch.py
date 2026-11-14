@@ -115,14 +115,18 @@ class _ZlibDecoder:
     """gzip decoding, chunked so no single call inflates more than the step."""
 
     def __init__(self, wbits: int, request: httpx.Request) -> None:
+        self._wbits = wbits
         self._dec = zlib.decompressobj(wbits)
         self._request = request
 
     def feed(self, data: bytes) -> Iterator[bytes]:
         try:
-            yield self._dec.decompress(data, _DECODE_STEP)
-            while self._dec.unconsumed_tail:
-                yield self._dec.decompress(self._dec.unconsumed_tail, _DECODE_STEP)
+            pending = data
+            while pending:
+                if self._dec.eof:
+                    self._dec = zlib.decompressobj(self._wbits)
+                yield self._dec.decompress(pending, _DECODE_STEP)
+                pending = self._dec.unused_data if self._dec.eof else self._dec.unconsumed_tail
         except zlib.error as exc:
             raise httpx.DecodingError(str(exc), request=self._request) from exc
 
@@ -154,6 +158,10 @@ class _DeflateDecoder:
             yield self._decompress(data)
             while self._dec.unconsumed_tail:
                 yield self._dec.decompress(self._dec.unconsumed_tail, _DECODE_STEP)
+            if self._dec.unused_data:
+                raise httpx.DecodingError(
+                    "trailing data after deflate stream", request=self._request
+                )
         except zlib.error as exc:
             raise httpx.DecodingError(str(exc), request=self._request) from exc
 

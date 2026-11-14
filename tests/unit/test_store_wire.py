@@ -5,6 +5,7 @@ from __future__ import annotations
 import gzip
 import ipaddress
 import socket
+import zlib
 from typing import Any
 
 import certifi
@@ -454,15 +455,28 @@ async def test_accepted_wire_encodings_deliver_the_same_body(
     ],
     ids=["unknown", "empty-element", "multiple", "duplicate"],
 )
+@pytest.mark.parametrize("status", [200, 403, 429, 503])
 async def test_rejected_wire_encodings_are_never_silently_dropped(
-    fake_wire: FakeWire, dns: HostNetwork, encoding_headers: list[tuple[str, str]]
+    fake_wire: FakeWire, dns: HostNetwork, encoding_headers: list[tuple[str, str]], status: int
 ) -> None:
-    fake_wire.script = [FakeCurlResponse(headers=encoding_headers, body=GZIP_PLAIN)]
+    fake_wire.script = [
+        FakeCurlResponse(
+            status_code=status,
+            headers=[*encoding_headers, ("Retry-After", "60")],
+            body=GZIP_PLAIN,
+        )
+    ]
     async with build_store_client() as client:
-        with pytest.raises(httpx.DecodingError) as exc:
-            await client.get("https://shop.example/p")
+        if status == 200:
+            with pytest.raises(httpx.DecodingError) as exc:
+                await client.get("https://shop.example/p")
+            assert is_retryable_http_error(exc.value) is False
+        else:
+            response = await client.get("https://shop.example/p")
+            assert response.status_code == status
+            assert response.headers["retry-after"] == "60"
+            assert response.content == b""
         assert client._transport._slots._value == 10  # type: ignore[attr-defined]
-    assert is_retryable_http_error(exc.value) is False
     assert fake_wire.sessions[0].closes == 1
 
 
@@ -561,11 +575,12 @@ async def test_cookies_stay_with_their_domain_across_redirects(
 
 @pytest.mark.parametrize("axis", ["wire", "decoded"])
 @pytest.mark.parametrize("delta", [-1, 0, 1])
+@pytest.mark.parametrize("status", [200, 403, 429, 503])
 @settings(max_examples=16, deadline=None)
 @example(sizes=[])
 @example(sizes=[1] * 1100)
 @given(sizes=st.lists(st.integers(min_value=1, max_value=1100), max_size=12))
-async def test_body_ceiling(axis: str, delta: int, sizes: list[int]) -> None:
+async def test_body_ceiling(axis: str, delta: int, status: int, sizes: list[int]) -> None:
     limit = 1024
     plain = b"a" * (limit + delta)
     if axis == "wire":
@@ -586,7 +601,9 @@ async def test_body_ceiling(axis: str, delta: int, sizes: list[int]) -> None:
             break
         pieces.append(size)
     wire = FakeWire()
-    wire.script = [FakeCurlResponse(headers=headers, body=body, chunk_sizes=tuple(pieces))]
+    wire.script = [
+        FakeCurlResponse(status_code=status, headers=headers, body=body, chunk_sizes=tuple(pieces))
+    ]
     net = HostNetwork()
     with pytest.MonkeyPatch.context() as patch:
         patch.setattr(socket, "getaddrinfo", net.resolve)
@@ -695,3 +712,63 @@ async def test_build_store_client_uses_the_chrome_wire() -> None:
     async with build_store_client() as store, build_client() as plain:
         assert store._transport._wire == "chrome"  # type: ignore[attr-defined]
         assert plain._transport._wire == "httpx"  # type: ignore[attr-defined]
+
+
+@pytest.mark.parametrize(
+    ("encoding", "tail_kind"),
+    [("gzip", "garbage"), ("deflate", "garbage"), ("gzip", "truncated")],
+)
+@settings(max_examples=32, deadline=None)
+@given(extra=st.binary(max_size=64), cut=st.integers(min_value=0, max_value=1000))
+async def test_compressed_tail_is_never_accepted(
+    encoding: str, tail_kind: str, extra: bytes, cut: int
+) -> None:
+    compress = gzip.compress if encoding == "gzip" else zlib.compress
+    tail = b"\x00" + extra
+    if tail_kind == "truncated":
+        frame = gzip.compress(extra)
+        tail = frame[: 1 + cut % (len(frame) - 1)]
+    wire = FakeWire()
+    wire.script = [
+        FakeCurlResponse(
+            headers=[("Content-Encoding", encoding)],
+            body=compress(b"first") + tail,
+        )
+    ]
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(socket, "getaddrinfo", HostNetwork().resolve)
+        patch.setattr(store_wire, "_open_session", wire.open)
+        async with build_store_client() as client:
+            with pytest.raises(httpx.DecodingError) as exc:
+                await client.get("https://shop.example/p")
+    assert is_retryable_http_error(exc.value) is False
+
+
+async def test_complete_gzip_members_are_all_delivered(
+    fake_wire: FakeWire, dns: HostNetwork
+) -> None:
+    fake_wire.script = [
+        FakeCurlResponse(
+            headers=[("Content-Encoding", "gzip")],
+            body=gzip.compress(b"first") + gzip.compress(b"second"),
+        )
+    ]
+    async with build_store_client() as client:
+        response = await client.get("https://shop.example/p")
+    assert response.content == b"firstsecond"
+
+
+@pytest.mark.parametrize("value", [b"caf\xe9", b"caf\xc3\xa9"])
+async def test_response_header_bytes_survive_unchanged(
+    fake_wire: FakeWire, dns: HostNetwork, value: bytes
+) -> None:
+    fake_wire.script = [
+        FakeCurlResponse(
+            headers=[("X-Name", value.decode("latin-1")), ("X-Name", "second")],
+            body=b"ok",
+        )
+    ]
+    async with build_store_client() as client:
+        response = await client.get("https://shop.example/p")
+    assert response.content == b"ok"
+    assert response.headers.raw == [(b"X-Name", value), (b"X-Name", b"second")]

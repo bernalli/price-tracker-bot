@@ -39,6 +39,10 @@ class _FakeHeaders:
     def __init__(self, items: list[tuple[str, str]]) -> None:
         self._items = list(items)
 
+    @property
+    def raw(self) -> list[tuple[bytes, bytes]]:
+        return [(name.encode("ascii"), value.encode("latin-1")) for name, value in self._items]
+
     def multi_items(self) -> list[tuple[str, str]]:
         return list(self._items)
 

@@ -9,6 +9,7 @@ validating it again.
 from __future__ import annotations
 
 import ipaddress
+import logging
 import re
 from typing import TYPE_CHECKING, Final, Literal
 
@@ -29,13 +30,15 @@ if TYPE_CHECKING:
 
     from curl_cffi.requests import Response as CurlResponse
 
+logger = logging.getLogger(__name__)
+
 STORE_IMPERSONATE: Final = "chrome152"
 STORE_ACCEPT_LANGUAGE: Final = "it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7"
 WIRE_MAX_BODY_BYTES: Final = 16 * 1024 * 1024
 DECODED_MAX_BODY_BYTES: Final = 16 * 1024 * 1024
 _ALLOWED_METHODS: Final = frozenset({"GET", "HEAD"})
 _DROPPED_RESPONSE_HEADERS: Final = frozenset(
-    {"content-encoding", "content-length", "transfer-encoding"}
+    {b"content-encoding", b"content-length", b"transfer-encoding"}
 )
 _CURL_IPRESOLVE_V4: Final = 1
 _LABEL: Final = r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?"
@@ -107,7 +110,19 @@ class _DecodedBodyStream(httpx.AsyncByteStream):
     async def __aiter__(self) -> AsyncIterator[bytes]:
         from price_tracker.core.fetch import _read_capped  # noqa: PLC0415
 
-        body, truncated = await _read_capped(self._raw_response, DECODED_MAX_BODY_BYTES)
+        try:
+            body, truncated = await _read_capped(self._raw_response, DECODED_MAX_BODY_BYTES)
+        except httpx.DecodingError:
+            if self._raw_response.is_success:
+                raise
+            # Status and headers remain evidence even when the body is unusable.
+            # Keep the decoder's message, response body and URL out of this log.
+            logger.warning(
+                "store response body discarded after decoding failure status=%d",
+                self._raw_response.status_code,
+            )
+            yield b""
+            return
         if truncated:
             raise BodyCeilingExceeded(
                 "store response exceeded the decoded body ceiling",
@@ -202,9 +217,7 @@ class ChromeConnection(httpx.AsyncBaseTransport):
         if response.primary_ip not in addresses:
             raise UnsafeURLError("the connection did not use a validated address")
         # curl_cffi types header values as optional; a parsed response line always has one.
-        wire_headers = [
-            (name, value) for name, value in response.headers.multi_items() if value is not None
-        ]
+        wire_headers = [(name, value) for name, value in response.headers.raw if value is not None]
         # The inner response keeps the wire's encoding headers for the fetch reader;
         # stream=, never content=, so HTTPX does not decode it on its own.
         raw_response = httpx.Response(
