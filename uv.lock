@@ -2092,7 +2092,7 @@ wheels = [
 
 [[package]]
 name = "price-tracker"
-version = "1.12.0"
+version = "1.13.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },

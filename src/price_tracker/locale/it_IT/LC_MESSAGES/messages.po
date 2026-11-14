@@ -3006,3 +3006,9 @@ msgstr "Prezzo aggiornato, disponibilità non verificata."
 
 msgid "🚫 Last confirmed: sold out"
 msgstr "🚫 Ultima disponibilità confermata: esaurito"
+
+msgid "Fewer store blocks"
+msgstr "Meno blocchi dai negozi"
+
+msgid "Steadier Amazon checks"
+msgstr "Controlli Amazon più stabili"
