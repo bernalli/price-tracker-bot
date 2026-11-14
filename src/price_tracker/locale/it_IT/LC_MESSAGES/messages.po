@@ -3012,3 +3012,20 @@ msgstr "Meno blocchi dai negozi"
 
 msgid "Steadier Amazon checks"
 msgstr "Controlli Amazon più stabili"
+
+msgid "{domain} is blocking the bot"
+msgstr "{domain} blocca il bot"
+
+msgid "{n} product is not being updated."
+msgid_plural "{n} products are not being updated."
+msgstr[0] "{n} prodotto non viene aggiornato."
+msgstr[1] "{n} prodotti non vengono aggiornati."
+
+msgid "I keep retrying by myself and will tell you when it answers again."
+msgstr "Continuo a riprovare da solo e ti avviso quando risponde di nuovo."
+
+msgid "{domain} answers again"
+msgstr "{domain} risponde di nuovo"
+
+msgid "Checks on this store have resumed."
+msgstr "I controlli su questo negozio sono ripresi."

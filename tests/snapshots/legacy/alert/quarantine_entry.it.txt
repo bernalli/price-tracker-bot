@@ -3,19 +3,8 @@
 # locale: it
 # frozen_now: 2026-03-01T12:00:00Z
 ## step 1: job run_check_all
--> sendMessage chat=10
-   param link_preview_options={"is_disabled": true}
-   param parse_mode="HTML"
-   text:
-   | 🔒 <b>Sito in pausa automatica</b>
-   |
-   | <b>example.com</b> ha fallito troppi controlli (controlli automatici bloccati).
-   | Sospendo temporaneamente i check su questo sito per non insistere contro un blocco.
-   | 🔁 Riprovo da solo dopo: 2026-03-01 13:00 UTC
-   |
-   | Dettagli con /errori.
+(no calls)
 ## db after step 1
-+ bot_config key="quarantine_notice:10:example.com" {value="2026-03-01T12:00:00+00:00"}
 ~ products id=1 last_error: NULL -> "block: HTTP 403 block on https://shop.example.com/item/1"
 ~ products id=1 last_error_at: NULL -> <now:9999-99-99 99:99:99>
 ~ products id=1 last_check_outcome: NULL -> "block"

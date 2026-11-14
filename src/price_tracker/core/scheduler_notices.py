@@ -8,19 +8,20 @@ from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any, cast
 
-import aiosqlite
-
 from price_tracker.bot.messages import reset_locale, set_locale, user_locale
 from price_tracker.core.alert import (
     _why,
-    format_quarantine_notification,
     format_stock_notice,
+    format_store_blocked_notice,
+    format_store_reopened_notice,
     format_warning_notice,
     operational_buttons,
 )
+from price_tracker.core.health import QuarantineState
 from price_tracker.core.notices import NoticeCollector, NoticeGroup, OperationalEvent, group_key_for
 from price_tracker.core.scheduler_runtime import format_operational_notice
 from price_tracker.core.textlimits import NAME_BUDGET, WHY_BUDGET, truncate_visible
+from price_tracker.core.url_utils import extract_etld_plus_one
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -30,18 +31,16 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger("price_tracker.core.scheduler")
 
-# A store that keeps rate-limiting re-enters quarantine every few hours (the
-# breaker closes after a good probe, the next blocks lock it again). The user
-# hears about it once a day; /errors shows the quarantine all along.
-QUARANTINE_NOTICE_INTERVAL = timedelta(hours=24)
 WARNING_NOTICE_INTERVAL = timedelta(hours=24)
 STATUS_RETRY_INTERVAL = timedelta(minutes=15)
-_QUARANTINE_NOTICE_KEY_PREFIX = "quarantine_notice:"
+STORE_NOTICE_KEY_PREFIX = "store_notice:"
+_TOLD_BLOCKED = "blocked"
+_TOLD_OPEN = "open"
 
 
-def quarantine_notice_key(user_id: int, domain: str) -> str:
-    """``bot_config`` key holding when ``user_id`` was last told ``domain`` paused."""
-    return f"{_QUARANTINE_NOTICE_KEY_PREFIX}{user_id}:{domain}"
+def store_notice_key(user_id: int, domain: str) -> str:
+    """Return the persistent notice key for one recipient and store."""
+    return f"{STORE_NOTICE_KEY_PREFIX}{user_id}:{domain}"
 
 
 def _stored_notice_time(value: object, *, now: datetime) -> datetime | None:
@@ -67,64 +66,97 @@ class NoticeDeliveryMixin:
     deps: SchedulerDeps
     _notice_lock: asyncio.Lock
 
-    async def _notify_quarantine_entry(
-        self, product: ProductRecord, domain: str, *, reason: str
-    ) -> None:
-        """Push a one-shot alert when ``domain`` first enters quarantine.
+    async def _reconcile_store_notices(self) -> None:
+        """Bring every recipient's store notice in line with the store's current state.
 
-        Called only on the CLOSED → LOCKED transition, and pushed at most once per
-        :data:`QUARANTINE_NOTICE_INTERVAL` for the same user and domain. The time
-        of the last delivered notice lives in ``bot_config``, so the interval
-        holds across a restart. The notifier runs under a broad try/except so a
-        flaky transport never aborts the scheduler tick.
+        Runs at the end of each periodic sweep, under ``_notice_lock`` for the whole
+        round, so two rounds never interleave their reads and writes of the notice
+        memory. Recipients are the active users with active products on a store.
+        The state of each store is sampled once: LOCKED_T3 and HALF_OPEN_T3 mean
+        blocked, CLOSED means open, every other result is left alone. A store that
+        changes state during the round is reconciled by the next one.
+
+        Nothing here fails the sweep: an error skips the user, store or recipient
+        it concerns, and an error outside them is logged.
         """
-        key = quarantine_notice_key(product.user_id, domain)
-        now = datetime.now(UTC)
         try:
-            stored = await self.deps.repo.get_config(key)
-        except aiosqlite.Error:
-            # Better a second notice than a lost one.
-            logger.warning("Could not read the last quarantine notice time for %s", domain)
-            stored = None
-        last = _stored_notice_time(stored, now=now)
-        if last is not None and now - last < QUARANTINE_NOTICE_INTERVAL:
-            logger.info(
-                "Quarantine of %s re-entered within %s of the last notice to user %d; "
-                "not pushed again",
-                domain,
-                QUARANTINE_NOTICE_INTERVAL,
-                product.user_id,
-            )
+            async with self._notice_lock:
+                recipients: dict[str, set[int]] = {}
+                for user in await self.deps.repo.list_active_users():
+                    try:
+                        products = await self.deps.repo.list_products_for_user(
+                            user_id=user.user_id, only_active=True
+                        )
+                    except Exception:  # noqa: BLE001 — one unreadable user must not stop the rest
+                        logger.exception(
+                            "Could not read the products of user %d for store notices",
+                            user.user_id,
+                        )
+                        continue
+                    for product in products:
+                        domain = extract_etld_plus_one(product.url)
+                        if domain:
+                            recipients.setdefault(domain, set()).add(user.user_id)
+                for domain in sorted(recipients):
+                    try:
+                        state = self.deps.health_mgr.state(domain)
+                    except Exception:  # noqa: BLE001 — one unreadable store must not stop the rest
+                        logger.exception("Could not read the state of %s for store notices", domain)
+                        continue
+                    if state is QuarantineState.LOCKED_T3 or state is QuarantineState.HALF_OPEN_T3:
+                        blocked = True
+                    elif state is QuarantineState.CLOSED:
+                        blocked = False
+                    else:
+                        continue
+                    for user_id in sorted(recipients[domain]):
+                        try:
+                            await self._announce_store_to(user_id, domain, blocked=blocked)
+                        except Exception:  # noqa: BLE001 — one recipient must not stop the rest
+                            logger.exception(
+                                "Could not announce the state of %s to user %d", domain, user_id
+                            )
+        except Exception:  # noqa: BLE001 — notices must never fail the periodic sweep
+            logger.exception("Could not reconcile store notices")
+
+    async def _announce_store_to(self, user_id: int, domain: str, *, blocked: bool) -> None:
+        """Tell ``user_id`` that ``domain`` blocks the bot, or answers again, if not yet told.
+
+        The caller holds ``_notice_lock``. Only the exact stored value ``"blocked"``
+        means the user was last told the store blocks; anything else means open.
+        The new value is stored only after the notifier accepted the notice, so a
+        refused or failed delivery is retried by the next round.
+        """
+        repo = self.deps.repo
+        key = store_notice_key(user_id, domain)
+        stored = await repo.get_config(key)
+        if (stored == _TOLD_BLOCKED) == blocked:
             return
-        async with self._recipient_locale(product.user_id):
-            message = format_quarantine_notification(
-                domain=domain,
-                reason=reason,
-                locked_until=self.deps.health_mgr.locked_until(domain),
-            )
-        product_name = truncate_visible(product.name or product.url, NAME_BUDGET)
-        delivered = await self._notify(
-            product.user_id,
-            message,
-            product_id=None,
-            payload={
-                "kind": "operational",
-                "event": "quarantine",
-                "domain": domain,
-                "products": [{"id": product.id, "name": product_name, "why": "blocked"}],
-                "count": 1,
-                "event_id": (
-                    f"ops:quarantine:{product.user_id}:{domain}:"
-                    f"{self.deps.health_mgr.locked_until(domain) or 'none'}"
-                ),
-            },
-        )
-        if not delivered:
+        products = await repo.list_products_for_user(user_id=user_id, only_active=True)
+        count = sum(1 for product in products if extract_etld_plus_one(product.url) == domain)
+        if count == 0:
             return
-        try:
-            await self.deps.repo.set_config(key, now.isoformat())
-        except aiosqlite.Error:
-            logger.warning("Could not record the quarantine notice time for %s", domain)
+        async with self._recipient_locale(user_id):
+            text = (
+                format_store_blocked_notice(domain=domain, products=count)
+                if blocked
+                else format_store_reopened_notice(domain=domain)
+            )
+        event = "quarantine" if blocked else "quarantine_end"
+        stamp = self.deps.health_mgr.locked_until(domain) if blocked else datetime.now(UTC)
+        payload = {
+            "kind": "operational",
+            "event": event,
+            "domain": domain,
+            "count": count,
+            "event_id": f"ops:{event}:{user_id}:{domain}:{stamp or 'none'}",
+        }
+        # A user removed while the notice was prepared is not told; nothing runs
+        # between this check and the delivery.
+        if not await repo.is_user_allowed(user_id):
+            return
+        if await self._notify(user_id, text, product_id=None, payload=payload):
+            await repo.set_config(key, _TOLD_BLOCKED if blocked else _TOLD_OPEN)
 
     async def _record_failure_and_maybe_disable(
         self,

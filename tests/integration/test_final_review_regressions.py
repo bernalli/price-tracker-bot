@@ -21,8 +21,8 @@ import pytest_asyncio
 from price_tracker.bot.handlers._cards import product_view
 from price_tracker.bot.messages import reset_locale, set_locale
 from price_tracker.bot.ui.cards import CardActions, product_card
-from price_tracker.core.alert import _why, format_quarantine_notification
-from price_tracker.core.exceptions import HTTPBlockStatus, ListingGone
+from price_tracker.core.alert import _why
+from price_tracker.core.exceptions import ListingGone
 from price_tracker.core.notices import NoticeCollector
 from price_tracker.core.page_image import ImagePageHTML
 from price_tracker.core.registry import ScraperRegistry
@@ -333,15 +333,6 @@ async def test_queued_warning_is_retired_or_marked_historical_after_recovery(wor
     await digest.flush_user(user_id=1)
     text = "\n".join(call.kwargs["text"] for call in bot.send_message.await_args_list)
     assert "checks failing" not in text, text
-
-
-def test_quarantine_notification_does_not_echo_raw_exception_or_query():
-    reason = str(
-        HTTPBlockStatus(status=403, url="https://example.com/p/1?diagnostic=SYNTHETIC_QUERY_MARKER")
-    )
-    text = format_quarantine_notification(domain="example.com", reason=reason, locked_until=None)
-    assert "SYNTHETIC_QUERY_MARKER" not in text, text
-    assert "HTTP 403 block on" not in text, text
 
 
 def test_processing_error_is_not_presented_as_unreachable_site():

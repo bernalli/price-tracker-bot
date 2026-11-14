@@ -30,7 +30,6 @@ from price_tracker.core.alert import (
     PriceAlert,
     format_alert,
     format_back_in_stock,
-    format_quarantine_notification,
 )
 from price_tracker.core.exceptions import ParseError
 from price_tracker.core.health import HealthManager
@@ -58,7 +57,8 @@ LATER = datetime.now(UTC) + timedelta(days=1)
 DROP_EN, DROP_IT = "Price drop!", "Prezzo in calo!"
 STOCK_EN, STOCK_IT = "Product available again", "Prodotto di nuovo disponibile"
 NOTICE_EN, NOTICE_IT = "Price unreadable on", "Prezzo illeggibile su"
-PAUSE_EN, PAUSE_IT = "Site paused automatically", "Sito in pausa automatica"
+BLOCK_EN, BLOCK_IT = "is blocking the bot", "blocca il bot"
+REOPEN_EN, REOPEN_IT = "answers again", "risponde di nuovo"
 DIGEST_EN, DIGEST_IT = "Use /lista for full state.", "Usa /lista per lo stato completo."
 
 
@@ -238,35 +238,40 @@ async def test_a_failed_language_read_falls_back_to_the_default_and_the_sweep_go
 async def test_the_quarantine_notice_follows_the_recipient_across_a_restart(
     repo: Repository,
 ) -> None:
-    products = {uid: await _product(repo, uid, "blocked") for uid in (A, B, C, D)}
-    for round_ in range(2):
-        notifier = _Notifier()
-        async with httpx.AsyncClient() as client:
-            scheduler = _scheduler(repo, client, notifier, {})
-            for pid in products.values():
-                record = await repo.get_product(pid)
-                assert record is not None
-                # One store per round: a store's notice is pushed once a day.
-                domain = f"store{round_}.com"
-                await scheduler._notify_quarantine_entry(record, domain, reason="403")
-        for uid in (A, B, C, D):
-            assert _expect(uid, PAUSE_EN, PAUSE_IT) in notifier.texts(uid)[0], (round_, uid)
-
-
-async def test_changing_the_stored_language_changes_the_next_message(repo: Repository) -> None:
-    pid = await _product(repo, A, "blocked")
-    record = await repo.get_product(pid)
-    assert record is not None
+    for uid in (A, B, C, D):
+        await _product(repo, uid, "blocked")  # every product is on example.com
     notifier = _Notifier()
     async with httpx.AsyncClient() as client:
         scheduler = _scheduler(repo, client, notifier, {})
-        await scheduler._notify_quarantine_entry(record, "example.com", reason="403")
+        for _block in range(12):
+            await scheduler.deps.health_mgr.record_block("example.com", reason="HTTP 403")
+        await scheduler._reconcile_store_notices()
+
+        restarted = _scheduler(repo, client, notifier, {})
+        await restarted.deps.health_mgr.load()
+        await restarted.deps.health_mgr.record_success("example.com")
+        await restarted._reconcile_store_notices()
+    for uid in (A, B, C, D):
+        blocked, reopened = notifier.texts(uid)
+        assert _expect(uid, BLOCK_EN, BLOCK_IT) in blocked, uid
+        assert _expect(uid, REOPEN_EN, REOPEN_IT) in reopened, uid
+
+
+async def test_changing_the_stored_language_changes_the_next_message(repo: Repository) -> None:
+    await _product(repo, A, "blocked")
+    notifier = _Notifier()
+    async with httpx.AsyncClient() as client:
+        scheduler = _scheduler(repo, client, notifier, {})
+        health = scheduler.deps.health_mgr
+        for _block in range(12):
+            await health.record_block("example.com", reason="HTTP 403")
+        await scheduler._reconcile_store_notices()
         await repo.set_user_language(A, "en")
-        # Another store: the same one is not notified twice in a day.
-        await scheduler._notify_quarantine_entry(record, "example.org", reason="403")
+        await health.record_success("example.com")
+        await scheduler._reconcile_store_notices()
     first, second = notifier.texts(A)
-    assert PAUSE_IT in first
-    assert PAUSE_EN in second
+    assert BLOCK_IT in first
+    assert REOPEN_EN in second
 
 
 async def _suspended_collector(scheduler: Scheduler, repo: Repository, *uids: int) -> Any:
@@ -522,22 +527,3 @@ def test_the_english_alert_is_byte_identical_to_the_old_text(
         ) == _old_back_in_stock(name, alert.url, new, "€")
     finally:
         reset_locale(token)
-
-
-def test_the_italian_quarantine_text_describes_the_block_without_raw_detail() -> None:
-    token = set_locale("it")
-    try:
-        text = format_quarantine_notification(
-            domain="example.com",
-            reason="HTTP 403",
-            locked_until=datetime(2026, 3, 1, 12, 30, tzinfo=UTC),
-        )
-    finally:
-        reset_locale(token)
-    assert text == (
-        "🔒 <b>Sito in pausa automatica</b>\n\n"
-        "<b>example.com</b> ha fallito troppi controlli (controlli automatici bloccati).\n"
-        "Sospendo temporaneamente i check su questo sito per non insistere "
-        "contro un blocco.\n🔁 Riprovo da solo dopo: 2026-03-01 12:30 UTC\n\n"
-        "Dettagli con /errori."
-    )
