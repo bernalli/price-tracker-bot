@@ -3029,3 +3029,6 @@ msgstr "{domain} risponde di nuovo"
 
 msgid "Checks on this store have resumed."
 msgstr "I controlli su questo negozio sono ripresi."
+
+msgid "Notice when a store blocks"
+msgstr "Avviso se un negozio blocca"

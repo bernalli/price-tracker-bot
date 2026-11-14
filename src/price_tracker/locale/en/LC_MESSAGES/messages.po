@@ -2871,3 +2871,6 @@ msgstr "{domain} answers again"
 
 msgid "Checks on this store have resumed."
 msgstr "Checks on this store have resumed."
+
+msgid "Notice when a store blocks"
+msgstr "Notice when a store blocks"
