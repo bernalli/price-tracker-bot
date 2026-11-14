@@ -18,7 +18,6 @@ from price_tracker.core.alert import (
 )
 from price_tracker.core.drop_floor import NO_DROP_FLOOR, DropFloor, floor_for_choice
 from price_tracker.core.exceptions import BlockEvent, ListingGone, ParseError
-from price_tracker.core.health import QuarantineState
 from price_tracker.core.image_url import normalize_image_url
 from price_tracker.core.money import MAX_AMOUNT, normalize_currency_code
 from price_tracker.core.notices import NoticeCollector
@@ -48,10 +47,6 @@ class ProductChecksMixin:
     _product_locks: dict[int, asyncio.Lock]
 
     if TYPE_CHECKING:
-
-        async def _notify_quarantine_entry(
-            self, product: ProductRecord, domain: str, *, reason: str
-        ) -> None: ...
 
         async def _record_failure_and_maybe_disable(
             self,
@@ -115,14 +110,9 @@ class ProductChecksMixin:
                 if isinstance(exc, BlockEvent):
                     reason = "block"
                     if domain != "unknown":
-                        previous = self.deps.health_mgr.state(domain)
                         await handle_block_in_pipeline(
                             exc, health_mgr=self.deps.health_mgr, domain=domain
                         )
-                        if previous == QuarantineState.CLOSED and self.deps.health_mgr.is_locked(
-                            domain
-                        ):
-                            await self._notify_quarantine_entry(product, domain, reason="block")
                 if self.deps.metrics is not None:
                     self.deps.metrics.price_check_total.labels(
                         scraper=scraper_name,
@@ -615,14 +605,9 @@ class ProductChecksMixin:
                             scraper=scraper_name, domain=domain, status="block"
                         ).inc()
                     if domain != "unknown":
-                        previous = self.deps.health_mgr.state(domain)
                         await handle_block_in_pipeline(
                             exc, health_mgr=self.deps.health_mgr, domain=domain
                         )
-                        if previous == QuarantineState.CLOSED and self.deps.health_mgr.is_locked(
-                            domain
-                        ):
-                            await self._notify_quarantine_entry(product, domain, reason=str(exc))
                     disabled = await self._record_failure_and_maybe_disable(
                         product,
                         scraper_name=scraper_name,

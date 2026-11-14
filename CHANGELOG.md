@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.13.1] - 2026-11-14
+
+### Added
+
+- A store that refuses the bot up to the last quarantine tier (T3) is announced once on Telegram to each user with active
+  products there, with the number of products not being updated, and once more when it answers again.
+
+### Removed
+
+- The "Site paused automatically" notice on the first quarantine tier: the first two tiers are silent.
+
 ## [1.13.0] - 2026-11-14
 
 ### Changed

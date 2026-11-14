@@ -432,3 +432,128 @@ def test_warning_rejects_counter_ordering_above_the_limit() -> None:
         ]
     )
     assert "checks failing (?/?)" in blocks[0][1]
+
+
+@pytest.mark.asyncio
+async def test_a_deferred_reopening_is_shown_as_a_previous_notice() -> None:
+    repo = AsyncMock()
+    repo.is_user_allowed.return_value = True
+    service = DigestService(repo=repo, bot=AsyncMock())
+    payload = await service._current_status_payload(
+        {
+            "kind": "operational",
+            "event": "quarantine_end",
+            "domain": "shop.example",
+        },
+        user_id=1,
+    )
+    assert payload is not None
+    assert payload["historical"] is True
+    _, blocks, _, unrenderable_ids = _digest_blocks(
+        [_entry(entry_id=1, product_id=None, payload=payload)]
+    )
+    assert blocks == [
+        (
+            1,
+            "⚠️ Operational notices\n"
+            "Previous notice for shop.example: use /lista for the current status.",
+        )
+    ]
+    assert unrenderable_ids == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("event", ["quarantine", "quarantine_end"])
+async def test_deferred_store_notices_are_retired_for_removed_users(event: str) -> None:
+    repo = AsyncMock()
+    repo.is_user_allowed.return_value = False
+    repo.list_pending_digest.return_value = [
+        _entry(
+            entry_id=1,
+            product_id=None,
+            payload={
+                "kind": "operational",
+                "event": event,
+                "domain": "shop.example",
+            },
+        )
+    ]
+    bot = AsyncMock()
+    service = DigestService(repo=repo, bot=bot)
+
+    assert await service.flush_user(user_id=42) == 0
+
+    bot.send_message.assert_not_awaited()
+    repo.mark_digest_flushed.assert_awaited_once_with([1])
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("event", ["quarantine", "quarantine_end"])
+async def test_removal_after_digest_normalization_prevents_delivery(
+    repo_mock: AsyncMock, telegram_mock: AsyncMock, event: str
+) -> None:
+    allowed = {42: True}
+    repo_mock.is_user_allowed.side_effect = lambda user_id: allowed[user_id]
+
+    async def get_user(user_id: int) -> None:
+        # The language read happens after normalization, right before rendering.
+        allowed[user_id] = False
+
+    repo_mock.get_user.side_effect = get_user
+    entry = _entry(
+        entry_id=1,
+        product_id=None,
+        payload={"kind": "operational", "event": event, "domain": "shop.example"},
+    )
+    repo_mock.list_pending_digest = AsyncMock(return_value=[entry])
+    repo_mock.mark_digest_flushed = AsyncMock()
+    service = DigestService(repo=repo_mock, bot=telegram_mock)
+
+    assert await service.flush_user(user_id=42) == 0
+
+    telegram_mock.send_message.assert_not_awaited()
+    repo_mock.mark_digest_flushed.assert_awaited_once_with([1])
+
+
+@pytest.mark.asyncio
+async def test_removal_between_digest_pages_stops_remaining_pages(
+    repo_mock: AsyncMock, telegram_mock: AsyncMock
+) -> None:
+    pending = {
+        entry_id: _entry(
+            entry_id=entry_id,
+            product_id=entry_id,
+            payload={
+                "product_name": "x" * 200,
+                "old_price": "120",
+                "new_price": "99",
+                "domain": "example" * 10,
+            },
+        )
+        for entry_id in range(1, 201)
+    }
+    allowed = {42: True}
+    repo_mock.is_user_allowed.side_effect = lambda user_id: allowed[user_id]
+
+    async def list_pending_digest(*, user_id: int) -> list[DigestEntry]:
+        return list(pending.values())
+
+    async def mark_digest_flushed(ids: list[int]) -> None:
+        for entry_id in ids:
+            pending.pop(entry_id, None)
+
+    async def send_message(**kwargs: object) -> None:
+        allowed[42] = False  # the user is removed while the first page is sent
+
+    repo_mock.list_pending_digest = AsyncMock(side_effect=list_pending_digest)
+    repo_mock.mark_digest_flushed = AsyncMock(side_effect=mark_digest_flushed)
+    telegram_mock.send_message = AsyncMock(side_effect=send_message)
+    service = DigestService(repo=repo_mock, bot=telegram_mock)
+
+    flushed = await service.flush_user(user_id=42)
+
+    assert telegram_mock.send_message.await_count == 1
+    first_page = repo_mock.mark_digest_flushed.await_args_list[0].args[0]
+    assert 0 < len(first_page) < 200
+    assert flushed == len(first_page)
+    assert pending == {}

@@ -14,7 +14,6 @@ import httpx
 
 from price_tracker.core.domain_spacing import retry_after_of, run_spaced
 from price_tracker.core.exceptions import BlockEvent, ListingGone, ParseError
-from price_tracker.core.health import QuarantineState
 from price_tracker.core.notices import NoticeCollector
 from price_tracker.core.scheduler_common import (
     CHECK_TICK_MINUTES,
@@ -73,9 +72,7 @@ class PeriodicRunsMixin:
             collector: NoticeCollector,
         ) -> str: ...
 
-        async def _notify_quarantine_entry(
-            self, product: ProductRecord, domain: str, *, reason: str
-        ) -> None: ...
+        async def _reconcile_store_notices(self) -> None: ...
 
         async def _record_failure_and_maybe_disable(
             self,
@@ -119,12 +116,7 @@ class PeriodicRunsMixin:
                     scraper=scraper_name, domain=domain, status="block"
                 ).inc()
             if domain != "unknown":
-                # Capture the pre-block state so we notify exactly once, on the
-                # CLOSED → LOCKED transition (no spam while a domain stays locked).
-                prev_state = self.deps.health_mgr.state(domain)
                 await handle_block_in_pipeline(e, health_mgr=self.deps.health_mgr, domain=domain)
-                if prev_state == QuarantineState.CLOSED and self.deps.health_mgr.is_locked(domain):
-                    await self._notify_quarantine_entry(product, domain, reason=str(e))
             await self._record_failure_and_maybe_disable(
                 product,
                 scraper_name=scraper_name,
@@ -456,3 +448,4 @@ class PeriodicRunsMixin:
         await self._run_sweep(batches)
         if not batches:
             await self._flush_guaranteed(NoticeCollector())
+        await self._reconcile_store_notices()

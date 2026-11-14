@@ -21,7 +21,7 @@ from hypothesis import strategies as st
 
 from price_tracker.core.alert import format_operational_notice
 from price_tracker.core.exceptions import ListingGone, ParseError
-from price_tracker.core.health import HealthManager
+from price_tracker.core.health import HealthManager, QuarantineState
 from price_tracker.core.notices import NoticeCollector, NoticeGroup, OperationalEvent
 from price_tracker.core.registry import ScraperRegistry
 from price_tracker.core.scheduler import Scheduler, SchedulerDeps, _failure_reason
@@ -2019,14 +2019,12 @@ class _CaptchaScraper(AbstractScraper):
 
 
 @pytest.mark.asyncio
-async def test_scheduler_notifies_once_on_quarantine_entry(
+async def test_scheduler_stays_silent_on_quarantine_entry(
     repo_with_product: tuple[Repository, int],
 ) -> None:
-    """A domain crossing into LOCKED (T1 threshold = 3 blocks) pushes exactly one
-    quarantine alert — on the CLOSED→LOCKED transition, not on every block."""
+    """A domain crossing into LOCKED_T1 (3 blocks) pushes nothing: only the last
+    tier is announced, by the reconciliation at the end of a periodic sweep."""
     repo, pid = repo_with_product
-    # The notice is written in the recipient's language.
-    await repo.set_user_language(1, "it")
     registry = ScraperRegistry()
     registry.register(_CaptchaScraper())
     notifier = AsyncMock()
@@ -2046,19 +2044,11 @@ async def test_scheduler_notifies_once_on_quarantine_entry(
         )
         product = await repo.get_product(pid)
         assert product is not None
-        await scheduler._scrape_one(product, collector=NoticeCollector())
-        assert notifier.await_count == 0  # block 1: still CLOSED
-        await scheduler._scrape_one(product, collector=NoticeCollector())
-        assert notifier.await_count == 0  # block 2: still CLOSED
-        await scheduler._scrape_one(product, collector=NoticeCollector())
-        assert notifier.await_count == 1  # block 3: CLOSED→LOCKED_T1 → notify once
-        await scheduler._scrape_one(product, collector=NoticeCollector())
-        assert notifier.await_count == 1  # still locked → no re-notify
+        for _block in range(4):
+            await scheduler._scrape_one(product, collector=NoticeCollector())
+        assert health_mgr.state("example.com") is QuarantineState.LOCKED_T1
 
-    assert notifier.await_args is not None
-    message = notifier.await_args.args[1]
-    assert "example.com" in message
-    assert "pausa automatica" in message.lower() or "quarantena" in message.lower()
+    notifier.assert_not_awaited()
 
     # last_error was persisted for /errori visibility (via the public projection).
     errored = await repo.list_products_with_errors(user_id=1)

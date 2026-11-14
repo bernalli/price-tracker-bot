@@ -272,9 +272,12 @@ class DigestService:
     ) -> dict[str, Any] | None:
         """Remove obsolete members using both the stored version and current state."""
         event = payload.get("event")
-        if event == "quarantine":
+        if event in {"quarantine", "quarantine_end"}:
             # Domain breaker state belongs to the scheduler. A deferred notice
-            # cannot promise that the quarantine is still current at delivery.
+            # cannot promise that the quarantine is still current at delivery,
+            # and a user removed since it was queued is not told at all.
+            if not await self._repo.is_user_allowed(user_id):
+                return None
             return {**payload, "historical": True}
         if event not in {"suspended", "unavailable", "restocked", "warning"}:
             return payload
@@ -418,6 +421,14 @@ class DigestService:
         flushed_count = 0
         unrenderable_pending = unrenderable_ids.copy()
         for text, page_ids in pages:
+            # A user removed while the digest was prepared, or between two pages,
+            # receives nothing more: the rows still pending are retired unsent.
+            if not await self._repo.is_user_allowed(user_id):
+                pending = await self._repo.list_pending_digest(user_id=user_id)
+                retired_ids = [entry.id for entry in pending if entry.id is not None]
+                if retired_ids:
+                    await self._repo.mark_digest_flushed(retired_ids)
+                return flushed_count
             await self._bot.send_message(chat_id=user_id, text=text, parse_mode="HTML")
             ids_to_flush = [*page_ids, *unrenderable_pending]
             for entry_id in unrenderable_pending:

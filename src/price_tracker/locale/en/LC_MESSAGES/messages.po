@@ -2854,3 +2854,23 @@ msgstr "Fewer store blocks"
 
 msgid "Steadier Amazon checks"
 msgstr "Steadier Amazon checks"
+
+msgid "{domain} is blocking the bot"
+msgstr "{domain} is blocking the bot"
+
+msgid "{n} product is not being updated."
+msgid_plural "{n} products are not being updated."
+msgstr[0] "{n} product is not being updated."
+msgstr[1] "{n} products are not being updated."
+
+msgid "I keep retrying by myself and will tell you when it answers again."
+msgstr "I keep retrying by myself and will tell you when it answers again."
+
+msgid "{domain} answers again"
+msgstr "{domain} answers again"
+
+msgid "Checks on this store have resumed."
+msgstr "Checks on this store have resumed."
+
+msgid "Notice when a store blocks"
+msgstr "Notice when a store blocks"

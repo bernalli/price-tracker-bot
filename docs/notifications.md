@@ -138,9 +138,21 @@ Besides price-drop alerts, the bot sends **operational notices**: automatic repo
 product's *tracking health* rather than its price — the listing was removed, the price could
 no longer be read, the site stopped answering, the site is blocking automated checks, or a
 site-wide quarantine. A pre-suspension warning fires at half the failure threshold, before the
-product is actually suspended. A site that blocks automated checks is reported by the site-wide
-quarantine notice alone: a block does not count toward the failure threshold, so it produces
-neither a pre-suspension warning nor a suspension.
+product is actually suspended. A block does not count toward the failure threshold, so it produces
+neither a pre-suspension warning nor a suspension. At the end of each
+periodic sweep, the bot reconciles store notices for active users
+with active products on that store. LOCKED_T3 and HALF_OPEN_T3 mean
+blocked; CLOSED means open; earlier tiers cause no notice.
+A blocked notice includes the user's number of active products.
+A reopening is announced only after an accepted blocked notice.
+Failed deliveries are retried on the next periodic sweep, even when
+no product is due. bot_config stores the last accepted notice under
+`store_notice:<user_id>:<domain>`. Acceptance includes digest enqueue.
+A store may change state during delivery; the next successful sweep
+reconciles the new state. Deferred notices describe a previous event,
+and inactive users are checked again before delivery. A restart
+preserves successfully recorded notice state. A delivery followed
+by a failed state write can be repeated.
 
 ### Aggregation
 

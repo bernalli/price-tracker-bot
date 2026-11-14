@@ -397,26 +397,35 @@ def format_error_notification(
     )
 
 
-def format_quarantine_notification(
-    *,
-    domain: str,
-    reason: str,
-    locked_until: datetime | None,
-) -> str:
-    """Notify the user that a domain entered anti-bot quarantine (one-shot).
+def format_store_blocked_notice(*, domain: str, products: int) -> str:
+    """Tell a user that ``domain`` keeps refusing the bot up to the last quarantine tier.
 
-    Sent on the CLOSED → LOCKED transition only, so the user learns a site has
-    started failing without being spammed on every individual check.
+    ``products`` is how many of the user's active products on that store are not
+    being updated. The text names no duration: the lockout length is the health
+    state machine's business.
     """
-    until = ""
-    if locked_until is not None:
-        until = "\n" + _("🔁 I will retry by myself after: {when} UTC").format(
-            when=f"{locked_until:%Y-%m-%d %H:%M}"
-        )
-    return _(
-        "🔒 <b>Site paused automatically</b>\n\n"
-        "<b>{domain}</b> failed too many checks ({reason}).\n"
-        "I am pausing the checks on this site for a while, so as not to push "
-        "against a block.{until}\n\n"
-        "Details with /errori."
-    ).format(domain=_escape_html(domain), reason=_("automated checks blocked"), until=until)
+    shown = _escape_html(truncate_visible(domain, DOMAIN_BUDGET))
+    lines = [
+        "🔒 <b>" + _("{domain} is blocking the bot").format(domain=shown) + "</b>",
+        "",
+        ngettext(
+            "{n} product is not being updated.",
+            "{n} products are not being updated.",
+            products,
+        ).format(n=products),
+        _("I keep retrying by myself and will tell you when it answers again."),
+        "",
+        _("Details with /errori."),
+    ]
+    return "\n".join(lines)
+
+
+def format_store_reopened_notice(*, domain: str) -> str:
+    """Tell a user that ``domain``, announced as blocking the bot, answers again."""
+    shown = _escape_html(truncate_visible(domain, DOMAIN_BUDGET))
+    lines = [
+        "🔓 <b>" + _("{domain} answers again").format(domain=shown) + "</b>",
+        "",
+        _("Checks on this store have resumed."),
+    ]
+    return "\n".join(lines)

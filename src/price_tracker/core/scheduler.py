@@ -30,9 +30,6 @@ from price_tracker.core.alert import crosses_threshold as crosses_threshold
 from price_tracker.core.alert import format_alert as format_alert
 from price_tracker.core.alert import format_back_in_stock as format_back_in_stock
 from price_tracker.core.alert import format_operational_notice as format_operational_notice
-from price_tracker.core.alert import (
-    format_quarantine_notification as format_quarantine_notification,
-)
 from price_tracker.core.alert import format_warning_notice as format_warning_notice
 from price_tracker.core.alert import operational_buttons as operational_buttons
 from price_tracker.core.exceptions import LISTING_GONE_STATUSES as LISTING_GONE_STATUSES
