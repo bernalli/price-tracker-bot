@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING, Final, Protocol
 
 import brotli  # type: ignore[import-untyped]
 import httpx
+import zstandard
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -184,6 +185,29 @@ class _BrotliDecoder:
         return bool(self._dec.is_finished())
 
 
+class _ZstdDecoder:
+    """Decode one native block at a time and require complete zstd frames."""
+
+    def __init__(self, request: httpx.Request) -> None:
+        self._ctx = zstandard.ZstdDecompressor(max_window_size=16 * 1024 * 1024)
+        self._dec = self._ctx.decompressobj()
+        self._request = request
+
+    def feed(self, data: bytes) -> Iterator[bytes]:
+        try:
+            for offset in range(len(data)):
+                if self._dec.eof:
+                    self._dec = self._ctx.decompressobj()
+                piece = self._dec.decompress(data[offset : offset + 1])
+                for start in range(0, len(piece), _DECODE_STEP):
+                    yield piece[start : start + _DECODE_STEP]
+        except zstandard.ZstdError as exc:
+            raise httpx.DecodingError(str(exc), request=self._request) from exc
+
+    def complete(self) -> bool:
+        return bool(self._dec.eof)
+
+
 def _decoder_for(content_encoding: str, request: httpx.Request) -> _StepDecoder:
     value = (content_encoding or "identity").strip().lower()
     if value in ("", "identity"):
@@ -194,6 +218,8 @@ def _decoder_for(content_encoding: str, request: httpx.Request) -> _StepDecoder:
         return _DeflateDecoder(request)
     if value == "br":
         return _BrotliDecoder(request)
+    if value == "zstd":
+        return _ZstdDecoder(request)
     raise httpx.DecodingError(f"unsupported content-encoding {value!r}", request=request)
 
 

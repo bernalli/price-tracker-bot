@@ -30,6 +30,7 @@ import httpx
 import pytest
 import pytest_asyncio
 import respx
+import zstandard
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
@@ -461,12 +462,14 @@ async def test_reading_stops_at_the_cap(client):
     assert page.truncated is True
 
 
-@pytest.mark.parametrize("encoding", ["deflate", "br"])
+@pytest.mark.parametrize("encoding", ["deflate", "br", "zstd"])
 async def test_compressed_bomb_never_inflates_beyond_the_step(client, encoding):
     n = 8 * 1024 * 1024
     raw_zeros = b"\x00" * n
     if encoding == "deflate":
         compressed = zlib.compress(raw_zeros, 9)
+    elif encoding == "zstd":
+        compressed = zstandard.ZstdCompressor().compress(raw_zeros)
     else:
         compressed = brotli.compress(raw_zeros, quality=5)
     url = f"https://f.example/p/bomb-{encoding}"
@@ -514,12 +517,14 @@ async def test_wire_cap_stops_a_stream_that_produces_no_output(client):
     assert counter["calls"] <= 6
 
 
-@pytest.mark.parametrize("encoding", ["zstd", "gzip, br"])
+@pytest.mark.parametrize("encoding", ["unknown", "gzip, br"])
 async def test_unknown_or_multiple_content_encoding_is_a_decoding_error(client, encoding):
     url = "https://f.example/p/badenc"
-    # A body that is valid for the declared encodings (gzip applied first, then
-    # br), so a reader that decodes stacked encodings would return a page here.
-    payload = b"data" if encoding == "zstd" else brotli.compress(gzip.compress(b"data"))
+    # A single zstd is supported now, so the unknown case names an encoding that
+    # no decoder handles. The stacked case carries a body that is valid for the
+    # declared encodings (gzip applied first, then br), so a reader that decodes
+    # stacked encodings would return a page here.
+    payload = b"data" if encoding == "unknown" else brotli.compress(gzip.compress(b"data"))
 
     # An async generator, not raw bytes: httpx.Response(content=bytes) builds a
     # ByteStream and eagerly self-decodes it at construction time, which would
@@ -971,6 +976,8 @@ def test_fetch_has_documented_callers_only():
             "zalando",
         )
     }
+    # The Chrome store wire reuses _read_capped to decode its wire bytes.
+    allowed_callers.add(SRC_ROOT / "core" / "store_wire.py")
     pattern = re.compile(
         r"price_tracker\.core\.fetch\b"
         r"|from\s+price_tracker\.core\s+import\s+[^\n]*\bfetch\b"
@@ -1210,14 +1217,16 @@ async def test_rejected_encoding_still_closes_the_response(client, monkeypatch):
         return response
 
     monkeypatch.setattr(client, "send", recording_send)
-    url = "https://f.example/p/zstd"
+    url = "https://f.example/p/unknown"
 
     async def body() -> AsyncIterator[bytes]:
         yield b"data"
 
     with respx.mock(assert_all_called=False) as router:
         router.get(url).mock(
-            return_value=httpx.Response(200, content=body(), headers={"content-encoding": "zstd"})
+            return_value=httpx.Response(
+                200, content=body(), headers={"content-encoding": "unknown"}
+            )
         )
         with pytest.raises(httpx.DecodingError):
             await fetch_page(url, client)
@@ -1298,10 +1307,15 @@ async def test_fallback_final_url_with_other_scheme_or_unusable_is_refused(clien
             await fetch_page(url, client, fallbacks=(fb,))
 
 
-@pytest.mark.parametrize("encoding", ["gzip", "deflate", "br"])
+@pytest.mark.parametrize("encoding", ["gzip", "deflate", "br", "zstd"])
 async def test_truncated_compressed_body_is_a_decoding_error(client, encoding):
     page_bytes = b"<html>" + b"price 9.99 " * 3000 + b"</html>"
-    compressors = {"gzip": gzip.compress, "deflate": zlib.compress, "br": brotli.compress}
+    compressors = {
+        "gzip": gzip.compress,
+        "deflate": zlib.compress,
+        "br": brotli.compress,
+        "zstd": zstandard.ZstdCompressor().compress,
+    }
     compressed = compressors[encoding](page_bytes)
     url = f"https://f.example/p/cut-{encoding}"
     decoder = fetch._decoder_for(encoding, httpx.Request("GET", url))
@@ -1331,3 +1345,58 @@ async def test_truncated_compressed_body_is_a_decoding_error(client, encoding):
         router.get(url).mock(return_value=response(b""))
         empty = await fetch_page(url, client)
     assert empty.text == ""
+    if encoding == "zstd":
+        await _check_zstd_variants(client, url, page_bytes, compressed)
+
+
+def _zstd_pieces(compressed: bytes, request: httpx.Request, *, step: int) -> list[bytes]:
+    """Feed ``compressed`` in parts of ``step`` bytes; return every emitted piece."""
+    decoder = fetch._decoder_for("zstd", request)
+    pieces: list[bytes] = []
+    for start in range(0, len(compressed), step):
+        pieces.extend(decoder.feed(compressed[start : start + step]))
+    assert decoder.complete() is True
+    return pieces
+
+
+async def _check_zstd_variants(
+    client: httpx.AsyncClient, url: str, page_bytes: bytes, compressed: bytes
+) -> None:
+    request = httpx.Request("GET", url)
+    # One-byte parts and a single part decode to the same page, in bounded pieces.
+    for step in (1, len(compressed)):
+        pieces = _zstd_pieces(compressed, request, step=step)
+        assert b"".join(pieces) == page_bytes
+        assert all(len(piece) <= fetch._DECODE_STEP for piece in pieces)
+
+    def response(raw: bytes) -> httpx.Response:
+        async def body() -> AsyncIterator[bytes]:
+            for start in range(0, len(raw), 997):
+                yield raw[start : start + 997]
+
+        return httpx.Response(200, content=body(), headers={"content-encoding": "zstd"})
+
+    second = zstandard.ZstdCompressor().compress(b"<p>second frame</p>")
+    with_checksum = bytearray(zstandard.ZstdCompressor(write_checksum=True).compress(page_bytes))
+    with_checksum[-1] ^= 0xFF
+    no_size = zstandard.ZstdCompressor(write_content_size=False).compress(page_bytes)
+    assert no_size[4] == 0x00  # frame header: no content size, no checksum, windowed
+    # The same frame, declaring a 32 MiB window: above the 16 MiB the reader allows.
+    wide_window = no_size[:5] + bytes([0x78]) + no_size[6:]
+
+    cases: list[tuple[bytes, bytes | None]] = [
+        (compressed + second, page_bytes + b"<p>second frame</p>"),
+        (compressed + second[: len(second) // 2], None),
+        (bytes(with_checksum), None),
+        (no_size, page_bytes),
+        (wide_window, None),
+    ]
+    for raw, expected in cases:
+        with respx.mock(assert_all_called=False) as router:
+            router.get(url).mock(return_value=response(raw))
+            if expected is None:
+                with pytest.raises(httpx.DecodingError):
+                    await fetch_page(url, client)
+            else:
+                page = await fetch_page(url, client)
+                assert page.text == expected.decode()
