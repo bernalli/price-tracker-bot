@@ -326,3 +326,113 @@ async def test_errori_command_no_errors() -> None:
     update.message.reply_text.assert_awaited_once()
     assert "Nessun errore" in update.message.reply_text.call_args.args[0]
     update.message.reply_html.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("exc_kind", ["block", "gone"])
+async def test_debug_url_reports_scraper_block_or_gone_without_crashing(exc_kind: str) -> None:
+    """A scraper raising BlockEvent or ListingGone during /debug must be reported, not crash."""
+    from unittest.mock import patch  # noqa: PLC0415
+
+    from price_tracker.bot.handlers.debug import debug_url  # noqa: PLC0415
+    from price_tracker.core.exceptions import HTTPBlockStatus, ListingGone  # noqa: PLC0415
+
+    exc: Exception = (
+        HTTPBlockStatus(status=429, url="https://shop.example/p/1")
+        if exc_kind == "block"
+        else ListingGone(status=404, url="https://shop.example/p/1")
+    )
+    scraper = SimpleNamespace(scrape=AsyncMock(side_effect=exc))
+    registry = SimpleNamespace(resolve=lambda _url: scraper)
+    placeholder = MagicMock()
+    placeholder.edit_text = AsyncMock()
+    update = MagicMock()
+    update.message.reply_text = AsyncMock(return_value=placeholder)
+    context = MagicMock()
+    context.bot_data = {"scraper": registry, "http_client": MagicMock()}
+
+    response = SimpleNamespace(status_code=200, text="<html><title>Shop</title></html>")
+    fresh = MagicMock()
+    fresh.__aenter__ = AsyncMock(return_value=MagicMock())
+    fresh.__aexit__ = AsyncMock(return_value=False)
+
+    with (
+        patch("price_tracker.bot.handlers.debug.public_request", AsyncMock(return_value=response)),
+        patch("price_tracker.bot.handlers.debug.build_store_client", return_value=fresh),
+    ):
+        await debug_url(update, context, "https://shop.example/p/1")
+
+    placeholder.edit_text.assert_awaited_once()
+    rendered = str(placeholder.edit_text.await_args.args[0])
+    expected_code = "429" if exc_kind == "block" else "404"
+    assert expected_code in rendered
+
+
+@pytest.mark.asyncio
+async def test_status_admin_and_menu_info_survive_malformed_saved_interval() -> None:
+    """A non-numeric check_interval_minutes in bot_config must not crash status or menus."""
+    from price_tracker.bot.callbacks import Action, encode  # noqa: PLC0415
+    from price_tracker.bot.handlers.callbacks._admin import handle_admin_menu  # noqa: PLC0415
+    from price_tracker.bot.handlers.callbacks._menu import _handle_menu_info  # noqa: PLC0415
+    from price_tracker.bot.handlers.debug import cmd_status  # noqa: PLC0415
+    from price_tracker.config import Config  # noqa: PLC0415
+    from price_tracker.db.models import UserRecord  # noqa: PLC0415
+
+    cfg = Config(
+        telegram_bot_token="x",  # noqa: S106
+        admin_users=(),
+        check_interval_minutes=360,
+        database_path=":memory:",
+        default_threshold_type="percentage",
+        default_threshold_value="10",
+        max_consecutive_errors=10,
+        check_delay_seconds=0.0,
+        notification_cooldown_hours=24,
+        request_timeout=30,
+        log_level="INFO",
+        lang="en",
+    )
+    db = MagicMock()
+    db.is_user_allowed = AsyncMock(return_value=True)
+    db.is_user_admin = AsyncMock(return_value=True)
+    db.update_user_info = AsyncMock()
+    db.set_user_telegram_tag = AsyncMock()
+    db.get_user = AsyncMock(
+        return_value=UserRecord(
+            user_id=2,
+            is_admin=False,
+            is_active=True,
+            display_name=None,
+            username=None,
+        )
+    )
+    db.list_active_users = AsyncMock(return_value=[])
+    db.get_stats = AsyncMock(
+        return_value={"active_products": 1, "total_products": 1, "total_checks": 1}
+    )
+    db.get_config = AsyncMock(return_value="not-a-number")
+
+    context = MagicMock()
+    context.bot_data = {"db": db, "config": cfg}
+    context.user_data = {}
+
+    update = MagicMock()
+    update.effective_user.id = 1
+    update.effective_user.language_code = "en"
+    update.message.reply_text = AsyncMock()
+    await cmd_status(update, context)
+    assert "6h" in update.message.reply_text.await_args.args[0]
+
+    query = MagicMock()
+    query.edit_message_text = AsyncMock()
+    assert await handle_admin_menu(query, context, db, 1, encode(Action("admin"))) is True
+    assert "360" in query.edit_message_text.await_args.args[0]
+
+    nick_cb = encode(Action("admin.nick_id", (2,)))
+    assert await handle_admin_menu(query, context, db, 1, nick_cb) is True
+    nick_rendered = query.edit_message_text.await_args.args[0]
+    assert "None" not in nick_rendered
+    assert "N/A" in nick_rendered
+
+    await _handle_menu_info(query, context, db, 1)
+    assert "6h" in query.edit_message_text.await_args.args[0]

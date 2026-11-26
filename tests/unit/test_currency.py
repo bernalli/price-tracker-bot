@@ -231,3 +231,64 @@ async def test_get_rates_parse_failure_emits_fallback_only_not_error(
     assert _count_currency_label(reg, "fallback") == 1.0
     assert _count_currency_label(reg, "error") == 0.0
     assert _count_currency_label(reg, "miss") == 1.0
+
+
+@pytest.mark.asyncio
+async def test_get_rates_retries_and_emits_error_on_real_network_failure() -> None:
+    """Real httpx network failures must trigger tenacity retry and emit result='error'."""
+    from prometheus_client import CollectorRegistry  # noqa: PLC0415
+
+    from price_tracker.observability.metrics import MetricsRegistry  # noqa: PLC0415
+
+    reg = CollectorRegistry()
+    metrics = MetricsRegistry(registry=reg)
+    db = _StubDB()
+
+    with respx.mock(assert_all_called=True) as router:
+        route = router.get(API_URL).mock(side_effect=httpx.ConnectError("offline"))
+        async with httpx.AsyncClient() as client:
+            result = await get_rates(db, client, metrics=metrics)
+
+    assert route.call_count == 2
+    assert "USD" in result
+    assert _count_currency_label(reg, "error") == 1.0
+    assert _count_currency_label(reg, "fallback") == 0.0
+    assert _count_currency_label(reg, "miss") == 1.0
+
+
+@pytest.mark.asyncio
+async def test_get_rates_survives_malformed_decimal_and_naive_timestamp_in_cache() -> None:
+    """Corrupt cached Decimal falls back to fresh fetch without a hit; naive UTC ts hits cache."""
+    from prometheus_client import CollectorRegistry  # noqa: PLC0415
+
+    from price_tracker.observability.metrics import MetricsRegistry  # noqa: PLC0415
+
+    bad_decimal = json.dumps(
+        {"rates": {"USD": "not-a-decimal"}, "fetched_at": datetime.now(UTC).isoformat()}
+    )
+    reg_bad = CollectorRegistry()
+    db_bad = _StubDB({CACHE_KEY: bad_decimal})
+    with respx.mock(assert_all_called=True) as router:
+        route = router.get(API_URL).respond(200, json={"rates": {"USD": 1.12}})
+        async with httpx.AsyncClient() as client:
+            result_bad = await get_rates(db_bad, client, metrics=MetricsRegistry(registry=reg_bad))
+    assert route.call_count == 1
+    assert result_bad["USD"] == Decimal("1.12")
+    assert _count_currency_label(reg_bad, "hit") == 0.0
+    assert _count_currency_label(reg_bad, "miss") == 1.0
+
+    naive_ts = json.dumps(
+        {"rates": {"USD": "1.09"}, "fetched_at": datetime.now(UTC).replace(tzinfo=None).isoformat()}
+    )
+    reg_naive = CollectorRegistry()
+    db_naive = _StubDB({CACHE_KEY: naive_ts})
+    with respx.mock(assert_all_called=False) as router:
+        route = router.get(API_URL).respond(200, json={"rates": {"USD": 1.12}})
+        async with httpx.AsyncClient() as client:
+            result_naive = await get_rates(
+                db_naive, client, metrics=MetricsRegistry(registry=reg_naive)
+            )
+    assert route.call_count == 0
+    assert result_naive["USD"] == Decimal("1.09")
+    assert _count_currency_label(reg_naive, "hit") == 1.0
+    assert _count_currency_label(reg_naive, "miss") == 0.0

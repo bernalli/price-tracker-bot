@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.13.2] - 2026-11-26
+
+### Fixed
+
+- Currency rate lookups retry transient HTTP failures and record `result="error"` metrics when retries fail. Cached rates validate decimal values before recording a cache hit and normalize naive timestamps to UTC.
+- Digest-mode alerts route to the digest queue before throttle checks so queued items do not spend immediate-send quota. Concurrent alerts for the same user serialize under a per-recipient lock so the last throttle slot cannot be overspent.
+- Throttle timestamps persist through a single-column SQL upsert, and notification preference commands update only their changed columns so concurrent mute, timezone, quiet-hours, digest, and throttle updates do not overwrite each other.
+- Fallback dictionary alerts escape HTML in product names and domains. The in-process alert deduplication cache is bounded to 4,096 entries.
+- `/debug` reports store blocks, removed listings, and scraper errors instead of raising unhandled exceptions. `/mute` rejects overflowing hour counts cleanly. `/status`, admin menus, `/setinterval`, and `/refresh` read the persisted global interval with fallback handling, and unset nicknames display `N/A` instead of `None`.
+- Scraper health updates persist to SQLite before mutating in-memory state.
+- The Prometheus `/metrics` endpoint refreshes `bot_uptime_seconds` on each scrape, startup seeds `products_tracked_total` from the database, and shutdown closes the shared HTTP client.
+- Fetch responses run block detection once instead of twice on terminal responses.
+
 ## [1.13.1] - 2026-11-14
 
 ### Added

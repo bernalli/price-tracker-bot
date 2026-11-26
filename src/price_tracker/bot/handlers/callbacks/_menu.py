@@ -29,6 +29,7 @@ from price_tracker.bot.keyboards import menu_back_button
 from price_tracker.bot.messages import _
 from price_tracker.bot.ui.panels import home_screen
 from price_tracker.bot.ui.product_rows import record_row
+from price_tracker.core.scheduler_common import configured_interval_minutes
 from price_tracker.core.textlimits import split_message
 
 if TYPE_CHECKING:
@@ -374,7 +375,7 @@ async def _handle_menu_info(
     stats = await db.get_stats(user_id)
     is_admin = await db.is_user_admin(user_id)
     saved = await db.get_config("check_interval_minutes")
-    interval = int(saved) if saved else config.check_interval_minutes
+    interval = configured_interval_minutes(saved, configured=config.check_interval_minutes)
     int_str = f"{interval // 60}h" if interval >= 60 and interval % 60 == 0 else f"{interval}min"
     text = _(
         "ℹ️ <b>Statistics</b>\n\n"

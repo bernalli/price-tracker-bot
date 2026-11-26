@@ -39,6 +39,7 @@ from price_tracker.bot.handlers._helpers import (
 from price_tracker.bot.messages import _, current_locale
 from price_tracker.bot.ui.product_rows import record_row
 from price_tracker.bot.ui.width import truncate_to_width
+from price_tracker.core.scheduler_common import configured_interval_minutes
 from price_tracker.core.textlimits import fit_html, split_message
 from price_tracker.i18n.format import duration, money
 
@@ -141,10 +142,14 @@ async def cmd_refresh(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if minutes <= 0:
         await db.set_product_interval(product_id, None)
         config = _config(context)
+        saved = await db.get_config("check_interval_minutes")
+        global_interval = configured_interval_minutes(
+            saved, configured=config.check_interval_minutes
+        )
         name_safe = _escape_html(truncate_to_width(product.get("name") or _("Unknown"), 80))
         await update.message.reply_text(
             _("⏱ Interval reset to global (every {min} min)\n📦 #{pid} — {name}").format(
-                min=config.check_interval_minutes, pid=product_id, name=name_safe
+                min=global_interval, pid=product_id, name=name_safe
             ),
             parse_mode=ParseMode.HTML,
         )

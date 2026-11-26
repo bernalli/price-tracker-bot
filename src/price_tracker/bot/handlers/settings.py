@@ -8,7 +8,6 @@ Also includes the per-user notification preference commands
 
 from __future__ import annotations
 
-import dataclasses
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 from zoneinfo import available_timezones
@@ -19,7 +18,7 @@ from telegram.ext import Application, CommandHandler
 from price_tracker.bot.decorators import _config, _db, admin_only, restricted, with_locale
 from price_tracker.bot.handlers._helpers import _parse_id
 from price_tracker.bot.messages import _, ngettext
-from price_tracker.db.models import NotificationPrefs
+from price_tracker.core.scheduler_common import configured_interval_minutes
 from price_tracker.notifier.preferences import clear_mute, update_prefs
 
 if TYPE_CHECKING:
@@ -38,12 +37,15 @@ async def cmd_set_interval(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     """Set the global price-check interval (admin)."""
     if not context.args:
         config = _config(context)
+        db = context.bot_data.get("db")
+        saved = await db.get_config("check_interval_minutes") if db is not None else None
+        interval = configured_interval_minutes(saved, configured=config.check_interval_minutes)
         await update.message.reply_text(
             _(
                 "⏱ Current interval: <b>every {minutes} minutes</b>\n\n"
                 "Usage: /setinterval &lt;minutes&gt;\n"
                 "Example: <code>/setinterval 120</code> for every 2 hours"
-            ).format(minutes=config.check_interval_minutes),
+            ).format(minutes=interval),
             parse_mode=ParseMode.HTML,
         )
         return
@@ -128,7 +130,13 @@ async def mute_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                 "Duration must be a positive number of hours or 'forever'"
             )
             return
-        mute_until = datetime.now(UTC) + timedelta(hours=hours)
+        try:
+            mute_until = datetime.now(UTC) + timedelta(hours=hours)
+        except OverflowError:
+            await update.message.reply_text(
+                "Duration is too large; enter a smaller number of hours or 'forever'"
+            )
+            return
 
     await update_prefs(repo, update.effective_user.id, product_id, mute=True, mute_until=mute_until)
     scope = "all products" if product_id is None else f"product {product_id}"
@@ -179,17 +187,7 @@ async def digest_mode_command(update: Update, context: ContextTypes.DEFAULT_TYPE
             return
 
     user_id = update.effective_user.id
-    existing = await repo.get_notification_prefs(user_id=user_id, product_id=None)
-    if existing is not None:
-        prefs = dataclasses.replace(existing, digest_mode=enabled, digest_interval_minutes=interval)
-    else:
-        prefs = NotificationPrefs(
-            user_id=user_id,
-            product_id=None,
-            digest_mode=enabled,
-            digest_interval_minutes=interval,
-        )
-    await repo.upsert_notification_prefs(prefs)
+    await update_prefs(repo, user_id, None, digest_mode=enabled, digest_interval_minutes=interval)
     suffix = f" (interval {interval}m)" if enabled else ""
     await update.message.reply_text(f"Digest mode {'on' if enabled else 'off'}{suffix}.")
 
@@ -204,19 +202,9 @@ async def quiet_hours_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text("Usage: /quiet_hours HH:MM-HH:MM | off")
         return
     user_id = update.effective_user.id
-    existing = await repo.get_notification_prefs(user_id=user_id, product_id=None)
 
     if args[0] == "off":
-        if existing is not None:
-            prefs = dataclasses.replace(existing, quiet_hours_start=None, quiet_hours_end=None)
-        else:
-            prefs = NotificationPrefs(
-                user_id=user_id,
-                product_id=None,
-                quiet_hours_start=None,
-                quiet_hours_end=None,
-            )
-        await repo.upsert_notification_prefs(prefs)
+        await update_prefs(repo, user_id, None, quiet_hours_start=None, quiet_hours_end=None)
         await update.message.reply_text("Quiet hours disabled.")
         return
 
@@ -231,16 +219,7 @@ async def quiet_hours_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     if start == end:
         await update.message.reply_text("Quiet hours start and end cannot be the same time")
         return
-    if existing is not None:
-        prefs = dataclasses.replace(existing, quiet_hours_start=start, quiet_hours_end=end)
-    else:
-        prefs = NotificationPrefs(
-            user_id=user_id,
-            product_id=None,
-            quiet_hours_start=start,
-            quiet_hours_end=end,
-        )
-    await repo.upsert_notification_prefs(prefs)
+    await update_prefs(repo, user_id, None, quiet_hours_start=start, quiet_hours_end=end)
     await update.message.reply_text(f"Quiet hours set to {start}-{end}.")
 
 
@@ -258,12 +237,7 @@ async def timezone_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await update.message.reply_text(f"Unknown timezone: {tz}")
         return
     user_id = update.effective_user.id
-    existing = await repo.get_notification_prefs(user_id=user_id, product_id=None)
-    if existing is not None:
-        prefs = dataclasses.replace(existing, timezone=tz)
-    else:
-        prefs = NotificationPrefs(user_id=user_id, product_id=None, timezone=tz)
-    await repo.upsert_notification_prefs(prefs)
+    await update_prefs(repo, user_id, None, timezone=tz)
     await update.message.reply_text(f"Timezone set to {tz}.")
 
 
@@ -277,12 +251,8 @@ async def throttle_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await update.message.reply_text("Usage: /throttle <N> | off")
         return
     user_id = update.effective_user.id
-    existing = await repo.get_notification_prefs(user_id=user_id, product_id=None)
     if args[0] == "off":
-        if existing is not None:
-            prefs = dataclasses.replace(existing, throttle_per_hour=None)
-        else:
-            prefs = NotificationPrefs(user_id=user_id, product_id=None, throttle_per_hour=None)
+        limit: int | None = None
     else:
         try:
             limit = int(args[0])
@@ -292,11 +262,7 @@ async def throttle_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         if limit <= 0:
             await update.message.reply_text("N must be > 0")
             return
-        if existing is not None:
-            prefs = dataclasses.replace(existing, throttle_per_hour=limit)
-        else:
-            prefs = NotificationPrefs(user_id=user_id, product_id=None, throttle_per_hour=limit)
-    await repo.upsert_notification_prefs(prefs)
+    await update_prefs(repo, user_id, None, throttle_per_hour=limit)
     await update.message.reply_text("Throttle updated.")
 
 

@@ -49,3 +49,46 @@ async def test_set_interval_persists_without_crashing() -> None:
 
     db.set_config.assert_awaited_once_with("check_interval_minutes", "120")
     job_queue.run_repeating.assert_not_called()
+
+
+async def test_set_interval_no_args_reads_persisted_global_interval() -> None:
+    db = AsyncMock()
+    db.is_user_admin = AsyncMock(return_value=True)
+    db.is_user_allowed = AsyncMock(return_value=True)
+    db.get_user = AsyncMock(return_value=None)
+    db.get_config = AsyncMock(return_value="180")
+    update = MagicMock()
+    update.effective_user.id = 1
+    update.effective_user.language_code = "en"
+    update.message.reply_text = AsyncMock()
+    context = MagicMock()
+    context.args = []
+    context.bot_data = {"db": db, "config": _make_config()}
+
+    await cmd_set_interval(update, context)
+
+    assert "180" in update.message.reply_text.await_args.args[0]
+
+
+async def test_refresh_reset_to_global_reports_persisted_global_interval() -> None:
+    from price_tracker.bot.handlers.monitoring import cmd_refresh  # noqa: PLC0415
+
+    db = AsyncMock()
+    db.is_user_allowed = AsyncMock(return_value=True)
+    db.is_user_admin = AsyncMock(return_value=False)
+    db.update_user_info = AsyncMock()
+    db.get_user = AsyncMock(return_value=None)
+    db.get_product_for_user = AsyncMock(return_value={"id": 1, "user_id": 1, "name": "Kettle"})
+    db.set_product_interval = AsyncMock()
+    db.get_config = AsyncMock(return_value="120")
+    update = MagicMock()
+    update.effective_user.id = 1
+    update.effective_user.language_code = "en"
+    update.message.reply_text = AsyncMock()
+    context = MagicMock()
+    context.args = ["1", "0"]
+    context.bot_data = {"db": db, "config": _make_config()}
+
+    await cmd_refresh(update, context)
+
+    assert "120" in update.message.reply_text.await_args.args[0]

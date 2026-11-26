@@ -21,6 +21,7 @@ from price_tracker.bot.handlers._helpers import _escape_html, _parse_id
 from price_tracker.bot.handlers.callbacks._legacy import resolve_callback
 from price_tracker.bot.keyboards import menu_back_button
 from price_tracker.bot.messages import _
+from price_tracker.core.scheduler_common import configured_interval_minutes
 
 if TYPE_CHECKING:
     from telegram.ext import ContextTypes
@@ -56,7 +57,7 @@ async def handle_admin_menu(
         users = await db.list_active_users()
         config = _config(context)
         saved = await db.get_config("check_interval_minutes")
-        interval = int(saved) if saved else config.check_interval_minutes
+        interval = configured_interval_minutes(saved, configured=config.check_interval_minutes)
         rows = [
             [InlineKeyboardButton(_("👥 User list"), callback_data=encode(Action("admin.users")))],
             [
@@ -226,7 +227,7 @@ async def handle_admin_menu(
             return True
         context.user_data["pending_action"] = ("admin_nick", target_id)
         u = await db.get_user(target_id)
-        current_name = u.get("display_name", _("N/A")) if u else _("N/A")
+        current_name = (u.get("display_name") or _("N/A")) if u else _("N/A")
         await query.edit_message_text(
             _(
                 "✏️ <b>Nickname for {user_id}</b>\nCurrent: {current}\n\nEnter the new nickname:"

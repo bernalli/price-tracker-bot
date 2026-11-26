@@ -199,3 +199,130 @@ async def test_explicit_post_init_after_initialize_wires_scheduler(
             await http_client.aclose()
         await application.shutdown()
         await db_conn.close()
+
+
+@pytest.mark.asyncio
+async def test_post_init_seeds_products_tracked_gauge(fake_config: Config) -> None:
+    """Startup must seed products_tracked from the DB instead of leaving the gauge at 0."""
+    from decimal import Decimal  # noqa: PLC0415
+
+    from prometheus_client import CollectorRegistry  # noqa: PLC0415
+
+    from price_tracker.db.migrator import apply_migrations  # noqa: PLC0415
+    from price_tracker.db.repository import Repository  # noqa: PLC0415
+    from price_tracker.main import MIGRATIONS_DIR  # noqa: PLC0415
+    from price_tracker.observability.metrics import MetricsRegistry  # noqa: PLC0415
+
+    db_conn = await aiosqlite.connect(":memory:")
+    db_conn.row_factory = aiosqlite.Row
+    await apply_migrations(db_conn, MIGRATIONS_DIR)
+    seed_repo = Repository(db_conn)
+    await seed_repo.ensure_user(1, is_admin=True)
+    await seed_repo.add_product(
+        user_id=1,
+        url="https://shop.example/a",
+        name="A",
+        domain="shop.example",
+        initial_price=Decimal("10"),
+        currency="EUR",
+    )
+    paused_id = await seed_repo.add_product(
+        user_id=1,
+        url="https://shop.example/b",
+        name="B",
+        domain="shop.example",
+        initial_price=Decimal("20"),
+        currency="EUR",
+    )
+    await seed_repo.pause_product(paused_id)
+
+    reg = CollectorRegistry()
+    metrics = MetricsRegistry(registry=reg)
+    application = (
+        Application.builder()
+        .token(fake_config.telegram_bot_token)
+        .post_init(_combined_post_init)
+        .build()
+    )
+    application.bot_data["config"] = fake_config
+    application.bot_data["db_conn"] = db_conn
+    application.bot_data["metrics"] = metrics
+    registry = ScraperRegistry()
+    discover_builtin_scrapers(registry)
+    application.bot_data["registry"] = registry
+
+    try:
+        await _combined_post_init(application)
+        assert application.bot_data["products_tracked"] == 1
+        assert reg.get_sample_value("price_tracker_products_tracked_total") == 1.0
+    finally:
+        http_client = application.bot_data.get("http_client")
+        if http_client is not None:
+            await http_client.aclose()
+        await db_conn.close()
+
+
+@pytest.mark.asyncio
+async def test_amain_closes_http_client_on_shutdown(
+    fake_config: Config, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Shutdown must close the store HTTP client created in post_init."""
+    import asyncio  # noqa: PLC0415
+    from typing import Any  # noqa: PLC0415
+    from unittest.mock import AsyncMock  # noqa: PLC0415
+
+    from prometheus_client import CollectorRegistry  # noqa: PLC0415
+
+    from price_tracker import main as main_mod  # noqa: PLC0415
+    from price_tracker.core.http_client import build_store_client  # noqa: PLC0415
+    from price_tracker.observability.metrics import MetricsRegistry  # noqa: PLC0415
+
+    close_spy = AsyncMock()
+
+    def _spied_build(*, timeout: float = 30.0) -> object:
+        client = build_store_client(timeout=timeout)
+        real_close = client.aclose
+
+        async def _close() -> None:
+            await close_spy()
+            await real_close()
+
+        client.aclose = _close  # type: ignore[method-assign]
+        return client
+
+    async def _noop(self: object, *args: object, **kwargs: object) -> None:  # noqa: ARG001
+        return None
+
+    async def _fake_start(self: Any) -> None:
+        self._running = True
+
+    async def _fake_stop(self: Any) -> None:
+        self._running = False
+
+    async def _noop_fn(*args: object, **kwargs: object) -> None:  # noqa: ARG001
+        return None
+
+    async def _cancel_wait(self: object) -> None:  # noqa: ARG001
+        await asyncio.sleep(0)
+        raise asyncio.CancelledError
+
+    monkeypatch.setattr(Config, "from_env", classmethod(lambda cls: fake_config))
+    monkeypatch.setattr(main_mod, "configure_logging", lambda *, level: None)
+    monkeypatch.setattr(
+        main_mod, "MetricsRegistry", lambda: MetricsRegistry(registry=CollectorRegistry())
+    )
+    monkeypatch.setattr(main_mod, "build_store_client", _spied_build)
+    monkeypatch.setattr(main_mod, "sync_command_menus", _noop_fn)
+    monkeypatch.setattr(main_mod, "announce_release", _noop_fn)
+    monkeypatch.setattr(Application, "initialize", _noop)
+    monkeypatch.setattr(Application, "start", _fake_start)
+    monkeypatch.setattr(Application, "stop", _fake_stop)
+    monkeypatch.setattr(Application, "shutdown", _noop)
+    monkeypatch.setattr(Updater, "start_polling", _noop)
+    monkeypatch.setattr(Updater, "stop", _noop)
+    monkeypatch.setattr(asyncio.Event, "wait", _cancel_wait)
+
+    with pytest.raises(asyncio.CancelledError):
+        await main_mod.amain()
+
+    close_spy.assert_awaited_once()

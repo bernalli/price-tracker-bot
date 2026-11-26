@@ -14,10 +14,13 @@ The notifier supports two dispatch paths:
 
 from __future__ import annotations
 
-import dataclasses
+import asyncio
+import html
 import logging
+from collections import OrderedDict
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Final, cast
+from weakref import WeakValueDictionary
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
@@ -25,7 +28,6 @@ from telegram.constants import ParseMode
 from price_tracker.bot.callbacks import encode
 from price_tracker.bot.handlers.callbacks._legacy import resolve_callback
 from price_tracker.core.textlimits import split_message
-from price_tracker.db.models import NotificationPrefs
 from price_tracker.notifier.preferences import (
     ThrottleWindow,
     is_muted_now,
@@ -40,6 +42,7 @@ if TYPE_CHECKING:
     from price_tracker.observability.metrics import MetricsRegistry
 
 logger = logging.getLogger(__name__)
+MAX_DEDUPE_SEEN: Final = 4096
 
 
 class TelegramNotifier:
@@ -55,7 +58,8 @@ class TelegramNotifier:
         self._metrics = metrics
         self._prefs = prefs
         self._digest = digest
-        self._dedupe_seen: set[str] = set()  # event_id deduplication (in-process)
+        self._delivery_locks: WeakValueDictionary[int, asyncio.Lock] = WeakValueDictionary()
+        self._dedupe_seen: OrderedDict[str, None] = OrderedDict()  # bounded in-process dedupe
 
     async def __call__(
         self,
@@ -154,6 +158,16 @@ class TelegramNotifier:
     async def notify_alert(
         self, *, user_id: int, product_id: int | None, alert: dict[str, Any]
     ) -> bool:
+        """Serialize delivery and throttle accounting for each recipient."""
+        lock = self._delivery_locks.setdefault(user_id, asyncio.Lock())
+        async with lock:
+            return await self._notify_alert_locked(
+                user_id=user_id, product_id=product_id, alert=alert
+            )
+
+    async def _notify_alert_locked(
+        self, *, user_id: int, product_id: int | None, alert: dict[str, Any]
+    ) -> bool:
         """Dispatch an alert respecting the user's effective preferences.
 
         Flow:
@@ -161,9 +175,9 @@ class TelegramNotifier:
           2. Resolve effective prefs.
           3. Mute → drop (``mute`` reason).
           4. Quiet hours → enqueue if digest_mode else drop.
-          5. Throttle exceeded → enqueue if digest_mode else drop.
-          6. Digest mode (no quiet/throttle gate) → enqueue.
-          7. Otherwise immediate send.
+          5. Digest mode → enqueue (does not consume immediate throttle quota).
+          6. Throttle exceeded → enqueue if digest_mode or operational else drop.
+          7. Otherwise immediate send, then persist throttle window.
 
         Returns ``True`` when the alert was sent or queued for a digest, and
         ``False`` when it was dropped. The distinction matters to the caller:
@@ -203,8 +217,17 @@ class TelegramNotifier:
             self._emit_skipped("quiet_hours")
             return False
 
+        if eff is not None and eff.digest_mode and self._digest is not None:
+            return await self._enqueue_for_digest(
+                user_id=user_id,
+                product_id=product_id,
+                alert=alert,
+                event_id=event_id,
+            )
+
+        window: ThrottleWindow | None = None
         if eff is not None and eff.throttle_per_hour is not None and self._prefs is not None:
-            # Load throttle window from prefs row (fetch fresh)
+            # Load throttle window from prefs row (fetch fresh under per-user lock)
             row = await self._prefs._repo.get_notification_prefs(  # noqa: SLF001
                 user_id=user_id, product_id=None
             )
@@ -219,24 +242,6 @@ class TelegramNotifier:
                     )
                 self._emit_skipped("throttle")
                 return False
-            window.record(now)
-            if row is not None:
-                updated = dataclasses.replace(row, throttle_state_json=window.to_json())
-            else:
-                updated = NotificationPrefs(
-                    user_id=user_id,
-                    product_id=None,
-                    throttle_state_json=window.to_json(),
-                )
-            await self._prefs._repo.upsert_notification_prefs(updated)  # noqa: SLF001
-
-        if eff is not None and eff.digest_mode and self._digest is not None:
-            return await self._enqueue_for_digest(
-                user_id=user_id,
-                product_id=product_id,
-                alert=alert,
-                event_id=event_id,
-            )
 
         # A caller that already rendered the message (the scheduler's rich
         # price-drop body) keeps its text; the dict-only fallback is for callers
@@ -249,6 +254,14 @@ class TelegramNotifier:
             disable_preview=operational,
         )
         self._mark_delivered(event_id)
+        if window is not None and self._prefs is not None:
+            window.record(now)
+            try:
+                await self._prefs._repo.set_throttle_state(  # noqa: SLF001
+                    user_id=user_id, throttle_state_json=window.to_json()
+                )
+            except Exception as e:  # noqa: BLE001 — message already delivered
+                logger.warning("Failed to persist throttle window for user %d: %s", user_id, e)
         return True
 
     async def _enqueue_for_digest(
@@ -282,7 +295,10 @@ class TelegramNotifier:
         success for a message nobody ever delivered.
         """
         if event_id is not None:
-            self._dedupe_seen.add(event_id)
+            self._dedupe_seen[event_id] = None
+            self._dedupe_seen.move_to_end(event_id)
+            if len(self._dedupe_seen) > MAX_DEDUPE_SEEN:
+                self._dedupe_seen.popitem(last=False)
 
     def _emit_skipped(self, reason: str) -> None:
         if self._metrics is not None:
@@ -291,15 +307,17 @@ class TelegramNotifier:
 
 def _format_alert_message(alert: dict[str, Any]) -> str:
     """Compose the immediate-send HTML alert body (English)."""
-    name = alert.get("product_name", "Product")
-    old = alert.get("old_price", "?")
-    new = alert.get("new_price", "?")
-    currency = alert.get("currency", "")
-    domain = alert.get("domain", "")
+    raw_old = alert.get("old_price", "?")
+    raw_new = alert.get("new_price", "?")
     try:
-        arrow = "🔻" if float(new) < float(old) else "🔺"
+        arrow = "🔻" if float(raw_new) < float(raw_old) else "🔺"
     except (TypeError, ValueError):
         arrow = "•"
+    name = html.escape(str(alert.get("product_name", "Product")))
+    old = html.escape(str(raw_old))
+    new = html.escape(str(raw_new))
+    currency = html.escape(str(alert.get("currency", "")))
+    domain = html.escape(str(alert.get("domain", "")))
     return f"{arrow} <b>{name}</b>\n{currency}{old} → {currency}{new}\n{domain}"
 
 

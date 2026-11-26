@@ -93,6 +93,11 @@ async def post_init(application: Application[Any, Any, Any, Any, Any, Any]) -> N
     # Wire DigestService so /digest_now and other digest-driven flows can
     # reach it via context.bot_data.
     metrics: MetricsRegistry | None = application.bot_data.get("metrics")
+    stats = await repo.get_stats()
+    products_tracked = int(stats["active_products"])
+    application.bot_data["products_tracked"] = products_tracked
+    if metrics is not None:
+        metrics.products_tracked_total.set(products_tracked)
     application.bot_data["digest_service"] = DigestService(
         repo=repo,
         bot=application.bot,
@@ -270,7 +275,12 @@ async def amain() -> None:
     metrics_server: MetricsServer | None = None
     if config.metrics_enabled:
         host, port = parse_bind(config.prometheus_bind)
-        metrics_server = MetricsServer(host=host, port=port, metrics=metrics)
+        metrics_server = MetricsServer(
+            host=host,
+            port=port,
+            metrics=metrics,
+            before_scrape=lambda: metrics.bot_uptime_seconds.set(time.monotonic() - start_time),
+        )
         await metrics_server.start()
         log.info("metrics_server.start", host=host, port=port)
     else:
@@ -331,10 +341,17 @@ async def amain() -> None:
         if metrics_server is not None:
             await metrics_server.stop()
             log.info("metrics_server.stop")
-        await application.updater.stop()
-        await application.stop()
-        await application.shutdown()
-        await db_conn.close()
+        try:
+            await application.updater.stop()
+            await application.stop()
+            await application.shutdown()
+        finally:
+            try:
+                http_client = application.bot_data.get("http_client")
+                if http_client is not None:
+                    await http_client.aclose()
+            finally:
+                await db_conn.close()
 
 
 def main() -> None:

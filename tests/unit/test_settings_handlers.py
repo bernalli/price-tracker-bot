@@ -421,3 +421,19 @@ def test_timezone_command_uses_cached_set():
     """Sanity check: module-level cache exists and contains a known tz."""
     assert isinstance(_VALID_TIMEZONES, frozenset)
     assert "Europe/Berlin" in _VALID_TIMEZONES
+
+
+@pytest.mark.asyncio
+async def test_mute_overflow_hours_rejected_cleanly():
+    """An astronomically large hour count must be rejected instead of raising OverflowError."""
+    repo = AsyncMock()
+    repo.get_notification_prefs = AsyncMock(return_value=None)
+    repo.upsert_notification_prefs = AsyncMock()
+    update = _build_update(42, ["all", "999999999999"])
+    context = _build_context(["all", "999999999999"], repository=repo)
+
+    await mute_command(update, context)
+
+    repo.upsert_notification_prefs.assert_not_called()
+    update.message.reply_text.assert_awaited_once()
+    assert "too large" in update.message.reply_text.await_args.args[0].lower()

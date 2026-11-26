@@ -1399,3 +1399,25 @@ async def _check_zstd_variants(
             else:
                 page = await fetch_page(url, client)
                 assert page.text == expected.decode()
+
+
+async def test_fetch_primary_calls_detect_block_event_once_per_response(
+    client, monkeypatch
+) -> None:
+    """A terminal 200 response must run block detection once, not twice."""
+    from price_tracker.core.scraper_base import detect_block_event  # noqa: PLC0415
+
+    calls = 0
+
+    def spy(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return detect_block_event(*args, **kwargs)
+
+    monkeypatch.setattr(fetch, "detect_block_event", spy)
+    url = "https://f.example/p/once"
+    with respx.mock(assert_all_called=True) as router:
+        router.get(url).mock(return_value=httpx.Response(200, text="<html>ok</html>"))
+        page = await fetch_page(url, client)
+    assert page.status == 200
+    assert calls == 1

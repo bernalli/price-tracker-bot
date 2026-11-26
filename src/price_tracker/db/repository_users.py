@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+from typing import Final
+
 from price_tracker.core.drop_floor import MIN_DROP_CHOICES
 from price_tracker.db.models import NotificationPrefs, UserRecord
 from price_tracker.db.repository_common import (
@@ -13,6 +16,34 @@ from price_tracker.db.repository_common import (
     _row_to_user,
 )
 from price_tracker.i18n.locales import AVAILABLE_LANGUAGES
+
+_PREFS_COLUMNS: Final[frozenset[str]] = frozenset(
+    {
+        "mute",
+        "mute_until",
+        "digest_mode",
+        "digest_interval_minutes",
+        "quiet_hours_start",
+        "quiet_hours_end",
+        "throttle_per_hour",
+        "timezone",
+        "throttle_state_json",
+    }
+)
+_PREFS_BOOL_COLUMNS: Final[frozenset[str]] = frozenset({"mute", "digest_mode"})
+_PREFS_INHERITED_DEFAULTS: Final[tuple[tuple[str, object], ...]] = (
+    ("digest_mode", 0),
+    ("digest_interval_minutes", 60),
+    ("timezone", "Europe/Rome"),
+)
+
+
+def _encode_pref_value(name: str, value: object) -> object:
+    if name in _PREFS_BOOL_COLUMNS:
+        return int(bool(value))
+    if name == "mute_until" and isinstance(value, datetime):
+        return value.isoformat()
+    return value
 
 
 class UserRepositoryMixin(_RepositoryBase):
@@ -246,6 +277,78 @@ class UserRepositoryMixin(_RepositoryBase):
                     prefs.throttle_state_json,
                 ),
             )
+        await self._conn.commit()
+
+    async def set_throttle_state(self, *, user_id: int, throttle_state_json: str) -> None:
+        """Atomically update only ``throttle_state_json`` on the user's global prefs row.
+
+        Unlike ``upsert_notification_prefs``, this never touches user-controlled preference
+        columns (``mute``, ``digest_mode``, ``quiet_hours_*``, ``timezone``, etc.) even when
+        a settings command commits concurrently.
+        """
+        await self._conn.execute(
+            """
+            INSERT INTO notification_prefs (user_id, product_id, throttle_state_json)
+            VALUES (?, NULL, ?)
+            ON CONFLICT(user_id) WHERE product_id IS NULL DO UPDATE SET
+                throttle_state_json = excluded.throttle_state_json,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (user_id, throttle_state_json),
+        )
+        await self._conn.commit()
+
+    async def patch_notification_prefs(
+        self, *, user_id: int, product_id: int | None, **changes: object
+    ) -> None:
+        """Atomically update only the specified columns of a ``notification_prefs`` row.
+
+        For a new per-product row, ``digest_mode``, ``digest_interval_minutes`` and
+        ``timezone`` inherit from the user's global row inside the same SQL statement; on
+        conflict only the explicitly changed columns and ``updated_at`` are written, so
+        concurrent updates to unrelated columns (including ``throttle_state_json``) survive.
+        """
+        unknown = set(changes) - _PREFS_COLUMNS
+        if unknown:
+            raise TypeError(f"unknown preference fields: {sorted(unknown)}")
+        ordered = sorted(changes)
+
+        if product_id is None:
+            cols = ["user_id", "product_id", *ordered]
+            placeholders = ["?", "NULL", *("?" for _ in ordered)]
+            params: list[object] = [
+                user_id,
+                *(_encode_pref_value(col, changes[col]) for col in ordered),
+            ]
+            set_clauses = [*(f"{col} = excluded.{col}" for col in ordered)]
+            set_clauses.append("updated_at = CURRENT_TIMESTAMP")
+            conflict = "ON CONFLICT(user_id) WHERE product_id IS NULL"
+        else:
+            cols = ["user_id", "product_id"]
+            placeholders = ["?", "?"]
+            params = [user_id, product_id]
+            for inherited_col, default_val in _PREFS_INHERITED_DEFAULTS:
+                if inherited_col not in changes:
+                    cols.append(inherited_col)
+                    placeholders.append(
+                        f"COALESCE((SELECT {inherited_col} FROM notification_prefs "
+                        "WHERE user_id = ? AND product_id IS NULL), ?)"
+                    )
+                    params.extend((user_id, default_val))
+            for col in ordered:
+                cols.append(col)
+                placeholders.append("?")
+                params.append(_encode_pref_value(col, changes[col]))
+            set_clauses = [*(f"{col} = excluded.{col}" for col in ordered)]
+            set_clauses.append("updated_at = CURRENT_TIMESTAMP")
+            conflict = "ON CONFLICT(user_id, product_id)"
+
+        sql = (
+            f"INSERT INTO notification_prefs ({', '.join(cols)}) "
+            f"VALUES ({', '.join(placeholders)}) "
+            f"{conflict} DO UPDATE SET {', '.join(set_clauses)}"
+        )
+        await self._conn.execute(sql, tuple(params))
         await self._conn.commit()
 
     async def is_user_admin(self, user_id: int) -> bool:
