@@ -23,7 +23,7 @@
    param parse_mode="HTML"
    text:
    | ✏️ <b>Nickname per 10</b>
-   | Attuale: None
+   | Attuale: N/D
    |
    | Scrivi il nuovo nickname:
    keyboard:

@@ -6,6 +6,8 @@ user_id as label (privacy + cardinality invariant).
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from aiohttp import web
 from prometheus_client import (
     CONTENT_TYPE_LATEST,
@@ -16,6 +18,9 @@ from prometheus_client import (
     generate_latest,
 )
 from prometheus_client import REGISTRY as DEFAULT_REGISTRY
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 NAMESPACE = "price_tracker"
 
@@ -127,16 +132,20 @@ class MetricsServer:
         host: str = "127.0.0.1",
         port: int = 9090,
         metrics: MetricsRegistry,
+        before_scrape: Callable[[], None] | None = None,
     ) -> None:
         self._host = host
         self._port = port
         self._metrics = metrics
+        self._before_scrape = before_scrape
         self._app = web.Application()
         self._app.router.add_get("/metrics", self._handle_metrics)
         self._runner: web.AppRunner | None = None
         self._site: web.TCPSite | None = None
 
     async def _handle_metrics(self, request: web.Request) -> web.Response:  # noqa: ARG002
+        if self._before_scrape is not None:
+            self._before_scrape()
         body = generate_latest(self._metrics.registry)
         return web.Response(body=body, content_type=CONTENT_TYPE_LATEST.split(";")[0].strip())
 

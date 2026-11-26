@@ -155,8 +155,8 @@ class HealthManager:
                 last_block_reason=reason,
                 last_success_at=current.last_success_at if current else None,
             )
-            self._records[domain] = updated
             await self._repo.upsert_scraper_health(updated)
+            self._records[domain] = updated
             if self._metrics is not None:
                 if current_state != new_state:
                     self._metrics.quarantine_transitions_total.labels(
@@ -181,8 +181,8 @@ class HealthManager:
                 last_block_reason=current.last_block_reason if current else None,
                 last_success_at=now,
             )
-            self._records[domain] = updated
             await self._repo.upsert_scraper_health(updated)
+            self._records[domain] = updated
             if self._metrics is not None:
                 if current_state != QuarantineState.CLOSED:
                     self._metrics.quarantine_transitions_total.labels(

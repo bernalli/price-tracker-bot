@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Final, Protocol, TypeVar
 from zoneinfo import ZoneInfo
 
 from price_tracker.db.models import NotificationPrefs
+from price_tracker.db.repository_users import UserRepositoryMixin
 
 if TYPE_CHECKING:
     from price_tracker.db.repository import Repository
@@ -267,6 +268,9 @@ async def update_prefs(
     unknown = set(changes) - known
     if unknown:
         raise TypeError(f"unknown preference fields: {sorted(unknown)}")
+    if isinstance(store, UserRepositoryMixin):
+        await store.patch_notification_prefs(user_id=user_id, product_id=product_id, **changes)
+        return
     base = await store.get_notification_prefs(user_id=user_id, product_id=product_id)
     if base is None:
         base = NotificationPrefs(user_id=user_id, product_id=product_id)

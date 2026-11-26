@@ -133,7 +133,7 @@ async def test_startup_runs_announcement_after_polling_and_cancels_on_shutdown(
     monkeypatch.setattr(main, "discover_builtin_scrapers", Mock())
     monkeypatch.setattr(main, "discover_dropin_scrapers", Mock())
     monkeypatch.setattr(main, "register_handlers", Mock())
-    monkeypatch.setattr(main, "build_store_client", Mock())
+    monkeypatch.setattr(main, "build_store_client", Mock(return_value=Mock(aclose=AsyncMock())))
     monkeypatch.setattr(main, "sync_command_menus", AsyncMock())
     setup_scheduler = AsyncMock(side_effect=lambda app: events.append("scheduler"))
     monkeypatch.setattr(main, "_setup_scheduler", setup_scheduler)

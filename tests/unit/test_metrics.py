@@ -66,3 +66,19 @@ class TestMetricsRegistry:
         m.bot_uptime_seconds.set(120.0)
         val = fresh_registry.get_sample_value("price_tracker_bot_uptime_seconds")
         assert val == 120.0
+
+    @pytest.mark.asyncio
+    async def test_metrics_server_invokes_before_scrape_hook(self, fresh_registry):
+        from price_tracker.observability.metrics import MetricsServer  # noqa: PLC0415
+
+        m = MetricsRegistry(registry=fresh_registry)
+        m.bot_uptime_seconds.set(0.0)
+        server = MetricsServer(
+            host="127.0.0.1",
+            port=0,
+            metrics=m,
+            before_scrape=lambda: m.bot_uptime_seconds.set(42.5),
+        )
+        resp = await server._handle_metrics(None)  # type: ignore[arg-type]
+        assert isinstance(resp.body, (bytes, bytearray))
+        assert b"price_tracker_bot_uptime_seconds 42.5" in bytes(resp.body)

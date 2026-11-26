@@ -375,15 +375,6 @@ async def _fetch_primary(
             request = next_request
             continue
 
-        # Only a response that will not be followed reaches block detection and
-        # status handling: the body of a followed redirect is never inspected.
-        detect_block_event(
-            status_code=response.status_code,
-            body=text,
-            url=current,
-            retry_after=retry_after_header(response),
-            headers=response.headers,
-        )
         if decode_error is not None:
             raise decode_error
         response.raise_for_status()

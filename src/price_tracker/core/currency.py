@@ -67,7 +67,7 @@ async def _fetch_fresh_rates(client: httpx.AsyncClient) -> dict[str, Any] | None
         r = await public_request(client, "GET", API_URL, timeout=15.0)
         r.raise_for_status()
         data = r.json()
-    except (httpx.HTTPError, ValueError) as e:
+    except ValueError as e:
         logger.warning("FX rates fetch failed: %s", e)
         return None
 
@@ -95,11 +95,21 @@ async def get_rates(
         try:
             cached = json.loads(cached_raw)
             fetched = datetime.fromisoformat(cached["fetched_at"])
+            if fetched.tzinfo is None:
+                fetched = fetched.replace(tzinfo=UTC)
             if datetime.now(UTC) - fetched < timedelta(hours=CACHE_TTL_HOURS):
+                rates = {k: Decimal(str(v)) for k, v in cached["rates"].items()}
                 if metrics is not None:
                     metrics.currency_lookups_total.labels(result="hit").inc()
-                return {k: Decimal(str(v)) for k, v in cached["rates"].items()}
-        except (json.JSONDecodeError, KeyError, ValueError) as e:
+                return rates
+        except (
+            json.JSONDecodeError,
+            KeyError,
+            ValueError,
+            TypeError,
+            ArithmeticError,
+            AttributeError,
+        ) as e:
             logger.warning("Cache parse failed: %s", e)
 
     if metrics is not None:

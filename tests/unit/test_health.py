@@ -214,3 +214,27 @@ async def test_is_quarantined_follows_every_state(repo_mock: AsyncMock) -> None:
         await mgr.record_success("x.com")
         assert mgr.state("x.com") == QuarantineState.CLOSED
         assert mgr.is_quarantined("x.com") is False
+
+
+@pytest.mark.asyncio
+async def test_health_manager_does_not_mutate_memory_when_persistence_fails(
+    repo_mock: AsyncMock,
+) -> None:
+    mgr = HealthManager(repo=repo_mock)
+    await mgr.load()
+    repo_mock.upsert_scraper_health = AsyncMock(side_effect=RuntimeError("db locked"))
+
+    with pytest.raises(RuntimeError, match="db locked"):
+        await mgr.record_block("x.com", reason="HTTP 429")
+    assert mgr.consecutive_blocks("x.com") == 0
+    assert mgr.state("x.com") == QuarantineState.CLOSED
+
+    repo_mock.upsert_scraper_health = AsyncMock(return_value=None)
+    for _ in range(3):
+        await mgr.record_block("x.com", reason="HTTP 429")
+    assert mgr.state("x.com") == QuarantineState.LOCKED_T1
+
+    repo_mock.upsert_scraper_health = AsyncMock(side_effect=RuntimeError("db locked"))
+    with pytest.raises(RuntimeError, match="db locked"):
+        await mgr.record_success("x.com")
+    assert mgr.state("x.com") == QuarantineState.LOCKED_T1

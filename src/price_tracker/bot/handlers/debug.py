@@ -14,6 +14,7 @@ import time
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
+import httpx
 from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler
 
@@ -32,7 +33,9 @@ from price_tracker.bot.messages import _
 from price_tracker.bot.ui.check_status import STORE_REFUSAL_OUTCOMES
 from price_tracker.bot.ui.product_rows import product_row
 from price_tracker.bot.ui.width import truncate_to_width
+from price_tracker.core.exceptions import BlockEvent, ListingGone, ScrapeError
 from price_tracker.core.http_client import build_store_client, public_request
+from price_tracker.core.scheduler_common import configured_interval_minutes
 from price_tracker.core.textlimits import split_message
 from price_tracker.core.url_utils import extract_etld_plus_one
 
@@ -290,16 +293,24 @@ async def debug_url(update: Update, context: ContextTypes.DEFAULT_TYPE, url: str
     if scraper_for_url is None:
         lines.append(_("   ❌ no known scraper for this domain"))
     else:
-        result = await scraper_for_url.scrape(url, client)
-        lines.append(
-            _("   Name: {name}").format(
-                name=_escape_html(truncate_to_width(result.name or "❌", 60))
-            )
-        )
-        if result.price:
-            lines.append(_("   Price: €{price}").format(price=_ext(result.price, 40)))
+        try:
+            result = await scraper_for_url.scrape(url, client)
+        except BlockEvent as e:
+            lines.append(f"   🛡 blocked: {_ext(e, 80)}")
+        except ListingGone as e:
+            lines.append(f"   🚫 listing gone: {_ext(e, 80)}")
+        except (ScrapeError, httpx.HTTPError, ValueError) as e:
+            lines.append(f"   ❌ scraper error: {_ext(e, 80)}")
         else:
-            lines.append(_("   Price: ❌ ({error})").format(error=_ext(result.error or "", 40)))
+            lines.append(
+                _("   Name: {name}").format(
+                    name=_escape_html(truncate_to_width(result.name or "❌", 60))
+                )
+            )
+            if result.price:
+                lines.append(_("   Price: €{price}").format(price=_ext(result.price, 40)))
+            else:
+                lines.append(_("   Price: ❌ ({error})").format(error=_ext(result.error or "", 40)))
 
     await msg.edit_text("\n".join(lines), parse_mode=ParseMode.HTML, disable_web_page_preview=True)
 
@@ -315,7 +326,7 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
     user_stats = await db.get_stats(user_id)
     saved_interval = await db.get_config("check_interval_minutes")
-    interval = int(saved_interval) if saved_interval else config.check_interval_minutes
+    interval = configured_interval_minutes(saved_interval, configured=config.check_interval_minutes)
 
     if interval >= 60:
         hours = interval / 60
